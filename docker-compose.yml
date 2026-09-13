@@ -1,0 +1,31 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: sdk-gaharu-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: sdk_gaharu_sempana
+      MYSQL_USER: sdk_user
+      MYSQL_PASSWORD: sdk_password
+      MYSQL_ROOT_PASSWORD: sdk_root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - sdk_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psdk_root_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer:latest
+    container_name: sdk-gaharu-adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      - mysql
+
+volumes:
+  sdk_mysql_data:

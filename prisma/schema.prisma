@@ -1,0 +1,238 @@
+// Schema ini dimodelkan dari data yang ada di mockup Claude Design
+// (Sistem_Data_Keuangan_Gaharu_Sempana_dc.html) + keputusan yang sudah
+// disepakati di sesi sebelumnya (5 role, akses entity many-to-many, dst).
+// Ini pondasi awal — akan ada penyesuaian saat halaman-halaman lain
+// (Piutang, Pajak, dsb) mulai diimplementasi.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN // "ceo" di mockup
+  MANAJER_KEUANGAN
+  STAF_KEUANGAN
+  MANAGER_ADMIN // hanya akses halaman notifikasi termin
+  ADMIN_SIDAMON // belum login ke sistem ini, disiapkan untuk fase trial nanti
+}
+
+enum UserStatus {
+  PENDING // menunggu approval Manajer Keuangan (alur self-registration)
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  passwordHash  String
+  role          Role?
+  status        UserStatus @default(PENDING)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  entityAccess     UserEntityAccess[]
+  transactions     Transaction[]        @relation("TransactionStaff")
+  jenisInputBuatan JenisInputTransaksi[] @relation("JenisInputCreator")
+  dokumenUpload    Dokumen[]             @relation("DokumenUploader")
+  activityLogs     ActivityLog[]         @relation("ActivityActor")
+  terminAudits     Termin[]              @relation("TerminAuditor")
+}
+
+// 4 entitas inti + 1 entitas "Umum" (ruang transit KSO / pinjam bendera).
+// Satu user bisa punya akses ke banyak entity (many-to-many, terpisah dari role).
+model Entity {
+  id         String   @id @default(cuid())
+  key        String   @unique // "gaharu" | "kencana" | "tataring" | "ciptaAsri" | "umum"
+  name       String
+  legalName  String
+  colorHex   String
+  isUmum     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  access       UserEntityAccess[]
+  projects     Project[]
+  transactions Transaction[]
+  loadingDock  LoadingDockTransaksi[]
+}
+
+model UserEntityAccess {
+  userId   String
+  entityId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entityId])
+}
+
+model Project {
+  id            String   @id @default(cuid())
+  entityId      String
+  code          String   @unique // contoh: GHR-091
+  name          String
+  contractValue Decimal  @db.Decimal(18, 2)
+  spend         Decimal  @db.Decimal(18, 2)
+  createdAt     DateTime @default(now())
+
+  entity  Entity   @relation(fields: [entityId], references: [id])
+  termin  Termin[]
+  jurnal  Transaction[]
+
+  // profit dihitung di query layer (contractValue - spend), tidak disimpan
+}
+
+enum TerminStatus {
+  ON_TRACK
+  AT_RISK
+  NEEDS_AUDIT
+}
+
+model Termin {
+  id         String       @id @default(cuid())
+  projectId  String
+  name       String
+  percentage Int
+  status     TerminStatus @default(ON_TRACK)
+  auditedAt  DateTime?
+  auditedById String?
+  createdAt  DateTime     @default(now())
+
+  project    Project @relation(fields: [projectId], references: [id])
+  auditedBy  User?   @relation("TerminAuditor", fields: [auditedById], references: [id])
+}
+
+enum CoaKategori {
+  PENDAPATAN
+  BEBAN
+  ASET
+  KEWAJIBAN
+  MODAL
+}
+
+model CoaAccount {
+  id        String      @id @default(cuid())
+  code      String      @unique
+  name      String
+  kategori  CoaKategori
+  createdAt DateTime    @default(now())
+
+  transactions Transaction[]
+}
+
+// Jenis input transaksi yang bisa ditambah langsung oleh Staf Keuangan
+// tanpa approval (Super Admin & Manajer hanya dapat notifikasi setelahnya).
+model JenisInputTransaksi {
+  id             String   @id @default(cuid())
+  key            String   @unique // "kasKecil" | "kasBesar" | "bankBuku" | dst (custom)
+  nama           String
+  extraFieldsJson Json?
+  active         Boolean  @default(true)
+  createdById    String?  // null = "Bawaan Sistem"
+  createdAt      DateTime @default(now())
+
+  createdBy    User?         @relation("JenisInputCreator", fields: [createdById], references: [id])
+  transactions Transaction[]
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  entityId      String
+  jenisInputId  String
+  tanggal       DateTime
+  noBukti       String
+  keterangan    String
+  projectId     String?
+  coaAccountId  String?
+  debit         Decimal  @db.Decimal(18, 2) @default(0)
+  kredit        Decimal  @db.Decimal(18, 2) @default(0)
+  saldoSetelah  Decimal  @db.Decimal(18, 2)
+  extraFieldsJson Json?
+  staffId       String
+  createdAt     DateTime @default(now())
+
+  entity     Entity               @relation(fields: [entityId], references: [id])
+  jenisInput JenisInputTransaksi  @relation(fields: [jenisInputId], references: [id])
+  project    Project?             @relation(fields: [projectId], references: [id])
+  coaAccount CoaAccount?          @relation(fields: [coaAccountId], references: [id])
+  staff      User                 @relation("TransactionStaff", fields: [staffId], references: [id])
+}
+
+enum LoadingDockStatus {
+  MENUNGGU_ALOKASI
+  DI_LOADING_DOCK
+  DIALOKASI
+}
+
+// Transaksi KSO / pinjam bendera di entitas Umum, direview bulanan oleh Manajer Keuangan.
+model LoadingDockTransaksi {
+  id         String            @id @default(cuid())
+  entityId   String
+  nama       String
+  total      Decimal           @db.Decimal(18, 2)
+  status     LoadingDockStatus @default(MENUNGGU_ALOKASI)
+  reviewedAt DateTime?
+  createdAt  DateTime          @default(now())
+
+  entity Entity @relation(fields: [entityId], references: [id])
+}
+
+enum DokumenKategori {
+  SOP
+  DOKUMEN_PENDUKUNG
+}
+
+model Dokumen {
+  id           String          @id @default(cuid())
+  judul        String
+  kategori     DokumenKategori
+  fileUrl      String
+  uploadedById String
+  createdAt    DateTime        @default(now())
+
+  uploadedBy User @relation("DokumenUploader", fields: [uploadedById], references: [id])
+}
+
+enum NotifikasiType {
+  PENDAFTARAN
+  LOADING_DOCK
+  TERMIN_AUDIT
+  TERMIN_BARU
+  PROGRES_80
+  PERUBAHAN_CLOSED
+  BACKDATE
+  JENIS_INPUT_BARU
+}
+
+// Notifikasi ditarget ke role (bukan per-user), sesuai perilaku di mockup
+// (notifAll untuk Super Admin, notifAllManajer untuk Manajer Keuangan).
+model Notifikasi {
+  id         String         @id @default(cuid())
+  type       NotifikasiType
+  targetRole Role
+  text       String
+  read       Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+}
+
+enum LogCategory {
+  USER_ACTIVITY // auto-terhapus tiap 30 hari
+  FINANCIAL_CHANGE // disimpan permanen 10 tahun
+}
+
+model ActivityLog {
+  id         String      @id @default(cuid())
+  actorId    String
+  action     String
+  category   LogCategory
+  detail     Json?
+  createdAt  DateTime    @default(now())
+
+  actor User @relation("ActivityActor", fields: [actorId], references: [id])
+}

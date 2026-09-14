@@ -58,7 +58,7 @@ export function KasScreenClient({
     <>
       <div className="flex items-center justify-between flex-wrap gap-3.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-white">
+          <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-surface-card">
             {saldoLabel}: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
           </div>
 
@@ -71,7 +71,7 @@ export function KasScreenClient({
                   onClick={() => switchRekening(r.id)}
                   className={`px-3 py-1.5 rounded-pill text-[12px] font-bold transition-colors ${
                     r.id === selectedRekeningId
-                      ? "bg-white text-navy-text shadow-sm"
+                      ? "bg-surface-card text-navy-text shadow-sm"
                       : "text-muted-strong hover:text-navy-text"
                   }`}
                 >
@@ -134,7 +134,7 @@ export function KasScreenClient({
                     <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                       {r.keterangan}
                       {r.rekening && (
-                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md">
                           {r.rekening}
                         </span>
                       )}

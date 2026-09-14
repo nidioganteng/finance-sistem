@@ -60,9 +60,9 @@ export default async function JurnalPage({
 
       {/* Warning balance — muncul kalau Total Debit ≠ Total Kredit */}
       {!isBalanced && rows.length > 0 && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-[14px] px-4 py-3.5">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
-          <div className="text-[13px] text-red-700">
+          <div className="text-[13px] text-red-700 dark:text-red-400">
             <span className="font-bold">Jurnal tidak seimbang!</span> Total Debit dan Kredit berbeda sebesar{" "}
             <span className="font-bold">Rp {selisih.toLocaleString("id-ID")}</span>. Kemungkinan ada transaksi lama
             yang belum punya entri pasangan. Periksa kembali data atau hubungi Manajer Keuangan.
@@ -81,7 +81,7 @@ export default async function JurnalPage({
         />
       </div>
 
-      <div className="bg-white border border-black/[.06] rounded-[20px] p-5 overflow-x-auto">
+      <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
         <table className="w-full text-sm min-w-[860px]">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
@@ -166,14 +166,14 @@ export default async function JurnalPage({
                 </td>
                 <td
                   className={`py-3.5 px-1.5 text-[13.5px] font-extrabold text-right tabular-nums ${
-                    isBalanced ? "text-navy-text" : "text-red-600"
+                    isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"
                   }`}
                 >
                   {totalDebitFmt}
                 </td>
                 <td
                   className={`py-3.5 px-1.5 text-[13.5px] font-extrabold text-right tabular-nums ${
-                    isBalanced ? "text-navy-text" : "text-red-600"
+                    isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"
                   }`}
                 >
                   {totalKreditFmt}

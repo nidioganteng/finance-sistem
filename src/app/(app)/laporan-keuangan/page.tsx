@@ -55,7 +55,7 @@ export default async function LaporanKeuanganPage({
       <div className="print:hidden"><LaporanKeuanganTabs currentTab={tab} /></div>
 
       {!hasData && (
-        <div className="bg-white rounded-[20px] border border-black/[.06] py-16 text-center">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
           <div className="text-sm font-semibold text-muted-stronger mb-1">Tidak ada data</div>
           <p className="text-[13px] text-muted">Belum ada transaksi dengan akun COA untuk periode ini.</p>
         </div>
@@ -89,9 +89,9 @@ function NeracaTab({
       </div>
 
       {!data.neracaBalanced && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-[14px] px-4 py-3.5">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
-          <div className="text-[13px] text-red-700">
+          <div className="text-[13px] text-red-700 dark:text-red-400">
             <span className="font-bold">Neraca tidak seimbang!</span> Total Aktiva ({data.totalAsetFmt}) ≠ Total Pasiva ({data.totalPassivaFmt}).
             Periksa entri akun COA untuk menemukan sumber ketidakseimbangan.
           </div>
@@ -100,7 +100,7 @@ function NeracaTab({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Aktiva */}
-        <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
           <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">AKTIVA</div>
           <table className="w-full text-sm">
             <tbody>
@@ -117,7 +117,7 @@ function NeracaTab({
             <tfoot>
               <tr className="border-t-2 border-border">
                 <td className="py-3.5 px-6 font-extrabold text-navy-text">Total Aktiva</td>
-                <td className={`py-3.5 px-6 text-right tabular-nums font-extrabold ${data.neracaBalanced ? "text-navy-text" : "text-red-600"}`}>
+                <td className={`py-3.5 px-6 text-right tabular-nums font-extrabold ${data.neracaBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                   {data.totalAsetFmt}
                 </td>
               </tr>
@@ -128,7 +128,7 @@ function NeracaTab({
         {/* Pasiva */}
         <div className="flex flex-col gap-4">
           {/* Kewajiban */}
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">KEWAJIBAN</div>
             <table className="w-full text-sm">
               <tbody>
@@ -150,7 +150,7 @@ function NeracaTab({
           </div>
 
           {/* Modal */}
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">MODAL</div>
             <table className="w-full text-sm">
               <tbody>
@@ -161,7 +161,7 @@ function NeracaTab({
                   </tr>
                 ))}
                 {/* Laba Tahun Berjalan — angka yang SAMA dari tab Laba Rugi */}
-                <tr className="border-b border-surface-subtle bg-green-50/40">
+                <tr className="border-b border-surface-subtle bg-green-50/40 dark:bg-green-500/10">
                   <td className="py-2.5 px-6 text-[13px] font-semibold text-muted-stronger">
                     Laba Tahun Berjalan {year}
                   </td>
@@ -181,14 +181,14 @@ function NeracaTab({
           </div>
 
           {/* Total Pasiva */}
-          <div className={`px-6 py-4 rounded-[16px] border-2 ${data.neracaBalanced ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+          <div className={`px-6 py-4 rounded-[16px] border-2 ${data.neracaBalanced ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10" : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"}`}>
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-[13px] text-navy-text">Total Kewajiban + Modal</span>
-              <span className={`font-extrabold tabular-nums ${data.neracaBalanced ? "text-navy-text" : "text-red-600"}`}>
+              <span className={`font-extrabold tabular-nums ${data.neracaBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                 {data.totalPassivaFmt}
               </span>
             </div>
-            <div className={`text-[12px] mt-1 font-semibold ${data.neracaBalanced ? "text-green-700" : "text-red-700"}`}>
+            <div className={`text-[12px] mt-1 font-semibold ${data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
               {data.neracaBalanced ? "✓ Neraca seimbang" : "✗ Neraca tidak seimbang"}
             </div>
           </div>
@@ -219,7 +219,7 @@ function LabaRugiTab({
       </div>
 
       {/* Pendapatan */}
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">PENDAPATAN USAHA</div>
         <table className="w-full text-sm">
           <tbody>
@@ -234,7 +234,7 @@ function LabaRugiTab({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-border-soft bg-green-50/50">
+            <tr className="border-t border-border-soft bg-green-50/50 dark:bg-green-500/10">
               <td className="py-3 px-6 font-extrabold text-navy-text">Total Pendapatan Usaha</td>
               <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-green">{data.totalPendapatanFmt}</td>
             </tr>
@@ -243,7 +243,7 @@ function LabaRugiTab({
       </div>
 
       {/* Beban */}
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">BEBAN USAHA</div>
         <table className="w-full text-sm">
           <tbody>
@@ -258,7 +258,7 @@ function LabaRugiTab({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-border-soft bg-red-50/50">
+            <tr className="border-t border-border-soft bg-red-50/50 dark:bg-red-500/10">
               <td className="py-3 px-6 font-extrabold text-navy-text">Total Beban Usaha</td>
               <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-red">{data.totalBebanFmt}</td>
             </tr>
@@ -267,7 +267,7 @@ function LabaRugiTab({
       </div>
 
       {/* Laba/Rugi Bersih */}
-      <div className={`px-6 py-5 rounded-[20px] border-2 ${data.labaBersihPositive ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+      <div className={`px-6 py-5 rounded-[20px] border-2 ${data.labaBersihPositive ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10" : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"}`}>
         <div className="text-[12px] font-semibold text-muted-stronger mb-1">
           {data.labaBersihPositive ? "LABA BERSIH" : "RUGI BERSIH"}
         </div>
@@ -308,15 +308,15 @@ function ArusKasTab({
       </div>
 
       {!data.arusKasBalanced && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-[14px] px-4 py-3.5">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
-          <div className="text-[13px] text-red-700">
+          <div className="text-[13px] text-red-700 dark:text-red-400">
             <span className="font-bold">Arus Kas tidak seimbang!</span> Kas Akhir Periode ({data.kasAkhirFmt}) ≠ total saldo Kas+Bank di Neraca ({data.kasAsetFmt}).
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <table className="w-full text-sm">
           <tbody>
             {/* ── Aktivitas Operasi ── */}
@@ -416,9 +416,9 @@ function ArusKasTab({
                 {data.kasAwal === 0 ? "—" : data.kasAwalFmt}
               </td>
             </tr>
-            <tr className={`border-t-2 ${data.arusKasBalanced ? "border-green-400 bg-green-50/50" : "border-red-400 bg-red-50/50"}`}>
+            <tr className={`border-t-2 ${data.arusKasBalanced ? "border-green-400 dark:border-green-500/40 bg-green-50/50 dark:bg-green-500/10" : "border-red-400 dark:border-red-500/40 bg-red-50/50 dark:bg-red-500/10"}`}>
               <td className="py-4 px-6 font-extrabold text-navy-text">Kas & Setara Kas Akhir Periode</td>
-              <td className={`py-4 px-6 text-right tabular-nums font-extrabold text-[15px] ${data.arusKasBalanced ? "text-navy-text" : "text-red-600"}`}>
+              <td className={`py-4 px-6 text-right tabular-nums font-extrabold text-[15px] ${data.arusKasBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                 {data.kasAkhirFmt}
               </td>
             </tr>
@@ -427,7 +427,7 @@ function ArusKasTab({
       </div>
 
       {data.arusKasBalanced && (
-        <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-[12px] text-green-700 font-semibold">
+        <div className="px-4 py-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 text-[12px] text-green-700 dark:text-green-400 font-semibold">
           ✓ Kas Akhir Periode sama dengan total saldo Kas+Bank di Neraca — laporan konsisten.
         </div>
       )}

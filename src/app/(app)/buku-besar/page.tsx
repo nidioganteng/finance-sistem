@@ -87,9 +87,9 @@ async function RekapView({
   return (
     <div className="flex flex-col gap-4">
       {!isBalanced && rows.length > 0 && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-[14px] px-4 py-3.5">
+        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
-          <div className="text-[13px] text-red-700">
+          <div className="text-[13px] text-red-700 dark:text-red-400">
             <span className="font-bold">Buku Besar tidak seimbang!</span> Total Debet dan Kredit
             seluruh akun berbeda sebesar{" "}
             <span className="font-bold">Rp {selisih.toLocaleString("id-ID")}</span>. Periksa Jurnal Umum
@@ -98,7 +98,7 @@ async function RekapView({
         </div>
       )}
 
-      <div className="bg-white border border-black/[.06] rounded-[20px] overflow-hidden">
+      <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
@@ -161,10 +161,10 @@ async function RekapView({
                     <span className="ml-2 text-[11px] font-bold text-red-500">⚠ tidak seimbang</span>
                   )}
                 </td>
-                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold ${isBalanced ? "text-navy-text" : "text-red-600"}`}>
+                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                   {totalSemuaDebetFmt}
                 </td>
-                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold ${isBalanced ? "text-navy-text" : "text-red-600"}`}>
+                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                   {totalSemuaKreditFmt}
                 </td>
                 <td className="py-3.5 px-5" />
@@ -193,7 +193,7 @@ async function DrilldownView({
 
   if (!data) {
     return (
-      <div className="bg-white rounded-[20px] border border-black/[.06] py-16 text-center">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
         <p className="text-sm text-muted">Akun tidak ditemukan.</p>
         <a href={backHref} className="text-brand text-[13px] font-bold mt-2 inline-block">← Kembali</a>
       </div>
@@ -219,7 +219,7 @@ async function DrilldownView({
         </span>
       </div>
 
-      <div className="bg-white border border-black/[.06] rounded-[20px] overflow-hidden">
+      <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">

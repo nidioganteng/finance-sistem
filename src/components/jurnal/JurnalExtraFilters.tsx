@@ -53,7 +53,7 @@ export function JurnalExtraFilters({
       <select
         value={currentBulan}
         onChange={(e) => push({ bulan: e.target.value })}
-        className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-white focus:outline-none"
+        className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
       >
         <option value="">Semua Bulan</option>
         {MONTH_OPTIONS.map((o) => (
@@ -67,7 +67,7 @@ export function JurnalExtraFilters({
       <select
         value={currentAkunId}
         onChange={(e) => push({ akunId: e.target.value })}
-        className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-white focus:outline-none max-w-[220px]"
+        className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none max-w-[220px]"
       >
         <option value="">Semua Akun</option>
         {coaList.map((c) => (

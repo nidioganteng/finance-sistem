@@ -141,7 +141,7 @@ export function PiutangClient({
         <>
           {/* Kartu ringkasan */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-[16px] border border-black/[.06] p-5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
               <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
                 Total Nilai Kontrak Aktif
               </div>
@@ -150,7 +150,7 @@ export function PiutangClient({
               </div>
               <div className="text-[12px] text-muted mt-0.5">{summary.jumlahProyek} proyek</div>
             </div>
-            <div className="bg-white rounded-[16px] border border-black/[.06] p-5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
               <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
                 Total Termin Tertagih
               </div>
@@ -163,7 +163,7 @@ export function PiutangClient({
                   : "—"}
               </div>
             </div>
-            <div className="bg-white rounded-[16px] border border-black/[.06] p-5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
               <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
                 Sisa Piutang Belum Tertagih
               </div>
@@ -176,11 +176,11 @@ export function PiutangClient({
 
           {/* Tabel proyek dengan termin expandable */}
           {projectList.length === 0 ? (
-            <div className="bg-white rounded-[20px] border border-black/[.06] py-16 text-center text-sm text-muted">
+            <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center text-sm text-muted">
               Belum ada proyek untuk entitas ini.
             </div>
           ) : (
-            <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+            <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-surface-hover text-left">
@@ -299,7 +299,7 @@ export function PiutangClient({
                                         handleStatusChange(t.id, e.target.value as TerminStatus)
                                       }
                                       disabled={isPending}
-                                      className="px-2 py-1 rounded-lg border border-border text-[11.5px] bg-white"
+                                      className="px-2 py-1 rounded-lg border border-border text-[11.5px] bg-surface-input text-navy-text"
                                     >
                                       <option value="ON_TRACK">On Track</option>
                                       <option value="AT_RISK">At Risk</option>

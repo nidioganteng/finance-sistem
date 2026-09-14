@@ -52,3 +52,59 @@ export async function getRecentNotifications(role: Role) {
 export async function getUnreadNotificationCount(role: Role) {
   return prisma.notifikasi.count({ where: { targetRole: role, read: false } });
 }
+
+export async function getGrupPiutangMetrics() {
+  const terminPerluPerhatian = await prisma.termin.count({
+    where: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } },
+  });
+
+  // Total piutang belum teragih = contractValue - spend untuk proyek yang ada termin bermasalah
+  const projekBermasalah = await prisma.project.findMany({
+    where: { termin: { some: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } } } },
+    select: { contractValue: true, spend: true },
+  });
+  const totalPiutangBelumTeragih = projekBermasalah.reduce(
+    (s, p) => s + Math.max(0, Number(p.contractValue) - Number(p.spend)),
+    0
+  );
+
+  return { terminPerluPerhatian, totalPiutangBelumTeragih };
+}
+
+const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+export async function getMonthlyChartData(entityKeys: string[], year: number) {
+  const start = new Date(`${year}-01-01`);
+  const end = new Date(`${year + 1}-01-01`);
+
+  const rows = await prisma.transaction.findMany({
+    where: {
+      entity: { key: { in: entityKeys } },
+      tanggal: { gte: start, lt: end },
+    },
+    select: {
+      tanggal: true,
+      debit: true,
+      entity: { select: { key: true } },
+    },
+  });
+
+  return BULAN.map((month, i) => {
+    const entry: Record<string, string | number> = { month };
+    for (const key of entityKeys) {
+      entry[key] = rows
+        .filter((r) => r.entity.key === key && new Date(r.tanggal).getMonth() === i)
+        .reduce((s, r) => s + Number(r.debit), 0);
+    }
+    return entry;
+  });
+}
+
+export function formatMiliar(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1e9) return sign + "Rp " + (abs / 1e9).toFixed(1).replace(".", ",") + " M";
+  if (abs >= 1e6) return sign + "Rp " + (abs / 1e6).toFixed(1).replace(".", ",") + " JT";
+  if (abs >= 1e3) return sign + "Rp " + (abs / 1e3).toFixed(1).replace(".", ",") + " rb";
+  return formatRupiah(n);
+}

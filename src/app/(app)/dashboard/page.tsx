@@ -1,17 +1,33 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getAccessibleEntities, getRecentNotifications, getUnreadNotificationCount, formatRupiah } from "@/lib/dashboard-data";
+import {
+  getAccessibleEntities,
+  getRecentNotifications,
+  getUnreadNotificationCount,
+  getGrupPiutangMetrics,
+  getMonthlyChartData,
+  formatRupiah,
+  formatMiliar,
+} from "@/lib/dashboard-data";
 import { canViewGrupAggregate, roleLabel } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { UserBadge, NotifBell } from "@/components/layout/UserBadge";
-import { EntityCard } from "@/components/dashboard/EntityCard";
+import { EntityCard, EntityCardCompact } from "@/components/dashboard/EntityCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import {
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  AlertTriangle,
+  CalendarClock,
+} from "lucide-react";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { entity?: string };
+  searchParams: { entity?: string; chartYear?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
@@ -29,11 +45,20 @@ export default async function DashboardPage({
   const showingGrup = canGrup && !selectedKey;
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
-  const notifications = await getRecentNotifications(role);
-  const unreadCount = await getUnreadNotificationCount(role);
+  const currentYear = new Date().getFullYear();
+  const chartYear = searchParams.chartYear ? parseInt(searchParams.chartYear) : currentYear;
+
+  const [notifications, unreadCount, piutangMetrics, monthlyData] = await Promise.all([
+    getRecentNotifications(role),
+    getUnreadNotificationCount(role),
+    showingGrup ? getGrupPiutangMetrics() : Promise.resolve(null),
+    showingGrup ? getMonthlyChartData(entityKeys, chartYear) : Promise.resolve([]),
+  ]);
 
   const rightSlot = (
     <>
+      <ThemeToggle />
+      <NotifBell unreadCount={unreadCount} />
       {canGrup && (
         <EntitySwitcher
           entities={entities.map((e) => ({ key: e.key, name: e.name }))}
@@ -49,24 +74,40 @@ export default async function DashboardPage({
         />
       )}
       <UserBadge name={name} role={role} />
-      <NotifBell unreadCount={unreadCount} />
     </>
+  );
+
+  // Hitung agregat grup
+  const totalRevenue = entities.reduce((s, e) => s + e.revenue, 0);
+  const totalSpend = entities.reduce((s, e) => s + e.spend, 0);
+  const totalProfit = totalRevenue - totalSpend;
+
+  // Pisahkan entitas utama dan Umum
+  const mainEntities = entities.filter((e) => !e.isUmum);
+  const umumEntity = entities.find((e) => e.isUmum);
+
+  const welcomeBanner = (
+    <div className="relative overflow-hidden rounded-[20px] px-10 py-8 flex items-center justify-between gap-6 bg-gradient-to-br from-[#2f5fe0] via-[#6a4de0] to-[#9145d6]">
+      <div className="relative z-10">
+        <div className="text-2xl font-extrabold text-white">Selamat Datang, {name}! 👋</div>
+        <div className="text-[13.5px] text-white/85 mt-2 flex items-center gap-2.5 flex-wrap">
+          Sistem Data Keuangan Gaharu Sempana Group, Anda masuk sebagai
+          <span className="bg-white/20 px-3 py-1 rounded-full font-bold text-[11.5px] text-white tracking-wide">
+            {roleLabel(role)}
+          </span>
+        </div>
+      </div>
+      <div className="flex-none w-16 h-16 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="8" r="4" fill="rgba(255,255,255,0.8)" />
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="rgba(255,255,255,0.8)" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
   );
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-[20px] px-10 py-8 flex items-center justify-between gap-6 bg-gradient-to-br from-[#2f5fe0] via-[#6a4de0] to-[#9145d6]">
-        <div className="relative z-10">
-          <div className="text-2xl font-extrabold text-white">Selamat Datang, {name}! 👋</div>
-          <div className="text-[13.5px] text-white/85 mt-2 flex items-center gap-2.5 flex-wrap">
-            Sistem Data Keuangan Gaharu Sempana Group, Anda masuk sebagai
-            <span className="bg-white/20 px-3 py-1 rounded-full font-bold text-[11.5px] text-white tracking-wide">
-              {roleLabel(role)}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <PageHeader
         title={showingGrup ? "Master Dashboard" : `Dashboard ${selectedEntity?.name ?? ""}`}
         subtitle={
@@ -74,8 +115,14 @@ export default async function DashboardPage({
             ? "Ringkasan keuangan seluruh grup perusahaan"
             : `Ringkasan performa keuangan ${selectedEntity?.legalName ?? ""}`
         }
-        rightSlot={rightSlot}
+        rightSlot={
+          <div className="flex items-center gap-2.5">
+            {rightSlot}
+          </div>
+        }
       />
+
+      {welcomeBanner}
 
       {isStaff && (
         <span className="text-[10.5px] font-bold text-muted-faint bg-surface-hover px-2.5 py-1 rounded-full w-fit">
@@ -83,27 +130,103 @@ export default async function DashboardPage({
         </span>
       )}
 
+      {/* Grup / Master Dashboard view */}
       {showingGrup ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {entities.map((e) => (
-              <EntityCard
+          {/* 5 KPI cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+            <div className="bg-white rounded-[16px] border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <TrendingUp size={16} className="text-blue-500" />
+                </div>
+                <span className="text-[11.5px] font-semibold text-muted">Total Pendapatan Grup</span>
+              </div>
+              <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalRevenue)}</div>
+            </div>
+
+            <div className="bg-white rounded-[16px] border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
+                  <TrendingDown size={16} className="text-slate-400" />
+                </div>
+                <span className="text-[11.5px] font-semibold text-muted">Total Pengeluaran Grup</span>
+              </div>
+              <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
+            </div>
+
+            <div className="bg-white rounded-[16px] border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+                  <BarChart3 size={16} className="text-status-green" />
+                </div>
+                <span className="text-[11.5px] font-semibold text-muted">Total Laba Bersih Grup</span>
+              </div>
+              <div className={`text-[22px] font-extrabold tabular-nums ${totalProfit >= 0 ? "text-status-green" : "text-status-red"}`}>
+                {totalProfit < 0 ? "-" : ""}{formatMiliar(Math.abs(totalProfit))}
+              </div>
+            </div>
+
+            <div className={`rounded-[16px] border p-4 ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-50 border-yellow-200" : "bg-white border-border"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-100" : "bg-slate-50"}`}>
+                  <AlertTriangle size={16} className={(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-600" : "text-slate-400"} />
+                </div>
+                <span className="text-[11.5px] font-semibold text-muted">Piutang Perlu Perhatian</span>
+              </div>
+              <div className={`text-[22px] font-extrabold tabular-nums ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-700" : "text-navy-text"}`}>
+                {piutangMetrics?.terminPerluPerhatian ?? 0}
+                <span className="text-[13px] font-semibold ml-1 text-muted">termin</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[16px] border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <CalendarClock size={16} className="text-purple-500" />
+                </div>
+                <span className="text-[11.5px] font-semibold text-muted">Total Piutang Belum Teragih</span>
+              </div>
+              <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
+                {formatMiliar(piutangMetrics?.totalPiutangBelumTeragih ?? 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Entity cards compact — semua entitas 1 baris */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+            {mainEntities.map((e) => (
+              <EntityCardCompact
                 key={e.key}
                 entityKey={e.key}
                 name={e.name}
                 legalName={e.legalName}
                 colorHex={e.colorHex}
                 revenue={e.revenue}
-                spend={e.spend}
                 profit={e.profit}
               />
             ))}
+            {umumEntity && (
+              <EntityCardCompact
+                entityKey={umumEntity.key}
+                name={umumEntity.name}
+                legalName={umumEntity.legalName}
+                colorHex={umumEntity.colorHex}
+                revenue={umumEntity.revenue}
+                profit={umumEntity.profit}
+                isUmum
+              />
+            )}
           </div>
 
           <RevenueChart
-            data={entities.map((e) => ({ name: e.name, revenue: e.revenue, spend: e.spend, color: e.colorHex }))}
+            monthlyData={monthlyData}
+            entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))}
+            year={chartYear}
+            currentYear={currentYear}
           />
 
+          {/* Notifikasi terbaru */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Notifikasi Terbaru</div>
             {notifications.length === 0 ? (

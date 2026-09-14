@@ -5,6 +5,7 @@ import type { Config } from "tailwindcss";
 // tetap konsisten secara visual dengan desain aslinya.
 const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
+  darkMode: "class",
   theme: {
     extend: {
       fontFamily: {

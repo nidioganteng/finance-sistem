@@ -26,10 +26,6 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
     },
-    {
-      title: "Pengaturan",
-      items: [{ label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" }],
-    },
   ],
   MANAJER_KEUANGAN: [
     {

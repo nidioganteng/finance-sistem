@@ -37,6 +37,7 @@
 }
 
 :root.dark {
+  --color-navy: 65 96 158;
   --color-navy-text: 241 245 249;
   --color-surface-page: 10 14 24;
   --color-surface-card: 17 24 39;

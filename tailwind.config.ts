@@ -29,8 +29,14 @@ const config: Config = {
       },
       colors: {
         navy: {
-          DEFAULT: "#0f1729", // sidebar aktif / tombol utama — sengaja tetap gelap di kedua tema
-          text: withOpacity("--color-navy-text"), // warna teks judul
+          // Sidebar aktif / tombol utama. Nilainya beda per tema (lewat CSS
+          // variable) — di light mode navy nyaris hitam supaya kontras sama
+          // card putih, tapi kalau dipakai sama persis di dark mode dia
+          // nyaris nggak kelihatan karena background card/sidebar gelapnya
+          // udah deket banget sama navy itu sendiri. Makanya nilai dark-nya
+          // dibikin lebih terang (lihat :root.dark di globals.css).
+          DEFAULT: withOpacity("--color-navy"),
+          text: withOpacity("--color-navy-text"),
         },
         brand: {
           DEFAULT: "#3b6fed",

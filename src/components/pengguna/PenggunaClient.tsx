@@ -18,9 +18,9 @@ type UserItem = {
 };
 
 const STATUS_BADGE: Record<UserStatus, string> = {
-  PENDING: "bg-yellow-100 text-yellow-700",
-  ACTIVE: "bg-green-100 text-green-700",
-  INACTIVE: "bg-gray-100 text-gray-500",
+  PENDING: "bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
+  ACTIVE: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+  INACTIVE: "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400",
 };
 const STATUS_LABEL: Record<UserStatus, string> = {
   PENDING: "Menunggu",
@@ -117,7 +117,7 @@ export function PenggunaClient({
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="px-4 py-3 rounded-xl bg-red-50 text-status-red text-sm">{error}</div>
+        <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
 
       <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
@@ -134,7 +134,7 @@ export function PenggunaClient({
         ))}
       </div>
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left">
@@ -245,7 +245,7 @@ export function PenggunaClient({
                             <select
                               value={selectedRole}
                               onChange={(e) => setSelectedRole(e.target.value as Role)}
-                              className="px-3 py-2 rounded-xl border border-border text-sm bg-white"
+                              className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card"
                             >
                               {ROLE_OPTS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                             </select>

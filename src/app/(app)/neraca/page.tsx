@@ -52,13 +52,13 @@ export default async function NeracaPage({
       </div>
 
       {data.aset.length === 0 && data.kewajiban.length === 0 && data.modal.length === 0 ? (
-        <div className="bg-white rounded-[20px] border border-black/[.06] py-16 text-center">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
           <div className="text-sm font-semibold text-muted-stronger mb-1">Tidak ada data</div>
           <p className="text-[13px] text-muted">Isi data COA (Aset/Kewajiban/Modal) dan transaksi terlebih dahulu.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle">
               <div className="font-bold text-navy-text">ASET</div>
             </div>
@@ -79,7 +79,7 @@ export default async function NeracaPage({
           </div>
 
           <div className="flex flex-col gap-5">
-            <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+            <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
               <div className="px-6 py-4 border-b border-surface-subtle">
                 <div className="font-bold text-navy-text">KEWAJIBAN</div>
               </div>
@@ -102,7 +102,7 @@ export default async function NeracaPage({
               </table>
             </div>
 
-            <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+            <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
               <div className="px-6 py-4 border-b border-surface-subtle">
                 <div className="font-bold text-navy-text">MODAL</div>
               </div>
@@ -125,12 +125,12 @@ export default async function NeracaPage({
               </table>
             </div>
 
-            <div className={`px-6 py-4 rounded-[16px] border-2 ${data.balanced ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+            <div className={`px-6 py-4 rounded-[16px] border-2 ${data.balanced ? "border-green-300 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15" : "border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10"}`}>
               <div className="flex items-center justify-between">
                 <span className="font-bold text-[13px]">Total Kewajiban + Modal</span>
                 <span className="font-extrabold tabular-nums">{data.totalPassivaFmt}</span>
               </div>
-              <div className={`text-[12px] mt-1 font-semibold ${data.balanced ? "text-green-700" : "text-red-700"}`}>
+              <div className={`text-[12px] mt-1 font-semibold ${data.balanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
                 {data.balanced ? "✓ Neraca seimbang" : "✗ Neraca tidak seimbang — periksa data COA"}
               </div>
             </div>

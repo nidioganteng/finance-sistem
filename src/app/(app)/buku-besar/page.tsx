@@ -8,11 +8,11 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 
 const KATEGORI_BADGE: Record<string, string> = {
-  PENDAPATAN: "bg-green-100 text-green-700",
-  BEBAN: "bg-red-100 text-red-700",
-  ASET: "bg-blue-100 text-blue-700",
-  KEWAJIBAN: "bg-orange-100 text-orange-700",
-  MODAL: "bg-purple-100 text-purple-700",
+  PENDAPATAN: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+  BEBAN: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
+  ASET: "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
+  KEWAJIBAN: "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  MODAL: "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
 };
 
 export default async function BukuBesarPage({
@@ -56,14 +56,14 @@ export default async function BukuBesarPage({
       />
 
       {groups.length === 0 ? (
-        <div className="bg-white rounded-[20px] border border-black/[.06] py-16 text-center">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
           <div className="text-sm font-semibold text-muted-stronger mb-1">Tidak ada data</div>
           <p className="text-[13px] text-muted">Tidak ada transaksi dengan akun COA untuk periode ini.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
           {groups.map((group) => (
-            <div key={group.coa.code} className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+            <div key={group.coa.code} className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
               <div className="flex items-center gap-3 px-6 py-4 border-b border-surface-subtle">
                 <span className="font-mono font-bold text-navy-text">{group.coa.code}</span>
                 <span className="font-semibold text-muted-stronger">{group.coa.name}</span>

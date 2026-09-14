@@ -79,9 +79,20 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
   const availableYears = Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - i);
 
   const sharedAxisProps = {
-    tick: { fontSize: 11, fill: "#94a3b8" },
+    tick: { fontSize: 11, fill: "rgb(var(--color-muted-faint))" },
     axisLine: false as const,
     tickLine: false as const,
+  };
+
+  // Warna lewat CSS variable (bukan hex statis) supaya chart ikut ganti saat
+  // toggle dark mode tanpa perlu re-render — variabelnya di-resolve browser
+  // saat paint, bukan saat komponen ini di-render.
+  const tooltipContentStyle = {
+    borderRadius: 12,
+    border: "1px solid rgb(var(--color-border))",
+    background: "rgb(var(--color-surface-card))",
+    color: "rgb(var(--color-navy-text))",
+    fontSize: 12,
   };
 
   const chartContent = visibleEntities.map((e) =>
@@ -103,12 +114,12 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
 
   const commonChart = chartType === "bar" ? (
     <BarChart data={monthlyData} barGap={4} barCategoryGap="30%">
-      <CartesianGrid vertical={false} stroke="#f1f2f5" />
+      <CartesianGrid vertical={false} stroke="rgb(var(--color-border))" />
       <XAxis dataKey="month" {...sharedAxisProps} />
       <YAxis {...sharedAxisProps} tickFormatter={formatY} width={56} />
       <Tooltip
         formatter={(v: number, name: string) => [formatTooltip(v), name]}
-        contentStyle={{ borderRadius: 12, border: "1px solid #e2e6eb", fontSize: 12 }}
+        contentStyle={tooltipContentStyle}
       />
       <Legend
         iconType="circle"
@@ -119,12 +130,12 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
     </BarChart>
   ) : (
     <LineChart data={monthlyData}>
-      <CartesianGrid vertical={false} stroke="#f1f2f5" />
+      <CartesianGrid vertical={false} stroke="rgb(var(--color-border))" />
       <XAxis dataKey="month" {...sharedAxisProps} />
       <YAxis {...sharedAxisProps} tickFormatter={formatY} width={56} />
       <Tooltip
         formatter={(v: number, name: string) => [formatTooltip(v), name]}
-        contentStyle={{ borderRadius: 12, border: "1px solid #e2e6eb", fontSize: 12 }}
+        contentStyle={tooltipContentStyle}
       />
       <Legend
         iconType="circle"
@@ -136,7 +147,7 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="bg-surface-card rounded-2xl border border-border p-5">
       {/* Header row */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="text-sm font-bold text-navy-text">Performa Bulanan per Entitas</div>
@@ -146,7 +157,7 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
           <select
             value={year}
             onChange={(e) => changeYear(Number(e.target.value))}
-            className="text-[12px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-1.5 bg-white focus:outline-none"
+            className="text-[12px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-1.5 bg-surface-card focus:outline-none"
           >
             {availableYears.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -159,7 +170,7 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
               onClick={() => setChartType("bar")}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
                 chartType === "bar"
-                  ? "bg-white text-navy-text shadow-sm"
+                  ? "bg-surface-card text-navy-text shadow-sm"
                   : "text-muted hover:text-muted-stronger"
               }`}
             >
@@ -170,7 +181,7 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
               onClick={() => setChartType("line")}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
                 chartType === "line"
-                  ? "bg-white text-navy-text shadow-sm"
+                  ? "bg-surface-card text-navy-text shadow-sm"
                   : "text-muted hover:text-muted-stronger"
               }`}
             >
@@ -188,7 +199,7 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
           className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${
             activeKeys.has("all")
               ? "bg-navy text-white border-navy"
-              : "bg-white text-muted-stronger border-border-soft hover:bg-surface-hover"
+              : "bg-surface-card text-muted-stronger border-border-soft hover:bg-surface-hover"
           }`}
         >
           Semua Entitas
@@ -200,7 +211,7 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
               key={e.key}
               onClick={() => toggleEntity(e.key)}
               className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${
-                active ? "text-white border-transparent" : "bg-white text-muted-stronger border-border-soft hover:bg-surface-hover"
+                active ? "text-white border-transparent" : "bg-surface-card text-muted-stronger border-border-soft hover:bg-surface-hover"
               }`}
               style={active ? { backgroundColor: e.colorHex, borderColor: e.colorHex } : {}}
             >

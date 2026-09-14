@@ -15,7 +15,6 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { UserBadge, NotifBell } from "@/components/layout/UserBadge";
 import { EntityCard, EntityCardCompact } from "@/components/dashboard/EntityCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import {
   TrendingUp,
   TrendingDown,
@@ -57,7 +56,6 @@ export default async function DashboardPage({
 
   const rightSlot = (
     <>
-      <ThemeToggle />
       <NotifBell unreadCount={unreadCount} />
       {canGrup && (
         <EntitySwitcher
@@ -135,29 +133,29 @@ export default async function DashboardPage({
         <>
           {/* 5 KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div className="bg-white rounded-[16px] border border-border p-4">
+            <div className="bg-surface-card rounded-[16px] border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <TrendingUp size={16} className="text-blue-500" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
+                  <TrendingUp size={16} className="text-blue-500 dark:text-blue-400" />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted">Total Pendapatan Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalRevenue)}</div>
             </div>
 
-            <div className="bg-white rounded-[16px] border border-border p-4">
+            <div className="bg-surface-card rounded-[16px] border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
-                  <TrendingDown size={16} className="text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-500/15 flex items-center justify-center">
+                  <TrendingDown size={16} className="text-slate-400 dark:text-slate-500" />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted">Total Pengeluaran Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
             </div>
 
-            <div className="bg-white rounded-[16px] border border-border p-4">
+            <div className="bg-surface-card rounded-[16px] border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center">
                   <BarChart3 size={16} className="text-status-green" />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted">Total Laba Bersih Grup</span>
@@ -167,23 +165,23 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div className={`rounded-[16px] border p-4 ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-50 border-yellow-200" : "bg-white border-border"}`}>
+            <div className={`rounded-[16px] border p-4 ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-50 dark:bg-yellow-500/15 border-yellow-200 dark:border-yellow-500/30" : "bg-surface-card border-border"}`}>
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-100" : "bg-slate-50"}`}>
-                  <AlertTriangle size={16} className={(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-600" : "text-slate-400"} />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-100 dark:bg-yellow-500/20" : "bg-slate-50 dark:bg-slate-500/15"}`}>
+                  <AlertTriangle size={16} className={(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-600 dark:text-yellow-500" : "text-slate-400 dark:text-slate-500"} />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted">Piutang Perlu Perhatian</span>
               </div>
-              <div className={`text-[22px] font-extrabold tabular-nums ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-700" : "text-navy-text"}`}>
+              <div className={`text-[22px] font-extrabold tabular-nums ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-700 dark:text-yellow-400" : "text-navy-text"}`}>
                 {piutangMetrics?.terminPerluPerhatian ?? 0}
                 <span className="text-[13px] font-semibold ml-1 text-muted">termin</span>
               </div>
             </div>
 
-            <div className="bg-white rounded-[16px] border border-border p-4">
+            <div className="bg-surface-card rounded-[16px] border border-border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <CalendarClock size={16} className="text-purple-500" />
+                <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
+                  <CalendarClock size={16} className="text-purple-500 dark:text-purple-400" />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted">Total Piutang Belum Teragih</span>
               </div>
@@ -227,7 +225,7 @@ export default async function DashboardPage({
           />
 
           {/* Notifikasi terbaru */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Notifikasi Terbaru</div>
             {notifications.length === 0 ? (
               <p className="text-sm text-muted">Belum ada notifikasi.</p>
@@ -261,7 +259,7 @@ export default async function DashboardPage({
             interactive={!isStaff}
           />
 
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
             <table className="w-full text-sm">
               <thead>

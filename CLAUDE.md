@@ -40,8 +40,8 @@ mentah-mentah.
 ```
 src/
   app/(app)/<route>/page.tsx   -> route yang butuh login (dijaga middleware.ts)
-  app/login/page.tsx           -> halaman publik
-  components/layout/           -> Sidebar, PageHeader, EntitySwitcher, UserBadge, ComingSoon
+  app/login/page.tsx, app/register/page.tsx -> halaman publik
+  components/layout/           -> Sidebar, PageHeader, EntitySwitcher, UserBadge, ThemeToggle
   components/<fitur>/          -> komponen spesifik satu fitur, mis. components/kas/, components/jurnal/
   lib/rbac.ts                  -> daftar nav sidebar per role + helper role
   lib/auth.ts                  -> config NextAuth
@@ -78,9 +78,33 @@ src/
 **Design token — JANGAN pakai warna hex manual, pakai class Tailwind custom di `tailwind.config.ts`:**
 `bg-navy`, `text-navy-text`, `bg-brand` / `text-brand`, `text-muted` / `muted-strong` /
 `muted-stronger` / `muted-faint` / `muted-faintest`, `border-border` / `border-border-soft`,
-`bg-surface-page` / `surface-subtle` / `surface-input` / `surface-hover`, `text-status-green` /
-`status-red`, `rounded-pill`. Warna entity (gaharu/kencana/dst) dipakai langsung dari `entity.colorHex`
-di database (bukan class Tailwind statis) karena sifatnya dinamis per baris data.
+`bg-surface-page` / `surface-card` / `surface-subtle` / `surface-input` / `surface-hover`,
+`text-status-green` / `status-red` / `status-amber`, `rounded-pill`. Warna entity (gaharu/kencana/dst)
+dipakai langsung dari `entity.colorHex` di database (bukan class Tailwind statis) karena sifatnya
+dinamis per baris data. JANGAN pakai `bg-white` atau `border-black/[.06]` mentah — pakai
+`bg-surface-card` / `border-border-soft`, supaya otomatis ikut tema gelap (lihat bagian Dark Mode).
+
+**Dark mode — sudah aktif di semua halaman, ikuti pola ini kalau nambah UI baru:**
+- Mekanismenya: class `dark` di `<html>`, di-toggle oleh `components/layout/ThemeToggle.tsx` dan
+  disimpan di `localStorage("theme")`. Script blocking di `src/app/layout.tsx` (`<head>`) nge-apply
+  class itu sebelum paint pertama di SEMUA halaman (termasuk `/login`, `/register`) supaya nggak ada
+  flash tema salah.
+- Semua token warna di atas (`bg-surface-*`, `text-navy-text`, `text-muted*`, `border-border*`,
+  `text-status-*`) sebenarnya CSS variable (`--color-*`, didefinisikan di `src/app/globals.css`,
+  format `"R G B"`) yang dibaca `tailwind.config.ts` lewat helper `withOpacity()`. Nilai gelapnya
+  didefinisikan di selector `:root.dark` di `globals.css`. Artinya: **kalau komponen baru konsisten
+  pakai token-token ini (bukan `bg-white`/warna Tailwind default kayak `bg-gray-100` polos), dark
+  mode otomatis jalan tanpa perlu nulis varian `dark:` sama sekali.**
+- Untuk badge/alert status yang sengaja pakai warna Tailwind stok (`bg-green-100 text-green-700`,
+  `bg-red-50`, dst — dipakai buat badge kategori/status yang variannya banyak), tambahkan varian
+  `dark:` manual di sebelahnya, contoh pola yang sudah dipakai di `CoaClient.tsx`/`PiutangClient.tsx`:
+  `"bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"`.
+- `ThemeToggle` cuma dipasang sekali secara global: di brand row `Sidebar.tsx` (utk semua halaman
+  `(app)/*`) dan di kartu login/register (halaman publik). JANGAN tambah `<ThemeToggle />` lagi di
+  tiap `page.tsx` satu-satu.
+- Untuk chart recharts (lihat `RevenueChart.tsx`), warna axis/grid/tooltip nggak bisa pakai class
+  Tailwind (recharts butuh nilai warna langsung lewat prop), jadi dipakai string
+  `"rgb(var(--color-xxx))"` langsung supaya tetap ikut ganti pas toggle tema tanpa perlu re-render JS.
 
 ## Model data (prisma/schema.prisma) — ringkasan
 
@@ -100,38 +124,33 @@ di database (bukan class Tailwind statis) karena sifatnya dinamis per baris data
 
 ## Sudah dibangun (full, baca+tulis dari database asli)
 
-Login, Dashboard (Master Dashboard agregat + per-entity), Notifikasi (filter + tandai dibaca),
-Jurnal Umum (ledger + filter jenis input), Kas Kecil, Kas Besar, Bank Buku (termasuk form input
-transaksi baru multi-akun).
+Semua halaman di sidebar (lihat `lib/rbac.ts`) sudah punya implementasi asli, bukan placeholder lagi:
 
-## Belum dibangun (masih halaman placeholder `ComingSoon` di `components/layout/ComingSoon.tsx`)
+- **Auth & akun**: Login, Register (alur approval — akun baru `status: PENDING` sampai di-approve
+  Manajer Keuangan), Manajemen Pengguna (`/pengguna` — approve/reject, assign role + entity access).
+- **Overview**: Dashboard (Master Dashboard agregat grup + per-entity, chart performa bulanan),
+  Notifikasi (filter + tandai dibaca), Log Aktivitas (`/log`, 2 tab User Activity / Financial Change).
+- **Operasional harian**: Jurnal Umum, Kas Kecil, Kas Besar, Bank Buku (form input transaksi
+  multi-akun), Kontrol Piutang & Termin (`/piutang` — update status termin + review LoadingDock Umum).
+- **Laporan turunan ledger**: Buku Besar, Neraca, Laba Rugi, Arus Kas, Profitabilitas Proyek,
+  Laporan Keuangan (`/laporan`, gabungan dengan tab switcher), Laporan Pajak (`/pajak`).
+- **Pengaturan**: Bagan Akun (`/coa`, CRUD `CoaAccount`), Dokumen & SOP (`/dokumen`), Kelola Jenis
+  Input Transaksi (`/jenis-input`).
+- **Dark mode**: aktif di semua halaman di atas termasuk `/login` & `/register` — lihat bagian
+  "Dark mode" di atas untuk konvensi tokennya sebelum nambah UI baru.
 
-Urutan disarankan (yang lebih independen duluan):
+Komponen `ComingSoon` sudah nggak dipakai/nggak ada lagi di codebase — semua route punya halaman asli.
 
-1. **Bagan Akun** (`/coa`, Manajer) — CRUD `CoaAccount`. Paling sederhana, kerjain duluan.
-2. **Dokumen & SOP** (`/dokumen`, Manajer + Staf) — CRUD `Dokumen`, perlu upload file (belum ada
-   solusi upload file ditentukan — tanya user mau simpan ke mana: lokal, S3, atau lainnya).
-3. **Manajemen Pengguna** (`/pengguna`, khusus Manajer) — approval `User` dengan status PENDING,
-   assign `role` + `UserEntityAccess` saat approve. Perlu juga halaman/flow registrasi publik yang
-   belum ada sama sekali (belum ada route `/register`).
-4. **Kelola Jenis Input Transaksi** (`/jenis-input`, semua role tapi Staf yang bisa nambah) — CRUD
-   `JenisInputTransaksi`, saat Staf nambah baru trigger `Notifikasi` ke SUPER_ADMIN & MANAJER_KEUANGAN
-   (`NotifikasiType.JENIS_INPUT_BARU`).
-5. **Log Aktivitas** (`/log`, Manajer + Super Admin) — baca `ActivityLog`, ada 2 tab (User Activity
-   vs Financial Change) sesuai `LogCategory` enum. User activity auto-hapus 30 hari, financial change
-   permanen — belum ada job/cron buat auto-hapus, perlu diputuskan caranya (cron eksternal / route
-   API yang dipanggil terjadwal / dsb).
-6. **Kontrol Piutang & Termin** (`/piutang`, Manajer + Staf) — audit `Termin` (update status,
-   `auditedAt`, `auditedById`) + review `LoadingDockTransaksi` untuk entitas Umum.
-7. **Buku Besar, Neraca, Laba Rugi, Arus Kas** (`/buku-besar`, `/neraca`, `/laba-rugi`, `/arus-kas`,
-   Staf read-only) — turunan agregasi dari `Transaction` + `CoaAccount` per entity. Kerjain sebagai
-   satu batch karena datanya saling terkait (semua turunan dari ledger yang sama).
-8. **Profitabilitas Proyek** (`/profitabilitas`, Staf) — agregasi `Project.contractValue - Project.spend`
-   per proyek, sudah ada logikanya di `EntityCard`/dashboard, tinggal dibuatkan tabel detail per proyek.
-9. **Laporan Keuangan Internal** (`/laporan`, Super Admin + Manajer) — versi gabungan dari #7 dengan
-   tab switcher, plus fitur cetak/print preview dan bandingkan tahun (`compareYear`) seperti di mockup.
-10. **Laporan Pajak** (`/pajak`, Manajer) — rekonsiliasi data yang dilaporkan ke pajak vs laporan
-    internal, butuh keputusan dulu dari user soal sumber data pajaknya dari mana.
+## Area yang masih perlu keputusan / kemungkinan belum final
+
+Bagian implementasi sudah ada, tapi beberapa keputusan produk berikut ditandai "perlu dicek ulang
+manual" saat terakhir diaudit (belum tentu masih relevan — cek kode dulu sebelum nanya user):
+
+- **Upload file Dokumen & SOP** (`/dokumen`) — cek `Dokumen.fileUrl` diisi dari mana (lokal/S3/dsb).
+- **Auto-hapus Log Aktivitas** — `LogCategory.USER_ACTIVITY` seharusnya auto-hapus 30 hari,
+  `FINANCIAL_CHANGE` permanen. Cek apakah sudah ada job/cron buat itu atau masih manual.
+- **Sumber data Laporan Pajak** (`/pajak`) — cek dari mana angka pajak direkonsiliasi terhadap
+  laporan internal.
 
 ## Keputusan desain yang SUDAH final — jangan diulang tanya ke user kecuali user minta ubah
 

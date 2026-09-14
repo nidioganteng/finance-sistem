@@ -22,7 +22,7 @@ export function EntityCardCompact({
   return (
     <Link href={`/dashboard?entity=${entityKey}`} className="block">
       <div
-        className="bg-white rounded-2xl border border-border p-4 flex flex-col gap-3 hover:shadow-[0_4px_16px_rgba(15,23,42,.06)] transition-shadow"
+        className="bg-surface-card rounded-2xl border border-border p-4 flex flex-col gap-3 hover:shadow-[0_4px_16px_rgba(15,23,42,.06)] transition-shadow"
         style={{ borderLeft: `4px solid ${colorHex}` }}
       >
         <div className="flex items-center gap-2">
@@ -78,7 +78,7 @@ export function EntityCard({
 }) {
   const content = (
     <div
-      className={`bg-white rounded-2xl border border-border p-5 flex flex-col gap-3 ${
+      className={`bg-surface-card rounded-2xl border border-border p-5 flex flex-col gap-3 ${
         interactive ? "hover:shadow-[0_4px_16px_rgba(15,23,42,.06)] transition-shadow" : ""
       }`}
     >

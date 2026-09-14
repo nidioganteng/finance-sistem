@@ -49,13 +49,13 @@ export default async function JurnalPage({
         <button
           disabled
           title="Export akan diimplementasikan di iterasi berikutnya"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] border border-border-soft text-[13px] font-semibold text-muted-faint bg-white opacity-60 cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-[11px] border border-border-soft text-[13px] font-semibold text-muted-faint bg-surface-card opacity-60 cursor-not-allowed"
         >
           Ekspor ke Excel
         </button>
       </div>
 
-      <div className="bg-white border border-black/[.06] rounded-[20px] p-5 overflow-x-auto">
+      <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
@@ -74,10 +74,7 @@ export default async function JurnalPage({
               <tr key={r.id} className="border-b border-surface-subtle">
                 <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
                 <td className="py-2.5 px-1.5">
-                  <span
-                    className="text-[10.5px] font-bold px-2.5 py-1 rounded-md"
-                    style={{ background: r.sumberBg, color: r.sumberColor }}
-                  >
+                  <span className={`text-[10.5px] font-bold px-2.5 py-1 rounded-md ${r.sumberClassName}`}>
                     {r.sumberLabel}
                   </span>
                 </td>

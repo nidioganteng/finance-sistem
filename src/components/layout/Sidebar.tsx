@@ -41,7 +41,7 @@ export function Sidebar({ role }: { role: Role }) {
   const sections = getNavForRole(role);
 
   return (
-    <aside className="w-[260px] flex-none bg-white border-r border-black/[.06] flex flex-col p-4 pt-5 sticky top-0 h-screen">
+    <aside className="w-[260px] flex-none bg-surface-card border-r border-border-soft flex flex-col p-4 pt-5 sticky top-0 h-screen">
       <div className="flex items-center gap-2.5 px-2 pb-6">
         <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-brand to-brand-soft flex items-center justify-center flex-none">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -49,7 +49,7 @@ export function Sidebar({ role }: { role: Role }) {
             <rect x="10" y="14" width="4" height="6" fill="#fff" />
           </svg>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="font-extrabold text-[14.5px] text-navy-text leading-tight">Data Keuangan</div>
           <div className="text-[10px] text-muted-faint font-semibold">Gaharu Sempana Group</div>
         </div>

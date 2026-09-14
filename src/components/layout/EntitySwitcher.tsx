@@ -31,7 +31,7 @@ export function EntitySwitcher({
     <select
       value={currentEntityKey}
       onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-2 rounded-[11px] border border-border-soft text-[13px] font-bold text-muted-stronger bg-white cursor-pointer"
+      className="px-3 py-2 rounded-[11px] border border-border-soft text-[13px] font-bold text-muted-stronger bg-surface-card cursor-pointer"
     >
       {showGrupOption && <option value="grup">Semua Entitas</option>}
       {entities.map((e) => (

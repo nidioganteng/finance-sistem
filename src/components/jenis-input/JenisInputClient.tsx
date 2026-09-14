@@ -62,7 +62,7 @@ export function JenisInputClient({
   }
 
   return (
-    <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+    <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-surface-subtle">
         <span className="text-sm font-bold text-navy-text">{initialData.length} Jenis Input</span>
         <button
@@ -74,7 +74,7 @@ export function JenisInputClient({
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 text-status-red text-sm">{error}</div>
+        <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
 
       {showAdd && (
@@ -84,7 +84,7 @@ export function JenisInputClient({
               name="nama"
               required
               placeholder="Nama jenis input baru (mis. Petty Cash)"
-              className="px-3 py-2 rounded-xl border border-border text-sm flex-1 bg-white"
+              className="px-3 py-2 rounded-xl border border-border text-sm flex-1 bg-surface-card"
             />
             <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
               <Check size={14} /> Simpan
@@ -127,7 +127,7 @@ export function JenisInputClient({
               </td>
               <td className="py-3 px-3 font-mono text-[12px] text-muted">{item.key}</td>
               <td className="py-3 px-3">
-                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${item.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${item.active ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400"}`}>
                   {item.active ? "Aktif" : "Nonaktif"}
                 </span>
               </td>
@@ -152,7 +152,7 @@ export function JenisInputClient({
                       <button
                         onClick={() => handleDelete(item.id)}
                         disabled={isPending}
-                        className="p-2 rounded-lg hover:bg-red-50 text-status-red"
+                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red"
                         title="Hapus"
                       >
                         <Trash2 size={14} />

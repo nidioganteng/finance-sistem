@@ -1,11 +1,13 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
-const SUMBER_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  kasKecil: { bg: "#fef3c7", color: "#92400e", label: "Kas Kecil" },
-  kasBesar: { bg: "#dbe3f7", color: "#1e40af", label: "Kas Besar" },
-  bankBuku: { bg: "#dcfce7", color: "#166534", label: "Bank Buku" },
+// Class Tailwind (bukan hex manual) supaya badge sumber ikut tema gelap.
+const SUMBER_STYLE: Record<string, { className: string; label: string }> = {
+  kasKecil: { className: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300", label: "Kas Kecil" },
+  kasBesar: { className: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300", label: "Kas Besar" },
+  bankBuku: { className: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300", label: "Bank Buku" },
 };
+const SUMBER_STYLE_DEFAULT = "bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-300";
 
 export async function getJenisInputChips(entityId: string) {
   const jenis = await prisma.jenisInputTransaksi.findMany({
@@ -33,12 +35,11 @@ export async function getJurnalRows(entityId: string, filterKey?: string) {
 
   return {
     rows: rows.map((r) => {
-      const style = SUMBER_STYLE[r.jenisInput.key] ?? { bg: "#ede9fe", color: "#6d28d9", label: r.jenisInput.nama };
+      const style = SUMBER_STYLE[r.jenisInput.key] ?? { className: SUMBER_STYLE_DEFAULT, label: r.jenisInput.nama };
       return {
         id: r.id,
         tanggal: r.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
-        sumberBg: style.bg,
-        sumberColor: style.color,
+        sumberClassName: style.className,
         sumberLabel: style.label,
         kodeProyek: r.project?.code ?? "-",
         kategori: r.coaAccount?.name ?? "-",

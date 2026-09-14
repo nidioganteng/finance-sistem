@@ -22,22 +22,23 @@ export default async function NotifikasiPage({ searchParams }: { searchParams: {
         <form action={markAllNotifikasiRead}>
           <button
             type="submit"
-            className="px-4 py-2.5 rounded-[11px] border border-border-soft text-[13px] font-semibold text-muted-stronger bg-white"
+            className="px-4 py-2.5 rounded-[11px] border border-border-soft text-[13px] font-semibold text-muted-stronger bg-surface-card"
           >
             Tandai Semua Sudah Dibaca
           </button>
         </form>
       </div>
 
-      <div className="bg-white border border-black/[.06] rounded-[20px] overflow-hidden">
+      <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
         {list.length === 0 ? (
           <p className="p-6 text-sm text-muted">Tidak ada notifikasi untuk filter ini.</p>
         ) : (
           list.map((n) => (
             <div
               key={n.id}
-              className="flex gap-3 items-start px-5 py-4 border-b border-surface-subtle last:border-b-0"
-              style={{ background: n.read ? "transparent" : "#eef4ff" }}
+              className={`flex gap-3 items-start px-5 py-4 border-b border-surface-subtle last:border-b-0 ${
+                n.read ? "" : "bg-blue-50 dark:bg-blue-500/10"
+              }`}
             >
               <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-none ${n.read ? "bg-border" : "bg-brand"}`} />
               <div className="flex-1 min-w-0">

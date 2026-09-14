@@ -48,13 +48,13 @@ export default async function LabaRugiPage({
       />
 
       {data.pendapatanList.length === 0 && data.bebanList.length === 0 ? (
-        <div className="bg-white rounded-[20px] border border-black/[.06] py-16 text-center">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
           <div className="text-sm font-semibold text-muted-stronger mb-1">Tidak ada data</div>
           <p className="text-[13px] text-muted">Isi data COA (Pendapatan/Beban) dan transaksi terlebih dahulu.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle">
               <div className="font-bold text-navy-text">PENDAPATAN</div>
             </div>
@@ -69,7 +69,7 @@ export default async function LabaRugiPage({
                     <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-green">{item.totalFmt}</td>
                   </tr>
                 ))}
-                <tr className="bg-green-50">
+                <tr className="bg-green-50 dark:bg-green-500/15">
                   <td className="py-3 px-6 font-extrabold text-navy-text">Total Pendapatan</td>
                   <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-green">{data.totalPendapatanFmt}</td>
                 </tr>
@@ -77,7 +77,7 @@ export default async function LabaRugiPage({
             </table>
           </div>
 
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle">
               <div className="font-bold text-navy-text">BEBAN</div>
             </div>
@@ -92,7 +92,7 @@ export default async function LabaRugiPage({
                     <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-red">{item.totalFmt}</td>
                   </tr>
                 ))}
-                <tr className="bg-red-50">
+                <tr className="bg-red-50 dark:bg-red-500/10">
                   <td className="py-3 px-6 font-extrabold text-navy-text">Total Beban</td>
                   <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-red">{data.totalBebanFmt}</td>
                 </tr>
@@ -100,7 +100,7 @@ export default async function LabaRugiPage({
             </table>
           </div>
 
-          <div className={`px-6 py-5 rounded-[20px] border-2 ${data.labaBersihPositive ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+          <div className={`px-6 py-5 rounded-[20px] border-2 ${data.labaBersihPositive ? "border-green-300 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15" : "border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10"}`}>
             <div className="text-[13px] font-semibold text-muted-stronger mb-1">
               {data.labaBersihPositive ? "LABA BERSIH" : "RUGI BERSIH"}
             </div>

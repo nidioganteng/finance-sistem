@@ -26,9 +26,9 @@ type DockItem = {
 };
 
 const STATUS_BADGE: Record<TerminStatus, string> = {
-  ON_TRACK: "bg-green-100 text-green-700",
-  AT_RISK: "bg-orange-100 text-orange-700",
-  NEEDS_AUDIT: "bg-red-100 text-red-700",
+  ON_TRACK: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+  AT_RISK: "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  NEEDS_AUDIT: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
 };
 const STATUS_LABEL: Record<TerminStatus, string> = {
   ON_TRACK: "On Track",
@@ -77,7 +77,7 @@ export function PiutangClient({
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="px-4 py-3 rounded-xl bg-red-50 text-status-red text-sm">{error}</div>
+        <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
 
       <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
@@ -98,7 +98,7 @@ export function PiutangClient({
       </div>
 
       {tab === "termin" && (
-        <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-hover text-left">
@@ -170,7 +170,7 @@ export function PiutangClient({
                           value={t.status}
                           onChange={(e) => handleStatusChange(t.id, e.target.value as TerminStatus)}
                           disabled={isPending}
-                          className="px-2 py-1.5 rounded-lg border border-border text-[12px] bg-white"
+                          className="px-2 py-1.5 rounded-lg border border-border text-[12px] bg-surface-card"
                         >
                           <option value="ON_TRACK">On Track</option>
                           <option value="AT_RISK">At Risk</option>
@@ -187,7 +187,7 @@ export function PiutangClient({
       )}
 
       {tab === "dock" && (
-        <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-hover text-left">

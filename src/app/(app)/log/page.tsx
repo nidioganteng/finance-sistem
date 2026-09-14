@@ -30,7 +30,7 @@ export default async function LogPage({
 
       <LogTabs currentTab={tab} />
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left">

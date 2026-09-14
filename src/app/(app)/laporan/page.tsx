@@ -140,7 +140,7 @@ export default async function LaporanPage({
               },
               { label: "Total Transaksi", value: txCount.toString() + " transaksi", color: "text-navy-text" },
             ].map((card) => (
-              <div key={card.label} className="bg-white rounded-[16px] border border-black/[.06] p-5">
+              <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
                 <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
                 <div className={`text-[18px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
               </div>
@@ -151,7 +151,7 @@ export default async function LaporanPage({
 
       {tab === "laba-rugi" && labaRugiData && (
         <div className="flex flex-col gap-5">
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle font-bold text-navy-text">PENDAPATAN</div>
             <table className="w-full text-sm">
               <tbody>
@@ -161,14 +161,14 @@ export default async function LaporanPage({
                     <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-green">{item.totalFmt}</td>
                   </tr>
                 ))}
-                <tr className="bg-green-50">
+                <tr className="bg-green-50 dark:bg-green-500/15">
                   <td className="py-3 px-6 font-extrabold text-navy-text">Total Pendapatan</td>
                   <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-green">{labaRugiData.totalPendapatanFmt}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <div className="px-6 py-4 border-b border-surface-subtle font-bold text-navy-text">BEBAN</div>
             <table className="w-full text-sm">
               <tbody>
@@ -178,14 +178,14 @@ export default async function LaporanPage({
                     <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-red">{item.totalFmt}</td>
                   </tr>
                 ))}
-                <tr className="bg-red-50">
+                <tr className="bg-red-50 dark:bg-red-500/10">
                   <td className="py-3 px-6 font-extrabold text-navy-text">Total Beban</td>
                   <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-red">{labaRugiData.totalBebanFmt}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div className={`px-6 py-5 rounded-[20px] border-2 ${labaRugiData.labaBersihPositive ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+          <div className={`px-6 py-5 rounded-[20px] border-2 ${labaRugiData.labaBersihPositive ? "border-green-300 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15" : "border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10"}`}>
             <div className="text-[13px] font-semibold text-muted-stronger mb-1">
               {labaRugiData.labaBersihPositive ? "LABA BERSIH" : "RUGI BERSIH"}
             </div>
@@ -203,7 +203,7 @@ export default async function LaporanPage({
       )}
 
       {tab === "arus-kas" && arusKasData && (
-        <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-hover text-left">

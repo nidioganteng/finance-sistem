@@ -79,7 +79,7 @@ export function KasTransactionForm({
   }
 
   return (
-    <div className="bg-white border border-black/[.06] rounded-[20px] p-5 flex flex-col gap-3.5">
+    <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 flex flex-col gap-3.5">
       <div className="text-sm font-bold text-navy-text">Transaksi Baru</div>
 
       <div className="grid grid-cols-2 gap-3.5">

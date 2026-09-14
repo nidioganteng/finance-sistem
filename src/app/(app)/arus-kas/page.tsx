@@ -58,14 +58,14 @@ export default async function ArusKasPage({
             color: data.netTotalPositive ? "text-status-green" : "text-status-red",
           },
         ].map((card) => (
-          <div key={card.label} className="bg-white rounded-[16px] border border-black/[.06] p-5">
+          <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
             <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
             <div className={`text-[20px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left">

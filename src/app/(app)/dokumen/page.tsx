@@ -32,14 +32,14 @@ export default async function DokumenPage({
         subtitle="Arsip dokumen dan prosedur standar operasional"
       />
 
-      <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-[13px] text-amber-800">
+      <div className="px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-[13px] text-amber-800 dark:text-amber-300">
         <strong>Fitur upload dokumen</strong> akan tersedia di fase berikutnya. Untuk sementara, hubungi
         administrator sistem untuk menambahkan dokumen baru.
       </div>
 
       <DokumenFilterTabs current={kategori} />
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         {dokumen.length === 0 ? (
           <div className="py-16 text-center">
             <div className="text-sm font-semibold text-muted-stronger mb-1">Belum ada dokumen</div>

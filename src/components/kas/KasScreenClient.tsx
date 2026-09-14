@@ -35,7 +35,7 @@ export function KasScreenClient({
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-3.5">
-        <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-white">
+        <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-surface-card">
           Saldo Berjalan: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
         </div>
         <button
@@ -56,7 +56,7 @@ export function KasScreenClient({
         />
       )}
 
-      <div className="bg-white border border-black/[.06] rounded-[20px] p-5 overflow-x-auto">
+      <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">

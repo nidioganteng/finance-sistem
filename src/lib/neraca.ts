@@ -19,18 +19,18 @@ export async function getNeracaData(entityId: string, year: number) {
     KEWAJIBAN: new Map(),
     MODAL: new Map(),
   };
+  let totalPendapatan = 0;
+  let totalBeban = 0;
 
   for (const t of transactions) {
     if (!t.coaAccount) continue;
     const kat = t.coaAccount.kategori;
+    if (kat === "PENDAPATAN") { totalPendapatan += Number(t.kredit); continue; }
+    if (kat === "BEBAN") { totalBeban += Number(t.kredit); continue; }
     if (!["ASET", "KEWAJIBAN", "MODAL"].includes(kat)) continue;
     const map = maps[kat];
     if (!map.has(t.coaAccountId!)) {
-      map.set(t.coaAccountId!, {
-        code: t.coaAccount.code,
-        name: t.coaAccount.name,
-        saldo: 0,
-      });
+      map.set(t.coaAccountId!, { code: t.coaAccount.code, name: t.coaAccount.name, saldo: 0 });
     }
     const item = map.get(t.coaAccountId!)!;
     if (kat === "ASET") {
@@ -49,15 +49,21 @@ export async function getNeracaData(entityId: string, year: number) {
   const totalAset = aset.reduce((s, i) => s + i.saldo, 0);
   const totalKewajiban = kewajiban.reduce((s, i) => s + i.saldo, 0);
   const totalModal = modal.reduce((s, i) => s + i.saldo, 0);
+  const labaBersih = totalPendapatan - totalBeban;
+  const totalPassiva = totalKewajiban + totalModal + labaBersih;
 
   return {
     aset,
     kewajiban,
     modal,
+    labaBersih,
+    labaBersihFmt: formatRupiah(Math.abs(labaBersih)),
+    labaBersihPositive: labaBersih >= 0,
     totalAsetFmt: formatRupiah(totalAset),
     totalKewajibanFmt: formatRupiah(totalKewajiban),
     totalModalFmt: formatRupiah(totalModal),
-    totalPassivaFmt: formatRupiah(totalKewajiban + totalModal),
-    balanced: Math.abs(totalAset - (totalKewajiban + totalModal)) < 1,
+    totalModalDanLabaFmt: formatRupiah(totalModal + labaBersih),
+    totalPassivaFmt: formatRupiah(totalPassiva),
+    balanced: Math.abs(totalAset - totalPassiva) < 1,
   };
 }

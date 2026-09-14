@@ -27,7 +27,7 @@ export async function getLabaRugiData(entityId: string, year: number) {
           total: 0,
         });
       }
-      pendapatan.get(t.coaAccountId!)!.total += Number(t.debit);
+      pendapatan.get(t.coaAccountId!)!.total += Number(t.kredit);
     } else if (t.coaAccount.kategori === "BEBAN") {
       if (!beban.has(t.coaAccountId!)) {
         beban.set(t.coaAccountId!, {

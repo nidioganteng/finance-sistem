@@ -6,19 +6,41 @@ export function formatRupiah(n: number) {
 }
 
 export async function getAccessibleEntities(entityKeys: string[]) {
-  const entities = await prisma.entity.findMany({
-    where: { key: { in: entityKeys } },
-    include: {
-      projects: { include: { termin: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [entities, txRows] = await Promise.all([
+    prisma.entity.findMany({
+      where: { key: { in: entityKeys } },
+      include: { projects: { include: { termin: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
+    // supaya Dashboard Manager konsisten dengan Laporan Keuangan Staff.
+    prisma.transaction.findMany({
+      where: {
+        entity: { key: { in: entityKeys } },
+        coaAccount: { kategori: { in: ["PENDAPATAN", "BEBAN"] } },
+      },
+      select: {
+        entityId: true,
+        kredit: true,
+        coaAccount: { select: { kategori: true } },
+      },
+    }),
+  ]);
 
-  // Revenue & spend dihitung langsung dari data project asli, bukan angka
-  // terpisah seperti di mockup, supaya nggak ada dua sumber data yang bisa beda.
+  const revenueMap = new Map<string, number>();
+  const spendMap = new Map<string, number>();
+  for (const tx of txRows) {
+    const amt = Number(tx.kredit);
+    if (tx.coaAccount?.kategori === "PENDAPATAN") {
+      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + amt);
+    } else if (tx.coaAccount?.kategori === "BEBAN") {
+      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + amt);
+    }
+  }
+
   return entities.map((e) => {
-    const revenue = e.projects.reduce((sum, p) => sum + Number(p.contractValue), 0);
-    const spend = e.projects.reduce((sum, p) => sum + Number(p.spend), 0);
+    const revenue = revenueMap.get(e.id) ?? 0;
+    const spend = spendMap.get(e.id) ?? 0;
     return {
       id: e.id,
       key: e.key,
@@ -81,10 +103,11 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
     where: {
       entity: { key: { in: entityKeys } },
       tanggal: { gte: start, lt: end },
+      coaAccount: { kategori: "PENDAPATAN" },
     },
     select: {
       tanggal: true,
-      debit: true,
+      kredit: true,
       entity: { select: { key: true } },
     },
   });
@@ -94,7 +117,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
     for (const key of entityKeys) {
       entry[key] = rows
         .filter((r) => r.entity.key === key && new Date(r.tanggal).getMonth() === i)
-        .reduce((s, r) => s + Number(r.debit), 0);
+        .reduce((s, r) => s + Number(r.kredit), 0);
     }
     return entry;
   });

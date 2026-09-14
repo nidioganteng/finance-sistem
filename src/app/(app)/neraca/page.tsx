@@ -117,9 +117,17 @@ export default async function NeracaPage({
                       <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold">{item.saldoFmt}</td>
                     </tr>
                   ))}
+                  <tr className="border-b border-surface-subtle bg-green-50/40 dark:bg-green-500/10">
+                    <td className="py-2.5 px-6 text-[13px] font-semibold text-muted-stronger">
+                      Laba Tahun Berjalan
+                    </td>
+                    <td className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
+                      {data.labaBersihPositive ? "" : "-"}{data.labaBersihFmt}
+                    </td>
+                  </tr>
                   <tr className="bg-surface-subtle">
-                    <td className="py-3 px-6 font-extrabold text-navy-text">Total Modal</td>
-                    <td className="py-3 px-6 text-right tabular-nums font-extrabold text-navy-text">{data.totalModalFmt}</td>
+                    <td className="py-3 px-6 font-extrabold text-navy-text">Total Modal + Laba</td>
+                    <td className="py-3 px-6 text-right tabular-nums font-extrabold text-navy-text">{data.totalModalDanLabaFmt}</td>
                   </tr>
                 </tbody>
               </table>

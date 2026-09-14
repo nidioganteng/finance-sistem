@@ -73,3 +73,9 @@ body {
   background: rgb(var(--color-border));
   border-radius: 8px;
 }
+
+@media print {
+  body { background: white !important; }
+  main { padding: 1rem !important; gap: 1rem !important; }
+  .print\:hidden { display: none !important; }
+}

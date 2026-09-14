@@ -64,7 +64,6 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "grid" },
-        { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
     },
     {
@@ -75,10 +74,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Bank Buku", href: "/bank-buku", icon: "receipt" },
         { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
-        { label: "Neraca", href: "/neraca", icon: "scale" },
-        { label: "Laba Rugi", href: "/laba-rugi", icon: "fileText" },
-        { label: "Arus Kas", href: "/arus-kas", icon: "trendingUp" },
-        { label: "Profitabilitas Proyek", href: "/profitabilitas", icon: "trendingUp" },
+        { label: "Laporan Keuangan", href: "/laporan-keuangan", icon: "fileText" },
         { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
       ],
     },

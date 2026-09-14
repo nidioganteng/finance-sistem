@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getPiutangData } from "@/lib/piutang";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -19,10 +20,7 @@ export default async function PiutangPage({
   }
 
   const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : entityKeys[0];
+  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
   if (!selectedEntity) {
@@ -45,7 +43,8 @@ export default async function PiutangPage({
         }
       />
       <PiutangClient
-        terminList={data.terminList}
+        projectList={data.projectList}
+        summary={data.summary}
         loadingDockList={data.loadingDockList}
         userRole={role}
         isUmumEntity={selectedEntity.isUmum}

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { KasTransactionForm } from "./KasTransactionForm";
+import type { RekeningOption } from "@/lib/bank-accounts";
 
 type CoaOption = { id: string; code: string; name: string };
 type LedgerRow = {
@@ -9,6 +11,7 @@ type LedgerRow = {
   noBukti: string;
   keterangan: string;
   akunTags: string[];
+  rekening?: string;
   masukFmt: string;
   keluarFmt: string;
   saldoFmt: string;
@@ -20,24 +23,65 @@ export function KasScreenClient({
   pagePath,
   coaOptions,
   saldoFmt,
+  saldoLabel = "Saldo Berjalan",
   ledger,
+  rekeningOptions = [],
+  selectedRekeningId,
 }: {
   entityKey: string;
   jenisInputKey: string;
   pagePath: string;
   coaOptions: CoaOption[];
   saldoFmt: string;
+  saldoLabel?: string;
   ledger: LedgerRow[];
+  rekeningOptions?: RekeningOption[];
+  selectedRekeningId?: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [panelOpen, setPanelOpen] = useState(false);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  const switchRekening = useCallback(
+    (id: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("rekening", id);
+      router.push(`${pathname}?${params.toString()}`);
+      setPanelOpen(false);
+    },
+    [router, pathname, searchParams]
+  );
 
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-3.5">
-        <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-surface-card">
-          Saldo Berjalan: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-white">
+            {saldoLabel}: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
+          </div>
+
+          {/* Rekening switcher — hanya tampil di Bank Buku */}
+          {rekeningOptions.length > 1 && (
+            <div className="flex items-center gap-1 bg-surface-hover rounded-pill p-1">
+              {rekeningOptions.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => switchRekening(r.id)}
+                  className={`px-3 py-1.5 rounded-pill text-[12px] font-bold transition-colors ${
+                    r.id === selectedRekeningId
+                      ? "bg-white text-navy-text shadow-sm"
+                      : "text-muted-strong hover:text-navy-text"
+                  }`}
+                >
+                  {r.nama}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
         <button
           onClick={() => setPanelOpen((v) => !v)}
           className="px-4.5 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold"
@@ -52,6 +96,8 @@ export function KasScreenClient({
           jenisInputKey={jenisInputKey}
           pagePath={pagePath}
           coaOptions={coaOptions}
+          rekeningOptions={rekeningOptions}
+          defaultRekeningId={selectedRekeningId}
           onClose={() => setPanelOpen(false)}
         />
       )}
@@ -85,7 +131,14 @@ export function KasScreenClient({
                   <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top">
                     <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
                     <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{r.noBukti}</td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">{r.keterangan}</td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
+                      {r.keterangan}
+                      {r.rekening && (
+                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 px-2 py-0.5 rounded-md">
+                          {r.rekening}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-1.5">
                       <div className="flex gap-1 flex-wrap">
                         {(expanded ? r.akunTags : shown).map((tag, i) => (

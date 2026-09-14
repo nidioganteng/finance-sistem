@@ -18,6 +18,10 @@ export function EntitySwitcher({
   const pathname = usePathname();
 
   function onChange(value: string) {
+    // Persist selection so other pages remember it when navigated to without ?entity=
+    if (value !== "grup") {
+      document.cookie = `lastEntityKey=${value}; path=/; max-age=2592000`; // 30 days
+    }
     const params = new URLSearchParams(searchParams.toString());
     if (value === "grup") {
       params.delete("entity");

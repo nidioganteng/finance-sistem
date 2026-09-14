@@ -8,6 +8,7 @@ export default function KasBesarPage({ searchParams }: { searchParams: { entity?
       subtitle="Input dan riwayat transaksi kas besar"
       pagePath="/kas-besar"
       searchParams={searchParams}
+      excludeEntityKeys={["umum"]}
     />
   );
 }

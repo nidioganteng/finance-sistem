@@ -2,7 +2,9 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJenisInput, getCoaOptions, getRunningSaldo, getKasLedger } from "@/lib/kas";
+import { REKENING_BY_ENTITY, type RekeningOption } from "@/lib/bank-accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { KasScreenClient } from "./KasScreenClient";
@@ -13,21 +15,24 @@ export async function KasScreen({
   subtitle,
   pagePath,
   searchParams,
+  excludeEntityKeys = [],
 }: {
   jenisInputKey: string;
   title: string;
   subtitle: string;
   pagePath: string;
-  searchParams: { entity?: string };
+  searchParams: { entity?: string; rekening?: string };
+  excludeEntityKeys?: string[];
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
 
-  // Halaman input Kas cuma ada di sidebar Staf Keuangan pada desain aslinya.
   if (role !== "STAF_KEUANGAN") redirect("/dashboard");
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = searchParams.entity && entityKeys.includes(searchParams.entity) ? searchParams.entity : entityKeys[0];
+  const allEntities = await getAccessibleEntities(entityKeys);
+  const entities = allEntities.filter((e) => !excludeEntityKeys.includes(e.key));
+  const validKeys = entities.map((e) => e.key);
+  const selectedKey = resolveEntityKey(searchParams.entity, validKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
   const jenisInput = await getJenisInput(jenisInputKey);
@@ -35,10 +40,21 @@ export async function KasScreen({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
+  // Rekening per entitas — hanya relevan untuk Bank Buku
+  const isBankBuku = jenisInputKey === "bankBuku";
+  const rekeningOptions: RekeningOption[] = isBankBuku
+    ? (REKENING_BY_ENTITY[selectedKey] ?? [])
+    : [];
+  const selectedRekeningId =
+    rekeningOptions.length > 0
+      ? rekeningOptions.find((r) => r.id === searchParams.rekening)?.id ?? rekeningOptions[0].id
+      : undefined;
+  const selectedRekeningNama = rekeningOptions.find((r) => r.id === selectedRekeningId)?.nama;
+
   const [coaOptions, saldo, ledger] = await Promise.all([
     getCoaOptions(),
-    getRunningSaldo(selectedEntity.id, jenisInput.id),
-    getKasLedger(selectedEntity.id, jenisInput.id),
+    getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama),
+    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama),
   ]);
 
   return (
@@ -60,7 +76,10 @@ export async function KasScreen({
         pagePath={pagePath}
         coaOptions={coaOptions.map((c) => ({ id: c.id, code: c.code, name: c.name }))}
         saldoFmt={formatRupiah(saldo)}
+        saldoLabel={selectedRekeningNama ? `Saldo ${selectedRekeningNama}` : "Saldo Berjalan"}
         ledger={ledger}
+        rekeningOptions={rekeningOptions}
+        selectedRekeningId={selectedRekeningId}
       />
     </>
   );

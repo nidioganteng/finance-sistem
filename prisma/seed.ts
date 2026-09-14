@@ -3,8 +3,6 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// Helper: buat satu transaksi balanced (baris akun + kas entry pasangan)
-// Mengembalikan saldo baru setelah transaksi.
 async function buatTransaksi(params: {
   entityId: string;
   jenisInputId: string;
@@ -16,7 +14,7 @@ async function buatTransaksi(params: {
   saldoBefore: number;
   staffId: string;
   rekeningNama?: string;
-  kasCoaId: string; // COA untuk kas/bank entry (wajib supaya Buku Besar balance)
+  kasCoaId: string;
 }): Promise<number> {
   const total = params.rows.reduce((s, r) => s + r.nominal, 0);
   const isKeluar = params.arah === "keluar";
@@ -32,7 +30,6 @@ async function buatTransaksi(params: {
     staffId: params.staffId,
   };
 
-  // Baris akun: keluar → Debet | masuk → Kredit
   for (const row of params.rows) {
     await prisma.transaction.create({
       data: {
@@ -44,7 +41,6 @@ async function buatTransaksi(params: {
     });
   }
 
-  // Kas/bank entry (counter leg): keluar → Kredit | masuk → Debet
   await prisma.transaction.create({
     data: {
       ...common,
@@ -62,10 +58,6 @@ async function buatTransaksi(params: {
 }
 
 async function main() {
-  // ────────────────────────────────────────────────────────────────
-  // BERSIHKAN DATA LAMA (transaksional, notifikasi, termin)
-  // Entity, user, COA, project, jenis input dibiarkan (upsert di bawah)
-  // ────────────────────────────────────────────────────────────────
   await prisma.transaction.deleteMany({});
   await prisma.notifikasi.deleteMany({});
   await prisma.termin.deleteMany({});
@@ -75,7 +67,7 @@ async function main() {
     { key: "gaharu",    name: "Gaharu",     legalName: "PT Gaharu Sempana Konstruksi", colorHex: "#3b6fed" },
     { key: "kencana",   name: "Kencana",    legalName: "PT Kencana Mitra Properti",    colorHex: "#e0433f" },
     { key: "tataring",  name: "Tataring",   legalName: "PT Tataring Cipta Bangun",     colorHex: "#1f9d55" },
-    { key: "ciptaAsri", name: "Cipta Asri", legalName: "PT Cipta Asri Landscape",      colorHex: "#8b5cf6" },
+    { key: "ciptaAsri", name: "Cipta Asri", legalName: "PT Cipta Asri Landscape",      colorHex: "#8b5cf6", isUmum: false },
     { key: "umum",      name: "Umum",       legalName: "Ruang Transit Antar Entitas",  colorHex: "#64748b", isUmum: true },
   ];
   const entities: Record<string, { id: string }> = {};
@@ -143,7 +135,6 @@ async function main() {
 
   // ── COA ──────────────────────────────────────────────────────────
   const coaDefs = [
-    // Kas & Bank (ASET — debet normal)
     { code: "1-001", name: "Kas Kecil",               kategori: CoaKategori.ASET },
     { code: "1-002", name: "Kas Besar",               kategori: CoaKategori.ASET },
     { code: "1-101", name: "Bank BRI GS",             kategori: CoaKategori.ASET },
@@ -153,10 +144,8 @@ async function main() {
     { code: "1-301", name: "Bank BPD TB",             kategori: CoaKategori.ASET },
     { code: "1-401", name: "Bank BPD CAD",            kategori: CoaKategori.ASET },
     { code: "1-501", name: "Bank BPD KP",             kategori: CoaKategori.ASET },
-    // Pendapatan
     { code: "4-001", name: "Penerimaan Termin",       kategori: CoaKategori.PENDAPATAN },
     { code: "4-002", name: "Pendapatan Jasa Giro",    kategori: CoaKategori.PENDAPATAN },
-    // Beban
     { code: "5-001", name: "Pembayaran Material",     kategori: CoaKategori.BEBAN },
     { code: "5-002", name: "Biaya Operasional",       kategori: CoaKategori.BEBAN },
     { code: "5-003", name: "Biaya Makan & Konsumsi",  kategori: CoaKategori.BEBAN },
@@ -170,6 +159,9 @@ async function main() {
   }
 
   // ── Projects & Termin ────────────────────────────────────────────
+  // contractValue & spend sengaja dikalibrasi agar konsisten dengan transaksi:
+  // - Dashboard (Manajer/Admin) pakai contractValue & spend langsung dari sini
+  // - Laporan Keuangan (Staf) pakai transaksi aktual yang totalnya menyesuaikan
   const projectSeed = [
     { entityKey: "gaharu",    code: "GHR-091", name: "Gudang Distribusi Cikarang",   contractValue: 6.2e9,  spend: 4.1e9,  terminPct: 90 },
     { entityKey: "gaharu",    code: "GHR-088", name: "Pabrik Komponen Bekasi",        contractValue: 9.4e9,  spend: 6.0e9,  terminPct: 84 },
@@ -194,16 +186,30 @@ async function main() {
     });
   }
 
-  const gId = entities["gaharu"].id;
-  const sId = staf.id;
+  const gId  = entities["gaharu"].id;
+  const kId  = entities["kencana"].id;
+  const tId  = entities["tataring"].id;
+  const caId = entities["ciptaAsri"].id;
+  const uId  = entities["umum"].id;
+  const sId  = staf.id;
+
+  const kasKecilCoaId = coa["1-001"].id;
+  const kasBesarCoaId = coa["1-002"].id;
+  const briGsCoaId    = coa["1-101"].id;
+  const bpdGsCoaId    = coa["1-102"].id;
+  const briKakCoaId   = coa["1-201"].id;
+  const bpdKakCoaId   = coa["1-202"].id;
+  const bpdTbCoaId    = coa["1-301"].id;
+  const bpdCadCoaId   = coa["1-401"].id;
+  const bpdKpCoaId    = coa["1-501"].id;
 
   // ════════════════════════════════════════════════════════════════
-  // TRANSAKSI DUMMY — semua balanced (Debet = Kredit per transaksi)
+  // GAHARU — Target Pendapatan ~13,5 M, Beban ~10,1 M
+  // (Dashboard: contractValue 15,6 M, spend 10,1 M)
   // ════════════════════════════════════════════════════════════════
 
   // ── Kas Kecil — Gaharu ──────────────────────────────────────────
   let skkGaharu = 0;
-  const kasKecilCoaId = coa["1-001"].id;
 
   skkGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasKecil"].id, staffId: sId,
@@ -212,7 +218,6 @@ async function main() {
     rows: [{ coaId: coa["4-001"].id, nominal: 5_000_000 }],
     saldoBefore: skkGaharu, kasCoaId: kasKecilCoaId,
   });
-
   skkGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-05", noBukti: "GS/050901", arah: "keluar",
@@ -220,7 +225,6 @@ async function main() {
     rows: [{ coaId: coa["5-004"].id, nominal: 350_000 }],
     saldoBefore: skkGaharu, kasCoaId: kasKecilCoaId,
   });
-
   skkGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-08", noBukti: "GS/080901", arah: "keluar",
@@ -231,7 +235,6 @@ async function main() {
     ],
     saldoBefore: skkGaharu, kasCoaId: kasKecilCoaId,
   });
-
   skkGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-10", noBukti: "GS/100901", arah: "keluar",
@@ -239,7 +242,6 @@ async function main() {
     rows: [{ coaId: coa["5-004"].id, nominal: 120_000 }],
     saldoBefore: skkGaharu, kasCoaId: kasKecilCoaId,
   });
-
   skkGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-14", noBukti: "GS/140901", arah: "keluar",
@@ -250,7 +252,6 @@ async function main() {
 
   // ── Kas Besar — Gaharu ──────────────────────────────────────────
   let skbGaharu = 0;
-  const kasBesarCoaId = coa["1-002"].id;
 
   skbGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasBesar"].id, staffId: sId,
@@ -259,7 +260,6 @@ async function main() {
     rows: [{ coaId: coa["4-001"].id, nominal: 100_000_000 }],
     saldoBefore: skbGaharu, kasCoaId: kasBesarCoaId,
   });
-
   skbGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasBesar"].id, staffId: sId,
     tanggal: "2026-09-05", noBukti: "GS/050902", arah: "keluar",
@@ -267,7 +267,6 @@ async function main() {
     rows: [{ coaId: coa["5-005"].id, nominal: 12_500_000 }],
     saldoBefore: skbGaharu, kasCoaId: kasBesarCoaId,
   });
-
   skbGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasBesar"].id, staffId: sId,
     tanggal: "2026-09-08", noBukti: "GS/080902", arah: "keluar",
@@ -278,7 +277,6 @@ async function main() {
     ],
     saldoBefore: skbGaharu, kasCoaId: kasBesarCoaId,
   });
-
   skbGaharu = await buatTransaksi({
     entityId: gId, jenisInputId: ji["kasBesar"].id, staffId: sId,
     tanggal: "2026-09-12", noBukti: "GS/120901", arah: "keluar",
@@ -288,78 +286,78 @@ async function main() {
   });
 
   // ── Bank Buku — BRI GS (Gaharu) ─────────────────────────────────
+  // Penerimaan termin proyek (bulk via bank)
   let sbbBriGs = 0;
-  const briGsCoaId = coa["1-101"].id;
 
   sbbBriGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-03", noBukti: "GS/030901", arah: "masuk",
-    keterangan: "Penerimaan termin 1 — GHR-091",
-    rows: [{ coaId: coa["4-001"].id, nominal: 62_000_000 }],
+    keterangan: "Penerimaan termin — GHR-091 (90% dari kontrak Rp 6,2 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 5_580_000_000 }],
     saldoBefore: sbbBriGs, rekeningNama: "BRI GS", kasCoaId: briGsCoaId,
   });
-
   sbbBriGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-10", noBukti: "GS/100902", arah: "masuk",
-    keterangan: "Penerimaan termin 1 — GHR-088",
-    rows: [{ coaId: coa["4-001"].id, nominal: 45_000_000 }],
+    keterangan: "Penerimaan termin pertama — GHR-088 (50% dari kontrak Rp 9,4 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 4_700_000_000 }],
     saldoBefore: sbbBriGs, rekeningNama: "BRI GS", kasCoaId: briGsCoaId,
   });
-
   sbbBriGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-30", noBukti: "GS/300901", arah: "keluar",
     keterangan: "Biaya administrasi bank September",
-    rows: [{ coaId: coa["5-006"].id, nominal: 274_604 }],
+    rows: [{ coaId: coa["5-006"].id, nominal: 1_500_000 }],
     saldoBefore: sbbBriGs, rekeningNama: "BRI GS", kasCoaId: briGsCoaId,
   });
-
   sbbBriGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-30", noBukti: "GS/300902", arah: "masuk",
-    keterangan: "Jasa giro September",
-    rows: [{ coaId: coa["4-002"].id, nominal: 1_273_023 }],
+    keterangan: "Jasa giro September BRI GS",
+    rows: [{ coaId: coa["4-002"].id, nominal: 12_500_000 }],
     saldoBefore: sbbBriGs, rekeningNama: "BRI GS", kasCoaId: briGsCoaId,
   });
 
   // ── Bank Buku — BPD GS (Gaharu) ─────────────────────────────────
   let sbbBpdGs = 0;
-  const bpdGsCoaId = coa["1-102"].id;
 
   sbbBpdGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-15", noBukti: "GS/150901", arah: "masuk",
-    keterangan: "Transfer masuk pembayaran termin KCN-041",
-    rows: [{ coaId: coa["4-001"].id, nominal: 25_000_000 }],
+    keterangan: "Penerimaan termin kedua — GHR-088 (34% dari kontrak Rp 9,4 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 3_100_000_000 }],
     saldoBefore: sbbBpdGs, rekeningNama: "BPD GS", kasCoaId: bpdGsCoaId,
   });
-
   sbbBpdGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-20", noBukti: "GS/200901", arah: "keluar",
-    keterangan: "Pembayaran subkontraktor pasang baja",
-    rows: [{ coaId: coa["5-001"].id, nominal: 18_500_000 }],
+    keterangan: "Pembayaran material, subkontraktor & supplier GHR-091 + GHR-088",
+    rows: [{ coaId: coa["5-001"].id, nominal: 7_050_000_000 }],
     saldoBefore: sbbBpdGs, rekeningNama: "BPD GS", kasCoaId: bpdGsCoaId,
   });
-
+  sbbBpdGs = await buatTransaksi({
+    entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
+    tanggal: "2026-09-25", noBukti: "GS/250901", arah: "keluar",
+    keterangan: "Pembayaran upah mandor & tukang GHR-091 + GHR-088 September",
+    rows: [{ coaId: coa["5-005"].id, nominal: 3_000_000_000 }],
+    saldoBefore: sbbBpdGs, rekeningNama: "BPD GS", kasCoaId: bpdGsCoaId,
+  });
   sbbBpdGs = await buatTransaksi({
     entityId: gId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-30", noBukti: "GS/300903", arah: "keluar",
-    keterangan: "Biaya administrasi bank September",
-    rows: [{ coaId: coa["5-006"].id, nominal: 152_000 }],
+    keterangan: "Biaya administrasi bank September BPD GS",
+    rows: [{ coaId: coa["5-006"].id, nominal: 250_000 }],
     saldoBefore: sbbBpdGs, rekeningNama: "BPD GS", kasCoaId: bpdGsCoaId,
   });
 
   // ════════════════════════════════════════════════════════════════
-  // KENCANA — PT Kencana Mitra Properti
+  // KENCANA — Target Pendapatan ~2,6 M, Beban ~1,9 M
+  // (Dashboard: contractValue 3,1 M, spend 1,9 M)
   // ════════════════════════════════════════════════════════════════
-  const kId = entities["kencana"].id;
-  const briKakCoaId = coa["1-201"].id;
-  const bpdKakCoaId = coa["1-202"].id;
 
   // ── Kas Kecil — Kencana ─────────────────────────────────────────
   let skkKencana = 0;
+
   skkKencana = await buatTransaksi({
     entityId: kId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-02", noBukti: "KAK/020901", arah: "masuk",
@@ -391,6 +389,7 @@ async function main() {
 
   // ── Kas Besar — Kencana ─────────────────────────────────────────
   let skbKencana = 0;
+
   skbKencana = await buatTransaksi({
     entityId: kId, jenisInputId: ji["kasBesar"].id, staffId: sId,
     tanggal: "2026-09-01", noBukti: "KAK/010902", arah: "masuk",
@@ -415,11 +414,12 @@ async function main() {
 
   // ── Bank Buku — BRI KAK (Kencana) ───────────────────────────────
   let sbbBriKak = 0;
+
   sbbBriKak = await buatTransaksi({
     entityId: kId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-05", noBukti: "KAK/050902", arah: "masuk",
-    keterangan: "Penerimaan termin 1 proyek KCN-041",
-    rows: [{ coaId: coa["4-001"].id, nominal: 31_000_000 }],
+    keterangan: "Penerimaan termin pertama KCN-041 (50% dari kontrak Rp 3,1 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 1_550_000_000 }],
     saldoBefore: sbbBriKak, rekeningNama: "BRI KAK", kasCoaId: briKakCoaId,
   });
   sbbBriKak = await buatTransaksi({
@@ -439,36 +439,44 @@ async function main() {
 
   // ── Bank Buku — BPD KAK (Kencana) ───────────────────────────────
   let sbbBpdKak = 0;
+
   sbbBpdKak = await buatTransaksi({
     entityId: kId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-12", noBukti: "KAK/120901", arah: "masuk",
-    keterangan: "Transfer masuk modal kerja proyek KCN-041",
-    rows: [{ coaId: coa["4-001"].id, nominal: 15_000_000 }],
+    keterangan: "Penerimaan termin kedua KCN-041 (34% dari kontrak Rp 3,1 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 1_054_000_000 }],
     saldoBefore: sbbBpdKak, rekeningNama: "BPD KAK", kasCoaId: bpdKakCoaId,
   });
   sbbBpdKak = await buatTransaksi({
     entityId: kId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-20", noBukti: "KAK/200901", arah: "keluar",
-    keterangan: "Pembayaran supplier material bangunan",
-    rows: [{ coaId: coa["5-001"].id, nominal: 8_000_000 }],
+    keterangan: "Pembayaran material & supplier KCN-041",
+    rows: [{ coaId: coa["5-001"].id, nominal: 1_500_000_000 }],
+    saldoBefore: sbbBpdKak, rekeningNama: "BPD KAK", kasCoaId: bpdKakCoaId,
+  });
+  sbbBpdKak = await buatTransaksi({
+    entityId: kId, jenisInputId: ji["bankBuku"].id, staffId: sId,
+    tanggal: "2026-09-25", noBukti: "KAK/250901", arah: "keluar",
+    keterangan: "Pembayaran upah tukang & subkontraktor KCN-041",
+    rows: [{ coaId: coa["5-005"].id, nominal: 388_000_000 }],
     saldoBefore: sbbBpdKak, rekeningNama: "BPD KAK", kasCoaId: bpdKakCoaId,
   });
   sbbBpdKak = await buatTransaksi({
     entityId: kId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-30", noBukti: "KAK/300903", arah: "keluar",
-    keterangan: "Biaya administrasi bank September",
+    keterangan: "Biaya administrasi bank September BPD KAK",
     rows: [{ coaId: coa["5-006"].id, nominal: 110_000 }],
     saldoBefore: sbbBpdKak, rekeningNama: "BPD KAK", kasCoaId: bpdKakCoaId,
   });
 
   // ════════════════════════════════════════════════════════════════
-  // TATARING — PT Tataring Cipta Bangun
+  // TATARING — Target Pendapatan ~0,81 M, Beban ~1,1 M (rugi)
+  // (Dashboard: contractValue 1,8 M, spend 1,1 M — proyek masih awal)
   // ════════════════════════════════════════════════════════════════
-  const tId = entities["tataring"].id;
-  const bpdTbCoaId = coa["1-301"].id;
 
   // ── Kas Kecil — Tataring ─────────────────────────────────────────
   let skkTataring = 0;
+
   skkTataring = await buatTransaksi({
     entityId: tId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-03", noBukti: "TTR/030901", arah: "masuk",
@@ -493,6 +501,7 @@ async function main() {
 
   // ── Kas Besar — Tataring ─────────────────────────────────────────
   let skbTataring = 0;
+
   skbTataring = await buatTransaksi({
     entityId: tId, jenisInputId: ji["kasBesar"].id, staffId: sId,
     tanggal: "2026-09-01", noBukti: "TTR/010902", arah: "masuk",
@@ -517,18 +526,26 @@ async function main() {
 
   // ── Bank Buku — BPD TB (Tataring) ───────────────────────────────
   let sbbBpdTb = 0;
+
   sbbBpdTb = await buatTransaksi({
     entityId: tId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-04", noBukti: "TTR/040901", arah: "masuk",
-    keterangan: "Penerimaan termin 1 proyek TTR-018",
-    rows: [{ coaId: coa["4-001"].id, nominal: 18_000_000 }],
+    keterangan: "Penerimaan termin TTR-018 (45% dari kontrak Rp 1,8 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 778_890_000 }],
     saldoBefore: sbbBpdTb, rekeningNama: "BPD TB", kasCoaId: bpdTbCoaId,
   });
   sbbBpdTb = await buatTransaksi({
     entityId: tId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-18", noBukti: "TTR/180901", arah: "keluar",
-    keterangan: "Pembayaran material plafon & partisi",
-    rows: [{ coaId: coa["5-001"].id, nominal: 5_000_000 }],
+    keterangan: "Pembayaran material plafon, partisi & mekanikal",
+    rows: [{ coaId: coa["5-001"].id, nominal: 750_000_000 }],
+    saldoBefore: sbbBpdTb, rekeningNama: "BPD TB", kasCoaId: bpdTbCoaId,
+  });
+  sbbBpdTb = await buatTransaksi({
+    entityId: tId, jenisInputId: ji["bankBuku"].id, staffId: sId,
+    tanggal: "2026-09-22", noBukti: "TTR/220901", arah: "keluar",
+    keterangan: "Pembayaran upah tukang renovasi & finishing",
+    rows: [{ coaId: coa["5-005"].id, nominal: 339_465_000 }],
     saldoBefore: sbbBpdTb, rekeningNama: "BPD TB", kasCoaId: bpdTbCoaId,
   });
   sbbBpdTb = await buatTransaksi({
@@ -547,13 +564,13 @@ async function main() {
   });
 
   // ════════════════════════════════════════════════════════════════
-  // CIPTA ASRI — PT Cipta Asri Landscape
+  // CIPTA ASRI — Target Pendapatan ~0,72 M, Beban ~1,3 M (rugi)
+  // (Dashboard: contractValue 2,4 M, spend 1,3 M — proyek masih awal)
   // ════════════════════════════════════════════════════════════════
-  const caId = entities["ciptaAsri"].id;
-  const bpdCadCoaId = coa["1-401"].id;
 
   // ── Kas Kecil — Cipta Asri ───────────────────────────────────────
   let skkCa = 0;
+
   skkCa = await buatTransaksi({
     entityId: caId, jenisInputId: ji["kasKecil"].id, staffId: sId,
     tanggal: "2026-09-02", noBukti: "CAS/020901", arah: "masuk",
@@ -578,6 +595,7 @@ async function main() {
 
   // ── Kas Besar — Cipta Asri ───────────────────────────────────────
   let skbCa = 0;
+
   skbCa = await buatTransaksi({
     entityId: caId, jenisInputId: ji["kasBesar"].id, staffId: sId,
     tanggal: "2026-09-01", noBukti: "CAS/010902", arah: "masuk",
@@ -602,18 +620,26 @@ async function main() {
 
   // ── Bank Buku — BPD CAD (Cipta Asri) ────────────────────────────
   let sbbBpdCad = 0;
+
   sbbBpdCad = await buatTransaksi({
     entityId: caId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-05", noBukti: "CAS/050901", arah: "masuk",
-    keterangan: "Penerimaan termin 1 proyek CAS-009",
-    rows: [{ coaId: coa["4-001"].id, nominal: 24_000_000 }],
+    keterangan: "Penerimaan termin CAS-009 (30% dari kontrak Rp 2,4 M)",
+    rows: [{ coaId: coa["4-001"].id, nominal: 679_000_000 }],
     saldoBefore: sbbBpdCad, rekeningNama: "BPD CAD", kasCoaId: bpdCadCoaId,
   });
   sbbBpdCad = await buatTransaksi({
     entityId: caId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-20", noBukti: "CAS/200901", arah: "keluar",
-    keterangan: "Pembayaran supplier irigasi & sistem drainase",
-    rows: [{ coaId: coa["5-001"].id, nominal: 3_000_000 }],
+    keterangan: "Pembayaran supplier irigasi, drainase & material taman",
+    rows: [{ coaId: coa["5-001"].id, nominal: 920_000_000 }],
+    saldoBefore: sbbBpdCad, rekeningNama: "BPD CAD", kasCoaId: bpdCadCoaId,
+  });
+  sbbBpdCad = await buatTransaksi({
+    entityId: caId, jenisInputId: ji["bankBuku"].id, staffId: sId,
+    tanggal: "2026-09-25", noBukti: "CAS/250901", arah: "keluar",
+    keterangan: "Pembayaran upah tukang taman & landscaper",
+    rows: [{ coaId: coa["5-005"].id, nominal: 366_650_000 }],
     saldoBefore: sbbBpdCad, rekeningNama: "BPD CAD", kasCoaId: bpdCadCoaId,
   });
   sbbBpdCad = await buatTransaksi({
@@ -627,22 +653,20 @@ async function main() {
   // ════════════════════════════════════════════════════════════════
   // UMUM — Ruang Transit Antar Entitas (hanya Bank Buku)
   // ════════════════════════════════════════════════════════════════
-  const uId = entities["umum"].id;
-  const bpdKpCoaId = coa["1-501"].id;
-
   let sbbBpdKp = 0;
+
   sbbBpdKp = await buatTransaksi({
     entityId: uId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-03", noBukti: "KP/030901", arah: "masuk",
     keterangan: "Transfer masuk dari Gaharu — pinjam bendera KSO",
-    rows: [{ coaId: coa["4-001"].id, nominal: 50_000_000 }],
+    rows: [{ coaId: coa["4-001"].id, nominal: 500_000_000 }],
     saldoBefore: sbbBpdKp, rekeningNama: "BPD KP", kasCoaId: bpdKpCoaId,
   });
   sbbBpdKp = await buatTransaksi({
     entityId: uId, jenisInputId: ji["bankBuku"].id, staffId: sId,
     tanggal: "2026-09-15", noBukti: "KP/150901", arah: "keluar",
     keterangan: "Reklasifikasi ke Kencana — proyek KSO selesai verifikasi",
-    rows: [{ coaId: coa["5-002"].id, nominal: 45_000_000 }],
+    rows: [{ coaId: coa["5-002"].id, nominal: 450_000_000 }],
     saldoBefore: sbbBpdKp, rekeningNama: "BPD KP", kasCoaId: bpdKpCoaId,
   });
   sbbBpdKp = await buatTransaksi({
@@ -664,6 +688,13 @@ async function main() {
   });
 
   console.log("✅ Seed selesai — semua transaksi balanced (Debet = Kredit).");
+  console.log("");
+  console.log("Ringkasan data per entitas (Laporan Keuangan Staf ≈ Dashboard Manager):");
+  console.log("  Gaharu     | Pendapatan ~13,5 M | Beban ~10,1 M | Laba ~3,4 M");
+  console.log("  Kencana    | Pendapatan ~2,66 M | Beban ~1,9 M  | Laba ~0,76 M");
+  console.log("  Tataring   | Pendapatan ~0,81 M | Beban ~1,1 M  | Rugi ~0,29 M");
+  console.log("  Cipta Asri | Pendapatan ~0,72 M | Beban ~1,3 M  | Rugi ~0,58 M");
+  console.log("  Umum       | Pendapatan ~0,5 M  | Beban ~0,45 M | Laba ~0,05 M");
   console.log("");
   console.log("Akun contoh (password: password123):");
   console.log("  superadmin@gaharusempana.com  →  Super Admin");

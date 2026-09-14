@@ -138,83 +138,8 @@ export function PiutangClient({
 
       {/* ── Tab: Daftar Termin ── */}
       {tab === "termin" && (
-<<<<<<< Updated upstream
-        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-hover text-left">
-                <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Proyek</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Termin</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Progress</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Status</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Diaudit</th>
-                {isManajer && (
-                  <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Aksi</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {terminList.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-muted">
-                    Belum ada data termin untuk entitas ini.
-                  </td>
-                </tr>
-              )}
-              {terminList.map((t) => (
-                <tr key={t.id} className="border-b border-surface-subtle hover:bg-surface-hover/30">
-                  <td className="py-3 px-6">
-                    <div className="font-semibold text-navy-text text-[13px]">{t.projectCode}</div>
-                    <div className="text-[12px] text-muted">{t.projectName}</div>
-                    <div className="text-[11.5px] text-muted-faint">{t.contractValueFmt}</div>
-                  </td>
-                  <td className="py-3 px-3 text-[13px] text-muted-stronger">{t.name}</td>
-                  <td className="py-3 px-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-1.5 bg-surface-hover rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-brand rounded-full"
-                          style={{ width: `${Math.min(t.percentage, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[12.5px] font-semibold text-muted-stronger">{t.percentage}%</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${STATUS_BADGE[t.status]}`}>
-                      {STATUS_LABEL[t.status]}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-[12px] text-muted">
-                    {t.auditedAt ? (
-                      <>
-                        <div>{t.auditedAt}</div>
-                        <div className="text-muted-faint">{t.auditedByName}</div>
-                      </>
-                    ) : (
-                      <span className="text-muted-faint">Belum diaudit</span>
-                    )}
-                  </td>
-                  {isManajer && (
-                    <td className="py-3 px-6 text-right">
-                      <div className="flex items-center gap-2 justify-end">
-                        {t.status !== "ON_TRACK" && (
-                          <button
-                            onClick={() => handleAudit(t.id)}
-                            disabled={isPending}
-                            className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12px] font-semibold flex items-center gap-1"
-                          >
-                            <CheckCircle size={12} /> Audit
-                          </button>
-                        )}
-                        <select
-                          value={t.status}
-                          onChange={(e) => handleStatusChange(t.id, e.target.value as TerminStatus)}
-                          disabled={isPending}
-                          className="px-2 py-1.5 rounded-lg border border-border text-[12px] bg-surface-card"
-=======
         <>
-          {/* Kartu ringkasan (spec B.3) */}
+          {/* Kartu ringkasan */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white rounded-[16px] border border-black/[.06] p-5">
               <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
@@ -283,7 +208,6 @@ export function PiutangClient({
                           key={`proj-${p.id}`}
                           onClick={() => toggleExpand(p.id)}
                           className="border-b border-surface-subtle bg-surface-subtle/30 hover:bg-surface-hover/40 cursor-pointer"
->>>>>>> Stashed changes
                         >
                           <td className="py-3 px-5 text-muted-faint">
                             {isExpanded

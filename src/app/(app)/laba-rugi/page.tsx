@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getLabaRugiData } from "@/lib/laba-rugi";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
@@ -17,10 +18,7 @@ export default async function LabaRugiPage({
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : entityKeys[0];
+  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
 

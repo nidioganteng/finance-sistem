@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getProfitabilitasData } from "@/lib/profitabilitas";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -28,10 +29,7 @@ export default async function ProfitabilitasPage({
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : entityKeys[0];
+  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
   if (!selectedEntity) {

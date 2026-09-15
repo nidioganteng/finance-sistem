@@ -6,6 +6,7 @@ import { getLabaRugiData } from "@/lib/laba-rugi";
 import { getNeracaData } from "@/lib/neraca";
 import { getArusKasData } from "@/lib/arus-kas";
 import { canViewGrupAggregate } from "@/lib/rbac";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
@@ -23,10 +24,12 @@ export default async function LaporanPage({
 
   const entities = await getAccessibleEntities(entityKeys);
   const canGrup = canViewGrupAggregate(role);
+  // Grup view hanya muncul kalau canGrup dan tidak ada entity di URL (user sengaja pilih grup).
+  // Kalau tidak ada entity di URL tapi juga tidak canGrup → baca cookie via resolveEntityKey.
   const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : undefined;
+    canGrup && !searchParams.entity
+      ? undefined
+      : resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const tab = searchParams.tab ?? "ringkasan";

@@ -9,6 +9,7 @@ import {
   formatRupiah,
   formatMiliar,
 } from "@/lib/dashboard-data";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate, roleLabel } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -35,12 +36,13 @@ export default async function DashboardPage({
   const canGrup = canViewGrupAggregate(role);
   const isStaff = role === "STAF_KEUANGAN";
 
-  const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
+  const selectedKey = isStaff
+    // Staff selalu punya entity aktif — baca cookie kalau URL tidak ada entity
+    ? resolveEntityKey(searchParams.entity, entityKeys)
+    // Manager/Admin: kalau URL tidak ada entity → tampilkan grup (undefined)
+    : searchParams.entity && entityKeys.includes(searchParams.entity)
       ? searchParams.entity
-      : isStaff
-      ? entityKeys[0]
-      : searchParams.entity;
+      : searchParams.entity; // undefined → grup
   const showingGrup = canGrup && !selectedKey;
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 

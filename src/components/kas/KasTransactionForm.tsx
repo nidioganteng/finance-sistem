@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createKasTransaction } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
+import { CoaCombobox } from "./CoaCombobox";
 
 type CoaOption = { id: string; code: string; name: string };
 type Row = { id: number; coaAccountId: string; nominal: string };
@@ -201,18 +202,11 @@ export function KasTransactionForm({
         <div className="flex flex-col gap-2">
           {rows.map((r) => (
             <div key={r.id} className="grid grid-cols-[1fr_160px_32px] gap-2.5 items-center">
-              <select
+              <CoaCombobox
                 value={r.coaAccountId}
-                onChange={(e) => updateRow(r.id, { coaAccountId: e.target.value })}
-                className="w-full px-2.5 py-2 rounded-[9px] border border-border text-[13px]"
-              >
-                <option value="">Pilih akun...</option>
-                {coaOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} — {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(id) => updateRow(r.id, { coaAccountId: id })}
+                options={coaOptions}
+              />
               <input
                 value={r.nominal}
                 onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}

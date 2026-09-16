@@ -11,12 +11,42 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { LaporanTabs } from "@/components/laporan/LaporanTabs";
+import { KomparasiControls } from "@/components/laporan/KomparasiControls";
 import { prisma } from "@/lib/prisma";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+
+const BULAN_LABEL = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+type Period = { year: number; month?: number };
+
+function parsePeriod(raw: string | undefined, mode: "tahunan" | "bulanan", fallback: Period): Period {
+  if (!raw) return mode === "bulanan" ? { year: fallback.year, month: fallback.month ?? 1 } : { year: fallback.year };
+  const [yStr, mStr] = raw.split("-");
+  const year = parseInt(yStr) || fallback.year;
+  if (mode !== "bulanan") return { year };
+  const month = parseInt(mStr) || fallback.month || 1;
+  return { year, month };
+}
+
+function periodLabel(p: Period, mode: "tahunan" | "bulanan") {
+  return mode === "bulanan" ? `${BULAN_LABEL[(p.month ?? 1) - 1]} ${p.year}` : `Tahun ${p.year}`;
+}
+
+// delta positif dianggap "baik" untuk Pendapatan & Laba, tapi "buruk" untuk Beban —
+// goodWhenUp membalik warna supaya kenaikan Beban tetap ditandai merah.
+function computeDelta(a: number, b: number, goodWhenUp: boolean) {
+  const diff = a - b;
+  const pct = b !== 0 ? (diff / Math.abs(b)) * 100 : a !== 0 ? 100 : 0;
+  const isUp = diff > 0;
+  const isFlat = diff === 0;
+  const isGood = isFlat ? null : isUp === goodWhenUp;
+  return { diff, pct, isUp, isFlat, isGood };
+}
 
 export default async function LaporanPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string; tab?: string };
+  searchParams: { entity?: string; year?: string; tab?: string; mode?: string; periodA?: string; periodB?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -99,6 +129,66 @@ export default async function LaporanPage({
     }
   }
 
+  // Komparasi antar-periode (bulan vs bulan, atau tahun vs tahun) — jangkauan
+  // dibatasi 5 tahun ke belakang lewat KomparasiControls.
+  let komparasiData: {
+    mode: "tahunan" | "bulanan";
+    periodA: Period;
+    periodB: Period;
+    labelA: string;
+    labelB: string;
+    pendapatan: ReturnType<typeof computeDelta> & { a: number; b: number };
+    beban: ReturnType<typeof computeDelta> & { a: number; b: number };
+    laba: ReturnType<typeof computeDelta> & { a: number; b: number };
+    txCountA: number;
+    txCountB: number;
+  } | null = null;
+
+  if (tab === "komparasi") {
+    const mode = searchParams.mode === "bulanan" ? "bulanan" : "tahunan";
+    const nowYear = new Date().getFullYear();
+    const nowMonth = new Date().getMonth() + 1;
+    const periodA = parsePeriod(searchParams.periodA, mode, { year: nowYear, month: nowMonth });
+    const periodB = parsePeriod(searchParams.periodB, mode, { year: nowYear - 1, month: nowMonth });
+
+    const dateRange = (p: Period) =>
+      p.month
+        ? { gte: new Date(p.year, p.month - 1, 1), lte: new Date(p.year, p.month, 0, 23, 59, 59) }
+        : { gte: new Date(`${p.year}-01-01`), lte: new Date(`${p.year}-12-31T23:59:59`) };
+
+    const [labaRugiA, labaRugiB, txCountA, txCountB] = await Promise.all([
+      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month))),
+      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month))),
+      prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodA) } }),
+      prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodB) } }),
+    ]);
+
+    const sumPendapatan = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalPendapatan, 0);
+    const sumBeban = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalBeban, 0);
+
+    const pendapatanA = sumPendapatan(labaRugiA);
+    const pendapatanB = sumPendapatan(labaRugiB);
+    const bebanA = sumBeban(labaRugiA);
+    const bebanB = sumBeban(labaRugiB);
+
+    komparasiData = {
+      mode,
+      periodA,
+      periodB,
+      labelA: periodLabel(periodA, mode),
+      labelB: periodLabel(periodB, mode),
+      pendapatan: { a: pendapatanA, b: pendapatanB, ...computeDelta(pendapatanA, pendapatanB, true) },
+      beban: { a: bebanA, b: bebanB, ...computeDelta(bebanA, bebanB, false) },
+      laba: {
+        a: pendapatanA - bebanA,
+        b: pendapatanB - bebanB,
+        ...computeDelta(pendapatanA - bebanA, pendapatanB - bebanB, true),
+      },
+      txCountA,
+      txCountB,
+    };
+  }
+
   const txCount = await prisma.transaction.count({
     where: {
       entityId: { in: entityIds },
@@ -115,10 +205,14 @@ export default async function LaporanPage({
     <>
       <PageHeader
         title="Laporan Keuangan"
-        subtitle={`Ringkasan laporan keuangan — ${entityLabel} ${currentYear}`}
+        subtitle={
+          tab === "komparasi" && komparasiData
+            ? `Komparasi laporan keuangan — ${entityLabel} · ${komparasiData.labelA} vs ${komparasiData.labelB}`
+            : `Ringkasan laporan keuangan — ${entityLabel} ${currentYear}`
+        }
         rightSlot={
           <>
-            <YearSelect currentYear={currentYear} />
+            {tab !== "komparasi" && <YearSelect currentYear={currentYear} />}
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
               showGrupOption={canGrup}
@@ -129,6 +223,68 @@ export default async function LaporanPage({
       />
 
       <LaporanTabs currentTab={tab} />
+
+      {tab === "komparasi" && komparasiData && (
+        <div className="flex flex-col gap-5">
+          <KomparasiControls
+            mode={komparasiData.mode}
+            periodA={komparasiData.periodA}
+            periodB={komparasiData.periodB}
+          />
+
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-hover text-left">
+                  <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Metrik</th>
+                  <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">{komparasiData.labelA}</th>
+                  <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">{komparasiData.labelB}</th>
+                  <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Selisih</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: "Pendapatan", d: komparasiData.pendapatan },
+                  { label: "Beban", d: komparasiData.beban },
+                  { label: "Laba/Rugi Bersih", d: komparasiData.laba },
+                ].map((row) => {
+                  const Icon = row.d.isFlat ? Minus : row.d.isUp ? TrendingUp : TrendingDown;
+                  const color = row.d.isFlat
+                    ? "text-muted"
+                    : row.d.isGood
+                    ? "text-status-green"
+                    : "text-status-red";
+                  return (
+                    <tr key={row.label} className="border-b border-surface-subtle">
+                      <td className="py-3 px-6 font-semibold text-navy-text">{row.label}</td>
+                      <td className="py-3 px-3 text-right tabular-nums text-navy-text">{formatRupiah(row.d.a)}</td>
+                      <td className="py-3 px-3 text-right tabular-nums text-navy-text">{formatRupiah(row.d.b)}</td>
+                      <td className={`py-3 px-6 text-right tabular-nums font-bold ${color}`}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Icon size={14} />
+                          {(row.d.diff >= 0 ? "+" : "-") + formatRupiah(Math.abs(row.d.diff))}
+                          <span className="text-[11px] font-semibold text-muted-faint">
+                            ({row.d.pct >= 0 ? "+" : ""}{row.d.pct.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td className="py-3 px-6 font-semibold text-navy-text">Total Transaksi</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-navy-text">{komparasiData.txCountA}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-navy-text">{komparasiData.txCountB}</td>
+                  <td className="py-3 px-6 text-right tabular-nums font-bold text-muted-stronger">
+                    {komparasiData.txCountA - komparasiData.txCountB >= 0 ? "+" : ""}
+                    {komparasiData.txCountA - komparasiData.txCountB}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {tab === "ringkasan" && labaRugiData && (
         <div className="flex flex-col gap-5">

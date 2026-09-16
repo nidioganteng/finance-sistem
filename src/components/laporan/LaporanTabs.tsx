@@ -7,6 +7,7 @@ const TABS = [
   { key: "laba-rugi", label: "Laba Rugi" },
   { key: "neraca", label: "Neraca" },
   { key: "arus-kas", label: "Arus Kas" },
+  { key: "komparasi", label: "Komparasi" },
 ];
 
 export function LaporanTabs({ currentTab }: { currentTab: string }) {

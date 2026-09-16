@@ -126,6 +126,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
 export function formatMiliar(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
+  if (abs >= 1e12) return sign + "Rp " + (abs / 1e12).toFixed(1).replace(".", ",") + " T";
   if (abs >= 1e9) return sign + "Rp " + (abs / 1e9).toFixed(1).replace(".", ",") + " M";
   if (abs >= 1e6) return sign + "Rp " + (abs / 1e6).toFixed(1).replace(".", ",") + " JT";
   if (abs >= 1e3) return sign + "Rp " + (abs / 1e3).toFixed(1).replace(".", ",") + " rb";

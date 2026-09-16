@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
+import { canManageTransaksi } from "@/lib/rbac";
 
 type KasRowInput = { coaAccountId: string; nominal: number };
 
@@ -40,7 +41,7 @@ async function resolveKasCoa(jenisInputKey: string, rekeningId?: string): Promis
 export async function createKasTransaction(input: CreateKasTransactionInput) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: "Belum login." };
-  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa input transaksi ini." };
+  if (!canManageTransaksi(session.user.role)) return { error: "Kamu tidak punya akses untuk input transaksi ini." };
   if (!session.user.entityKeys.includes(input.entityKey)) return { error: "Kamu tidak punya akses ke entity ini." };
 
   const validRows = input.rows.filter((r) => r.coaAccountId && r.nominal > 0);
@@ -159,7 +160,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
 export async function deleteKasTransactionGroup(txIds: string[], pagePath: string) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: "Belum login." };
-  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa menghapus transaksi." };
+  if (!canManageTransaksi(session.user.role)) return { error: "Kamu tidak punya akses untuk menghapus transaksi." };
   if (txIds.length === 0) return { error: "Tidak ada transaksi untuk dihapus." };
 
   // Find crossingGroupIds from the source transactions
@@ -331,7 +332,7 @@ export async function updateKasTransactionGroup(input: {
 }) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: "Belum login." };
-  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa mengedit transaksi." };
+  if (!canManageTransaksi(session.user.role)) return { error: "Kamu tidak punya akses untuk mengedit transaksi." };
   if (!input.newNoBukti.trim() || !input.newKeterangan.trim()) return { error: "No. bukti dan keterangan wajib diisi." };
 
   await prisma.$transaction([

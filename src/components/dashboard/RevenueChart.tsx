@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -14,9 +14,9 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Legend,
+  LabelList,
 } from "recharts";
 import { BarChart2, TrendingUp, GitCompare, X } from "lucide-react";
-import { EntityMonthlyChart } from "@/components/laporan/EntityMonthlyChart";
 
 type EntityMeta = { key: string; name: string; colorHex: string };
 type MonthRow = Record<string, string | number>;
@@ -27,6 +27,10 @@ interface Props {
   years: number[];
   currentYear: number;
 }
+
+// Warna per tahun saat mode bandingkan aktif — dipakai gantiin warna per
+// entitas, karena satu chart cuma bisa punya satu dimensi warna sekaligus.
+const YEAR_COLORS = ["#3b6fed", "#f59e0b", "#1f9d55", "#e0433f", "#8b5cf6"];
 
 function formatY(v: number) {
   if (v >= 1e12) return (v / 1e12).toFixed(1).replace(".", ",") + " T";
@@ -110,6 +114,31 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
   const availableYears = Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - i);
   const addableYears = availableYears.filter((y) => y !== year && !compareYears.includes(y));
 
+  // Saat bandingkan tahun, gabungkan jadi satu deret data: satu kolom per
+  // tahun, nilainya total pendapatan entitas yang lagi ditampilkan (filter
+  // pill) untuk bulan itu — jadi satu chart bisa nunjukin beberapa tahun
+  // sekaligus, warnanya per tahun (bukan per entitas lagi).
+  const comparisonData = useMemo(() => {
+    if (!isComparing) return [];
+    const base = monthlyDataByYear[0] ?? [];
+    return base.map((row, monthIdx) => {
+      const entry: MonthRow = { month: row.month };
+      years.forEach((y, i) => {
+        const yearRow = monthlyDataByYear[i]?.[monthIdx];
+        entry[String(y)] = visibleEntities.reduce(
+          (s, e) => s + (Number(yearRow?.[e.key]) || 0),
+          0
+        );
+      });
+      return entry;
+    });
+  }, [isComparing, monthlyDataByYear, years, visibleEntities]);
+
+  const chartData = isComparing ? comparisonData : monthlyDataByYear[0];
+  const series = isComparing
+    ? years.map((y, i) => ({ dataKey: String(y), name: `Tahun ${y}`, color: YEAR_COLORS[i % YEAR_COLORS.length] }))
+    : visibleEntities.map((e) => ({ dataKey: e.key, name: e.name, color: e.colorHex }));
+
   const sharedAxisProps = {
     tick: { fontSize: 11, fill: "rgb(var(--color-muted-faint))" },
     axisLine: false as const,
@@ -127,25 +156,36 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
     fontSize: 12,
   };
 
-  const chartContent = visibleEntities.map((e) =>
+  const chartContent = series.map((s) =>
     chartType === "bar" ? (
-      <Bar key={e.key} dataKey={e.key} name={e.name} fill={e.colorHex} radius={[5, 5, 0, 0]} maxBarSize={28} />
+      <Bar key={s.dataKey} dataKey={s.dataKey} name={s.name} fill={s.color} radius={[5, 5, 0, 0]} maxBarSize={28}>
+        {/* Label angka pendapatan per bulan — cuma dinyalain saat bandingkan
+            tahun, biar admin bisa monitor angkanya langsung tanpa hover. */}
+        {isComparing && (
+          <LabelList
+            dataKey={s.dataKey}
+            position="top"
+            formatter={(v: number) => formatY(v)}
+            style={{ fontSize: 9, fontWeight: 700, fill: "rgb(var(--color-muted-stronger))" }}
+          />
+        )}
+      </Bar>
     ) : (
       <Line
-        key={e.key}
+        key={s.dataKey}
         type="monotone"
-        dataKey={e.key}
-        name={e.name}
-        stroke={e.colorHex}
+        dataKey={s.dataKey}
+        name={s.name}
+        stroke={s.color}
         strokeWidth={2.5}
-        dot={{ r: 3, fill: e.colorHex }}
+        dot={{ r: 3, fill: s.color }}
         activeDot={{ r: 5 }}
       />
     )
   );
 
   const commonChart = chartType === "bar" ? (
-    <BarChart data={monthlyDataByYear[0]} barGap={4} barCategoryGap="30%">
+    <BarChart data={chartData} barGap={4} barCategoryGap="30%">
       <CartesianGrid vertical={false} stroke="rgb(var(--color-border))" />
       <XAxis dataKey="month" {...sharedAxisProps} />
       <YAxis {...sharedAxisProps} tickFormatter={formatY} width={56} />
@@ -161,7 +201,7 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
       {chartContent}
     </BarChart>
   ) : (
-    <LineChart data={monthlyDataByYear[0]}>
+    <LineChart data={chartData}>
       <CartesianGrid vertical={false} stroke="rgb(var(--color-border))" />
       <XAxis dataKey="month" {...sharedAxisProps} />
       <YAxis {...sharedAxisProps} tickFormatter={formatY} width={56} />
@@ -197,15 +237,16 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
           </select>
 
           {/* Chip tahun pembanding aktif */}
-          {compareYears.map((y) => (
+          {compareYears.map((y, i) => (
             <span
               key={y}
-              className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-[9px] bg-brand/10 text-brand text-[12px] font-semibold"
+              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-[9px] text-[12px] font-semibold"
+              style={{ background: `${YEAR_COLORS[(i + 1) % YEAR_COLORS.length]}1a`, color: YEAR_COLORS[(i + 1) % YEAR_COLORS.length] }}
             >
               vs {y}
               <button
                 onClick={() => removeCompareYear(y)}
-                className="p-0.5 rounded-full hover:bg-brand/20"
+                className="p-0.5 rounded-full hover:opacity-70"
                 aria-label={`Hapus perbandingan tahun ${y}`}
               >
                 <X size={11} />
@@ -227,33 +268,31 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
             </select>
           )}
 
-          {/* Chart type toggle — cuma relevan kalau tampilan 1 chart (tidak sedang bandingkan tahun) */}
-          {!isComparing && (
-            <div className="flex items-center gap-1 border border-border-soft rounded-[9px] p-0.5 bg-surface-subtle">
-              <button
-                onClick={() => setChartType("bar")}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
-                  chartType === "bar"
-                    ? "bg-surface-card text-navy-text shadow-sm"
-                    : "text-muted hover:text-muted-stronger"
-                }`}
-              >
-                <BarChart2 size={13} />
-                Bar
-              </button>
-              <button
-                onClick={() => setChartType("line")}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
-                  chartType === "line"
-                    ? "bg-surface-card text-navy-text shadow-sm"
-                    : "text-muted hover:text-muted-stronger"
-                }`}
-              >
-                <TrendingUp size={13} />
-                Line
-              </button>
-            </div>
-          )}
+          {/* Chart type toggle */}
+          <div className="flex items-center gap-1 border border-border-soft rounded-[9px] p-0.5 bg-surface-subtle">
+            <button
+              onClick={() => setChartType("bar")}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
+                chartType === "bar"
+                  ? "bg-surface-card text-navy-text shadow-sm"
+                  : "text-muted hover:text-muted-stronger"
+              }`}
+            >
+              <BarChart2 size={13} />
+              Bar
+            </button>
+            <button
+              onClick={() => setChartType("line")}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
+                chartType === "line"
+                  ? "bg-surface-card text-navy-text shadow-sm"
+                  : "text-muted hover:text-muted-stronger"
+              }`}
+            >
+              <TrendingUp size={13} />
+              Line
+            </button>
+          </div>
 
           {/* Buka tab Komparasi di /laporan (tabel Pendapatan/Beban/Laba lengkap) —
               bawa tahun yang sedang aktif di chart. Klik pada chart/tombol tahun
@@ -297,25 +336,17 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
         })}
       </div>
 
-      {!isComparing ? (
-        /* Chart tunggal — mode default, tanpa perbandingan tahun */
-        <ResponsiveContainer width="100%" height={280}>
-          {commonChart}
-        </ResponsiveContainer>
-      ) : (
-        /* Mode bandingkan tahun — satu chart kecil per tahun (warna tetap per
-           entitas), disusun berdampingan supaya gampang dibandingkan visual. */
-        <div className={`grid grid-cols-1 ${years.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"} gap-4`}>
-          {years.map((y, i) => (
-            <EntityMonthlyChart
-              key={y}
-              title={`Tahun ${y}`}
-              data={monthlyDataByYear[i] ?? []}
-              entities={visibleEntities}
-            />
-          ))}
+      {isComparing && (
+        <div className="text-[11.5px] text-muted-faint mb-2">
+          Menampilkan total pendapatan {activeKeys.has("all") ? "semua entitas" : "entitas terpilih"} per bulan,
+          dibandingkan antar-tahun.
         </div>
       )}
+
+      {/* Chart */}
+      <ResponsiveContainer width="100%" height={isComparing ? 320 : 280}>
+        {commonChart}
+      </ResponsiveContainer>
     </div>
   );
 }

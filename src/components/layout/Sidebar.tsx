@@ -17,6 +17,7 @@ import {
   WalletCards,
   TrendingUp,
   Scale,
+  Layers,
   LogOut,
 } from "lucide-react";
 import { getNavForRole, type NavItem } from "@/lib/rbac";
@@ -36,7 +37,13 @@ const ICONS: Record<NavItem["icon"], typeof LayoutGrid> = {
   scale: Scale,
 };
 
-export function Sidebar({ role }: { role: Role }) {
+export function Sidebar({
+  role,
+  customInputs = [],
+}: {
+  role: Role;
+  customInputs?: { key: string; nama: string }[];
+}) {
   const pathname = usePathname();
   const sections = getNavForRole(role);
 
@@ -81,6 +88,33 @@ export function Sidebar({ role }: { role: Role }) {
             </div>
           </div>
         ))}
+
+        {/* Dynamic custom jenis inputs — hanya untuk STAF_KEUANGAN */}
+        {customInputs.length > 0 && (
+          <div className="mb-3.5">
+            <div className="text-[10.5px] font-bold text-muted-faintest tracking-wider uppercase px-2.5 pt-1.5 pb-2">
+              Input Lainnya
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {customInputs.map((item) => {
+                const href = `/input/${item.key}`;
+                const active = pathname === href;
+                return (
+                  <Link
+                    key={item.key}
+                    href={href}
+                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-colors ${
+                      active ? "bg-navy text-white" : "text-muted-strong hover:bg-surface-hover"
+                    }`}
+                  >
+                    <Layers size={17} strokeWidth={1.8} />
+                    {item.nama}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       <button

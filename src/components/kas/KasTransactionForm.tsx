@@ -14,7 +14,7 @@ type InitialValues = {
   keterangan: string;
   arah: "masuk" | "keluar";
   rekeningId?: string;
-  crossingEntityKey?: string;
+  crossingEntityKeys?: string[];
   rows: { coaAccountId: string; nominal: string }[];
   existingTxIds: string[];
 };
@@ -67,7 +67,7 @@ export function KasTransactionForm({
   const [keterangan, setKeterangan] = useState(initialValues?.keterangan ?? "");
   const [arah, setArah] = useState<"masuk" | "keluar">(initialValues?.arah ?? "keluar");
   const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
-  const [crossingEntityKey, setCrossingEntityKey] = useState<string>(initialValues?.crossingEntityKey ?? "");
+  const [crossingEntityKeys, setCrossingEntityKeys] = useState<string[]>(initialValues?.crossingEntityKeys ?? []);
   const [rows, setRows] = useState<Row[]>(
     initialValues?.rows.map((r, i) => ({ id: i, coaAccountId: r.coaAccountId, nominal: r.nominal })) ??
       [{ id: 0, coaAccountId: "", nominal: "" }]
@@ -123,7 +123,7 @@ export function KasTransactionForm({
       rows: validRows.map((r) => ({ coaAccountId: r.coaAccountId, nominal: Number(r.nominal) })),
       pagePath,
       ...(isBankBuku ? { rekeningId } : {}),
-      ...(crossingEntityKey ? { crossingEntityKey } : {}),
+      ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
     };
     startTransition(async () => {
       const result = isEdit
@@ -214,27 +214,44 @@ export function KasTransactionForm({
         </div>
       </div>
 
-      {/* Crossing Entitas — opsional */}
-      {allEntities.length > 1 && (
+      {/* Crossing Entitas — multi-select */}
+      {allEntities.filter((e) => e.key !== entityKey).length > 0 && (
         <div>
           <label className="text-xs font-semibold text-muted-stronger block mb-1.5">
-            Untuk Entitas Lain{" "}
-            <span className="text-[10.5px] font-normal text-muted-faint">(opsional — transaksi crossing)</span>
+            Juga Catat ke Entitas Lain{" "}
+            <span className="text-[10.5px] font-normal text-muted-faint">(opsional — bisa pilih lebih dari satu)</span>
           </label>
-          <select
-            value={crossingEntityKey}
-            onChange={(e) => setCrossingEntityKey(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-[10px] border border-border text-[13.5px] bg-surface-input text-navy-text"
-          >
-            <option value="">— Tidak ada (transaksi biasa) —</option>
+          <div className="flex flex-wrap gap-2">
             {allEntities
               .filter((e) => e.key !== entityKey)
-              .map((e) => (
-                <option key={e.key} value={e.key}>
-                  {e.name}
-                </option>
-              ))}
-          </select>
+              .map((e) => {
+                const selected = crossingEntityKeys.includes(e.key);
+                return (
+                  <button
+                    key={e.key}
+                    type="button"
+                    onClick={() =>
+                      setCrossingEntityKeys((prev) =>
+                        selected ? prev.filter((k) => k !== e.key) : [...prev, e.key]
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-semibold border transition-colors ${
+                      selected
+                        ? "bg-navy text-white border-navy"
+                        : "bg-surface-card text-muted-stronger border-border hover:border-navy/40 hover:text-navy-text"
+                    }`}
+                  >
+                    {selected && <span className="mr-1">✓</span>}
+                    {e.name}
+                  </button>
+                );
+              })}
+          </div>
+          {crossingEntityKeys.length > 0 && (
+            <p className="text-[11px] text-muted-faint mt-1.5">
+              Transaksi akan dicatat di Kas Kecil/Besar/Bank Buku masing-masing entitas yang dipilih.
+            </p>
+          )}
         </div>
       )}
 

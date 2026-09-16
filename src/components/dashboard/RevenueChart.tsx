@@ -28,55 +28,9 @@ interface Props {
   currentYear: number;
 }
 
-// Warna per tahun saat mode bandingkan aktif & "Semua Entitas" dipilih (tidak
-// ada satu warna entitas yang relevan buat dijadikan dasar shade).
+// Warna per tahun saat mode bandingkan aktif — dipakai gantiin warna per
+// entitas, karena satu chart cuma bisa punya satu dimensi warna sekaligus.
 const YEAR_COLORS = ["#3b6fed", "#f59e0b", "#1f9d55", "#e0433f", "#8b5cf6"];
-
-function hexToHsl(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0;
-  const l = (max + min) / 2;
-  let s = 0;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
-    else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h /= 6;
-  }
-  return [h * 360, s * 100, l * 100];
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (h < 60) [r, g, b] = [c, x, 0];
-  else if (h < 120) [r, g, b] = [x, c, 0];
-  else if (h < 180) [r, g, b] = [0, c, x];
-  else if (h < 240) [r, g, b] = [0, x, c];
-  else if (h < 300) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-// Palet turunan dari warna entitas sendiri (hue & saturation dipertahankan,
-// lightness diubah-ubah) — dipakai saat bandingkan tahun untuk SATU entitas
-// spesifik, jadi warnanya terasa "milik" entitas itu, bukan palet generik.
-const LIGHTNESS_STEPS = [42, 68, 30, 80, 55];
-function entityYearPalette(baseHex: string, count: number): string[] {
-  const [h, s] = hexToHsl(baseHex);
-  const sat = Math.max(s, 40);
-  return Array.from({ length: count }, (_, i) => hslToHex(h, sat, LIGHTNESS_STEPS[i % LIGHTNESS_STEPS.length]));
-}
 
 function formatY(v: number) {
   if (v >= 1e12) return (v / 1e12).toFixed(1).replace(".", ",") + " T";
@@ -177,14 +131,8 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
   }, [isComparing, monthlyDataByYear, years, visibleEntities]);
 
   const chartData = isComparing ? comparisonData : monthlyDataByYear[0];
-  // 1 entitas spesifik dipilih → warna tahun diturunkan dari warna entitas itu
-  // sendiri; "Semua Entitas" (atau lebih dari 1 entitas dipilih) → palet umum.
-  const singleSelectedEntity = !activeKeys.has("all") && visibleEntities.length === 1 ? visibleEntities[0] : null;
-  const yearPalette = singleSelectedEntity
-    ? entityYearPalette(singleSelectedEntity.colorHex, years.length)
-    : YEAR_COLORS;
   const series = isComparing
-    ? years.map((y, i) => ({ dataKey: String(y), name: `Tahun ${y}`, color: yearPalette[i % yearPalette.length] }))
+    ? years.map((y, i) => ({ dataKey: String(y), name: `Tahun ${y}`, color: YEAR_COLORS[i % YEAR_COLORS.length] }))
     : visibleEntities.map((e) => ({ dataKey: e.key, name: e.name, color: e.colorHex }));
 
   const sharedAxisProps = {
@@ -289,7 +237,7 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
             <span
               key={y}
               className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-[9px] text-[12px] font-semibold"
-              style={{ background: `${yearPalette[(i + 1) % yearPalette.length]}1a`, color: yearPalette[(i + 1) % yearPalette.length] }}
+              style={{ background: `${YEAR_COLORS[(i + 1) % YEAR_COLORS.length]}1a`, color: YEAR_COLORS[(i + 1) % YEAR_COLORS.length] }}
             >
               vs {y}
               <button

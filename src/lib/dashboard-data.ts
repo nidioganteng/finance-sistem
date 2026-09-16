@@ -9,7 +9,7 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   const [entities, txRows] = await Promise.all([
     prisma.entity.findMany({
       where: { key: { in: entityKeys } },
-      include: { projects: { include: { termin: true } } },
+      include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
       orderBy: { createdAt: "asc" },
     }),
     // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
@@ -22,6 +22,7 @@ export async function getAccessibleEntities(entityKeys: string[]) {
       select: {
         entityId: true,
         kredit: true,
+        debit: true,
         coaAccount: { select: { kategori: true } },
       },
     }),
@@ -30,11 +31,10 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   const revenueMap = new Map<string, number>();
   const spendMap = new Map<string, number>();
   for (const tx of txRows) {
-    const amt = Number(tx.kredit);
     if (tx.coaAccount?.kategori === "PENDAPATAN") {
-      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + amt);
+      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
     } else if (tx.coaAccount?.kategori === "BEBAN") {
-      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + amt);
+      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
     }
   }
 
@@ -75,22 +75,33 @@ export async function getUnreadNotificationCount(role: Role) {
   return prisma.notifikasi.count({ where: { targetRole: role, read: false } });
 }
 
+// Warning piutang cuma muncul untuk proyek aktif yang progres pembayarannya
+// masih di bawah 80% DAN sudah lewat batas kontrak (deadline) — proyek yang
+// progresnya rendah tapi belum jatuh tempo tidak dianggap bermasalah.
 export async function getGrupPiutangMetrics() {
-  const terminPerluPerhatian = await prisma.termin.count({
-    where: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } },
+  const projects = await prisma.project.findMany({
+    where: { status: "ACTIVE" },
+    select: {
+      contractValue: true,
+      deadline: true,
+      termin: { select: { percentage: true } },
+    },
   });
 
-  // Total piutang belum teragih = contractValue - spend untuk proyek yang ada termin bermasalah
-  const projekBermasalah = await prisma.project.findMany({
-    where: { termin: { some: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } } } },
-    select: { contractValue: true, spend: true },
-  });
-  const totalPiutangBelumTeragih = projekBermasalah.reduce(
-    (s, p) => s + Math.max(0, Number(p.contractValue) - Number(p.spend)),
-    0
-  );
+  const now = new Date();
+  let terminPerluPerhatian = 0;
+  let totalPiutangBelumTertagih = 0;
 
-  return { terminPerluPerhatian, totalPiutangBelumTeragih };
+  for (const p of projects) {
+    const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
+    const isOverdue = p.deadline < now;
+    if (maxPct < 80 && isOverdue) {
+      terminPerluPerhatian += 1;
+      totalPiutangBelumTertagih += Number(p.contractValue) * (1 - maxPct / 100);
+    }
+  }
+
+  return { terminPerluPerhatian, totalPiutangBelumTertagih };
 }
 
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
@@ -126,6 +137,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
 export function formatMiliar(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
+  if (abs >= 1e12) return sign + "Rp " + (abs / 1e12).toFixed(1).replace(".", ",") + " T";
   if (abs >= 1e9) return sign + "Rp " + (abs / 1e9).toFixed(1).replace(".", ",") + " M";
   if (abs >= 1e6) return sign + "Rp " + (abs / 1e6).toFixed(1).replace(".", ",") + " JT";
   if (abs >= 1e3) return sign + "Rp " + (abs / 1e3).toFixed(1).replace(".", ",") + " rb";

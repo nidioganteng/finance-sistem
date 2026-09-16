@@ -45,17 +45,24 @@ export async function getPiutangData(entityId: string) {
     }),
   ]);
 
+  const now = new Date();
   let totalKontrak = 0;
   let totalTerminTagih = 0;
 
   const projectList = projects.map((p) => {
     const contractValue = Number(p.contractValue);
-    totalKontrak += contractValue;
+    const isCancelled = p.status === "CANCELLED";
 
     // Progress tertagih = persentase termin tertinggi × nilai kontrak
     const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
     const terminTagih = (maxPct / 100) * contractValue;
-    totalTerminTagih += terminTagih;
+    const sisaTagih = isCancelled ? 0 : contractValue - terminTagih;
+
+    // "Total Nilai Kontrak Aktif" cuma menjumlah proyek yang masih aktif
+    if (!isCancelled) {
+      totalKontrak += contractValue;
+      totalTerminTagih += terminTagih;
+    }
 
     return {
       id: p.id,
@@ -63,11 +70,14 @@ export async function getPiutangData(entityId: string) {
       name: p.name,
       contractValue,
       contractValueFmt: formatRupiah(contractValue),
+      deadlineFmt: p.deadline.toLocaleDateString("id-ID"),
+      isOverdue: !isCancelled && maxPct < 80 && p.deadline < now,
+      status: p.status,
       maxPercentage: maxPct,
       terminTagih,
       terminTagihFmt: formatRupiah(terminTagih),
-      sisaTagih: contractValue - terminTagih,
-      sisaTagihFmt: formatRupiah(contractValue - terminTagih),
+      sisaTagih,
+      sisaTagihFmt: formatRupiah(sisaTagih),
       // Tiap termin ditampilkan sebagai nominal uang masuk-nya sendiri (bukan
       // persentase) — dihitung dari selisih persentase kumulatif dgn termin
       // sebelumnya × nilai kontrak. Persentase tetap dipakai di belakang layar
@@ -98,7 +108,7 @@ export async function getPiutangData(entityId: string) {
       totalTerminTagihFmt: formatRupiah(totalTerminTagih),
       sisaPiutang,
       sisaPiutangFmt: formatRupiah(Math.abs(sisaPiutang)),
-      jumlahProyek: projects.length,
+      jumlahProyek: projects.filter((p) => p.status !== "CANCELLED").length,
     },
     loadingDockList: loadingDockList.map((d) => ({
       id: d.id,

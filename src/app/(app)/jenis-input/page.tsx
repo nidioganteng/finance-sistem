@@ -8,7 +8,7 @@ import { JenisInputClient } from "@/components/jenis-input/JenisInputClient";
 export default async function JenisInputPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  if (role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") redirect("/dashboard");
+  if (role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const data = await getJenisInputList();
 
@@ -19,15 +19,23 @@ export default async function JenisInputPage() {
         subtitle="Atur kategori input transaksi yang tersedia untuk staf keuangan"
       />
       <JenisInputClient
-        initialData={data.map((d) => ({
-          id: d.id,
-          key: d.key,
-          nama: d.nama,
-          active: d.active,
-          createdBy: d.createdBy,
-          createdAt: d.createdAt,
-          arahPencatatan: (d.extraFieldsJson as { arahPencatatan?: string } | null)?.arahPencatatan ?? null,
-        }))}
+        initialData={data.map((d) => {
+          const extra = d.extraFieldsJson as { arahLaporan?: string[]; arahPencatatan?: string } | null;
+          const arahLaporan = Array.isArray(extra?.arahLaporan)
+            ? extra.arahLaporan
+            : extra?.arahPencatatan
+            ? [extra.arahPencatatan]
+            : [];
+          return {
+            id: d.id,
+            key: d.key,
+            nama: d.nama,
+            active: d.active,
+            createdBy: d.createdBy,
+            createdAt: d.createdAt,
+            arahLaporan,
+          };
+        })}
         userRole={role}
       />
     </>

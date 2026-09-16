@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
+import { canManageTransaksi } from "@/lib/rbac";
 import { getJenisInput, getCoaOptions, getRunningSaldo, getKasLedger } from "@/lib/kas";
 import { getProjectOptions } from "@/lib/piutang";
 import { REKENING_BY_ENTITY, type RekeningOption } from "@/lib/bank-accounts";
@@ -28,7 +29,7 @@ export async function KasScreen({
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
 
-  if (role !== "STAF_KEUANGAN") redirect("/dashboard");
+  if (!canManageTransaksi(role)) redirect("/dashboard");
 
   const allEntities = await getAccessibleEntities(entityKeys);
   const entities = allEntities.filter((e) => !excludeEntityKeys.includes(e.key));

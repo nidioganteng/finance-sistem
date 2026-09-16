@@ -134,6 +134,88 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
   return { success: true };
 }
 
+export async function replaceKasTransaction(input: CreateKasTransactionInput & { existingTxIds: string[] }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { error: "Belum login." };
+  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa mengedit transaksi." };
+  if (!session.user.entityKeys.includes(input.entityKey)) return { error: "Kamu tidak punya akses ke entity ini." };
+  if (input.existingTxIds.length === 0) return { error: "Tidak ada transaksi lama untuk diganti." };
+
+  const validRows = input.rows.filter((r) => r.coaAccountId && r.nominal > 0);
+  if (validRows.length === 0) return { error: "Isi minimal satu baris akun dengan nominal." };
+  if (!input.noBukti || !input.keterangan) return { error: "No. bukti dan keterangan wajib diisi." };
+
+  if (input.jenisInputKey === "bankBuku") {
+    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Bank Buku." };
+    if (!isValidRekening(input.entityKey, input.rekeningId)) return { error: "Rekening yang dipilih tidak sesuai dengan entitas ini." };
+  }
+
+  const entity = await prisma.entity.findUnique({ where: { key: input.entityKey } });
+  const jenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: input.jenisInputKey } });
+  if (!entity || !jenisInput) return { error: "Entity atau jenis input tidak ditemukan." };
+
+  const rekeningNama = input.rekeningId ? getRekeningNama(input.entityKey, input.rekeningId) : undefined;
+
+  let kasCoaId: string | null = null;
+  if (input.jenisInputKey === "kasKecil") {
+    kasCoaId = (await prisma.coaAccount.findUnique({ where: { code: "1-001" } }))?.id ?? null;
+  } else if (input.jenisInputKey === "kasBesar") {
+    kasCoaId = (await prisma.coaAccount.findUnique({ where: { code: "1-002" } }))?.id ?? null;
+  } else if (input.jenisInputKey === "bankBuku" && input.rekeningId) {
+    const coaCode = REKENING_COA_CODE[input.rekeningId];
+    if (coaCode) kasCoaId = (await prisma.coaAccount.findUnique({ where: { code: coaCode } }))?.id ?? null;
+  }
+
+  // Delete old group first, then recalculate saldo without the old entries
+  await prisma.transaction.deleteMany({ where: { id: { in: input.existingTxIds } } });
+
+  const total = validRows.reduce((sum, r) => sum + r.nominal, 0);
+  const prevSaldo = await getRunningSaldo(entity.id, jenisInput.id, rekeningNama);
+  const newSaldo = prevSaldo + (input.arah === "masuk" ? total : -total);
+  const isKeluar = input.arah === "keluar";
+
+  const commonData = {
+    entityId: entity.id,
+    jenisInputId: jenisInput.id,
+    tanggal: new Date(input.tanggal),
+    noBukti: input.noBukti,
+    keterangan: input.keterangan,
+    saldoSetelah: newSaldo,
+    staffId: session.user.id,
+  };
+
+  const akunRows = validRows.map((r) =>
+    prisma.transaction.create({
+      data: {
+        ...commonData,
+        coaAccountId: r.coaAccountId,
+        debit: isKeluar ? r.nominal : 0,
+        kredit: isKeluar ? 0 : r.nominal,
+      },
+    })
+  );
+
+  const kasEntry = prisma.transaction.create({
+    data: {
+      ...commonData,
+      coaAccountId: kasCoaId,
+      debit: isKeluar ? 0 : total,
+      kredit: isKeluar ? total : 0,
+      extraFieldsJson: {
+        isKasEntry: true,
+        ...(rekeningNama ? { rekeningNama } : {}),
+        ...(input.crossingEntityKey ? { crossingEntityKey: input.crossingEntityKey } : {}),
+      },
+    },
+  });
+
+  await prisma.$transaction([...akunRows, kasEntry]);
+
+  revalidatePath(input.pagePath);
+  revalidatePath("/jurnal");
+  return { success: true };
+}
+
 export async function updateKasTransactionGroup(input: {
   txIds: string[];
   newNoBukti: string;

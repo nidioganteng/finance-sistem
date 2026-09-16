@@ -2,12 +2,22 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createKasTransaction } from "@/lib/actions/kas";
+import { createKasTransaction, replaceKasTransaction } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { CoaCombobox } from "./CoaCombobox";
 
 type CoaOption = { id: string; code: string; name: string };
 type Row = { id: number; coaAccountId: string; nominal: string };
+type InitialValues = {
+  tanggal: string;
+  noBukti: string;
+  keterangan: string;
+  arah: "masuk" | "keluar";
+  rekeningId?: string;
+  crossingEntityKey?: string;
+  rows: { coaAccountId: string; nominal: string }[];
+  existingTxIds: string[];
+};
 
 const ENTITY_CODE: Record<string, string> = {
   gaharu: "GS",
@@ -36,6 +46,7 @@ export function KasTransactionForm({
   rekeningOptions = [],
   defaultRekeningId,
   allEntities = [],
+  initialValues,
   onClose,
 }: {
   entityKey: string;
@@ -45,17 +56,22 @@ export function KasTransactionForm({
   rekeningOptions?: RekeningOption[];
   defaultRekeningId?: string;
   allEntities?: { key: string; name: string }[];
+  initialValues?: InitialValues;
   onClose: () => void;
 }) {
+  const isEdit = !!initialValues;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10));
-  const [noBukti, setNoBukti] = useState(() => genNoBukti(entityKey));
-  const [keterangan, setKeterangan] = useState("");
-  const [arah, setArah] = useState<"masuk" | "keluar">("keluar");
-  const [rekeningId, setRekeningId] = useState(defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
-  const [crossingEntityKey, setCrossingEntityKey] = useState<string>("");
-  const [rows, setRows] = useState<Row[]>([{ id: 0, coaAccountId: "", nominal: "" }]);
+  const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? new Date().toISOString().slice(0, 10));
+  const [noBukti, setNoBukti] = useState(initialValues?.noBukti ?? genNoBukti(entityKey));
+  const [keterangan, setKeterangan] = useState(initialValues?.keterangan ?? "");
+  const [arah, setArah] = useState<"masuk" | "keluar">(initialValues?.arah ?? "keluar");
+  const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
+  const [crossingEntityKey, setCrossingEntityKey] = useState<string>(initialValues?.crossingEntityKey ?? "");
+  const [rows, setRows] = useState<Row[]>(
+    initialValues?.rows.map((r, i) => ({ id: i, coaAccountId: r.coaAccountId, nominal: r.nominal })) ??
+      [{ id: 0, coaAccountId: "", nominal: "" }]
+  );
   const [error, setError] = useState<string | null>(null);
 
   const isBankBuku = jenisInputKey === "bankBuku";
@@ -97,19 +113,22 @@ export function KasTransactionForm({
       setError("No. bukti dan keterangan wajib diisi.");
       return;
     }
+    const payload = {
+      entityKey,
+      jenisInputKey,
+      tanggal,
+      noBukti,
+      keterangan,
+      arah,
+      rows: validRows.map((r) => ({ coaAccountId: r.coaAccountId, nominal: Number(r.nominal) })),
+      pagePath,
+      ...(isBankBuku ? { rekeningId } : {}),
+      ...(crossingEntityKey ? { crossingEntityKey } : {}),
+    };
     startTransition(async () => {
-      const result = await createKasTransaction({
-        entityKey,
-        jenisInputKey,
-        tanggal,
-        noBukti,
-        keterangan,
-        arah,
-        rows: validRows.map((r) => ({ coaAccountId: r.coaAccountId, nominal: Number(r.nominal) })),
-        pagePath,
-        ...(isBankBuku ? { rekeningId } : {}),
-        ...(crossingEntityKey ? { crossingEntityKey } : {}),
-      });
+      const result = isEdit
+        ? await replaceKasTransaction({ ...payload, existingTxIds: initialValues!.existingTxIds })
+        : await createKasTransaction(payload);
       if (result?.error) {
         setError(result.error);
         return;
@@ -121,7 +140,7 @@ export function KasTransactionForm({
 
   return (
     <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 flex flex-col gap-3.5">
-      <div className="text-sm font-bold text-navy-text">Transaksi Baru</div>
+      <div className="text-sm font-bold text-navy-text">{isEdit ? "Edit Transaksi" : "Transaksi Baru"}</div>
 
       <div className="grid grid-cols-2 gap-3.5">
         <div>
@@ -284,7 +303,7 @@ export function KasTransactionForm({
           onClick={handleSave}
           className="px-4 py-2.5 rounded-[10px] text-[13px] font-bold bg-navy text-white disabled:opacity-60"
         >
-          {isPending ? "Menyimpan..." : "Simpan Transaksi"}
+          {isPending ? "Menyimpan..." : isEdit ? "Simpan Perubahan" : "Simpan Transaksi"}
         </button>
       </div>
     </div>

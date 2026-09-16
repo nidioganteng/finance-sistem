@@ -35,6 +35,7 @@ export function KasTransactionForm({
   coaOptions,
   rekeningOptions = [],
   defaultRekeningId,
+  allEntities = [],
   onClose,
 }: {
   entityKey: string;
@@ -43,6 +44,7 @@ export function KasTransactionForm({
   coaOptions: CoaOption[];
   rekeningOptions?: RekeningOption[];
   defaultRekeningId?: string;
+  allEntities?: { key: string; name: string }[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -52,6 +54,7 @@ export function KasTransactionForm({
   const [keterangan, setKeterangan] = useState("");
   const [arah, setArah] = useState<"masuk" | "keluar">("keluar");
   const [rekeningId, setRekeningId] = useState(defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
+  const [crossingEntityKey, setCrossingEntityKey] = useState<string>("");
   const [rows, setRows] = useState<Row[]>([{ id: 0, coaAccountId: "", nominal: "" }]);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +108,7 @@ export function KasTransactionForm({
         rows: validRows.map((r) => ({ coaAccountId: r.coaAccountId, nominal: Number(r.nominal) })),
         pagePath,
         ...(isBankBuku ? { rekeningId } : {}),
+        ...(crossingEntityKey ? { crossingEntityKey } : {}),
       });
       if (result?.error) {
         setError(result.error);
@@ -190,6 +194,30 @@ export function KasTransactionForm({
           </button>
         </div>
       </div>
+
+      {/* Crossing Entitas — opsional */}
+      {allEntities.length > 1 && (
+        <div>
+          <label className="text-xs font-semibold text-muted-stronger block mb-1.5">
+            Untuk Entitas Lain{" "}
+            <span className="text-[10.5px] font-normal text-muted-faint">(opsional — transaksi crossing)</span>
+          </label>
+          <select
+            value={crossingEntityKey}
+            onChange={(e) => setCrossingEntityKey(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-[10px] border border-border text-[13.5px] bg-surface-input text-navy-text"
+          >
+            <option value="">— Tidak ada (transaksi biasa) —</option>
+            {allEntities
+              .filter((e) => e.key !== entityKey)
+              .map((e) => (
+                <option key={e.key} value={e.key}>
+                  {e.name}
+                </option>
+              ))}
+          </select>
+        </div>
+      )}
 
       {/* Baris Akun */}
       <div className="mt-1">

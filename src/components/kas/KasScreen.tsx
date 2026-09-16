@@ -82,6 +82,7 @@ export async function KasScreen({
         ledger={ledger}
         rekeningOptions={rekeningOptions}
         selectedRekeningId={selectedRekeningId}
+        allEntities={entities.map((e) => ({ key: e.key, name: e.name }))}
       />
     </>
   );

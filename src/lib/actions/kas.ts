@@ -19,6 +19,7 @@ export type CreateKasTransactionInput = {
   rows: KasRowInput[];
   pagePath: string; // path buat revalidate, mis. "/kas-kecil"
   rekeningId?: string; // khusus Bank Buku
+  crossingEntityKey?: string; // crossing antar entitas (opsional)
 };
 
 export async function createKasTransaction(input: CreateKasTransactionInput) {
@@ -109,6 +110,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       extraFieldsJson: {
         isKasEntry: true,
         ...(rekeningNama ? { rekeningNama } : {}),
+        ...(input.crossingEntityKey ? { crossingEntityKey: input.crossingEntityKey } : {}),
       },
     },
   });

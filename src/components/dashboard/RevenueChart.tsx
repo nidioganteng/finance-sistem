@@ -161,7 +161,7 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
           <LabelList
             dataKey={s.dataKey}
             position="top"
-            formatter={(v: number) => formatY(v)}
+            formatter={(v: number) => (v > 0 ? formatY(v) : "")}
             style={{ fontSize: 9, fontWeight: 700, fill: "rgb(var(--color-muted-stronger))" }}
           />
         )}
@@ -333,7 +333,7 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
 
       {/* Chart */}
       <div className="mt-4">
-        <ResponsiveContainer width="100%" height={isComparing ? 320 : 280}>
+        <ResponsiveContainer width="100%" height={isComparing ? 420 : 380}>
           {commonChart}
         </ResponsiveContainer>
       </div>

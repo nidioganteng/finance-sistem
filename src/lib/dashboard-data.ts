@@ -22,6 +22,7 @@ export async function getAccessibleEntities(entityKeys: string[]) {
       select: {
         entityId: true,
         kredit: true,
+        debit: true,
         coaAccount: { select: { kategori: true } },
       },
     }),
@@ -30,11 +31,10 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   const revenueMap = new Map<string, number>();
   const spendMap = new Map<string, number>();
   for (const tx of txRows) {
-    const amt = Number(tx.kredit);
     if (tx.coaAccount?.kategori === "PENDAPATAN") {
-      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + amt);
+      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
     } else if (tx.coaAccount?.kategori === "BEBAN") {
-      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + amt);
+      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
     }
   }
 
@@ -126,6 +126,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
 export function formatMiliar(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
+  if (abs >= 1e12) return sign + "Rp " + (abs / 1e12).toFixed(1).replace(".", ",") + " T";
   if (abs >= 1e9) return sign + "Rp " + (abs / 1e9).toFixed(1).replace(".", ",") + " M";
   if (abs >= 1e6) return sign + "Rp " + (abs / 1e6).toFixed(1).replace(".", ",") + " JT";
   if (abs >= 1e3) return sign + "Rp " + (abs / 1e3).toFixed(1).replace(".", ",") + " rb";

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatRupiah, formatMiliar } from "@/lib/dashboard-data";
+import { formatMiliar } from "@/lib/dashboard-data";
 
 // Compact card untuk Master Dashboard (grup view)
 export function EntityCardCompact({
@@ -97,16 +97,16 @@ export function EntityCard({
       <div className="grid grid-cols-3 gap-2 pt-1">
         <div>
           <div className="text-[10.5px] text-muted-faint font-semibold">Pendapatan</div>
-          <div className="text-[12.5px] font-bold text-navy-text mt-0.5">{formatRupiah(revenue)}</div>
+          <div className="text-[12.5px] font-bold text-navy-text mt-0.5">{formatMiliar(revenue)}</div>
         </div>
         <div>
           <div className="text-[10.5px] text-muted-faint font-semibold">Pengeluaran</div>
-          <div className="text-[12.5px] font-bold text-navy-text mt-0.5">{formatRupiah(spend)}</div>
+          <div className="text-[12.5px] font-bold text-navy-text mt-0.5">{formatMiliar(spend)}</div>
         </div>
         <div>
           <div className="text-[10.5px] text-muted-faint font-semibold">Laba</div>
           <div className={`text-[12.5px] font-bold mt-0.5 ${profit >= 0 ? "text-status-green" : "text-status-red"}`}>
-            {formatRupiah(profit)}
+            {formatMiliar(profit)}
           </div>
         </div>
       </div>

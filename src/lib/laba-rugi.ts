@@ -36,7 +36,7 @@ export async function getLabaRugiData(entityId: string, year: number) {
           total: 0,
         });
       }
-      beban.get(t.coaAccountId!)!.total += Number(t.kredit);
+      beban.get(t.coaAccountId!)!.total += Number(t.debit);
     }
   }
 

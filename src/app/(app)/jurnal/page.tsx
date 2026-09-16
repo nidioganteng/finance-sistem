@@ -44,7 +44,7 @@ export default async function JurnalPage({
   return (
     <>
       <PageHeader
-        title="Jurnal Umum"
+        title={`Jurnal Umum – ${selectedEntity.name}`}
         subtitle="Seluruh transaksi kas dan bank, tercatat otomatis dari setiap input"
         rightSlot={
           <>

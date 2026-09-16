@@ -162,19 +162,30 @@ async function main() {
   // contractValue & spend sengaja dikalibrasi agar konsisten dengan transaksi:
   // - Dashboard (Manajer/Admin) pakai contractValue & spend langsung dari sini
   // - Laporan Keuangan (Staf) pakai transaksi aktual yang totalnya menyesuaikan
+  // deadline sengaja dicampur: GHR-091/GHR-088/KCN-041 progres sudah >=80% (aman
+  // apa pun deadline-nya). TTR-018 progres 45% & deadline SUDAH lewat → memicu
+  // warning piutang. CAS-009 progres 30% tapi deadline BELUM lewat → tidak
+  // memicu warning (progres rendah saja tidak cukup, harus juga sudah jatuh tempo).
   const projectSeed = [
-    { entityKey: "gaharu",    code: "GHR-091", name: "Gudang Distribusi Cikarang",   contractValue: 6.2e9,  spend: 4.1e9,  terminPct: 90 },
-    { entityKey: "gaharu",    code: "GHR-088", name: "Pabrik Komponen Bekasi",        contractValue: 9.4e9,  spend: 6.0e9,  terminPct: 84 },
-    { entityKey: "kencana",   code: "KCN-041", name: "Ruko Kencana Blok C",           contractValue: 3.1e9,  spend: 1.9e9,  terminPct: 84 },
-    { entityKey: "tataring",  code: "TTR-018", name: "Renovasi Kantor Tataring",      contractValue: 1.8e9,  spend: 1.1e9,  terminPct: 45 },
-    { entityKey: "ciptaAsri", code: "CAS-009", name: "Taman Cipta Asri Residence",   contractValue: 2.4e9,  spend: 1.3e9,  terminPct: 30 },
+    { entityKey: "gaharu",    code: "GHR-091", name: "Gudang Distribusi Cikarang",   contractValue: 6.2e9,  spend: 4.1e9,  terminPct: 90, deadline: "2026-12-15" },
+    { entityKey: "gaharu",    code: "GHR-088", name: "Pabrik Komponen Bekasi",        contractValue: 9.4e9,  spend: 6.0e9,  terminPct: 84, deadline: "2026-11-30" },
+    { entityKey: "kencana",   code: "KCN-041", name: "Ruko Kencana Blok C",           contractValue: 3.1e9,  spend: 1.9e9,  terminPct: 84, deadline: "2026-10-20" },
+    { entityKey: "tataring",  code: "TTR-018", name: "Renovasi Kantor Tataring",      contractValue: 1.8e9,  spend: 1.1e9,  terminPct: 45, deadline: "2026-08-01" },
+    { entityKey: "ciptaAsri", code: "CAS-009", name: "Taman Cipta Asri Residence",   contractValue: 2.4e9,  spend: 1.3e9,  terminPct: 30, deadline: "2026-12-31" },
   ];
   const projects: Record<string, { id: string }> = {};
   for (const p of projectSeed) {
     projects[p.code] = await prisma.project.upsert({
       where: { code: p.code },
-      update: {},
-      create: { entityId: entities[p.entityKey].id, code: p.code, name: p.name, contractValue: p.contractValue, spend: p.spend },
+      update: { name: p.name, contractValue: p.contractValue, spend: p.spend, deadline: new Date(p.deadline), status: "ACTIVE" },
+      create: {
+        entityId: entities[p.entityKey].id,
+        code: p.code,
+        name: p.name,
+        contractValue: p.contractValue,
+        spend: p.spend,
+        deadline: new Date(p.deadline),
+      },
     });
     await prisma.termin.create({
       data: {

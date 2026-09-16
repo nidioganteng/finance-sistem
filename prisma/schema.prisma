@@ -72,14 +72,21 @@ model UserEntityAccess {
   @@id([userId, entityId])
 }
 
+enum ProjectStatus {
+  ACTIVE
+  CANCELLED
+}
+
 model Project {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
   entityId      String
-  code          String   @unique // contoh: GHR-091
+  code          String        @unique // contoh: GHR-091
   name          String
-  contractValue Decimal  @db.Decimal(18, 2)
-  spend         Decimal  @db.Decimal(18, 2)
-  createdAt     DateTime @default(now())
+  contractValue Decimal       @db.Decimal(18, 2)
+  spend         Decimal       @db.Decimal(18, 2)
+  deadline      DateTime // batas waktu kontrak — dipakai untuk logika warning piutang
+  status        ProjectStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
 
   entity  Entity   @relation(fields: [entityId], references: [id])
   termin  Termin[]

@@ -80,17 +80,17 @@ export async function getGrupPiutangMetrics() {
     where: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } },
   });
 
-  // Total piutang belum teragih = contractValue - spend untuk proyek yang ada termin bermasalah
+  // Total piutang belum tertagih = contractValue - spend untuk proyek yang ada termin bermasalah
   const projekBermasalah = await prisma.project.findMany({
     where: { termin: { some: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } } } },
     select: { contractValue: true, spend: true },
   });
-  const totalPiutangBelumTeragih = projekBermasalah.reduce(
+  const totalPiutangBelumTertagih = projekBermasalah.reduce(
     (s, p) => s + Math.max(0, Number(p.contractValue) - Number(p.spend)),
     0
   );
 
-  return { terminPerluPerhatian, totalPiutangBelumTeragih };
+  return { terminPerluPerhatian, totalPiutangBelumTertagih };
 }
 
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];

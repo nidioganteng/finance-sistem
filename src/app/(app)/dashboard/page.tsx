@@ -185,10 +185,10 @@ export default async function DashboardPage({
                 <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
                   <CalendarClock size={16} className="text-purple-500 dark:text-purple-400" />
                 </div>
-                <span className="text-[11.5px] font-semibold text-muted">Total Piutang Belum Teragih</span>
+                <span className="text-[11.5px] font-semibold text-muted">Total Piutang Belum Tertagih</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
-                {formatMiliar(piutangMetrics?.totalPiutangBelumTeragih ?? 0)}
+                {formatMiliar(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
               </div>
             </div>
           </div>

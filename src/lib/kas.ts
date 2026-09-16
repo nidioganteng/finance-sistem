@@ -63,6 +63,8 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
       keluar: number;
       saldo: number;
       hasKasEntry: boolean;
+      allTxIds: string[];
+      coaRows: { id: string; coaAccountId: string; coaName: string; nominal: number }[];
     }
   >();
 
@@ -78,9 +80,12 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
         keluar: 0,
         saldo: Number(r.saldoSetelah),
         hasKasEntry: false,
+        allTxIds: [],
+        coaRows: [],
       });
     }
     const g = groups.get(key)!;
+    g.allTxIds.push(r.id);
 
     const extra = r.extraFieldsJson as Record<string, unknown> | null;
     const isKasEntry = extra?.isKasEntry === true;
@@ -92,7 +97,10 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
       g.saldo = Number(r.saldoSetelah);
       if (extra?.rekeningNama) g.rekening = String(extra.rekeningNama);
     } else {
-      if (r.coaAccount) g.akunTags.push(r.coaAccount.name);
+      if (r.coaAccount) {
+        g.akunTags.push(r.coaAccount.name);
+        g.coaRows.push({ id: r.id, coaAccountId: r.coaAccount.id, coaName: r.coaAccount.name, nominal: Number(r.debit || r.kredit) });
+      }
       if (!extra && !g.hasKasEntry) {
         g.masuk += Number(r.debit);
         g.keluar += Number(r.kredit);
@@ -120,5 +128,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
     masukFmt: g.masuk > 0 ? formatRupiah(g.masuk) : "-",
     keluarFmt: g.keluar > 0 ? formatRupiah(g.keluar) : "-",
     saldoFmt: formatRupiah(g.saldo),
+    allTxIds: g.allTxIds,
+    coaRows: g.coaRows,
   }));
 }

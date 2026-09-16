@@ -43,7 +43,6 @@ export default async function PiutangPage({
         }
       />
       <PiutangClient
-        entityId={selectedEntity.id}
         projectList={data.projectList}
         summary={data.summary}
         loadingDockList={data.loadingDockList}

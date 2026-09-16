@@ -23,6 +23,8 @@ type LedgerRow = {
   coaRows: CoaRow[];
 };
 
+type ProjectOption = { id: string; code: string; name: string };
+
 export function KasScreenClient({
   entityKey,
   jenisInputKey,
@@ -34,6 +36,7 @@ export function KasScreenClient({
   rekeningOptions = [],
   selectedRekeningId,
   allEntities = [],
+  projectOptions = [],
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -45,6 +48,7 @@ export function KasScreenClient({
   rekeningOptions?: RekeningOption[];
   selectedRekeningId?: string;
   allEntities?: { key: string; name: string }[];
+  projectOptions?: ProjectOption[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -161,6 +165,7 @@ export function KasScreenClient({
           rekeningOptions={rekeningOptions}
           defaultRekeningId={selectedRekeningId}
           allEntities={allEntities}
+          projectOptions={projectOptions}
           onClose={() => setPanelOpen(false)}
         />
       )}

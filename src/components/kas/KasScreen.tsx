@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJenisInput, getCoaOptions, getRunningSaldo, getKasLedger } from "@/lib/kas";
+import { getProjectOptions } from "@/lib/piutang";
 import { REKENING_BY_ENTITY, type RekeningOption } from "@/lib/bank-accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -51,10 +52,11 @@ export async function KasScreen({
       : undefined;
   const selectedRekeningNama = rekeningOptions.find((r) => r.id === selectedRekeningId)?.nama;
 
-  const [coaOptions, saldo, ledger] = await Promise.all([
+  const [coaOptions, saldo, ledger, projectOptions] = await Promise.all([
     getCoaOptions(),
     getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama),
     getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama),
+    getProjectOptions(selectedEntity.id),
   ]);
 
   const coaList = coaOptions.map((c) => ({ id: c.id, code: c.code, name: c.name }));
@@ -83,6 +85,7 @@ export async function KasScreen({
         rekeningOptions={rekeningOptions}
         selectedRekeningId={selectedRekeningId}
         allEntities={entities.map((e) => ({ key: e.key, name: e.name }))}
+        projectOptions={projectOptions}
       />
     </>
   );

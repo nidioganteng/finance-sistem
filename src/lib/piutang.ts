@@ -1,6 +1,32 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
+// Daftar proyek satu entitas buat dropdown "Proyek Terkait" di form transaksi
+// Kas/Bank Buku — dipakai staf/manajer keuangan pas mencatat uang masuk yang
+// sekalian jadi pembayaran termin proyek tertentu.
+export async function getProjectOptions(entityId: string) {
+  const projects = await prisma.project.findMany({
+    where: { entityId },
+    select: { id: true, code: true, name: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return projects;
+}
+
+// Persentase termin baru dihitung dari akumulasi uang masuk (termin-termin
+// sebelumnya + pembayaran baru ini) dibanding nilai kontrak — bukan input
+// manual. Dipakai saat mencatat transaksi "uang masuk" yang terkait proyek.
+export function computeNewTerminPercentage(
+  contractValue: number,
+  existingTerminPercentages: number[],
+  nominalMasuk: number
+): number {
+  const maxPctSoFar = existingTerminPercentages.reduce((max, p) => Math.max(max, p), 0);
+  const cumulativeBefore = (maxPctSoFar / 100) * contractValue;
+  const cumulativeAfter = cumulativeBefore + nominalMasuk;
+  return Math.min(100, Math.round((cumulativeAfter / contractValue) * 100));
+}
+
 export async function getPiutangData(entityId: string) {
   const [projects, loadingDockList] = await Promise.all([
     prisma.project.findMany({

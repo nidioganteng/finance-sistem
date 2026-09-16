@@ -6,6 +6,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
+import { computeNewTerminPercentage } from "@/lib/piutang";
+import { TerminStatus } from "@prisma/client";
 
 type KasRowInput = { coaAccountId: string; nominal: number };
 
@@ -20,6 +22,7 @@ export type CreateKasTransactionInput = {
   pagePath: string; // path buat revalidate, mis. "/kas-kecil"
   rekeningId?: string; // khusus Bank Buku
   crossingEntityKey?: string; // crossing antar entitas (opsional)
+  projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
 };
 
 export async function createKasTransaction(input: CreateKasTransactionInput) {
@@ -115,10 +118,39 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     },
   });
 
-  await prisma.$transaction([...akunRows, kasEntry]);
+  // Uang masuk yang ditandai buat proyek tertentu otomatis jadi progres termin
+  // proyek itu — persentase dihitung sistem dari akumulasi uang masuk
+  // dibanding nilai kontrak, bukan diinput manual (lihat computeNewTerminPercentage).
+  const terminCreate: ReturnType<typeof prisma.termin.create>[] = [];
+  if (!isKeluar && input.projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: input.projectId },
+      include: { termin: { select: { percentage: true } } },
+    });
+    if (project) {
+      const newPct = computeNewTerminPercentage(
+        Number(project.contractValue),
+        project.termin.map((t) => t.percentage),
+        total
+      );
+      terminCreate.push(
+        prisma.termin.create({
+          data: {
+            projectId: input.projectId,
+            name: `Termin ${new Date(input.tanggal).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}`,
+            percentage: newPct,
+            status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
+          },
+        })
+      );
+    }
+  }
+
+  await prisma.$transaction([...akunRows, kasEntry, ...terminCreate]);
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/piutang");
   return { success: true };
 }
 

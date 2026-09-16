@@ -7,6 +7,7 @@ import type { RekeningOption } from "@/lib/bank-accounts";
 import { CoaCombobox } from "./CoaCombobox";
 
 type CoaOption = { id: string; code: string; name: string };
+type ProjectOption = { id: string; code: string; name: string };
 type Row = { id: number; coaAccountId: string; nominal: string };
 
 const ENTITY_CODE: Record<string, string> = {
@@ -36,6 +37,7 @@ export function KasTransactionForm({
   rekeningOptions = [],
   defaultRekeningId,
   allEntities = [],
+  projectOptions = [],
   onClose,
 }: {
   entityKey: string;
@@ -45,6 +47,7 @@ export function KasTransactionForm({
   rekeningOptions?: RekeningOption[];
   defaultRekeningId?: string;
   allEntities?: { key: string; name: string }[];
+  projectOptions?: ProjectOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -55,6 +58,7 @@ export function KasTransactionForm({
   const [arah, setArah] = useState<"masuk" | "keluar">("keluar");
   const [rekeningId, setRekeningId] = useState(defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
   const [crossingEntityKey, setCrossingEntityKey] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("");
   const [rows, setRows] = useState<Row[]>([{ id: 0, coaAccountId: "", nominal: "" }]);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,6 +113,7 @@ export function KasTransactionForm({
         pagePath,
         ...(isBankBuku ? { rekeningId } : {}),
         ...(crossingEntityKey ? { crossingEntityKey } : {}),
+        ...(arah === "masuk" && projectId ? { projectId } : {}),
       });
       if (result?.error) {
         setError(result.error);
@@ -194,6 +199,31 @@ export function KasTransactionForm({
           </button>
         </div>
       </div>
+
+      {/* Proyek Terkait — cuma relevan buat Uang Masuk, otomatis dicatat jadi
+          progres termin proyek itu (persentase dihitung sistem, bukan manual) */}
+      {arah === "masuk" && projectOptions.length > 0 && (
+        <div>
+          <label className="text-xs font-semibold text-muted-stronger block mb-1.5">
+            Proyek Terkait{" "}
+            <span className="text-[10.5px] font-normal text-muted-faint">
+              (opsional — otomatis jadi progres termin)
+            </span>
+          </label>
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-[10px] border border-border text-[13.5px] bg-surface-input text-navy-text"
+          >
+            <option value="">— Bukan pembayaran termin proyek —</option>
+            {projectOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.code} — {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Crossing Entitas — opsional */}
       {allEntities.length > 1 && (

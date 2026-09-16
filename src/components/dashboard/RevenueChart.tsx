@@ -17,7 +17,6 @@ import {
   LabelList,
 } from "recharts";
 import { BarChart2, TrendingUp, GitCompare, X } from "lucide-react";
-import { EntityMonthlyChart } from "@/components/laporan/EntityMonthlyChart";
 
 type EntityMeta = { key: string; name: string; colorHex: string };
 type MonthRow = Record<string, string | number>;
@@ -112,13 +111,6 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
     ? entities
     : entities.filter((e) => activeKeys.has(e.key));
 
-  // 1 entitas spesifik dipilih → satu chart gabungan warna-per-tahun (turunan
-  // warna entitas itu). "Semua Entitas" / lebih dari 1 entitas dipilih → tidak
-  // ada satu warna yang relevan buat basis, jadi ditampilkan sebagai beberapa
-  // chart terpisah (satu per tahun), warnanya tetap per entitas seperti biasa.
-  const singleSelectedEntity = !activeKeys.has("all") && visibleEntities.length === 1 ? visibleEntities[0] : null;
-  const showSmallMultiples = isComparing && !singleSelectedEntity;
-
   function pushParams(next: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(next)) {
@@ -185,8 +177,9 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
   }, [isComparing, monthlyDataByYear, years, visibleEntities]);
 
   const chartData = isComparing ? comparisonData : monthlyDataByYear[0];
-  // Warna tahun diturunkan dari warna entitas yang lagi dipilih (cuma dipakai
-  // di chart gabungan, saat singleSelectedEntity aktif).
+  // 1 entitas spesifik dipilih → warna tahun diturunkan dari warna entitas itu
+  // sendiri; "Semua Entitas" (atau lebih dari 1 entitas dipilih) → palet umum.
+  const singleSelectedEntity = !activeKeys.has("all") && visibleEntities.length === 1 ? visibleEntities[0] : null;
   const yearPalette = singleSelectedEntity
     ? entityYearPalette(singleSelectedEntity.colorHex, years.length)
     : YEAR_COLORS;
@@ -323,33 +316,31 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
             </select>
           )}
 
-          {/* Chart type toggle — gak relevan pas mode beberapa chart per tahun (small multiples selalu Bar) */}
-          {!showSmallMultiples && (
-            <div className="flex items-center gap-1 border border-border-soft rounded-[9px] p-0.5 bg-surface-subtle">
-              <button
-                onClick={() => setChartType("bar")}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
-                  chartType === "bar"
-                    ? "bg-surface-card text-navy-text shadow-sm"
-                    : "text-muted hover:text-muted-stronger"
-                }`}
-              >
-                <BarChart2 size={13} />
-                Bar
-              </button>
-              <button
-                onClick={() => setChartType("line")}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
-                  chartType === "line"
-                    ? "bg-surface-card text-navy-text shadow-sm"
-                    : "text-muted hover:text-muted-stronger"
-                }`}
-              >
-                <TrendingUp size={13} />
-                Line
-              </button>
-            </div>
-          )}
+          {/* Chart type toggle */}
+          <div className="flex items-center gap-1 border border-border-soft rounded-[9px] p-0.5 bg-surface-subtle">
+            <button
+              onClick={() => setChartType("bar")}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
+                chartType === "bar"
+                  ? "bg-surface-card text-navy-text shadow-sm"
+                  : "text-muted hover:text-muted-stronger"
+              }`}
+            >
+              <BarChart2 size={13} />
+              Bar
+            </button>
+            <button
+              onClick={() => setChartType("line")}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
+                chartType === "line"
+                  ? "bg-surface-card text-navy-text shadow-sm"
+                  : "text-muted hover:text-muted-stronger"
+              }`}
+            >
+              <TrendingUp size={13} />
+              Line
+            </button>
+          </div>
 
           {/* Buka tab Komparasi di /laporan (tabel Pendapatan/Beban/Laba lengkap) —
               bawa tahun yang sedang aktif di chart. Klik pada chart/tombol tahun
@@ -393,33 +384,17 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
         })}
       </div>
 
-      {isComparing && singleSelectedEntity && (
+      {isComparing && (
         <div className="text-[11.5px] text-muted-faint mb-2">
-          Menampilkan pendapatan {singleSelectedEntity.name} per bulan, dibandingkan antar-tahun.
+          Menampilkan total pendapatan {activeKeys.has("all") ? "semua entitas" : "entitas terpilih"} per bulan,
+          dibandingkan antar-tahun.
         </div>
       )}
 
-      {showSmallMultiples ? (
-        /* "Semua Entitas" / lebih dari 1 entitas — satu chart per tahun (sampai
-           5), warna tetap per entitas biar tetap bisa dibedakan per entitas
-           di tiap tahunnya. */
-        <div className={`grid grid-cols-1 ${years.length <= 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"} gap-4`}>
-          {years.map((y, i) => (
-            <EntityMonthlyChart
-              key={y}
-              title={`Tahun ${y}`}
-              data={monthlyDataByYear[i] ?? []}
-              entities={visibleEntities}
-            />
-          ))}
-        </div>
-      ) : (
-        /* Chart tunggal — mode default (1 tahun) atau bandingkan tahun untuk
-           1 entitas spesifik (warna per tahun). */
-        <ResponsiveContainer width="100%" height={isComparing ? 320 : 280}>
-          {commonChart}
-        </ResponsiveContainer>
-      )}
+      {/* Chart */}
+      <ResponsiveContainer width="100%" height={isComparing ? 320 : 280}>
+        {commonChart}
+      </ResponsiveContainer>
     </div>
   );
 }

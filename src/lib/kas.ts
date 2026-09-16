@@ -55,6 +55,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
     string,
     {
       tanggal: string;
+      tanggalRaw: string;
       noBukti: string;
       keterangan: string;
       akunTags: string[];
@@ -70,10 +71,12 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
   >();
 
   for (const r of rows) {
-    const key = r.noBukti + "|" + r.tanggal.toISOString().slice(0, 10);
+    const tanggalRaw = r.tanggal.toISOString().slice(0, 10);
+    const key = r.noBukti + "|" + tanggalRaw;
     if (!groups.has(key)) {
       groups.set(key, {
         tanggal: r.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
+        tanggalRaw,
         noBukti: r.noBukti,
         keterangan: r.keterangan,
         akunTags: [],
@@ -121,6 +124,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
 
   return filtered.map((g) => ({
     tanggal: g.tanggal,
+    tanggalRaw: g.tanggalRaw,
     noBukti: g.noBukti,
     keterangan: g.keterangan,
     akunTags: g.akunTags,

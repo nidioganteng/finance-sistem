@@ -90,18 +90,18 @@ export async function getGrupPiutangMetrics() {
 
   const now = new Date();
   let terminPerluPerhatian = 0;
-  let totalPiutangBelumTeragih = 0;
+  let totalPiutangBelumTertagih = 0;
 
   for (const p of projects) {
     const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
     const isOverdue = p.deadline < now;
     if (maxPct < 80 && isOverdue) {
       terminPerluPerhatian += 1;
-      totalPiutangBelumTeragih += Number(p.contractValue) * (1 - maxPct / 100);
+      totalPiutangBelumTertagih += Number(p.contractValue) * (1 - maxPct / 100);
     }
   }
 
-  return { terminPerluPerhatian, totalPiutangBelumTeragih };
+  return { terminPerluPerhatian, totalPiutangBelumTertagih };
 }
 
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];

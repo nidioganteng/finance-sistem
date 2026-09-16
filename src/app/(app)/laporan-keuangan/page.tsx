@@ -37,8 +37,8 @@ export default async function LaporanKeuanganPage({
   return (
     <>
       <PageHeader
-        title="Laporan Keuangan"
-        subtitle={`${selectedEntity.name} — Periode ${currentYear}`}
+        title={`Laporan Keuangan – ${selectedEntity.name}`}
+        subtitle={`Ringkasan laporan keuangan — Periode ${currentYear}`}
         rightSlot={
           <>
             <PrintButton />

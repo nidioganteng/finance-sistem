@@ -23,10 +23,19 @@ export default async function CustomInputPage({
     redirect("/dashboard");
   }
 
+  const LAPORAN_LABEL: Record<string, string> = {
+    JURNAL_UMUM: "Jurnal Umum",
+    BUKU_BESAR: "Buku Besar",
+    LAPORAN_KEUANGAN: "Laporan Keuangan",
+    PIUTANG: "Piutang",
+    PAJAK: "Laporan Pajak",
+  };
+
   const extra = jenisInput.extraFieldsJson as Record<string, unknown> | null;
+  const arahLaporan = Array.isArray(extra?.arahLaporan) ? (extra.arahLaporan as string[]) : [];
   const subtitle =
-    Array.isArray(extra?.arahLaporan) && (extra.arahLaporan as string[]).length > 0
-      ? `Dicatat ke: ${(extra.arahLaporan as string[]).join(", ")}`
+    arahLaporan.length > 0
+      ? `Dicatat ke: ${arahLaporan.map((k) => LAPORAN_LABEL[k] ?? k).join(", ")}`
       : "Input dan riwayat transaksi";
 
   return (

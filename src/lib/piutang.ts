@@ -1,6 +1,32 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
+// Daftar proyek satu entitas buat dropdown "Proyek Terkait" di form transaksi
+// Kas/Bank Buku — dipakai staf/manajer keuangan pas mencatat uang masuk yang
+// sekalian jadi pembayaran termin proyek tertentu.
+export async function getProjectOptions(entityId: string) {
+  const projects = await prisma.project.findMany({
+    where: { entityId },
+    select: { id: true, code: true, name: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return projects;
+}
+
+// Persentase termin baru dihitung dari akumulasi uang masuk (termin-termin
+// sebelumnya + pembayaran baru ini) dibanding nilai kontrak — bukan input
+// manual. Dipakai saat mencatat transaksi "uang masuk" yang terkait proyek.
+export function computeNewTerminPercentage(
+  contractValue: number,
+  existingTerminPercentages: number[],
+  nominalMasuk: number
+): number {
+  const maxPctSoFar = existingTerminPercentages.reduce((max, p) => Math.max(max, p), 0);
+  const cumulativeBefore = (maxPctSoFar / 100) * contractValue;
+  const cumulativeAfter = cumulativeBefore + nominalMasuk;
+  return Math.min(100, Math.round((cumulativeAfter / contractValue) * 100));
+}
+
 export async function getPiutangData(entityId: string) {
   const [projects, loadingDockList] = await Promise.all([
     prisma.project.findMany({
@@ -52,14 +78,22 @@ export async function getPiutangData(entityId: string) {
       terminTagihFmt: formatRupiah(terminTagih),
       sisaTagih,
       sisaTagihFmt: formatRupiah(sisaTagih),
-      termin: p.termin.map((t) => ({
-        id: t.id,
-        name: t.name,
-        percentage: t.percentage,
-        status: t.status,
-        auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
-        auditedByName: t.auditedBy?.name ?? null,
-      })),
+      // Tiap termin ditampilkan sebagai nominal uang masuk-nya sendiri (bukan
+      // persentase) — dihitung dari selisih persentase kumulatif dgn termin
+      // sebelumnya × nilai kontrak. Persentase tetap dipakai di belakang layar
+      // (lihat maxPct di atas), tampilan persen itu bagian Admin Sidamon.
+      termin: p.termin.map((t, i) => {
+        const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+        const nominalTermin = ((t.percentage - prevPct) / 100) * contractValue;
+        return {
+          id: t.id,
+          name: t.name,
+          nominalFmt: formatRupiah(nominalTermin),
+          status: t.status,
+          auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
+          auditedByName: t.auditedBy?.name ?? null,
+        };
+      }),
     };
   });
 

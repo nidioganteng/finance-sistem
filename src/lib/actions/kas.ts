@@ -7,6 +7,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
+import { computeNewTerminPercentage } from "@/lib/piutang";
+import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 
 type KasRowInput = { coaAccountId: string; nominal: number };
@@ -19,9 +21,10 @@ export type CreateKasTransactionInput = {
   keterangan: string;
   arah: "masuk" | "keluar";
   rows: KasRowInput[];
-  pagePath: string;
-  rekeningId?: string;
-  crossingEntityKeys?: string[];
+  pagePath: string; // path buat revalidate, mis. "/kas-kecil"
+  rekeningId?: string; // khusus Bank Buku
+  crossingEntityKeys?: string[]; // crossing antar entitas (opsional, bisa lebih dari satu)
+  projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
 };
 
 async function resolveKasCoa(jenisInputKey: string, rekeningId?: string): Promise<string | null> {
@@ -116,6 +119,37 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     },
   });
 
+  // Uang masuk yang ditandai buat proyek tertentu otomatis jadi termin baru
+  // proyek itu — dinomori urut per proyek (Termin 1, Termin 2, dst), bukan
+  // diberi nama tanggal. Persentase tetap dihitung & disimpan di belakang
+  // layar (dipakai buku besar perhitungan Piutang Perlu Perhatian dkk), tapi
+  // bukan yang ditampilkan/diinput Keuangan — itu bagian tampilan Sidamon.
+  const terminCreate: ReturnType<typeof prisma.termin.create>[] = [];
+  if (!isKeluar && input.projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: input.projectId },
+      include: { termin: { select: { percentage: true } } },
+    });
+    if (project) {
+      const newPct = computeNewTerminPercentage(
+        Number(project.contractValue),
+        project.termin.map((t) => t.percentage),
+        total
+      );
+      const terminKe = project.termin.length + 1;
+      terminCreate.push(
+        prisma.termin.create({
+          data: {
+            projectId: input.projectId,
+            name: `Termin ${terminKe}`,
+            percentage: newPct,
+            status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
+          },
+        })
+      );
+    }
+  }
+
   // Build crossing entity ops — tagged with crossingGroupId so they can be deleted/found together
   const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo }) => {
     const crossCommon = {
@@ -150,10 +184,11 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     return [...crossAkun, crossKas];
   });
 
-  await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);
+  await prisma.$transaction([...akunRows, kasEntry, ...crossingOps, ...terminCreate]);
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/piutang");
   return { success: true };
 }
 

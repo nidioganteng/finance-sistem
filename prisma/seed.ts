@@ -173,7 +173,7 @@ async function main() {
   for (const p of projectSeed) {
     projects[p.code] = await prisma.project.upsert({
       where: { code: p.code },
-      update: {},
+      update: { name: p.name, contractValue: p.contractValue, spend: p.spend },
       create: { entityId: entities[p.entityKey].id, code: p.code, name: p.name, contractValue: p.contractValue, spend: p.spend },
     });
     await prisma.termin.create({

@@ -60,7 +60,7 @@ export async function KasScreen({
   return (
     <>
       <PageHeader
-        title={title}
+        title={`${title} – ${selectedEntity.name}`}
         subtitle={subtitle}
         rightSlot={
           <EntitySwitcher

@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import {
   getAccessibleEntities,
-  getRecentNotifications,
   getUnreadNotificationCount,
   getGrupPiutangMetrics,
   getMonthlyChartData,
@@ -57,8 +56,7 @@ export default async function DashboardPage({
     .slice(0, 4);
   const chartYears = [chartYear, ...compareYears];
 
-  const [notifications, unreadCount, piutangMetrics, monthlyDataByYear] = await Promise.all([
-    getRecentNotifications(role),
+  const [unreadCount, piutangMetrics, monthlyDataByYear] = await Promise.all([
     getUnreadNotificationCount(role),
     showingGrup ? getGrupPiutangMetrics() : Promise.resolve(null),
     showingGrup ? Promise.all(chartYears.map((y) => getMonthlyChartData(entityKeys, y))) : Promise.resolve([]),
@@ -233,28 +231,6 @@ export default async function DashboardPage({
             years={chartYears}
             currentYear={currentYear}
           />
-
-          {/* Notifikasi terbaru */}
-          <div className="bg-surface-card rounded-2xl border border-border p-5">
-            <div className="text-sm font-bold text-navy-text mb-4">Notifikasi Terbaru</div>
-            {notifications.length === 0 ? (
-              <p className="text-sm text-muted">Belum ada notifikasi.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {notifications.map((n) => (
-                  <div key={n.id} className="flex gap-2.5 items-start">
-                    <span className={`w-2 h-2 rounded-full mt-1.5 flex-none ${n.read ? "bg-border" : "bg-brand"}`} />
-                    <div>
-                      <div className="text-[12.5px] text-muted-stronger leading-snug">{n.text}</div>
-                      <div className="text-[11px] text-muted-faint mt-0.5">
-                        {new Date(n.createdAt).toLocaleString("id-ID")}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </>
       ) : selectedEntity ? (
         <>

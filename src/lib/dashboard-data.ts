@@ -63,14 +63,6 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   });
 }
 
-export async function getRecentNotifications(role: Role) {
-  return prisma.notifikasi.findMany({
-    where: { targetRole: role },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  });
-}
-
 export async function getUnreadNotificationCount(role: Role) {
   return prisma.notifikasi.count({ where: { targetRole: role, read: false } });
 }

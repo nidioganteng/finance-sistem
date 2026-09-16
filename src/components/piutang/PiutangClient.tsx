@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
-import { auditTermin, updateTerminStatus } from "@/lib/actions/piutang";
-import { CheckCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { auditTermin, updateTerminStatus, createProject, recordTerminPayment } from "@/lib/actions/piutang";
+import { CheckCircle, ChevronDown, ChevronRight, Plus, Banknote } from "lucide-react";
 
 type TerminItem = {
   id: string;
@@ -63,12 +63,14 @@ const DOCK_STATUS_LABEL: Record<string, string> = {
 };
 
 export function PiutangClient({
+  entityId,
   projectList,
   summary,
   loadingDockList,
   userRole,
   isUmumEntity,
 }: {
+  entityId: string;
   projectList: ProjectItem[];
   summary: Summary;
   loadingDockList: DockItem[];
@@ -81,6 +83,14 @@ export function PiutangClient({
   );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newCode, setNewCode] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newContractValue, setNewContractValue] = useState("");
+
+  const [terminFormFor, setTerminFormFor] = useState<string | null>(null);
+  const [nominalMasuk, setNominalMasuk] = useState("");
 
   const isManajer = userRole === "MANAJER_KEUANGAN";
 
@@ -105,6 +115,34 @@ export function PiutangClient({
   function handleStatusChange(id: string, status: TerminStatus) {
     startTransition(async () => {
       await updateTerminStatus(id, status);
+    });
+  }
+
+  function handleCreateProject() {
+    const contractValue = Number(newContractValue.replace(/[^0-9]/g, ""));
+    startTransition(async () => {
+      try {
+        await createProject({ entityId, code: newCode, name: newName, contractValue });
+        setShowNewProject(false);
+        setNewCode("");
+        setNewName("");
+        setNewContractValue("");
+      } catch (e: unknown) {
+        setError((e as Error).message);
+      }
+    });
+  }
+
+  function handleRecordTermin(projectId: string) {
+    const nominal = Number(nominalMasuk.replace(/[^0-9]/g, ""));
+    startTransition(async () => {
+      try {
+        await recordTerminPayment({ projectId, nominalMasuk: nominal });
+        setTerminFormFor(null);
+        setNominalMasuk("");
+      } catch (e: unknown) {
+        setError((e as Error).message);
+      }
     });
   }
 
@@ -173,6 +211,70 @@ export function PiutangClient({
               <div className="text-[12px] text-muted mt-0.5">belum masuk kas</div>
             </div>
           </div>
+
+          {/* Tambah proyek baru — cuma nilai kontrak, termin diisi belakangan tiap ada uang masuk */}
+          {isManajer && (
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4">
+              {!showNewProject ? (
+                <button
+                  onClick={() => setShowNewProject(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-[12.5px] font-semibold"
+                >
+                  <Plus size={13} /> Proyek Baru
+                </button>
+              ) : (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-faint mb-1">Kode Proyek</label>
+                    <input
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value)}
+                      placeholder="mis. GHR-099"
+                      className="px-2.5 py-1.5 rounded-lg border border-border text-[13px] bg-surface-input text-navy-text w-36"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="block text-[11px] font-bold text-muted-faint mb-1">Nama Proyek</label>
+                    <input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="mis. Gudang Distribusi Cikarang"
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-border text-[13px] bg-surface-input text-navy-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-muted-faint mb-1">Nilai Kontrak (Rp)</label>
+                    <input
+                      value={newContractValue}
+                      onChange={(e) => setNewContractValue(e.target.value)}
+                      placeholder="0"
+                      inputMode="numeric"
+                      className="px-2.5 py-1.5 rounded-lg border border-border text-[13px] bg-surface-input text-navy-text w-40"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCreateProject}
+                    disabled={isPending || !newCode.trim() || !newName.trim() || !newContractValue}
+                    className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12.5px] font-semibold disabled:opacity-50"
+                  >
+                    Simpan
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewProject(false);
+                      setNewCode("");
+                      setNewName("");
+                      setNewContractValue("");
+                    }}
+                    disabled={isPending}
+                    className="px-3 py-1.5 rounded-lg border border-border text-[12.5px] font-semibold text-muted-stronger"
+                  >
+                    Batal
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tabel proyek dengan termin expandable */}
           {projectList.length === 0 ? (
@@ -310,6 +412,58 @@ export function PiutangClient({
                               </td>
                             </tr>
                           ))}
+
+                        {/* Catat uang masuk — persentase termin baru dihitung otomatis dari akumulasi uang masuk / nilai kontrak */}
+                        {isExpanded && isManajer && (
+                          <tr className="border-b border-surface-subtle bg-surface-subtle/20">
+                            <td className="py-2.5 px-5" />
+                            <td colSpan={5} className="py-2.5 px-3 pl-8">
+                              {terminFormFor !== p.id ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTerminFormFor(p.id);
+                                  }}
+                                  className="flex items-center gap-1.5 text-[11.5px] font-semibold text-brand"
+                                >
+                                  <Banknote size={12} /> Catat Uang Masuk
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <span className="text-[11.5px] text-muted-stronger">Rp</span>
+                                  <input
+                                    value={nominalMasuk}
+                                    onChange={(e) => setNominalMasuk(e.target.value)}
+                                    placeholder="0"
+                                    inputMode="numeric"
+                                    autoFocus
+                                    className="px-2 py-1 rounded-lg border border-border text-[12.5px] bg-surface-input text-navy-text w-36"
+                                  />
+                                  <button
+                                    onClick={() => handleRecordTermin(p.id)}
+                                    disabled={isPending || !nominalMasuk}
+                                    className="px-2.5 py-1 rounded-lg bg-navy text-white text-[11.5px] font-semibold disabled:opacity-50"
+                                  >
+                                    Simpan
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setTerminFormFor(null);
+                                      setNominalMasuk("");
+                                    }}
+                                    disabled={isPending}
+                                    className="px-2.5 py-1 rounded-lg border border-border text-[11.5px] font-semibold text-muted-stronger"
+                                  >
+                                    Batal
+                                  </button>
+                                  <span className="text-[11px] text-muted-faint">
+                                    Persentase termin baru dihitung otomatis dari kontrak.
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
                       </>
                     );
                   })}

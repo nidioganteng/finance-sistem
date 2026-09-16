@@ -32,8 +32,8 @@ export default async function PiutangPage({
   return (
     <>
       <PageHeader
-        title="Kontrol Piutang & Termin"
-        subtitle={`Kelola status termin proyek — ${selectedEntity.name}`}
+        title={`Kontrol Piutang & Termin – ${selectedEntity.name}`}
+        subtitle="Kelola status termin proyek"
         rightSlot={
           <EntitySwitcher
             entities={entities.map((e) => ({ key: e.key, name: e.name }))}

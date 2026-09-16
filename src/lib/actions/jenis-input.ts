@@ -23,6 +23,10 @@ export async function createJenisInput(formData: FormData) {
   const nama = (formData.get("nama") as string)?.trim();
   if (!nama) throw new Error("Nama wajib diisi.");
 
+  const arahPencatatan = (formData.get("arahPencatatan") as string) || "JURNAL_UMUM";
+  const validArah = ["JURNAL_UMUM", "PIUTANG", "PENDAPATAN"];
+  if (!validArah.includes(arahPencatatan)) throw new Error("Arah pencatatan tidak valid.");
+
   const baseKey = slugify(nama);
   let key = baseKey;
   let suffix = 1;
@@ -31,7 +35,7 @@ export async function createJenisInput(formData: FormData) {
   }
 
   await prisma.jenisInputTransaksi.create({
-    data: { key, nama, createdById: session.user.id },
+    data: { key, nama, createdById: session.user.id, extraFieldsJson: { arahPencatatan } },
   });
 
   await prisma.notifikasi.createMany({

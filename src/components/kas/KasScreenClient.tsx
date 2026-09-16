@@ -15,6 +15,7 @@ type LedgerRow = {
   keterangan: string;
   akunTags: string[];
   rekening?: string;
+  crossingEntityKey?: string;
   masukFmt: string;
   keluarFmt: string;
   saldoFmt: string;
@@ -32,6 +33,7 @@ export function KasScreenClient({
   ledger,
   rekeningOptions = [],
   selectedRekeningId,
+  allEntities = [],
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -42,6 +44,7 @@ export function KasScreenClient({
   ledger: LedgerRow[];
   rekeningOptions?: RekeningOption[];
   selectedRekeningId?: string;
+  allEntities?: { key: string; name: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -157,6 +160,7 @@ export function KasScreenClient({
           coaOptions={coaOptions}
           rekeningOptions={rekeningOptions}
           defaultRekeningId={selectedRekeningId}
+          allEntities={allEntities}
           onClose={() => setPanelOpen(false)}
         />
       )}
@@ -267,6 +271,11 @@ export function KasScreenClient({
                       {r.rekening && (
                         <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md">
                           {r.rekening}
+                        </span>
+                      )}
+                      {r.crossingEntityKey && (
+                        <span className="ml-2 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                          → {allEntities.find((e) => e.key === r.crossingEntityKey)?.name ?? r.crossingEntityKey}
                         </span>
                       )}
                     </td>

@@ -59,6 +59,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
       keterangan: string;
       akunTags: string[];
       rekening?: string;
+      crossingEntityKey?: string;
       masuk: number;
       keluar: number;
       saldo: number;
@@ -82,6 +83,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
         hasKasEntry: false,
         allTxIds: [],
         coaRows: [],
+        crossingEntityKey: undefined,
       });
     }
     const g = groups.get(key)!;
@@ -96,6 +98,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
       g.keluar = Number(r.kredit);
       g.saldo = Number(r.saldoSetelah);
       if (extra?.rekeningNama) g.rekening = String(extra.rekeningNama);
+      if (extra?.crossingEntityKey) g.crossingEntityKey = String(extra.crossingEntityKey);
     } else {
       if (r.coaAccount) {
         g.akunTags.push(r.coaAccount.name);
@@ -122,6 +125,7 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
     keterangan: g.keterangan,
     akunTags: g.akunTags,
     rekening: g.rekening,
+    crossingEntityKey: g.crossingEntityKey,
     masuk: g.masuk,
     keluar: g.keluar,
     saldo: g.saldo,

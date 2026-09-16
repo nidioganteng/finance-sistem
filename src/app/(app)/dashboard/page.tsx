@@ -58,7 +58,7 @@ export default async function DashboardPage({
 
   const rightSlot = (
     <>
-      <NotifBell unreadCount={unreadCount} />
+      {!isStaff && <NotifBell unreadCount={unreadCount} />}
       {canGrup && (
         <EntitySwitcher
           entities={entities.map((e) => ({ key: e.key, name: e.name }))}

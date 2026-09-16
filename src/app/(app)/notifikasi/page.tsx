@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getNotifFilterOptions, getNotifikasiList, getNotifTypeLabels } from "@/lib/notifikasi";
 import { markAllNotifikasiRead } from "@/lib/actions/notifikasi";
@@ -9,6 +10,7 @@ import { NotifikasiListClient } from "@/components/notifikasi/NotifikasiListClie
 export default async function NotifikasiPage({ searchParams }: { searchParams: { filter?: string } }) {
   const session = await getServerSession(authOptions);
   const role = session!.user.role;
+  if (role === "STAF_KEUANGAN") redirect("/dashboard");
   const filter = searchParams.filter ?? "semua";
 
   const options = getNotifFilterOptions(role);

@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
+import { getAccessibleEntities, formatRupiah, getMonthlyChartData, getMonthlyByYear } from "@/lib/dashboard-data";
 import { getLabaRugiData } from "@/lib/laba-rugi";
 import { getNeracaData } from "@/lib/neraca";
 import { getArusKasData } from "@/lib/arus-kas";
@@ -12,6 +12,9 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { LaporanTabs } from "@/components/laporan/LaporanTabs";
 import { KomparasiControls } from "@/components/laporan/KomparasiControls";
+import { EntityMonthlyChart } from "@/components/laporan/EntityMonthlyChart";
+import { YearMonthlyChart } from "@/components/laporan/YearMonthlyChart";
+import { MultiYearChips } from "@/components/laporan/MultiYearChips";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -46,7 +49,15 @@ function computeDelta(a: number, b: number, goodWhenUp: boolean) {
 export default async function LaporanPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string; tab?: string; mode?: string; periodA?: string; periodB?: string };
+  searchParams: {
+    entity?: string;
+    year?: string;
+    tab?: string;
+    mode?: string;
+    periodA?: string;
+    periodB?: string;
+    chartYears?: string;
+  };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -144,6 +155,12 @@ export default async function LaporanPage({
     txCountB: number;
   } | null = null;
 
+  type MonthRow = Record<string, string | number>;
+  let komparasiChart:
+    | { type: "grup"; chartA: MonthRow[]; chartB: MonthRow[]; entities: { key: string; name: string; colorHex: string }[] }
+    | { type: "single"; data: MonthRow[]; years: number[] }
+    | null = null;
+
   if (tab === "komparasi") {
     const mode = searchParams.mode === "bulanan" ? "bulanan" : "tahunan";
     const nowYear = new Date().getFullYear();
@@ -187,6 +204,36 @@ export default async function LaporanPage({
       txCountA,
       txCountB,
     };
+
+    // Chart bulanan cuma masuk akal buat mode Tahunan (dua/lebih tahun penuh
+    // dibandingkan bulan per bulan). Grup ("Semua Entitas") dibatasi ke 2 tahun
+    // (Periode A/B) dan warna = entitas; 1 entitas dibatasi 2-5 tahun sekaligus
+    // dan warna = tahun.
+    if (mode === "tahunan") {
+      if (!selectedEntity) {
+        const entityKeysAll = entities.map((e) => e.key);
+        const [chartA, chartB] = await Promise.all([
+          getMonthlyChartData(entityKeysAll, periodA.year),
+          getMonthlyChartData(entityKeysAll, periodB.year),
+        ]);
+        komparasiChart = {
+          type: "grup",
+          chartA,
+          chartB,
+          entities: entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex })),
+        };
+      } else {
+        const parsedYears = (searchParams.chartYears ?? "")
+          .split(",")
+          .map((y) => parseInt(y))
+          .filter((y) => !isNaN(y));
+        const chartYears = parsedYears.length >= 2
+          ? Array.from(new Set(parsedYears)).sort((a, b) => a - b).slice(0, 5)
+          : Array.from(new Set([periodB.year, periodA.year])).sort((a, b) => a - b);
+        const data = await getMonthlyByYear([selectedEntity.id], chartYears);
+        komparasiChart = { type: "single", data, years: chartYears };
+      }
+    }
   }
 
   const txCount = await prisma.transaction.count({
@@ -283,6 +330,28 @@ export default async function LaporanPage({
               </tbody>
             </table>
           </div>
+
+          {komparasiChart?.type === "grup" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <EntityMonthlyChart
+                title={komparasiData.labelA}
+                data={komparasiChart.chartA}
+                entities={komparasiChart.entities}
+              />
+              <EntityMonthlyChart
+                title={komparasiData.labelB}
+                data={komparasiChart.chartB}
+                entities={komparasiChart.entities}
+              />
+            </div>
+          )}
+
+          {komparasiChart?.type === "single" && (
+            <div className="flex flex-col gap-3">
+              <MultiYearChips selectedYears={komparasiChart.years} />
+              <YearMonthlyChart data={komparasiChart.data} years={komparasiChart.years} />
+            </div>
+          )}
         </div>
       )}
 

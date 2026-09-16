@@ -26,7 +26,7 @@ import {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; chartYear?: string };
+  searchParams: { entity?: string; chartYear?: string; compareYears?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
@@ -47,12 +47,21 @@ export default async function DashboardPage({
 
   const currentYear = new Date().getFullYear();
   const chartYear = searchParams.chartYear ? parseInt(searchParams.chartYear) : currentYear;
+  // Tahun pembanding tambahan (di luar chartYear) — maksimal 4 (jadi 5 tahun
+  // sekaligus), pembatasan lebih ketat (grup cuma 1) ditegakkan di RevenueChart
+  // lewat activeKeys (client-only state, jadi tidak bisa dibatasi di sini).
+  const compareYears = (searchParams.compareYears ?? "")
+    .split(",")
+    .map((y) => parseInt(y))
+    .filter((y, idx, arr) => !isNaN(y) && y !== chartYear && arr.indexOf(y) === idx)
+    .slice(0, 4);
+  const chartYears = [chartYear, ...compareYears];
 
-  const [notifications, unreadCount, piutangMetrics, monthlyData] = await Promise.all([
+  const [notifications, unreadCount, piutangMetrics, monthlyDataByYear] = await Promise.all([
     getRecentNotifications(role),
     getUnreadNotificationCount(role),
     showingGrup ? getGrupPiutangMetrics() : Promise.resolve(null),
-    showingGrup ? getMonthlyChartData(entityKeys, chartYear) : Promise.resolve([]),
+    showingGrup ? Promise.all(chartYears.map((y) => getMonthlyChartData(entityKeys, y))) : Promise.resolve([]),
   ]);
 
   const rightSlot = (
@@ -219,9 +228,9 @@ export default async function DashboardPage({
           </div>
 
           <RevenueChart
-            monthlyData={monthlyData}
+            monthlyDataByYear={monthlyDataByYear}
             entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))}
-            year={chartYear}
+            years={chartYears}
             currentYear={currentYear}
           />
 

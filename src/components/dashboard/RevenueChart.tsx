@@ -232,17 +232,16 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
             ))}
           </select>
 
-          {/* Chip tahun pembanding aktif */}
-          {compareYears.map((y, i) => (
+          {/* Chip tahun pembanding aktif — netral, samain kayak tombol lain di sebelahnya */}
+          {compareYears.map((y) => (
             <span
               key={y}
-              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-[9px] text-[12px] font-semibold"
-              style={{ background: `${YEAR_COLORS[(i + 1) % YEAR_COLORS.length]}1a`, color: YEAR_COLORS[(i + 1) % YEAR_COLORS.length] }}
+              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger bg-surface-card"
             >
               vs {y}
               <button
                 onClick={() => removeCompareYear(y)}
-                className="p-0.5 rounded-full hover:opacity-70"
+                className="p-0.5 rounded-full hover:bg-surface-hover"
                 aria-label={`Hapus perbandingan tahun ${y}`}
               >
                 <X size={11} />
@@ -332,17 +331,12 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
         })}
       </div>
 
-      {isComparing && (
-        <div className="text-[11.5px] text-muted-faint mb-2">
-          Menampilkan total pendapatan {activeKeys.has("all") ? "semua entitas" : "entitas terpilih"} per bulan,
-          dibandingkan antar-tahun.
-        </div>
-      )}
-
       {/* Chart */}
-      <ResponsiveContainer width="100%" height={isComparing ? 320 : 280}>
-        {commonChart}
-      </ResponsiveContainer>
+      <div className="mt-4">
+        <ResponsiveContainer width="100%" height={isComparing ? 320 : 280}>
+          {commonChart}
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { JenisInputClient } from "@/components/jenis-input/JenisInputClient";
 export default async function JenisInputPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  if (role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") redirect("/dashboard");
+  if (role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const data = await getJenisInputList();
 

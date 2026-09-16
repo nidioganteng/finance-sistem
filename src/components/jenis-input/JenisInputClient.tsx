@@ -39,7 +39,7 @@ export function JenisInputClient({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const canManage = userRole === "SUPER_ADMIN" || userRole === "MANAJER_KEUANGAN";
+  const canManage = userRole === "STAF_KEUANGAN";
 
   async function handleCreate(formData: FormData) {
     setError(null);

@@ -19,6 +19,7 @@ function slugify(nama: string) {
 export async function createJenisInput(formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
+  if (session.user.role !== "STAF_KEUANGAN") throw new Error("Hanya Staf Keuangan yang bisa menambahkan jenis input.");
 
   const nama = (formData.get("nama") as string)?.trim();
   if (!nama) throw new Error("Nama wajib diisi.");
@@ -38,18 +39,16 @@ export async function createJenisInput(formData: FormData) {
     data: { key, nama, createdById: session.user.id, extraFieldsJson: { arahPencatatan } },
   });
 
+  const now = new Date();
+  const tanggal = now.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
+  const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  const ARAH_LABEL: Record<string, string> = { JURNAL_UMUM: "Jurnal Umum", PIUTANG: "Piutang", PENDAPATAN: "Pendapatan" };
+  const notifText = `${session.user.name} menambahkan jenis input baru "${nama}" (arah: ${ARAH_LABEL[arahPencatatan] ?? arahPencatatan}) pada ${tanggal} pukul ${jam}.`;
+
   await prisma.notifikasi.createMany({
     data: [
-      {
-        type: "JENIS_INPUT_BARU",
-        targetRole: Role.SUPER_ADMIN,
-        text: `Jenis input transaksi baru "${nama}" ditambahkan oleh ${session.user.name}`,
-      },
-      {
-        type: "JENIS_INPUT_BARU",
-        targetRole: Role.MANAJER_KEUANGAN,
-        text: `Jenis input transaksi baru "${nama}" ditambahkan oleh ${session.user.name}`,
-      },
+      { type: "JENIS_INPUT_BARU", targetRole: Role.SUPER_ADMIN, text: notifText },
+      { type: "JENIS_INPUT_BARU", targetRole: Role.MANAJER_KEUANGAN, text: notifText },
     ],
   });
 
@@ -57,6 +56,8 @@ export async function createJenisInput(formData: FormData) {
 }
 
 export async function toggleJenisInput(id: string, currentActive: boolean) {
+  const session = await getServerSession(authOptions);
+  if (session?.user.role !== "STAF_KEUANGAN") throw new Error("Akses ditolak.");
   await prisma.jenisInputTransaksi.update({
     where: { id },
     data: { active: !currentActive },
@@ -65,6 +66,8 @@ export async function toggleJenisInput(id: string, currentActive: boolean) {
 }
 
 export async function deleteJenisInput(id: string) {
+  const session = await getServerSession(authOptions);
+  if (session?.user.role !== "STAF_KEUANGAN") throw new Error("Akses ditolak.");
   const item = await prisma.jenisInputTransaksi.findUnique({ where: { id } });
   if (!item) throw new Error("Jenis input tidak ditemukan.");
   if (SYSTEM_KEYS.includes(item.key)) {

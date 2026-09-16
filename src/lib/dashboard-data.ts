@@ -22,6 +22,7 @@ export async function getAccessibleEntities(entityKeys: string[]) {
       select: {
         entityId: true,
         kredit: true,
+        debit: true,
         coaAccount: { select: { kategori: true } },
       },
     }),
@@ -30,11 +31,10 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   const revenueMap = new Map<string, number>();
   const spendMap = new Map<string, number>();
   for (const tx of txRows) {
-    const amt = Number(tx.kredit);
     if (tx.coaAccount?.kategori === "PENDAPATAN") {
-      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + amt);
+      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
     } else if (tx.coaAccount?.kategori === "BEBAN") {
-      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + amt);
+      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
     }
   }
 

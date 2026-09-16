@@ -6,7 +6,6 @@ import {
   getUnreadNotificationCount,
   getGrupPiutangMetrics,
   getMonthlyChartData,
-  formatRupiah,
   formatMiliar,
 } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
@@ -58,7 +57,7 @@ export default async function DashboardPage({
 
   const rightSlot = (
     <>
-      <NotifBell unreadCount={unreadCount} />
+      {!isStaff && <NotifBell unreadCount={unreadCount} />}
       {canGrup && (
         <EntitySwitcher
           entities={entities.map((e) => ({ key: e.key, name: e.name }))}
@@ -278,14 +277,14 @@ export default async function DashboardPage({
                   <tr key={p.code} className="border-t border-border">
                     <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
                     <td className="py-3">{p.name}</td>
-                    <td className="py-3 text-right tabular-nums">{formatRupiah(p.contractValue)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatRupiah(p.spend)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
+                    <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
                     <td
                       className={`py-3 text-right tabular-nums font-semibold ${
                         p.profit >= 0 ? "text-status-green" : "text-status-red"
                       }`}
                     >
-                      {formatRupiah(p.profit)}
+                      {formatMiliar(p.profit)}
                     </td>
                   </tr>
                 ))}

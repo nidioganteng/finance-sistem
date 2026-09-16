@@ -26,7 +26,7 @@ export async function getNeracaData(entityId: string, year: number) {
     if (!t.coaAccount) continue;
     const kat = t.coaAccount.kategori;
     if (kat === "PENDAPATAN") { totalPendapatan += Number(t.kredit); continue; }
-    if (kat === "BEBAN") { totalBeban += Number(t.kredit); continue; }
+    if (kat === "BEBAN") { totalBeban += Number(t.debit); continue; }
     if (!["ASET", "KEWAJIBAN", "MODAL"].includes(kat)) continue;
     const map = maps[kat];
     if (!map.has(t.coaAccountId!)) {

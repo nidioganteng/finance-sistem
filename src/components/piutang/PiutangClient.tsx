@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
-import { auditTermin, updateTerminStatus } from "@/lib/actions/piutang";
-import { CheckCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { auditTermin, updateTerminStatus, cancelProject } from "@/lib/actions/piutang";
+import { CheckCircle, ChevronDown, ChevronRight, Ban } from "lucide-react";
 
 type TerminItem = {
   id: string;
@@ -20,6 +20,9 @@ type ProjectItem = {
   name: string;
   contractValue: number;
   contractValueFmt: string;
+  deadlineFmt: string;
+  isOverdue: boolean;
+  status: "ACTIVE" | "CANCELLED";
   maxPercentage: number;
   terminTagih: number;
   terminTagihFmt: string;
@@ -105,6 +108,17 @@ export function PiutangClient({
   function handleStatusChange(id: string, status: TerminStatus) {
     startTransition(async () => {
       await updateTerminStatus(id, status);
+    });
+  }
+
+  function handleCancelProject(id: string, code: string) {
+    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dianggap selesai.`)) return;
+    startTransition(async () => {
+      try {
+        await cancelProject(id);
+      } catch (e: unknown) {
+        setError((e as Error).message);
+      }
     });
   }
 
@@ -215,7 +229,14 @@ export function PiutangClient({
                               : <ChevronRight size={14} />}
                           </td>
                           <td className="py-3 px-3">
-                            <div className="font-bold text-navy-text text-[13px]">{p.code}</div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="font-bold text-navy-text text-[13px]">{p.code}</div>
+                              {p.status === "CANCELLED" && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-hover text-muted-faint">
+                                  Dibatalkan
+                                </span>
+                              )}
+                            </div>
                             <div className="text-[12px] text-muted-stronger">{p.name}</div>
                           </td>
                           <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-navy-text">
@@ -225,26 +246,49 @@ export function PiutangClient({
                             {p.terminTagihFmt}
                           </td>
                           <td className="py-3 px-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-28 h-2 bg-surface-hover rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all ${
-                                    p.maxPercentage >= 80
-                                      ? "bg-status-green"
-                                      : p.maxPercentage >= 50
-                                      ? "bg-brand"
-                                      : "bg-orange-400"
-                                  }`}
-                                  style={{ width: `${Math.min(p.maxPercentage, 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-[12.5px] font-bold text-muted-stronger">
-                                {p.maxPercentage}%
-                              </span>
-                            </div>
+                            {p.status === "CANCELLED" ? (
+                              <span className="text-[12px] text-muted-faint">Proyek selesai/dibatalkan</span>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-28 h-2 bg-surface-hover rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all ${
+                                        p.maxPercentage >= 80
+                                          ? "bg-status-green"
+                                          : p.maxPercentage >= 50
+                                          ? "bg-brand"
+                                          : "bg-orange-400"
+                                      }`}
+                                      style={{ width: `${Math.min(p.maxPercentage, 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[12.5px] font-bold text-muted-stronger">
+                                    {p.maxPercentage}%
+                                  </span>
+                                </div>
+                                <div className={`text-[11px] mt-1 ${p.isOverdue ? "text-status-red font-semibold" : "text-muted-faint"}`}>
+                                  Batas kontrak: {p.deadlineFmt}{p.isOverdue ? " · Lewat tempo" : ""}
+                                </div>
+                              </>
+                            )}
                           </td>
-                          <td className="py-3 px-5 text-right tabular-nums text-[13px] font-semibold text-status-red">
-                            {p.sisaTagihFmt}
+                          <td className="py-3 px-5 text-right">
+                            <div className="tabular-nums text-[13px] font-semibold text-status-red">
+                              {p.sisaTagihFmt}
+                            </div>
+                            {isManajer && p.status === "ACTIVE" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancelProject(p.id, p.code);
+                                }}
+                                disabled={isPending}
+                                className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover"
+                              >
+                                <Ban size={11} /> Batalkan Proyek
+                              </button>
+                            )}
                           </td>
                         </tr>
 

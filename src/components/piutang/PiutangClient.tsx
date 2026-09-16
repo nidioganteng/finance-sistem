@@ -8,7 +8,7 @@ import { CheckCircle, ChevronDown, ChevronRight } from "lucide-react";
 type TerminItem = {
   id: string;
   name: string;
-  percentage: number;
+  nominalFmt: string;
   status: TerminStatus;
   auditedAt: string | null;
   auditedByName: string | null;
@@ -266,8 +266,8 @@ export function PiutangClient({
                                   </div>
                                 )}
                               </td>
-                              <td className="py-2.5 px-3 text-right tabular-nums text-[12px] text-muted">
-                                {t.percentage}% dari kontrak
+                              <td className="py-2.5 px-3 text-right tabular-nums text-[12px] font-semibold text-status-green">
+                                {t.nominalFmt}
                               </td>
                               <td className="py-2.5 px-3" />
                               <td className="py-2.5 px-3">

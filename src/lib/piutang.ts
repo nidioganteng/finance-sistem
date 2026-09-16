@@ -68,14 +68,22 @@ export async function getPiutangData(entityId: string) {
       terminTagihFmt: formatRupiah(terminTagih),
       sisaTagih: contractValue - terminTagih,
       sisaTagihFmt: formatRupiah(contractValue - terminTagih),
-      termin: p.termin.map((t) => ({
-        id: t.id,
-        name: t.name,
-        percentage: t.percentage,
-        status: t.status,
-        auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
-        auditedByName: t.auditedBy?.name ?? null,
-      })),
+      // Tiap termin ditampilkan sebagai nominal uang masuk-nya sendiri (bukan
+      // persentase) — dihitung dari selisih persentase kumulatif dgn termin
+      // sebelumnya × nilai kontrak. Persentase tetap dipakai di belakang layar
+      // (lihat maxPct di atas), tampilan persen itu bagian Admin Sidamon.
+      termin: p.termin.map((t, i) => {
+        const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+        const nominalTermin = ((t.percentage - prevPct) / 100) * contractValue;
+        return {
+          id: t.id,
+          name: t.name,
+          nominalFmt: formatRupiah(nominalTermin),
+          status: t.status,
+          auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
+          auditedByName: t.auditedBy?.name ?? null,
+        };
+      }),
     };
   });
 

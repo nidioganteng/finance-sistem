@@ -118,9 +118,11 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     },
   });
 
-  // Uang masuk yang ditandai buat proyek tertentu otomatis jadi progres termin
-  // proyek itu — persentase dihitung sistem dari akumulasi uang masuk
-  // dibanding nilai kontrak, bukan diinput manual (lihat computeNewTerminPercentage).
+  // Uang masuk yang ditandai buat proyek tertentu otomatis jadi termin baru
+  // proyek itu — dinomori urut per proyek (Termin 1, Termin 2, dst), bukan
+  // diberi nama tanggal. Persentase tetap dihitung & disimpan di belakang
+  // layar (dipakai buku besar perhitungan Piutang Perlu Perhatian dkk), tapi
+  // bukan yang ditampilkan/diinput Keuangan — itu bagian tampilan Sidamon.
   const terminCreate: ReturnType<typeof prisma.termin.create>[] = [];
   if (!isKeluar && input.projectId) {
     const project = await prisma.project.findUnique({
@@ -133,11 +135,12 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         project.termin.map((t) => t.percentage),
         total
       );
+      const terminKe = project.termin.length + 1;
       terminCreate.push(
         prisma.termin.create({
           data: {
             projectId: input.projectId,
-            name: `Termin ${new Date(input.tanggal).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}`,
+            name: `Termin ${terminKe}`,
             percentage: newPct,
             status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
           },

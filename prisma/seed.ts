@@ -179,7 +179,7 @@ async function main() {
     await prisma.termin.create({
       data: {
         projectId: projects[p.code].id,
-        name: `Termin ${p.name}`,
+        name: "Termin 1",
         percentage: p.terminPct,
         status: p.terminPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
       },

@@ -57,6 +57,8 @@ export async function KasScreen({
     getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama),
   ]);
 
+  const coaList = coaOptions.map((c) => ({ id: c.id, code: c.code, name: c.name }));
+
   return (
     <>
       <PageHeader
@@ -74,7 +76,7 @@ export async function KasScreen({
         entityKey={selectedEntity.key}
         jenisInputKey={jenisInputKey}
         pagePath={pagePath}
-        coaOptions={coaOptions.map((c) => ({ id: c.id, code: c.code, name: c.name }))}
+        coaOptions={coaList}
         saldoFmt={formatRupiah(saldo)}
         saldoLabel={selectedRekeningNama ? `Saldo ${selectedRekeningNama}` : "Saldo Berjalan"}
         ledger={ledger}

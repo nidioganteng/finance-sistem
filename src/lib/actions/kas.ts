@@ -119,3 +119,42 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   revalidatePath("/jurnal");
   return { success: true };
 }
+
+export async function deleteKasTransactionGroup(txIds: string[], pagePath: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { error: "Belum login." };
+  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa menghapus transaksi." };
+  if (txIds.length === 0) return { error: "Tidak ada transaksi untuk dihapus." };
+
+  await prisma.transaction.deleteMany({ where: { id: { in: txIds } } });
+  revalidatePath(pagePath);
+  revalidatePath("/jurnal");
+  return { success: true };
+}
+
+export async function updateKasTransactionGroup(input: {
+  txIds: string[];
+  newNoBukti: string;
+  newKeterangan: string;
+  coaUpdates: { txId: string; newCoaAccountId: string }[];
+  pagePath: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { error: "Belum login." };
+  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa mengedit transaksi." };
+  if (!input.newNoBukti.trim() || !input.newKeterangan.trim()) return { error: "No. bukti dan keterangan wajib diisi." };
+
+  await prisma.$transaction([
+    prisma.transaction.updateMany({
+      where: { id: { in: input.txIds } },
+      data: { noBukti: input.newNoBukti.trim(), keterangan: input.newKeterangan.trim() },
+    }),
+    ...input.coaUpdates.map((u) =>
+      prisma.transaction.update({ where: { id: u.txId }, data: { coaAccountId: u.newCoaAccountId } })
+    ),
+  ]);
+
+  revalidatePath(input.pagePath);
+  revalidatePath("/jurnal");
+  return { success: true };
+}

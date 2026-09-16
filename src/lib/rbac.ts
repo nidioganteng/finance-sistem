@@ -119,3 +119,10 @@ export function roleLabel(role: Role): string {
 export function canViewGrupAggregate(role: Role): boolean {
   return role === "SUPER_ADMIN" || role === "MANAJER_KEUANGAN";
 }
+
+// Siapa yang boleh bikin proyek baru & catat uang masuk (termin) di halaman
+// Kontrol Piutang & Termin — Staf Keuangan ikut dikasih akses karena mereka
+// yang langsung input transaksi "uang masuk" via Kas/Bank Buku.
+export function canManagePiutang(role: Role): boolean {
+  return role === "MANAJER_KEUANGAN" || role === "STAF_KEUANGAN";
+}

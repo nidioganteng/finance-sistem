@@ -93,6 +93,9 @@ export function PiutangClient({
   const [nominalMasuk, setNominalMasuk] = useState("");
 
   const isManajer = userRole === "MANAJER_KEUANGAN";
+  // Proyek baru & catat uang masuk (termin) — Staf Keuangan ikut dikasih akses
+  // karena mereka yang langsung input transaksi "uang masuk" via Kas/Bank Buku.
+  const canManagePiutang = isManajer || userRole === "STAF_KEUANGAN";
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -213,7 +216,7 @@ export function PiutangClient({
           </div>
 
           {/* Tambah proyek baru — cuma nilai kontrak, termin diisi belakangan tiap ada uang masuk */}
-          {isManajer && (
+          {canManagePiutang && (
             <div className="bg-surface-card rounded-[16px] border border-border-soft p-4">
               {!showNewProject ? (
                 <button
@@ -414,7 +417,7 @@ export function PiutangClient({
                           ))}
 
                         {/* Catat uang masuk — persentase termin baru dihitung otomatis dari akumulasi uang masuk / nilai kontrak */}
-                        {isExpanded && isManajer && (
+                        {isExpanded && canManagePiutang && (
                           <tr className="border-b border-surface-subtle bg-surface-subtle/20">
                             <td className="py-2.5 px-5" />
                             <td colSpan={5} className="py-2.5 px-3 pl-8">

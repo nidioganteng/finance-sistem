@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { TerminStatus } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canManagePiutang } from "@/lib/rbac";
 
 // Admin proyek cuma input nilai kontrak di awal — belum ada termin/piutang
 // sama sekali sampai Keuangan mencatat uang masuk pertama (recordTerminPayment).
@@ -16,8 +17,8 @@ export async function createProject(input: {
 }) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
-  if (session.user.role !== "MANAJER_KEUANGAN") {
-    throw new Error("Hanya Manajer Keuangan yang bisa menambah proyek baru.");
+  if (!canManagePiutang(session.user.role)) {
+    throw new Error("Kamu tidak punya akses untuk menambah proyek baru.");
   }
   if (!input.code.trim() || !input.name.trim()) {
     throw new Error("Kode dan nama proyek wajib diisi.");
@@ -48,8 +49,8 @@ export async function createProject(input: {
 export async function recordTerminPayment(input: { projectId: string; nominalMasuk: number }) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
-  if (session.user.role !== "MANAJER_KEUANGAN") {
-    throw new Error("Hanya Manajer Keuangan yang bisa mencatat termin.");
+  if (!canManagePiutang(session.user.role)) {
+    throw new Error("Kamu tidak punya akses untuk mencatat termin.");
   }
   if (!(input.nominalMasuk > 0)) {
     throw new Error("Nominal uang masuk harus lebih dari 0.");

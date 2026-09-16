@@ -20,12 +20,7 @@ export default async function JenisInputPage() {
       />
       <JenisInputClient
         initialData={data.map((d) => {
-          const extra = d.extraFieldsJson as { arahLaporan?: string[]; arahPencatatan?: string } | null;
-          const arahLaporan = Array.isArray(extra?.arahLaporan)
-            ? extra.arahLaporan
-            : extra?.arahPencatatan
-            ? [extra.arahPencatatan]
-            : [];
+          const extra = d.extraFieldsJson as { arahLaporan?: string[] } | null;
           return {
             id: d.id,
             key: d.key,
@@ -33,7 +28,7 @@ export default async function JenisInputPage() {
             active: d.active,
             createdBy: d.createdBy,
             createdAt: d.createdAt,
-            arahLaporan,
+            arahLaporan: Array.isArray(extra?.arahLaporan) ? extra.arahLaporan : [],
           };
         })}
         userRole={role}

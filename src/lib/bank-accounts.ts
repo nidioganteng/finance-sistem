@@ -20,17 +20,6 @@ export const REKENING_COA_CODE: Record<string, string> = {
   "kp-bpd":  "1-501",
 };
 
-// Peta nama rekening → kode COA (dipakai seed & display fallback)
-export const REKENING_NAMA_TO_COA_CODE: Record<string, string> = {
-  "BRI KAK": "1-201",
-  "BPD KAK": "1-202",
-  "BRI GS":  "1-101",
-  "BPD GS":  "1-102",
-  "BPD TB":  "1-301",
-  "BPD CAD": "1-401",
-  "BPD KP":  "1-501",
-};
-
 export function getRekeningNama(entityKey: string, rekeningId: string): string | undefined {
   return REKENING_BY_ENTITY[entityKey]?.find((r) => r.id === rekeningId)?.nama;
 }

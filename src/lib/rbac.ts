@@ -6,7 +6,7 @@ export type NavItem = {
   icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale";
 };
 
-export type NavSection = {
+type NavSection = {
   title: string;
   items: NavItem[];
 };

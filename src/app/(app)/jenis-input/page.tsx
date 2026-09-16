@@ -26,6 +26,7 @@ export default async function JenisInputPage() {
           active: d.active,
           createdBy: d.createdBy,
           createdAt: d.createdAt,
+          arahPencatatan: (d.extraFieldsJson as { arahPencatatan?: string } | null)?.arahPencatatan ?? null,
         }))}
         userRole={role}
       />

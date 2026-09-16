@@ -9,7 +9,7 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   const [entities, txRows] = await Promise.all([
     prisma.entity.findMany({
       where: { key: { in: entityKeys } },
-      include: { projects: { include: { termin: true } } },
+      include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
       orderBy: { createdAt: "asc" },
     }),
     // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
@@ -75,20 +75,31 @@ export async function getUnreadNotificationCount(role: Role) {
   return prisma.notifikasi.count({ where: { targetRole: role, read: false } });
 }
 
+// Warning piutang cuma muncul untuk proyek aktif yang progres pembayarannya
+// masih di bawah 80% DAN sudah lewat batas kontrak (deadline) — proyek yang
+// progresnya rendah tapi belum jatuh tempo tidak dianggap bermasalah.
 export async function getGrupPiutangMetrics() {
-  const terminPerluPerhatian = await prisma.termin.count({
-    where: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } },
+  const projects = await prisma.project.findMany({
+    where: { status: "ACTIVE" },
+    select: {
+      contractValue: true,
+      deadline: true,
+      termin: { select: { percentage: true } },
+    },
   });
 
-  // Total piutang belum teragih = contractValue - spend untuk proyek yang ada termin bermasalah
-  const projekBermasalah = await prisma.project.findMany({
-    where: { termin: { some: { status: { in: ["AT_RISK", "NEEDS_AUDIT"] } } } },
-    select: { contractValue: true, spend: true },
-  });
-  const totalPiutangBelumTeragih = projekBermasalah.reduce(
-    (s, p) => s + Math.max(0, Number(p.contractValue) - Number(p.spend)),
-    0
-  );
+  const now = new Date();
+  let terminPerluPerhatian = 0;
+  let totalPiutangBelumTeragih = 0;
+
+  for (const p of projects) {
+    const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
+    const isOverdue = p.deadline < now;
+    if (maxPct < 80 && isOverdue) {
+      terminPerluPerhatian += 1;
+      totalPiutangBelumTeragih += Number(p.contractValue) * (1 - maxPct / 100);
+    }
+  }
 
   return { terminPerluPerhatian, totalPiutangBelumTeragih };
 }

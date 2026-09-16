@@ -11,6 +11,19 @@ type JenisInputItem = {
   active: boolean;
   createdBy: { name: string } | null;
   createdAt: Date;
+  arahPencatatan: string | null;
+};
+
+const ARAH_LABEL: Record<string, string> = {
+  JURNAL_UMUM: "Jurnal Umum",
+  PIUTANG: "Piutang",
+  PENDAPATAN: "Pendapatan",
+};
+
+const ARAH_BADGE: Record<string, string> = {
+  JURNAL_UMUM: "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
+  PIUTANG: "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400",
+  PENDAPATAN: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
 };
 
 const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
@@ -86,6 +99,15 @@ export function JenisInputClient({
               placeholder="Nama jenis input baru (mis. Petty Cash)"
               className="px-3 py-2 rounded-xl border border-border text-sm flex-1 bg-surface-card"
             />
+            <select
+              name="arahPencatatan"
+              defaultValue="JURNAL_UMUM"
+              className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card text-navy-text"
+            >
+              <option value="JURNAL_UMUM">Jurnal Umum</option>
+              <option value="PIUTANG">Piutang</option>
+              <option value="PENDAPATAN">Pendapatan</option>
+            </select>
             <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
               <Check size={14} /> Simpan
             </button>
@@ -104,6 +126,7 @@ export function JenisInputClient({
           <tr className="border-b border-surface-hover text-left">
             <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Nama</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Key</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Arah Pencatatan</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Status</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Dibuat Oleh</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Tanggal</th>
@@ -126,6 +149,15 @@ export function JenisInputClient({
                 </div>
               </td>
               <td className="py-3 px-3 font-mono text-[12px] text-muted">{item.key}</td>
+              <td className="py-3 px-3">
+                {item.arahPencatatan ? (
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${ARAH_BADGE[item.arahPencatatan] ?? "bg-surface-hover text-muted"}`}>
+                    {ARAH_LABEL[item.arahPencatatan] ?? item.arahPencatatan}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-muted-faint">—</span>
+                )}
+              </td>
               <td className="py-3 px-3">
                 <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${item.active ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400"}`}>
                   {item.active ? "Aktif" : "Nonaktif"}

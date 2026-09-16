@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart,
@@ -14,7 +15,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { BarChart2, TrendingUp } from "lucide-react";
+import { BarChart2, TrendingUp, GitCompare } from "lucide-react";
 
 type EntityMeta = { key: string; name: string; colorHex: string };
 type MonthRow = Record<string, string | number>;
@@ -190,6 +191,17 @@ export function RevenueChart({ monthlyData, entities, year, currentYear }: Props
               Line
             </button>
           </div>
+
+          {/* Buka tab Komparasi di /laporan, bawa tahun yang sedang aktif di chart
+              ini sebagai Periode A (Periode B default tahun sebelumnya) — klik pada
+              chart sendiri tetap cuma nampilin tooltip, tidak pindah halaman. */}
+          <Link
+            href={`/laporan?tab=komparasi&mode=tahunan&periodA=${year}&periodB=${year - 1}`}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
+          >
+            <GitCompare size={13} />
+            Detail Komparasi
+          </Link>
         </div>
       </div>
 

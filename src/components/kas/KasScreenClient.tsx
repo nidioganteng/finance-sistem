@@ -6,7 +6,7 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number };
@@ -17,7 +17,8 @@ type LedgerRow = {
   keterangan: string;
   akunTags: string[];
   rekening?: string;
-  crossingEntityKey?: string;
+  crossingEntityKeys?: string[];
+  crossingFromEntityKey?: string;
   masuk: number;
   keluar: number;
   masukFmt: string;
@@ -115,7 +116,7 @@ export function KasScreenClient({
                 keterangan: editingRow.keterangan,
                 arah: editingRow.masuk > 0 ? "masuk" : "keluar",
                 rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
-                crossingEntityKey: editingRow.crossingEntityKey ?? "",
+                crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
                 rows: editingRow.coaRows.map((cr) => ({
                   coaAccountId: cr.coaAccountId,
                   nominal: String(cr.nominal),
@@ -219,6 +220,11 @@ export function KasScreenClient({
                 const rest = r.akunTags.length - shown.length;
                 const expanded = expandedIdx === idx;
 
+                const isCrossingFrom = !!r.crossingFromEntityKey;
+                const sourceEntityName = isCrossingFrom
+                  ? (allEntities.find((e) => e.key === r.crossingFromEntityKey)?.name ?? r.crossingFromEntityKey)
+                  : null;
+
                 return (
                   <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
                     <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
@@ -230,9 +236,20 @@ export function KasScreenClient({
                           {r.rekening}
                         </span>
                       )}
-                      {r.crossingEntityKey && (
-                        <span className="ml-2 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
-                          → {allEntities.find((e) => e.key === r.crossingEntityKey)?.name ?? r.crossingEntityKey}
+                      {/* Crossing destination badge — transaksi masuk dari entitas lain */}
+                      {isCrossingFrom && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                          <ArrowRightLeft size={9} />
+                          dari {sourceEntityName}
+                        </span>
+                      )}
+                      {/* Crossing source badges — transaksi dikirim ke entitas lain */}
+                      {!isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                          <ArrowRightLeft size={9} />
+                          → {(r.crossingEntityKeys ?? [])
+                            .map((k) => allEntities.find((e) => e.key === k)?.name ?? k)
+                            .join(", ")}
                         </span>
                       )}
                     </td>
@@ -254,22 +271,26 @@ export function KasScreenClient({
                     <td className="py-2.5 px-1.5 text-[13px] font-bold text-status-red text-right tabular-nums">{r.keluarFmt}</td>
                     <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums">{r.saldoFmt}</td>
                     <td className="py-2.5 px-1.5 text-right">
-                      <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => openEdit(r)}
-                          className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-stronger"
-                          title="Edit"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          onClick={() => confirmDelete(r)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red"
-                          title="Hapus"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+                      {isCrossingFrom ? (
+                        <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>
+                      ) : (
+                        <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEdit(r)}
+                            className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-stronger"
+                            title="Edit"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => confirmDelete(r)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red"
+                            title="Hapus"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

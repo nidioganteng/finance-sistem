@@ -9,7 +9,7 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { LaporanKeuanganTabs } from "@/components/laporan-keuangan/LaporanKeuanganTabs";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -31,14 +31,13 @@ export default async function LaporanKeuanganPage({
   }
 
   const data = await getLaporanKeuanganData(selectedEntity.id, currentYear);
-
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   return (
     <>
       <PageHeader
-        title="Laporan Keuangan"
-        subtitle={`${selectedEntity.name} — Periode ${currentYear}`}
+        title={`Laporan Keuangan – ${selectedEntity.name}`}
+        subtitle={`Ringkasan laporan keuangan — Periode ${currentYear}`}
         rightSlot={
           <>
             <PrintButton />
@@ -68,6 +67,88 @@ export default async function LaporanKeuanganPage({
   );
 }
 
+// ── Shared helpers ────────────────────────────────────────────────────
+
+function ReportHeader({
+  entityName,
+  title,
+  period,
+  note,
+  badge,
+}: {
+  entityName: string;
+  title: string;
+  period: string;
+  note: string;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-surface-card border border-border-soft rounded-[20px] px-6 py-5 flex items-start justify-between gap-4">
+      <div>
+        <p className="text-[10px] font-bold text-muted-faintest uppercase tracking-[0.15em] mb-1.5">{entityName}</p>
+        <h2 className="text-[17px] font-extrabold text-navy-text">{title}</h2>
+        <p className="text-[12.5px] text-muted mt-1">{period}</p>
+        <p className="text-[11px] text-muted-faintest mt-0.5">{note}</p>
+      </div>
+      {badge && <div className="shrink-0 mt-1">{badge}</div>}
+    </div>
+  );
+}
+
+function SectionHeader({ color, label }: { color: string; label: string }) {
+  const map: Record<string, { bar: string; bg: string; border: string; text: string }> = {
+    blue:   { bar: "bg-blue-500",   bg: "bg-blue-50/60 dark:bg-blue-500/10",   border: "border-blue-100 dark:border-blue-500/20",   text: "text-blue-700 dark:text-blue-400" },
+    green:  { bar: "bg-green-500",  bg: "bg-green-50/60 dark:bg-green-500/10",  border: "border-green-100 dark:border-green-500/20",  text: "text-green-700 dark:text-green-400" },
+    red:    { bar: "bg-red-500",    bg: "bg-red-50/60 dark:bg-red-500/10",    border: "border-red-100 dark:border-red-500/20",    text: "text-red-700 dark:text-red-400" },
+    orange: { bar: "bg-orange-500", bg: "bg-orange-50/60 dark:bg-orange-500/10", border: "border-orange-100 dark:border-orange-500/20", text: "text-orange-700 dark:text-orange-400" },
+    violet: { bar: "bg-violet-500", bg: "bg-violet-50/60 dark:bg-violet-500/10", border: "border-violet-100 dark:border-violet-500/20", text: "text-violet-700 dark:text-violet-400" },
+    amber:  { bar: "bg-amber-500",  bg: "bg-amber-50/60 dark:bg-amber-500/10",  border: "border-amber-100 dark:border-amber-500/20",  text: "text-amber-700 dark:text-amber-400" },
+  };
+  const c = map[color] ?? map.blue;
+  return (
+    <div className={`flex items-center gap-2.5 px-5 py-3.5 border-b ${c.bg} ${c.border}`}>
+      <div className={`w-1 h-5 rounded-full shrink-0 ${c.bar}`} />
+      <span className={`text-[10.5px] font-extrabold uppercase tracking-widest ${c.text}`}>{label}</span>
+    </div>
+  );
+}
+
+function ItemRow({ code, name, amount, amountClass = "text-navy-text" }: {
+  code: string; name: string; amount: string; amountClass?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between py-2.5 px-5 gap-4">
+      <div className="flex items-baseline gap-2 min-w-0">
+        <code className="text-[10.5px] text-muted-faintest font-mono shrink-0">{code}</code>
+        <span className="text-[13px] text-muted-stronger">{name}</span>
+      </div>
+      <span className={`tabular-nums text-[13px] font-semibold shrink-0 ${amountClass}`}>{amount}</span>
+    </div>
+  );
+}
+
+function TotalRow({ label, amount, amountClass, bgClass, borderClass }: {
+  label: string; amount: string; amountClass: string; bgClass: string; borderClass: string;
+}) {
+  return (
+    <div className={`flex items-center justify-between px-5 py-3.5 border-t-2 ${bgClass} ${borderClass}`}>
+      <span className="font-extrabold text-[13px] text-navy-text">{label}</span>
+      <span className={`tabular-nums font-extrabold text-[14px] shrink-0 ${amountClass}`}>{amount}</span>
+    </div>
+  );
+}
+
+function SubtotalRow({ label, amount, amountClass = "text-navy-text", bgClass = "bg-surface-subtle/60", borderClass = "border-surface-hover" }: {
+  label: string; amount: string; amountClass?: string; bgClass?: string; borderClass?: string;
+}) {
+  return (
+    <div className={`flex items-center justify-between px-5 py-3 border-t ${bgClass} ${borderClass}`}>
+      <span className="font-bold text-[13px] text-muted-stronger">{label}</span>
+      <span className={`tabular-nums font-bold text-[13px] shrink-0 ${amountClass}`}>{amount}</span>
+    </div>
+  );
+}
+
 // ── Tab: Neraca ──────────────────────────────────────────────────────
 function NeracaTab({
   data,
@@ -78,119 +159,122 @@ function NeracaTab({
   year: number;
   entityName: string;
 }) {
+  const balancedBadge = (
+    <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
+      data.neracaBalanced
+        ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
+        : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
+    }`}>
+      {data.neracaBalanced ? "✓ Seimbang" : "✗ Tidak Seimbang"}
+    </span>
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Report header */}
-      <div className="text-center py-2">
-        <div className="font-bold text-navy-text text-[15px]">{entityName.toUpperCase()}</div>
-        <div className="font-bold text-navy-text text-[13px] mt-0.5">NERACA</div>
-        <div className="text-[12px] text-muted mt-0.5">Per 31 Desember {year}</div>
-        <div className="text-[11px] text-muted-faint">(Dalam Rupiah)</div>
-      </div>
+      <ReportHeader
+        entityName={entityName}
+        title="Neraca"
+        period={`Per 31 Desember ${year}`}
+        note="Dalam Rupiah"
+        badge={balancedBadge}
+      />
 
       {!data.neracaBalanced && (
         <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
-          <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
-          <div className="text-[13px] text-red-700 dark:text-red-400">
-            <span className="font-bold">Neraca tidak seimbang!</span> Total Aktiva ({data.totalAsetFmt}) ≠ Total Pasiva ({data.totalPassivaFmt}).
+          <AlertTriangle size={15} className="text-red-500 mt-0.5 shrink-0" />
+          <p className="text-[13px] text-red-700 dark:text-red-400">
+            <span className="font-bold">Neraca tidak seimbang!</span>{" "}
+            Total Aktiva ({data.totalAsetFmt}) ≠ Total Pasiva ({data.totalPassivaFmt}).
             Periksa entri akun COA untuk menemukan sumber ketidakseimbangan.
-          </div>
+          </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Aktiva */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* ── Aktiva ── */}
         <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-          <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">AKTIVA</div>
-          <table className="w-full text-sm">
-            <tbody>
-              {data.aset.length === 0 && (
-                <tr><td colSpan={2} className="py-4 px-6 text-[13px] text-muted italic">Tidak ada akun aset.</td></tr>
-              )}
-              {data.aset.map((item) => (
-                <tr key={item.code} className="border-b border-surface-subtle hover:bg-surface-hover/30">
-                  <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                  <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-navy-text">{item.saldoFmt}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-border">
-                <td className="py-3.5 px-6 font-extrabold text-navy-text">Total Aktiva</td>
-                <td className={`py-3.5 px-6 text-right tabular-nums font-extrabold ${data.neracaBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
-                  {data.totalAsetFmt}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+          <SectionHeader color="blue" label="Aktiva" />
+          <div className="divide-y divide-surface-subtle">
+            {data.aset.length === 0 ? (
+              <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aset.</p>
+            ) : (
+              data.aset.map((item) => (
+                <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
+              ))
+            )}
+          </div>
+          <TotalRow
+            label="Total Aktiva"
+            amount={data.totalAsetFmt}
+            amountClass={data.neracaBalanced ? "text-blue-700 dark:text-blue-400" : "text-status-red"}
+            bgClass="bg-blue-50 dark:bg-blue-500/15"
+            borderClass="border-blue-200 dark:border-blue-500/30"
+          />
         </div>
 
-        {/* Pasiva */}
+        {/* ── Pasiva ── */}
         <div className="flex flex-col gap-4">
           {/* Kewajiban */}
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">KEWAJIBAN</div>
-            <table className="w-full text-sm">
-              <tbody>
-                {data.kewajiban.length === 0 && (
-                  <tr><td colSpan={2} className="py-3 px-6 text-[13px] text-muted italic">Tidak ada kewajiban.</td></tr>
-                )}
-                {data.kewajiban.map((item) => (
-                  <tr key={item.code} className="border-b border-surface-subtle hover:bg-surface-hover/30">
-                    <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                    <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-navy-text">{item.saldoFmt}</td>
-                  </tr>
-                ))}
-                <tr className="bg-surface-subtle/60 border-t border-border-soft">
-                  <td className="py-2.5 px-6 font-bold text-[13px] text-navy-text">Total Kewajiban</td>
-                  <td className="py-2.5 px-6 text-right tabular-nums font-bold text-[13px] text-navy-text">{data.totalKewajibanFmt}</td>
-                </tr>
-              </tbody>
-            </table>
+            <SectionHeader color="orange" label="Kewajiban" />
+            <div className="divide-y divide-surface-subtle">
+              {data.kewajiban.length === 0 ? (
+                <p className="py-4 px-5 text-[13px] text-muted-faint italic">Tidak ada kewajiban.</p>
+              ) : (
+                data.kewajiban.map((item) => (
+                  <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
+                ))
+              )}
+            </div>
+            <SubtotalRow
+              label="Total Kewajiban"
+              amount={data.totalKewajibanFmt}
+              bgClass="bg-orange-50/50 dark:bg-orange-500/10"
+              borderClass="border-orange-100 dark:border-orange-500/20"
+            />
           </div>
 
           {/* Modal */}
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">MODAL</div>
-            <table className="w-full text-sm">
-              <tbody>
-                {data.modal.map((item) => (
-                  <tr key={item.code} className="border-b border-surface-subtle hover:bg-surface-hover/30">
-                    <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                    <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-navy-text">{item.saldoFmt}</td>
-                  </tr>
-                ))}
-                {/* Laba Tahun Berjalan — angka yang SAMA dari tab Laba Rugi */}
-                <tr className="border-b border-surface-subtle bg-green-50/40 dark:bg-green-500/10">
-                  <td className="py-2.5 px-6 text-[13px] font-semibold text-muted-stronger">
-                    Laba Tahun Berjalan {year}
-                  </td>
-                  <td className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
-                    {data.labaBersihPositive ? "" : "-"}{data.labaBersihFmt}
-                  </td>
-                </tr>
-                <tr className="bg-surface-subtle/60 border-t border-border-soft">
-                  <td className="py-2.5 px-6 font-bold text-[13px] text-navy-text">Total Modal</td>
-                  <td className="py-2.5 px-6 text-right tabular-nums font-bold text-[13px] text-navy-text">
-                    {/* totalModal + labaBersih */}
-                    {formatRupiah(Math.abs(data.totalModal + data.labaBersih))}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <SectionHeader color="violet" label="Modal" />
+            <div className="divide-y divide-surface-subtle">
+              {data.modal.map((item) => (
+                <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
+              ))}
+              <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-green-50/40 dark:bg-green-500/10">
+                <span className="text-[13px] font-semibold text-muted-stronger">Laba Tahun Berjalan {year}</span>
+                <span className={`tabular-nums text-[13px] font-bold shrink-0 ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
+                  {data.labaBersihPositive ? "" : "–"}{data.labaBersihFmt}
+                </span>
+              </div>
+            </div>
+            <SubtotalRow
+              label="Total Modal"
+              amount={formatRupiah(Math.abs(data.totalModal + data.labaBersih))}
+              bgClass="bg-violet-50/50 dark:bg-violet-500/10"
+              borderClass="border-violet-100 dark:border-violet-500/20"
+            />
           </div>
 
-          {/* Total Pasiva */}
-          <div className={`px-6 py-4 rounded-[16px] border-2 ${data.neracaBalanced ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10" : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"}`}>
-            <div className="flex items-center justify-between">
-              <span className="font-extrabold text-[13px] text-navy-text">Total Kewajiban + Modal</span>
-              <span className={`font-extrabold tabular-nums ${data.neracaBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
-                {data.totalPassivaFmt}
-              </span>
+          {/* Total Pasiva summary */}
+          <div className={`rounded-[16px] border-2 px-5 py-4 flex items-center justify-between gap-4 ${
+            data.neracaBalanced
+              ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10"
+              : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"
+          }`}>
+            <div>
+              <p className="font-extrabold text-[13px] text-navy-text">Total Kewajiban + Modal</p>
+              <p className={`text-[11.5px] font-semibold mt-0.5 ${
+                data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+              }`}>
+                {data.neracaBalanced ? "✓ Neraca seimbang" : "✗ Neraca tidak seimbang"}
+              </p>
             </div>
-            <div className={`text-[12px] mt-1 font-semibold ${data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
-              {data.neracaBalanced ? "✓ Neraca seimbang" : "✗ Neraca tidak seimbang"}
-            </div>
+            <span className={`tabular-nums font-extrabold text-[15px] shrink-0 ${
+              data.neracaBalanced ? "text-navy-text" : "text-status-red"
+            }`}>
+              {data.totalPassivaFmt}
+            </span>
           </div>
         </div>
       </div>
@@ -208,74 +292,102 @@ function LabaRugiTab({
   year: number;
   entityName: string;
 }) {
+  const statusBadge = (
+    <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
+      data.labaBersihPositive
+        ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
+        : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
+    }`}>
+      {data.labaBersihPositive ? "Laba" : "Rugi"}
+    </span>
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Report header */}
-      <div className="text-center py-2">
-        <div className="font-bold text-navy-text text-[15px]">{entityName.toUpperCase()}</div>
-        <div className="font-bold text-navy-text text-[13px] mt-0.5">LAPORAN LABA RUGI</div>
-        <div className="text-[12px] text-muted mt-0.5">Periode 1 Januari s/d 31 Desember {year}</div>
-        <div className="text-[11px] text-muted-faint">(Dalam Rupiah)</div>
-      </div>
+      <ReportHeader
+        entityName={entityName}
+        title="Laporan Laba Rugi"
+        period={`Periode 1 Januari s/d 31 Desember ${year}`}
+        note="Dalam Rupiah"
+        badge={statusBadge}
+      />
 
       {/* Pendapatan */}
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">PENDAPATAN USAHA</div>
-        <table className="w-full text-sm">
-          <tbody>
-            {data.pendapatan.length === 0 && (
-              <tr><td colSpan={2} className="py-4 px-6 text-[13px] text-muted italic">Tidak ada akun pendapatan.</td></tr>
-            )}
-            {data.pendapatan.map((item) => (
-              <tr key={item.code} className="border-b border-surface-subtle">
-                <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-green">{item.saldoFmt}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-border-soft bg-green-50/50 dark:bg-green-500/10">
-              <td className="py-3 px-6 font-extrabold text-navy-text">Total Pendapatan Usaha</td>
-              <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-green">{data.totalPendapatanFmt}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <SectionHeader color="green" label="Pendapatan Usaha" />
+        <div className="divide-y divide-surface-subtle">
+          {data.pendapatan.length === 0 ? (
+            <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun pendapatan.</p>
+          ) : (
+            data.pendapatan.map((item) => (
+              <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} amountClass="text-status-green" />
+            ))
+          )}
+        </div>
+        <TotalRow
+          label="Total Pendapatan Usaha"
+          amount={data.totalPendapatanFmt}
+          amountClass="text-status-green"
+          bgClass="bg-green-50 dark:bg-green-500/15"
+          borderClass="border-green-200 dark:border-green-500/30"
+        />
       </div>
 
       {/* Beban */}
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <div className="px-6 py-4 border-b border-surface-subtle font-extrabold text-navy-text">BEBAN USAHA</div>
-        <table className="w-full text-sm">
-          <tbody>
-            {data.beban.length === 0 && (
-              <tr><td colSpan={2} className="py-4 px-6 text-[13px] text-muted italic">Tidak ada akun beban.</td></tr>
-            )}
-            {data.beban.map((item) => (
-              <tr key={item.code} className="border-b border-surface-subtle">
-                <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-red">{item.saldoFmt}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-border-soft bg-red-50/50 dark:bg-red-500/10">
-              <td className="py-3 px-6 font-extrabold text-navy-text">Total Beban Usaha</td>
-              <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-red">{data.totalBebanFmt}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <SectionHeader color="red" label="Beban Usaha" />
+        <div className="divide-y divide-surface-subtle">
+          {data.beban.length === 0 ? (
+            <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun beban.</p>
+          ) : (
+            data.beban.map((item) => (
+              <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} amountClass="text-status-red" />
+            ))
+          )}
+        </div>
+        <TotalRow
+          label="Total Beban Usaha"
+          amount={data.totalBebanFmt}
+          amountClass="text-status-red"
+          bgClass="bg-red-50 dark:bg-red-500/15"
+          borderClass="border-red-200 dark:border-red-500/30"
+        />
       </div>
 
-      {/* Laba/Rugi Bersih */}
-      <div className={`px-6 py-5 rounded-[20px] border-2 ${data.labaBersihPositive ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10" : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"}`}>
-        <div className="text-[12px] font-semibold text-muted-stronger mb-1">
-          {data.labaBersihPositive ? "LABA BERSIH" : "RUGI BERSIH"}
-        </div>
-        <div className={`text-[28px] font-extrabold tabular-nums ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
-          {data.labaBersihPositive ? "" : "-"}{data.labaBersihFmt}
-        </div>
-        <div className="text-[12px] text-muted mt-1">
-          Total Pendapatan ({data.totalPendapatanFmt}) − Total Beban ({data.totalBebanFmt})
+      {/* Laba / Rugi Bersih — hero card */}
+      <div className={`rounded-[20px] border-2 overflow-hidden ${
+        data.labaBersihPositive
+          ? "border-green-300 dark:border-green-500/40"
+          : "border-red-300 dark:border-red-500/40"
+      }`}>
+        <div className={`px-6 py-5 flex items-start justify-between gap-4 ${
+          data.labaBersihPositive
+            ? "bg-green-50 dark:bg-green-500/10"
+            : "bg-red-50 dark:bg-red-500/10"
+        }`}>
+          <div>
+            <p className={`text-[10.5px] font-extrabold uppercase tracking-widest mb-1.5 ${
+              data.labaBersihPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            }`}>
+              {data.labaBersihPositive ? "Laba Bersih" : "Rugi Bersih"}
+            </p>
+            <p className={`text-[30px] font-extrabold tabular-nums leading-none ${
+              data.labaBersihPositive ? "text-status-green" : "text-status-red"
+            }`}>
+              {data.labaBersihPositive ? "" : "–"}{data.labaBersihFmt}
+            </p>
+            <p className="text-[12px] text-muted mt-2.5">
+              Pendapatan {data.totalPendapatanFmt} — Beban {data.totalBebanFmt}
+            </p>
+          </div>
+          <div className={`w-11 h-11 rounded-[13px] flex items-center justify-center shrink-0 ${
+            data.labaBersihPositive ? "bg-green-500" : "bg-red-500"
+          }`}>
+            {data.labaBersihPositive
+              ? <TrendingUp size={20} className="text-white" />
+              : <TrendingDown size={20} className="text-white" />
+            }
+          </div>
         </div>
       </div>
     </div>
@@ -292,145 +404,128 @@ function ArusKasTab({
   year: number;
   entityName: string;
 }) {
-  const fmtSigned = (val: number, fmt: string) =>
-    val === 0 ? <span className="text-muted-faint">—</span> :
-    val > 0 ? <span className="text-navy-text">{fmt}</span> :
-    <span className="text-status-red">({fmt})</span>;
+  function FmtSigned({ val, fmt }: { val: number; fmt: string }) {
+    if (val === 0) return <span className="text-muted-faint">—</span>;
+    if (val > 0) return <span className="text-navy-text font-semibold tabular-nums">{fmt}</span>;
+    return <span className="text-status-red font-semibold tabular-nums">({fmt})</span>;
+  }
+
+  function AkRow({ label, val, fmt, italic = false }: { label: string; val: number; fmt: string; italic?: boolean }) {
+    return (
+      <div className="flex items-baseline justify-between py-2.5 px-8 gap-4 border-b border-surface-subtle last:border-0">
+        <span className={`text-[13px] ${italic ? "text-muted-faint italic" : "text-muted-stronger"}`}>{label}</span>
+        {italic
+          ? <span className="text-[13px] text-muted-faint shrink-0">—</span>
+          : <span className="shrink-0 text-[13px]"><FmtSigned val={val} fmt={fmt} /></span>
+        }
+      </div>
+    );
+  }
+
+  function AkSubtotal({ label, val, fmt, color }: { label: string; val: number; fmt: string; color: string }) {
+    const bgMap: Record<string, string> = {
+      blue:   "bg-blue-50/40 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20",
+      violet: "bg-violet-50/40 dark:bg-violet-500/10 border-violet-100 dark:border-violet-500/20",
+      amber:  "bg-amber-50/40 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/20",
+    };
+    return (
+      <div className={`flex items-center justify-between px-5 py-3 border-t ${bgMap[color] ?? bgMap.blue}`}>
+        <span className="font-bold text-[13px] text-navy-text">{label}</span>
+        <span className="text-[13px] shrink-0"><FmtSigned val={val} fmt={fmt} /></span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Report header */}
-      <div className="text-center py-2">
-        <div className="font-bold text-navy-text text-[15px]">{entityName.toUpperCase()}</div>
-        <div className="font-bold text-navy-text text-[13px] mt-0.5">LAPORAN ARUS KAS</div>
-        <div className="text-[12px] text-muted mt-0.5">Periode 1 Januari s/d 31 Desember {year}</div>
-        <div className="text-[11px] text-muted-faint">(Dalam Rupiah) · Metode Tidak Langsung</div>
-      </div>
+      <ReportHeader
+        entityName={entityName}
+        title="Laporan Arus Kas"
+        period={`Periode 1 Januari s/d 31 Desember ${year}`}
+        note="Dalam Rupiah · Metode Tidak Langsung"
+        badge={
+          <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
+            data.arusKasBalanced
+              ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
+              : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
+          }`}>
+            {data.arusKasBalanced ? "✓ Konsisten" : "✗ Tidak Konsisten"}
+          </span>
+        }
+      />
 
       {!data.arusKasBalanced && (
         <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
-          <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
-          <div className="text-[13px] text-red-700 dark:text-red-400">
-            <span className="font-bold">Arus Kas tidak seimbang!</span> Kas Akhir Periode ({data.kasAkhirFmt}) ≠ total saldo Kas+Bank di Neraca ({data.kasAsetFmt}).
-          </div>
+          <AlertTriangle size={15} className="text-red-500 mt-0.5 shrink-0" />
+          <p className="text-[13px] text-red-700 dark:text-red-400">
+            <span className="font-bold">Arus Kas tidak seimbang!</span>{" "}
+            Kas Akhir Periode ({data.kasAkhirFmt}) ≠ total saldo Kas+Bank di Neraca ({data.kasAsetFmt}).
+          </p>
         </div>
       )}
 
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <table className="w-full text-sm">
-          <tbody>
-            {/* ── Aktivitas Operasi ── */}
-            <tr className="bg-surface-subtle">
-              <td colSpan={2} className="py-3 px-6 font-extrabold text-navy-text text-[13px]">
-                Aktivitas Operasi
-              </td>
-            </tr>
-            <tr className="border-b border-surface-subtle">
-              <td className="py-2.5 px-8 text-[13px] text-muted-stronger">Laba/(Rugi) Bersih</td>
-              <td className="py-2.5 px-6 text-right tabular-nums text-[13px]">
-                {fmtSigned(data.labaBersih, data.labaBersihFmt)}
-              </td>
-            </tr>
-            <tr className="border-b border-surface-subtle">
-              <td className="py-2.5 px-8 text-[13px] text-muted-faint italic">Penyesuaian non-kas (penyusutan, dll.)</td>
-              <td className="py-2.5 px-6 text-right tabular-nums text-[13px] text-muted-faint">—</td>
-            </tr>
-            {data.perubahanAsetNonKas !== 0 && (
-              <tr className="border-b border-surface-subtle">
-                <td className="py-2.5 px-8 text-[13px] text-muted-stronger">Penurunan/(Kenaikan) Aset Non-Kas</td>
-                <td className="py-2.5 px-6 text-right tabular-nums text-[13px]">
-                  {fmtSigned(data.perubahanAsetNonKas, formatRupiah(Math.abs(data.perubahanAsetNonKas)))}
-                </td>
-              </tr>
-            )}
-            {data.perubahanKewajiban !== 0 && (
-              <tr className="border-b border-surface-subtle">
-                <td className="py-2.5 px-8 text-[13px] text-muted-stronger">Kenaikan/(Penurunan) Kewajiban</td>
-                <td className="py-2.5 px-6 text-right tabular-nums text-[13px]">
-                  {fmtSigned(data.perubahanKewajiban, formatRupiah(Math.abs(data.perubahanKewajiban)))}
-                </td>
-              </tr>
-            )}
-            <tr className="border-b-2 border-border bg-surface-subtle/40">
-              <td className="py-3 px-6 font-bold text-[13px] text-navy-text">Kas dari Aktivitas Operasi</td>
-              <td className="py-3 px-6 text-right tabular-nums font-bold text-[13px]">
-                {fmtSigned(data.kasOperasi, data.kasOperasiFmt)}
-              </td>
-            </tr>
+        {/* Aktivitas Operasi */}
+        <SectionHeader color="blue" label="Aktivitas Operasi" />
+        <AkRow label="Laba/(Rugi) Bersih" val={data.labaBersih} fmt={data.labaBersihFmt} />
+        <AkRow label="Penyesuaian non-kas (penyusutan, dll.)" val={0} fmt="" italic />
+        {data.perubahanAsetNonKas !== 0 && (
+          <AkRow label="Penurunan/(Kenaikan) Aset Non-Kas" val={data.perubahanAsetNonKas} fmt={formatRupiah(Math.abs(data.perubahanAsetNonKas))} />
+        )}
+        {data.perubahanKewajiban !== 0 && (
+          <AkRow label="Kenaikan/(Penurunan) Kewajiban" val={data.perubahanKewajiban} fmt={formatRupiah(Math.abs(data.perubahanKewajiban))} />
+        )}
+        <AkSubtotal label="Kas dari Aktivitas Operasi" val={data.kasOperasi} fmt={data.kasOperasiFmt} color="blue" />
 
-            {/* ── Aktivitas Investasi ── */}
-            <tr className="bg-surface-subtle">
-              <td colSpan={2} className="py-3 px-6 font-extrabold text-navy-text text-[13px]">
-                Aktivitas Investasi
-              </td>
-            </tr>
-            <tr className="border-b border-surface-subtle">
-              <td className="py-2.5 px-8 text-[13px] text-muted-faint italic">Perolehan/Pelepasan Aset Tetap</td>
-              <td className="py-2.5 px-6 text-right tabular-nums text-[13px] text-muted-faint">—</td>
-            </tr>
-            <tr className="border-b-2 border-border bg-surface-subtle/40">
-              <td className="py-3 px-6 font-bold text-[13px] text-navy-text">Kas dari Aktivitas Investasi</td>
-              <td className="py-3 px-6 text-right tabular-nums font-bold text-[13px]">
-                {fmtSigned(data.kasInvestasi, data.kasInvestasiFmt)}
-              </td>
-            </tr>
-
-            {/* ── Aktivitas Pendanaan ── */}
-            <tr className="bg-surface-subtle">
-              <td colSpan={2} className="py-3 px-6 font-extrabold text-navy-text text-[13px]">
-                Aktivitas Pendanaan
-              </td>
-            </tr>
-            {data.kasPendanaan !== 0 ? (
-              <tr className="border-b border-surface-subtle">
-                <td className="py-2.5 px-8 text-[13px] text-muted-stronger">Perubahan Modal Bersih</td>
-                <td className="py-2.5 px-6 text-right tabular-nums text-[13px]">
-                  {fmtSigned(data.kasPendanaan, data.kasPendanaanFmt)}
-                </td>
-              </tr>
-            ) : (
-              <tr className="border-b border-surface-subtle">
-                <td className="py-2.5 px-8 text-[13px] text-muted-faint italic">Setoran Modal / Dividen</td>
-                <td className="py-2.5 px-6 text-right tabular-nums text-[13px] text-muted-faint">—</td>
-              </tr>
-            )}
-            <tr className="border-b-2 border-border bg-surface-subtle/40">
-              <td className="py-3 px-6 font-bold text-[13px] text-navy-text">Kas dari Aktivitas Pendanaan</td>
-              <td className="py-3 px-6 text-right tabular-nums font-bold text-[13px]">
-                {fmtSigned(data.kasPendanaan, data.kasPendanaanFmt)}
-              </td>
-            </tr>
-
-            {/* ── Penutup ── */}
-            <tr className="border-b border-surface-subtle">
-              <td className="py-3 px-6 font-semibold text-[13px] text-muted-stronger">
-                Kenaikan/(Penurunan) Bersih Kas & Setara Kas
-              </td>
-              <td className="py-3 px-6 text-right tabular-nums font-semibold text-[13px]">
-                {fmtSigned(data.kenaikanBersihKas, data.kenaikanBersihFmt)}
-              </td>
-            </tr>
-            <tr className="border-b border-surface-subtle">
-              <td className="py-3 px-6 font-semibold text-[13px] text-muted-stronger">Kas & Setara Kas Awal Periode</td>
-              <td className="py-3 px-6 text-right tabular-nums font-semibold text-[13px] text-muted">
-                {data.kasAwal === 0 ? "—" : data.kasAwalFmt}
-              </td>
-            </tr>
-            <tr className={`border-t-2 ${data.arusKasBalanced ? "border-green-400 dark:border-green-500/40 bg-green-50/50 dark:bg-green-500/10" : "border-red-400 dark:border-red-500/40 bg-red-50/50 dark:bg-red-500/10"}`}>
-              <td className="py-4 px-6 font-extrabold text-navy-text">Kas & Setara Kas Akhir Periode</td>
-              <td className={`py-4 px-6 text-right tabular-nums font-extrabold text-[15px] ${data.arusKasBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
-                {data.kasAkhirFmt}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {data.arusKasBalanced && (
-        <div className="px-4 py-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 text-[12px] text-green-700 dark:text-green-400 font-semibold">
-          ✓ Kas Akhir Periode sama dengan total saldo Kas+Bank di Neraca — laporan konsisten.
+        {/* Aktivitas Investasi */}
+        <div className="border-t border-surface-hover">
+          <SectionHeader color="violet" label="Aktivitas Investasi" />
+          <AkRow label="Perolehan/Pelepasan Aset Tetap" val={0} fmt="" italic />
+          <AkSubtotal label="Kas dari Aktivitas Investasi" val={data.kasInvestasi} fmt={data.kasInvestasiFmt} color="violet" />
         </div>
-      )}
+
+        {/* Aktivitas Pendanaan */}
+        <div className="border-t border-surface-hover">
+          <SectionHeader color="amber" label="Aktivitas Pendanaan" />
+          {data.kasPendanaan !== 0 ? (
+            <AkRow label="Perubahan Modal Bersih" val={data.kasPendanaan} fmt={data.kasPendanaanFmt} />
+          ) : (
+            <AkRow label="Setoran Modal / Dividen" val={0} fmt="" italic />
+          )}
+          <AkSubtotal label="Kas dari Aktivitas Pendanaan" val={data.kasPendanaan} fmt={data.kasPendanaanFmt} color="amber" />
+        </div>
+
+        {/* Summary */}
+        <div className="border-t-2 border-border">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-surface-subtle">
+            <span className="font-semibold text-[13px] text-muted-stronger">Kenaikan/(Penurunan) Bersih Kas & Setara Kas</span>
+            <span className="text-[13px] shrink-0 ml-4"><FmtSigned val={data.kenaikanBersihKas} fmt={data.kenaikanBersihFmt} /></span>
+          </div>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-surface-subtle">
+            <span className="font-semibold text-[13px] text-muted-stronger">Kas & Setara Kas Awal Periode</span>
+            <span className="tabular-nums font-semibold text-[13px] text-muted shrink-0 ml-4">
+              {data.kasAwal === 0 ? <span className="text-muted-faint">—</span> : data.kasAwalFmt}
+            </span>
+          </div>
+          <div className={`flex items-center justify-between px-5 py-4 gap-4 ${
+            data.arusKasBalanced
+              ? "bg-green-50 dark:bg-green-500/10"
+              : "bg-red-50 dark:bg-red-500/10"
+          }`}>
+            <div>
+              <p className="font-extrabold text-[13px] text-navy-text">Kas & Setara Kas Akhir Periode</p>
+              {data.arusKasBalanced && (
+                <p className="text-[11px] text-green-600 dark:text-green-400 font-semibold mt-0.5">✓ Konsisten dengan Neraca</p>
+              )}
+            </div>
+            <span className={`tabular-nums font-extrabold text-[16px] shrink-0 ${
+              data.arusKasBalanced ? "text-navy-text" : "text-status-red"
+            }`}>
+              {data.kasAkhirFmt}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

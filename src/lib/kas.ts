@@ -21,7 +21,6 @@ export async function getRunningSaldo(entityId: string, jenisInputId: string, re
   });
 
   if (rekeningNama) {
-    // Per-rekening saldo: cari entry terakhir untuk rekening ini
     const match = kasEntries.find((e) => {
       const extra = e.extraFieldsJson as Record<string, unknown> | null;
       return extra?.rekeningNama === rekeningNama;
@@ -29,10 +28,8 @@ export async function getRunningSaldo(entityId: string, jenisInputId: string, re
     return match ? Number(match.saldoSetelah) : 0;
   }
 
-  // Saldo gabungan (Kas Kecil / Kas Besar): ambil entry terakhir
   if (kasEntries.length > 0) return Number(kasEntries[0].saldoSetelah);
 
-  // Fallback untuk data lama sebelum double-entry
   const last = await prisma.transaction.findFirst({
     where: { entityId, jenisInputId },
     orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
@@ -41,9 +38,8 @@ export async function getRunningSaldo(entityId: string, jenisInputId: string, re
 }
 
 // Ledger dikelompokkan per noBukti.
-// Data baru: kas entry (isKasEntry=true) menentukan masuk/keluar/saldo dan rekening.
-// Data lama (tanpa extraFieldsJson): pakai logika lama.
-// rekeningNama: kalau diisi, hanya tampilkan transaksi dari rekening tersebut (Bank Buku).
+// crossingEntityKeys: transaksi ini dikirim DARI entitas ini KE entitas-entitas lain.
+// crossingFromEntityKey: transaksi ini DITERIMA dari entitas lain (sisi destinasi crossing).
 export async function getKasLedger(entityId: string, jenisInputId: string, rekeningNama?: string) {
   const rows = await prisma.transaction.findMany({
     where: { entityId, jenisInputId },
@@ -55,11 +51,14 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
     string,
     {
       tanggal: string;
+      tanggalRaw: string;
       noBukti: string;
       keterangan: string;
       akunTags: string[];
       rekening?: string;
-      crossingEntityKey?: string;
+      crossingEntityKeys?: string[];
+      crossingFromEntityKey?: string;
+      crossingGroupId?: string;
       masuk: number;
       keluar: number;
       saldo: number;
@@ -70,10 +69,12 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
   >();
 
   for (const r of rows) {
-    const key = r.noBukti + "|" + r.tanggal.toISOString().slice(0, 10);
+    const tanggalRaw = r.tanggal.toISOString().slice(0, 10);
+    const key = r.noBukti + "|" + tanggalRaw;
     if (!groups.has(key)) {
       groups.set(key, {
         tanggal: r.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
+        tanggalRaw,
         noBukti: r.noBukti,
         keterangan: r.keterangan,
         akunTags: [],
@@ -83,7 +84,6 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
         hasKasEntry: false,
         allTxIds: [],
         coaRows: [],
-        crossingEntityKey: undefined,
       });
     }
     const g = groups.get(key)!;
@@ -98,7 +98,16 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
       g.keluar = Number(r.kredit);
       g.saldo = Number(r.saldoSetelah);
       if (extra?.rekeningNama) g.rekening = String(extra.rekeningNama);
-      if (extra?.crossingEntityKey) g.crossingEntityKey = String(extra.crossingEntityKey);
+      // crossing source side — new multi-entity format
+      if (Array.isArray(extra?.crossingEntityKeys)) {
+        g.crossingEntityKeys = extra.crossingEntityKeys as string[];
+      } else if (extra?.crossingEntityKey) {
+        // backward compat with old single-entity crossing
+        g.crossingEntityKeys = [String(extra.crossingEntityKey)];
+      }
+      // crossing destination side
+      if (extra?.crossingFromEntityKey) g.crossingFromEntityKey = String(extra.crossingFromEntityKey);
+      if (extra?.crossingGroupId) g.crossingGroupId = String(extra.crossingGroupId);
     } else {
       if (r.coaAccount) {
         g.akunTags.push(r.coaAccount.name);
@@ -114,18 +123,19 @@ export async function getKasLedger(entityId: string, jenisInputId: string, reken
 
   const allGroups = Array.from(groups.values());
 
-  // Filter by rekening if specified (Bank Buku multi-rekening)
   const filtered = rekeningNama
     ? allGroups.filter((g) => !g.hasKasEntry || g.rekening === rekeningNama)
     : allGroups;
 
   return filtered.map((g) => ({
     tanggal: g.tanggal,
+    tanggalRaw: g.tanggalRaw,
     noBukti: g.noBukti,
     keterangan: g.keterangan,
     akunTags: g.akunTags,
     rekening: g.rekening,
-    crossingEntityKey: g.crossingEntityKey,
+    crossingEntityKeys: g.crossingEntityKeys,
+    crossingFromEntityKey: g.crossingFromEntityKey,
     masuk: g.masuk,
     keluar: g.keluar,
     saldo: g.saldo,

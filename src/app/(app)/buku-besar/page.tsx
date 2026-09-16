@@ -46,8 +46,8 @@ export default async function BukuBesarPage({
   return (
     <>
       <PageHeader
-        title="Buku Besar"
-        subtitle={`Ledger per akun COA — ${selectedEntity.name} ${currentYear}`}
+        title={`Buku Besar – ${selectedEntity.name}`}
+        subtitle={`Ledger per akun COA — ${currentYear}`}
         rightSlot={
           <>
             <PrintButton />

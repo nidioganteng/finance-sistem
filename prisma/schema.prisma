@@ -125,12 +125,15 @@ enum CoaKategori {
 
 model CoaAccount {
   id        String      @id @default(cuid())
-  code      String      @unique
+  code      String
   name      String
   kategori  CoaKategori
+  scope     String      @default("KAS") // "KAS" = kas kecil+besar, "BANK" = bank buku
   createdAt DateTime    @default(now())
 
   transactions Transaction[]
+
+  @@unique([code, scope])
 }
 
 // Jenis input transaksi yang bisa ditambah langsung oleh Staf Keuangan

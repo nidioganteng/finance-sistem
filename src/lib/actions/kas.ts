@@ -27,16 +27,27 @@ export type CreateKasTransactionInput = {
   projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
 };
 
-async function resolveKasCoa(jenisInputKey: string, rekeningId?: string): Promise<string | null> {
+const KAS_KECIL_COA: Record<string, string> = {
+  kencana: "1100", gaharu: "1200", tataring: "1300", ciptaAsri: "1400", umum: "1500",
+};
+const KAS_BESAR_COA: Record<string, string> = {
+  kencana: "110", gaharu: "120", tataring: "130", ciptaAsri: "140",
+};
+
+async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningId?: string): Promise<string | null> {
   if (jenisInputKey === "kasKecil") {
-    return (await prisma.coaAccount.findUnique({ where: { code: "1-001" } }))?.id ?? null;
+    const code = KAS_KECIL_COA[entityKey];
+    if (!code) return null;
+    return (await prisma.coaAccount.findUnique({ where: { code_scope: { code, scope: "KAS" } } }))?.id ?? null;
   }
   if (jenisInputKey === "kasBesar") {
-    return (await prisma.coaAccount.findUnique({ where: { code: "1-002" } }))?.id ?? null;
+    const code = KAS_BESAR_COA[entityKey];
+    if (!code) return null;
+    return (await prisma.coaAccount.findUnique({ where: { code_scope: { code, scope: "KAS" } } }))?.id ?? null;
   }
   if (jenisInputKey === "bankBuku" && rekeningId) {
     const coaCode = REKENING_COA_CODE[rekeningId];
-    if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code: coaCode } }))?.id ?? null;
+    if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code_scope: { code: coaCode, scope: "BANK" } } }))?.id ?? null;
   }
   return null;
 }
@@ -63,7 +74,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   if (!entity || !jenisInput) return { error: "Entity atau jenis input tidak ditemukan." };
 
   const rekeningNama = input.rekeningId ? getRekeningNama(input.entityKey, input.rekeningId) : undefined;
-  const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.rekeningId);
+  const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.entityKey, input.rekeningId);
 
   const total = validRows.reduce((sum, r) => sum + r.nominal, 0);
   const prevSaldo = await getRunningSaldo(entity.id, jenisInput.id, rekeningNama);
@@ -243,7 +254,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   if (!entity || !jenisInput) return { error: "Entity atau jenis input tidak ditemukan." };
 
   const rekeningNama = input.rekeningId ? getRekeningNama(input.entityKey, input.rekeningId) : undefined;
-  const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.rekeningId);
+  const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.entityKey, input.rekeningId);
 
   // Find old crossingGroupIds before deleting
   const existingTxs = await prisma.transaction.findMany({

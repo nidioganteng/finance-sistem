@@ -14,7 +14,7 @@ import { AlertTriangle } from "lucide-react";
 export default async function JurnalPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; filter?: string; bulan?: string; akunId?: string };
+  searchParams: { entity?: string; filter?: string; bulan?: string; akunCode?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -26,7 +26,7 @@ export default async function JurnalPage({
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const filter = searchParams.filter ?? "semua";
   const bulan = searchParams.bulan ?? "";
-  const akunId = searchParams.akunId ?? "";
+  const akunCode = searchParams.akunCode ?? "";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
@@ -36,7 +36,7 @@ export default async function JurnalPage({
     await Promise.all([
       getJenisInputChips(selectedEntity.id),
       getCoaList(),
-      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunId || undefined),
+      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined),
     ]);
 
   const selisih = Math.abs(totalDebit - totalKredit);
@@ -76,7 +76,7 @@ export default async function JurnalPage({
         <JurnalExtraFilters
           coaList={coaList}
           currentBulan={bulan}
-          currentAkunId={akunId}
+          currentAkunCode={akunCode}
           entityKey={selectedEntity.key}
         />
       </div>

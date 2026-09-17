@@ -16,14 +16,23 @@ export async function getJenisInputChips(entityId: string) {
 }
 
 export async function getCoaList() {
-  return prisma.coaAccount.findMany({ orderBy: { code: "asc" }, select: { id: true, code: true, name: true } });
+  const all = await prisma.coaAccount.findMany({ select: { code: true, name: true } });
+  // Dedup by (code, name) — KAS dan BANK scope bisa punya kode sama dengan nama berbeda,
+  // keduanya ditampilkan; kode sama + nama sama hanya ditampilkan sekali.
+  const seen = new Set<string>();
+  const unique: { code: string; name: string }[] = [];
+  for (const a of all.sort((x, y) => parseInt(x.code) - parseInt(y.code))) {
+    const key = `${a.code}|${a.name}`;
+    if (!seen.has(key)) { seen.add(key); unique.push(a); }
+  }
+  return unique;
 }
 
 export async function getJurnalRows(
   entityId: string,
   filterKey?: string,
-  bulan?: string,  // format "YYYY-MM"
-  akunId?: string, // coaAccountId
+  bulan?: string,    // format "YYYY-MM"
+  akunCode?: string, // filter by code akun (bisa match KAS & BANK)
 ) {
   // Bangun filter tanggal dari bulan jika ada
   let tanggalFilter: { gte?: Date; lt?: Date } | undefined;
@@ -37,8 +46,7 @@ export async function getJurnalRows(
       entityId,
       ...(filterKey && filterKey !== "semua" ? { jenisInput: { key: filterKey } } : {}),
       ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
-      // Filter akun: kalau akunId diisi, tampilkan baris COA itu PLUS kas entry pasangannya (sama noBukti)
-      ...(akunId ? { coaAccountId: akunId } : {}),
+      ...(akunCode ? { coaAccount: { code: akunCode } } : {}),
     },
     include: { jenisInput: true, coaAccount: true, project: true, staff: true },
     orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
@@ -47,13 +55,14 @@ export async function getJurnalRows(
   // Kalau filter akun aktif, juga ambil kas entry pasangan dari noBukti yang sama
   // supaya pembaca bisa lihat jurnal lengkap per transaksi
   let allRows = rows;
-  if (akunId && rows.length > 0) {
+  if (akunCode && rows.length > 0) {
     const noBuktiSet = [...new Set(rows.map((r) => r.noBukti))];
     const kasEntries = await prisma.transaction.findMany({
       where: {
         entityId,
         noBukti: { in: noBuktiSet },
         extraFieldsJson: { path: "$.isKasEntry", equals: true },
+        NOT: { coaAccount: { code: akunCode } },
       },
       include: { jenisInput: true, coaAccount: true, project: true, staff: true },
     });

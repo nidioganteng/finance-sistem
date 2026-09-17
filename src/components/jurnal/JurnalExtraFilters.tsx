@@ -3,7 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
-type CoaOption = { id: string; code: string; name: string };
+type CoaOption = { code: string; name: string };
 
 function genMonthOptions() {
   const opts: { value: string; label: string }[] = [];
@@ -22,12 +22,12 @@ const MONTH_OPTIONS = genMonthOptions();
 export function JurnalExtraFilters({
   coaList,
   currentBulan,
-  currentAkunId,
+  currentAkunCode,
   entityKey,
 }: {
   coaList: CoaOption[];
   currentBulan: string;
-  currentAkunId: string;
+  currentAkunCode: string;
   entityKey: string;
 }) {
   const router = useRouter();
@@ -65,13 +65,13 @@ export function JurnalExtraFilters({
 
       {/* Akun */}
       <select
-        value={currentAkunId}
-        onChange={(e) => push({ akunId: e.target.value })}
+        value={currentAkunCode}
+        onChange={(e) => push({ akunCode: e.target.value })}
         className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none max-w-[220px]"
       >
         <option value="">Semua Akun</option>
         {coaList.map((c) => (
-          <option key={c.id} value={c.id}>
+          <option key={`${c.code}|${c.name}`} value={c.code}>
             {c.code} — {c.name}
           </option>
         ))}

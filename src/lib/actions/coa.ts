@@ -9,9 +9,11 @@ export async function createCOA(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
 
+  const scope = (formData.get("scope") as string) || "KAS";
+
   if (!code || !name || !kategori) throw new Error("Semua field wajib diisi.");
 
-  await prisma.coaAccount.create({ data: { code, name, kategori } });
+  await prisma.coaAccount.create({ data: { code, name, kategori, scope } });
   revalidatePath("/coa");
 }
 

@@ -5,8 +5,9 @@ export async function getJenisInput(key: string) {
   return prisma.jenisInputTransaksi.findUnique({ where: { key } });
 }
 
-export async function getCoaOptions() {
-  return prisma.coaAccount.findMany({ orderBy: { code: "asc" } });
+export async function getCoaOptions(scope: "KAS" | "BANK" = "KAS") {
+  const accounts = await prisma.coaAccount.findMany({ where: { scope } });
+  return accounts.sort((a, b) => parseInt(a.code) - parseInt(b.code));
 }
 
 // rekeningNama dipakai untuk Bank Buku agar saldo dihitung per rekening, bukan per entity

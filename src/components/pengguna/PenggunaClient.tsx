@@ -28,7 +28,8 @@ const STATUS_LABEL: Record<UserStatus, string> = {
   INACTIVE: "Nonaktif",
 };
 
-const ROLE_OPTS: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_SUPER: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_MANAGER: Role[] = ["MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
 
 const FILTER_TABS = [
   { key: "semua", label: "Semua" },
@@ -40,10 +41,13 @@ const FILTER_TABS = [
 export function PenggunaClient({
   users,
   allEntities,
+  viewerRole,
 }: {
   users: UserItem[];
   allEntities: EntityItem[];
+  viewerRole: string;
 }) {
+  const roleOpts = viewerRole === "SUPER_ADMIN" ? ROLE_OPTS_SUPER : ROLE_OPTS_MANAGER;
   const [filter, setFilter] = useState("semua");
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [editEntityId, setEditEntityId] = useState<string | null>(null);
@@ -247,7 +251,7 @@ export function PenggunaClient({
                               onChange={(e) => setSelectedRole(e.target.value as Role)}
                               className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card"
                             >
-                              {ROLE_OPTS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                              {roleOpts.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                             </select>
                           </div>
                           <div>

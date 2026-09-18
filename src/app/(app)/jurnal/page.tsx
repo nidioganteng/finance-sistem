@@ -10,6 +10,7 @@ import { PrintButton } from "@/components/shared/PrintButton";
 import { JurnalFilterChips } from "@/components/jurnal/JurnalFilterChips";
 import { JurnalExtraFilters } from "@/components/jurnal/JurnalExtraFilters";
 import { AlertTriangle } from "lucide-react";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function JurnalPage({
   searchParams,
@@ -18,6 +19,7 @@ export default async function JurnalPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Jurnal Umum", "USER_ACTIVITY", { path: "/jurnal" });
 
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 

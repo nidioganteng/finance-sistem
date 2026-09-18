@@ -7,6 +7,7 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function ArusKasPage({
   searchParams,
@@ -15,6 +16,7 @@ export default async function ArusKasPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Arus Kas", "USER_ACTIVITY", { path: "/arus-kas" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

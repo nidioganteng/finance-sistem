@@ -9,6 +9,7 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { AlertTriangle, ChevronRight, ChevronLeft } from "lucide-react";
+import { logActivity } from "@/lib/actions/log";
 
 const KATEGORI_BADGE: Record<string, string> = {
   PENDAPATAN: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
@@ -25,6 +26,7 @@ export default async function BukuBesarPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Buku Besar", "USER_ACTIVITY", { path: "/buku-besar" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

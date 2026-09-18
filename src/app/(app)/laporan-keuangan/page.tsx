@@ -5,6 +5,7 @@ import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { logActivity } from "@/lib/actions/log";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
@@ -18,6 +19,7 @@ export default async function LaporanKeuanganPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan-keuangan" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

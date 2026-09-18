@@ -7,6 +7,7 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function NeracaPage({
   searchParams,
@@ -15,6 +16,7 @@ export default async function NeracaPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Neraca", "USER_ACTIVITY", { path: "/neraca" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

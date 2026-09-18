@@ -5,6 +5,7 @@ import { getActivityLogs } from "@/lib/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LogTabs } from "@/components/log/LogTabs";
 import { roleLabel } from "@/lib/rbac";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function LogPage({
   searchParams,
@@ -13,6 +14,7 @@ export default async function LogPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Log Aktivitas", "USER_ACTIVITY", { path: "/log" });
   if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const tab = searchParams.tab === "financial" ? "financial" : "user";

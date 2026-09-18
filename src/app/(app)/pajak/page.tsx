@@ -7,6 +7,7 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function PajakPage({
   searchParams,
@@ -15,6 +16,7 @@ export default async function PajakPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Laporan Pajak", "USER_ACTIVITY", { path: "/pajak" });
   if (role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

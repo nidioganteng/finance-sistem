@@ -26,6 +26,7 @@ interface Props {
   entities: EntityMeta[];
   years: number[];
   currentYear: number;
+  title?: string;
 }
 
 // Warna per tahun saat mode bandingkan aktif — dipakai gantiin warna per
@@ -46,7 +47,7 @@ function formatTooltip(value: number) {
 
 const YEAR_COUNT = 5; // jangkauan hingga 5 tahun ke belakang
 
-export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }: Props) {
+export function RevenueChart({ monthlyDataByYear, entities, years, currentYear, title }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -61,9 +62,11 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
   // Entitas" maupun 1 entitas spesifik yang dipilih.
   const maxCompareYears = 4;
 
-  const visibleEntities = activeKeys.has("all")
+  const visibleEntities = entities.length === 1
     ? entities
-    : entities.filter((e) => activeKeys.has(e.key));
+    : activeKeys.has("all")
+      ? entities
+      : entities.filter((e) => activeKeys.has(e.key));
 
   function pushParams(next: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -74,9 +77,12 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  const isSingleEntity = entities.length === 1 || (!activeKeys.has("all") && activeKeys.size === 1);
+
   function toggleEntity(key: string) {
     if (key === "all") {
       setActiveKeys(new Set(["all"]));
+      if (compareYears.length > 0) pushParams({ compareYears: null });
       return;
     }
     const next = new Set(activeKeys);
@@ -88,6 +94,8 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
       next.add(key);
     }
     setActiveKeys(next);
+    const willBeSingle = next.size === 1 && !next.has("all");
+    if (!willBeSingle && compareYears.length > 0) pushParams({ compareYears: null });
   }
 
   const changeYear = useCallback(
@@ -218,7 +226,9 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
     <div className="bg-surface-card rounded-2xl border border-border p-5">
       {/* Header row */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="text-sm font-bold text-navy-text">Performa Bulanan per Entitas</div>
+        <div className="text-sm font-bold text-navy-text">
+          {title ?? (entities.length === 1 ? `Performa Bulanan ${entities[0].name}` : "Performa Bulanan per Entitas")}
+        </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Year selector (tahun dasar) */}
@@ -232,8 +242,8 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
             ))}
           </select>
 
-          {/* Chip tahun pembanding aktif — netral, samain kayak tombol lain di sebelahnya */}
-          {compareYears.map((y) => (
+          {/* Chip & dropdown Bandingkan tahun — hanya saat 1 entitas dipilih */}
+          {isSingleEntity && compareYears.map((y) => (
             <span
               key={y}
               className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger bg-surface-card"
@@ -249,8 +259,7 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
             </span>
           ))}
 
-          {/* Tambah tahun pembanding — maksimal 5 tahun sekaligus (tahun dasar + 4) */}
-          {compareYears.length < maxCompareYears && addableYears.length > 0 && (
+          {isSingleEntity && compareYears.length < maxCompareYears && addableYears.length > 0 && (
             <select
               value=""
               onChange={(e) => e.target.value && addCompareYear(Number(e.target.value))}
@@ -293,7 +302,7 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
               bawa tahun yang sedang aktif di chart. Klik pada chart/tombol tahun
               sendiri tetap tidak pindah halaman. */}
           <Link
-            href={`/laporan?tab=komparasi&mode=tahunan&periodA=${year}&periodB=${compareYears[0] ?? year - 1}`}
+            href={`/laporan?tab=komparasi&mode=tahunan&periodA=${year}&periodB=${compareYears[0] ?? year - 2}${entities.length === 1 ? `&entity=${entities[0].key}` : ""}`}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
           >
             <GitCompare size={13} />
@@ -303,33 +312,35 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear }
       </div>
 
       {/* Entity filter pills */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        <button
-          onClick={() => toggleEntity("all")}
-          className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${
-            activeKeys.has("all")
-              ? "bg-navy text-white border-navy"
-              : "bg-surface-card text-muted-stronger border-border-soft hover:bg-surface-hover"
-          }`}
-        >
-          Semua Entitas
-        </button>
-        {entities.map((e) => {
-          const active = activeKeys.has(e.key);
-          return (
-            <button
-              key={e.key}
-              onClick={() => toggleEntity(e.key)}
-              className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${
-                active ? "text-white border-transparent" : "bg-surface-card text-muted-stronger border-border-soft hover:bg-surface-hover"
-              }`}
-              style={active ? { backgroundColor: e.colorHex, borderColor: e.colorHex } : {}}
-            >
-              {e.name}
-            </button>
-          );
-        })}
-      </div>
+      {entities.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          <button
+            onClick={() => toggleEntity("all")}
+            className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${
+              activeKeys.has("all")
+                ? "bg-navy text-white border-navy"
+                : "bg-surface-card text-muted-stronger border-border-soft hover:bg-surface-hover"
+            }`}
+          >
+            Semua Entitas
+          </button>
+          {entities.map((e) => {
+            const active = activeKeys.has(e.key);
+            return (
+              <button
+                key={e.key}
+                onClick={() => toggleEntity(e.key)}
+                className={`px-3 py-1 rounded-full text-[11.5px] font-semibold border transition-colors ${
+                  active ? "text-white border-transparent" : "bg-surface-card text-muted-stronger border-border-soft hover:bg-surface-hover"
+                }`}
+                style={active ? { backgroundColor: e.colorHex, borderColor: e.colorHex } : {}}
+              >
+                {e.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Chart */}
       <div className="mt-4">

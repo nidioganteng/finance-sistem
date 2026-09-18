@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function NeracaPage({
   searchParams,
@@ -31,7 +32,7 @@ export default async function NeracaPage({
   const data = await getNeracaData(selectedEntity.id, currentYear);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Neraca"
         subtitle={`Posisi keuangan per 31 Desember ${currentYear} — ${selectedEntity.name}`}
@@ -145,6 +146,6 @@ export default async function NeracaPage({
           </div>
         </div>
       )}
-    </>
+    </PageTransition>
   );
 }

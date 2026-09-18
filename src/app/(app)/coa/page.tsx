@@ -5,6 +5,7 @@ import { getCOAList } from "@/lib/coa";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CoaClient } from "@/components/coa/CoaClient";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function CoaPage() {
   const session = await getServerSession(authOptions);
@@ -15,9 +16,9 @@ export default async function CoaPage() {
   const coa = await getCOAList();
 
   return (
-    <>
+    <PageTransition>
       <PageHeader title="Bagan Akun" subtitle="Kelola daftar akun keuangan (Chart of Accounts)" />
       <CoaClient initialCoa={coa} />
-    </>
+    </PageTransition>
   );
 }

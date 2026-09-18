@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PiutangClient } from "@/components/piutang/PiutangClient";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function PiutangPage({
   searchParams,
@@ -32,7 +33,7 @@ export default async function PiutangPage({
   const data = await getPiutangData(selectedEntity.id);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={`Kontrol Piutang & Termin – ${selectedEntity.name}`}
         subtitle="Kelola status termin proyek"
@@ -51,6 +52,6 @@ export default async function PiutangPage({
         userRole={role}
         isUmumEntity={selectedEntity.isUmum}
       />
-    </>
+    </PageTransition>
   );
 }

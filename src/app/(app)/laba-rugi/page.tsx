@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function LabaRugiPage({
   searchParams,
@@ -31,7 +32,7 @@ export default async function LabaRugiPage({
   const data = await getLabaRugiData(selectedEntity.id, currentYear);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Laporan Laba Rugi"
         subtitle={`Periode Januari – Desember ${currentYear} — ${selectedEntity.name}`}
@@ -113,6 +114,6 @@ export default async function LabaRugiPage({
           </div>
         </div>
       )}
-    </>
+    </PageTransition>
   );
 }

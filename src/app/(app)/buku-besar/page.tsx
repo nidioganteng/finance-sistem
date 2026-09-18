@@ -10,6 +10,7 @@ import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { AlertTriangle, ChevronRight, ChevronLeft } from "lucide-react";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 const KATEGORI_BADGE: Record<string, string> = {
   PENDAPATAN: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
@@ -46,7 +47,7 @@ export default async function BukuBesarPage({
   const isDrilldown = !!searchParams.akun;
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={`Buku Besar – ${selectedEntity.name}`}
         subtitle={`Ledger per akun COA — ${currentYear}`}
@@ -67,7 +68,7 @@ export default async function BukuBesarPage({
         ? <DrilldownView entityId={selectedEntity.id} coaId={searchParams.akun!} year={currentYear} backHref={backHref} />
         : <RekapView entityId={selectedEntity.id} year={currentYear} rekapHref={rekapHref} />
       }
-    </>
+    </PageTransition>
   );
 }
 
@@ -101,7 +102,8 @@ async function RekapView({
       )}
 
       <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
               <th className="py-3 px-5">KODE AKUN</th>
@@ -174,6 +176,7 @@ async function RekapView({
             </tfoot>
           )}
         </table>
+        </div>
       </div>
     </div>
   );
@@ -222,7 +225,8 @@ async function DrilldownView({
       </div>
 
       <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
               <th className="py-3 px-5 whitespace-nowrap">TANGGAL</th>
@@ -274,6 +278,7 @@ async function DrilldownView({
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
     </div>
   );

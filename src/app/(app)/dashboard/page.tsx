@@ -24,6 +24,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function DashboardPage({
   searchParams,
@@ -124,7 +125,7 @@ export default async function DashboardPage({
   );
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={showingGrup ? "Master Dashboard" : `Dashboard ${selectedEntity?.name ?? ""}`}
         subtitle={
@@ -274,7 +275,8 @@ export default async function DashboardPage({
 
           <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="text-left text-[11.5px] font-bold text-muted-faint">
                   <td className="pb-2">Kode</td>
@@ -310,11 +312,12 @@ export default async function DashboardPage({
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       ) : (
         <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun. Hubungi Manajer Keuangan.</p>
       )}
-    </>
+    </PageTransition>
   );
 }

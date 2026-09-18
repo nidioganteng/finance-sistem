@@ -27,6 +27,7 @@ import {
 } from "@/lib/laporan-keuangan";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 const BULAN_LABEL = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -291,7 +292,7 @@ export default async function LaporanPage({
   const entityLabel = selectedEntity ? selectedEntity.name : "Semua Entitas";
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Laporan Keuangan"
         subtitle={
@@ -448,6 +449,6 @@ export default async function LaporanPage({
           entityName={entityLabel}
         />
       )}
-    </>
+    </PageTransition>
   );
 }

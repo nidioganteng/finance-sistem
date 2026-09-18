@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getJenisInput } from "@/lib/kas";
 import { KasScreen } from "@/components/kas/KasScreen";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
 
@@ -39,12 +40,14 @@ export default async function CustomInputPage({
       : "Input dan riwayat transaksi";
 
   return (
-    <KasScreen
-      jenisInputKey={params.key}
-      title={jenisInput.nama}
-      subtitle={subtitle}
-      pagePath={`/input/${params.key}`}
-      searchParams={searchParams}
-    />
+    <PageTransition>
+      <KasScreen
+        jenisInputKey={params.key}
+        title={jenisInput.nama}
+        subtitle={subtitle}
+        pagePath={`/input/${params.key}`}
+        searchParams={searchParams}
+      />
+    </PageTransition>
   );
 }

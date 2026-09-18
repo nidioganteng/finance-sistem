@@ -5,6 +5,7 @@ import { getUserList, getAllEntities } from "@/lib/pengguna";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PenggunaClient } from "@/components/pengguna/PenggunaClient";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function PenggunaPage() {
   const session = await getServerSession(authOptions);
@@ -20,7 +21,7 @@ export default async function PenggunaPage() {
     : users;
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Manajemen Pengguna"
         subtitle="Kelola akses dan peran pengguna sistem"
@@ -38,6 +39,6 @@ export default async function PenggunaPage() {
         allEntities={allEntities}
         viewerRole={role}
       />
-    </>
+    </PageTransition>
   );
 }

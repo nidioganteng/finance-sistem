@@ -5,6 +5,7 @@ import { getJenisInputList } from "@/lib/jenis-input";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { JenisInputClient } from "@/components/jenis-input/JenisInputClient";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function JenisInputPage() {
   const session = await getServerSession(authOptions);
@@ -15,7 +16,7 @@ export default async function JenisInputPage() {
   const data = await getJenisInputList();
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Kelola Jenis Input Transaksi"
         subtitle="Atur kategori input transaksi yang tersedia untuk staf keuangan"
@@ -35,6 +36,6 @@ export default async function JenisInputPage() {
         })}
         userRole={role}
       />
-    </>
+    </PageTransition>
   );
 }

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { logActivity } from "@/lib/actions/log";
 import { NotifFilterSelect } from "@/components/notifikasi/NotifFilterSelect";
 import { NotifikasiListClient } from "@/components/notifikasi/NotifikasiListClient";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function NotifikasiPage({ searchParams }: { searchParams: { filter?: string } }) {
   const session = await getServerSession(authOptions);
@@ -20,7 +21,7 @@ export default async function NotifikasiPage({ searchParams }: { searchParams: {
   const typeLabels = getNotifTypeLabels(role);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader title="Notifikasi" subtitle="Seluruh riwayat notifikasi sistem" />
 
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -46,6 +47,6 @@ export default async function NotifikasiPage({ searchParams }: { searchParams: {
           }))}
         />
       </div>
-    </>
+    </PageTransition>
   );
 }

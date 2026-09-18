@@ -1,6 +1,8 @@
+"use client";
 import Link from "next/link";
 import { formatMiliar } from "@/lib/dashboard-data";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { motion } from "framer-motion";
 
 // ── Compact card — Master Dashboard (grup view) ──────────────────────────────
 export function EntityCardCompact({
@@ -25,7 +27,10 @@ export function EntityCardCompact({
 
   return (
     <Link href={`/dashboard?entity=${entityKey}`} className="block group">
-      <div className="bg-surface-card rounded-2xl border border-border overflow-hidden hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-all duration-200">
+      <motion.div
+        whileHover={{ y: -2, transition: { duration: 0.15 } }}
+        className="bg-surface-card rounded-2xl border border-border overflow-hidden hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200"
+      >
         {/* Color bar top */}
         <div className="h-1" style={{ background: colorHex }} />
 
@@ -70,7 +75,7 @@ export function EntityCardCompact({
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </Link>
   );
 }
@@ -100,9 +105,10 @@ export function EntityCard({
   const spendPct = revenue > 0 ? Math.min(Math.round((spend / revenue) * 100), 100) : 0;
 
   const content = (
-    <div
+    <motion.div
+      whileHover={interactive ? { y: -2, transition: { duration: 0.15 } } : undefined}
       className={`bg-surface-card rounded-2xl border border-border overflow-hidden ${
-        interactive ? "hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-all duration-200" : ""
+        interactive ? "hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200" : ""
       }`}
     >
       {/* Gradient header */}
@@ -166,7 +172,7 @@ export function EntityCard({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 
   if (!interactive) return content;

@@ -168,7 +168,7 @@ export function JenisInputClient({
               <button
                 onClick={handleCreate}
                 disabled={isPending || !nama.trim() || arahLaporan.length === 0}
-                className="px-4 py-2.5 rounded-[10px] bg-navy text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-60"
+                className="px-4 py-2.5 rounded-[10px] bg-navy text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-60 active:scale-95 transition-transform"
               >
                 <Check size={14} /> {isPending ? "Menyimpan..." : "Simpan & Buat Halaman"}
               </button>
@@ -177,7 +177,8 @@ export function JenisInputClient({
         </div>
       )}
 
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0">
+      <table className="w-full text-sm min-w-[700px]">
         <thead>
           <tr className="border-b border-surface-hover text-left">
             <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Nama</th>
@@ -279,6 +280,7 @@ export function JenisInputClient({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

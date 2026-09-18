@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DokumenFilterTabs } from "@/components/dokumen/DokumenFilterTabs";
 import { ExternalLink } from "lucide-react";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 const KATEGORI_LABEL: Record<string, string> = {
   SOP: "SOP",
@@ -28,7 +29,7 @@ export default async function DokumenPage({
   const dokumen = await getDokumenList(kategori);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Dokumen & SOP Keuangan"
         subtitle="Arsip dokumen dan prosedur standar operasional"
@@ -48,7 +49,8 @@ export default async function DokumenPage({
             <p className="text-[13px] text-muted">Belum ada dokumen tersimpan untuk kategori ini.</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[520px]">
             <thead>
               <tr className="border-b border-surface-hover text-left">
                 <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Judul</th>
@@ -85,8 +87,9 @@ export default async function DokumenPage({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
-    </>
+    </PageTransition>
   );
 }

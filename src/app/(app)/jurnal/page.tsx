@@ -11,6 +11,7 @@ import { JurnalFilterChips } from "@/components/jurnal/JurnalFilterChips";
 import { JurnalExtraFilters } from "@/components/jurnal/JurnalExtraFilters";
 import { AlertTriangle } from "lucide-react";
 import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function JurnalPage({
   searchParams,
@@ -44,7 +45,7 @@ export default async function JurnalPage({
   const selisih = Math.abs(totalDebit - totalKredit);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={`Jurnal Umum – ${selectedEntity.name}`}
         subtitle="Seluruh transaksi kas dan bank, tercatat otomatis dari setiap input"
@@ -186,6 +187,6 @@ export default async function JurnalPage({
           )}
         </table>
       </div>
-    </>
+    </PageTransition>
   );
 }

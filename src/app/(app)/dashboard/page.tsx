@@ -14,6 +14,8 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { UserBadge, NotifBell } from "@/components/layout/UserBadge";
 import { EntityCard, EntityCardCompact } from "@/components/dashboard/EntityCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { EntityFinancialSummary } from "@/components/dashboard/EntityFinancialSummary";
+import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import {
   TrendingUp,
   TrendingDown,
@@ -21,6 +23,7 @@ import {
   AlertTriangle,
   CalendarClock,
 } from "lucide-react";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function DashboardPage({
   searchParams,
@@ -29,6 +32,7 @@ export default async function DashboardPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Dashboard", "USER_ACTIVITY", { path: "/dashboard" });
 
   const entities = await getAccessibleEntities(entityKeys);
   const canGrup = canViewGrupAggregate(role);
@@ -56,10 +60,17 @@ export default async function DashboardPage({
     .slice(0, 4);
   const chartYears = [chartYear, ...compareYears];
 
-  const [unreadCount, piutangMetrics, monthlyDataByYear] = await Promise.all([
+  const targetEntityKeys = showingGrup ? entityKeys : selectedEntity ? [selectedEntity.key] : [];
+
+  const [unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData] = await Promise.all([
     getUnreadNotificationCount(role),
     showingGrup ? getGrupPiutangMetrics() : Promise.resolve(null),
-    showingGrup ? Promise.all(chartYears.map((y) => getMonthlyChartData(entityKeys, y))) : Promise.resolve([]),
+    targetEntityKeys.length > 0
+      ? Promise.all(chartYears.map((y) => getMonthlyChartData(targetEntityKeys, y)))
+      : Promise.resolve([]),
+    selectedEntity
+      ? getLaporanKeuanganData([selectedEntity.id], currentYear)
+      : Promise.resolve(null),
   ]);
 
   const rightSlot = (
@@ -245,6 +256,22 @@ export default async function DashboardPage({
             interactive={!isStaff}
           />
 
+          {entityLaporanData && (
+            <EntityFinancialSummary
+              data={entityLaporanData}
+              entityKey={selectedEntity.key}
+              year={currentYear}
+            />
+          )}
+
+          <RevenueChart
+            monthlyDataByYear={monthlyDataByYear}
+            entities={[{ key: selectedEntity.key, name: selectedEntity.name, colorHex: selectedEntity.colorHex }]}
+            years={chartYears}
+            currentYear={currentYear}
+            title={`Performa Bulanan ${selectedEntity.name}`}
+          />
+
           <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
             <table className="w-full text-sm">
@@ -258,21 +285,29 @@ export default async function DashboardPage({
                 </tr>
               </thead>
               <tbody>
-                {selectedEntity.projects.map((p) => (
-                  <tr key={p.code} className="border-t border-border">
-                    <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
-                    <td className="py-3">{p.name}</td>
-                    <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
-                    <td
-                      className={`py-3 text-right tabular-nums font-semibold ${
-                        p.profit >= 0 ? "text-status-green" : "text-status-red"
-                      }`}
-                    >
-                      {formatMiliar(p.profit)}
+                {selectedEntity.projects.length === 0 ? (
+                  <tr className="border-t border-border">
+                    <td colSpan={5} className="py-6 text-center text-sm text-muted">
+                      Belum ada proyek berjalan untuk entitas ini.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  selectedEntity.projects.map((p) => (
+                    <tr key={p.code} className="border-t border-border">
+                      <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
+                      <td className="py-3">{p.name}</td>
+                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
+                      <td
+                        className={`py-3 text-right tabular-nums font-semibold ${
+                          p.profit >= 0 ? "text-status-green" : "text-status-red"
+                        }`}
+                      >
+                        {formatMiliar(p.profit)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

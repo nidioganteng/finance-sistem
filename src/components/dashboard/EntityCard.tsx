@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { formatMiliar } from "@/lib/dashboard-data";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
-// Compact card untuk Master Dashboard (grup view)
+// ── Compact card — Master Dashboard (grup view) ──────────────────────────────
 export function EntityCardCompact({
   entityKey,
   name,
@@ -19,36 +20,54 @@ export function EntityCardCompact({
   profit: number;
   isUmum?: boolean;
 }) {
+  const isProfit = profit >= 0;
+  const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0.0";
+
   return (
-    <Link href={`/dashboard?entity=${entityKey}`} className="block">
-      <div
-        className="bg-surface-card rounded-2xl border border-border p-4 flex flex-col gap-3 hover:shadow-[0_4px_16px_rgba(15,23,42,.06)] transition-shadow"
-        style={{ borderLeft: `4px solid ${colorHex}` }}
-      >
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-none"
-            style={{ background: colorHex }}
-          >
-            {name[0]}
+    <Link href={`/dashboard?entity=${entityKey}`} className="block group">
+      <div className="bg-surface-card rounded-2xl border border-border overflow-hidden hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-all duration-200">
+        {/* Color bar top */}
+        <div className="h-1" style={{ background: colorHex }} />
+
+        <div className="p-4">
+          {/* Header */}
+          <div className="flex items-center gap-2.5 mb-3">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[13px] font-extrabold flex-none shadow-sm"
+              style={{ background: colorHex }}
+            >
+              {name[0]}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13.5px] font-extrabold text-navy-text truncate">{name}</div>
+              {!isUmum && <div className="text-[10.5px] text-muted truncate">{legalName}</div>}
+              {isUmum && <div className="text-[10.5px] text-muted truncate">{legalName}</div>}
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-navy-text truncate">{name}</div>
-            {isUmum && (
-              <div className="text-[10.5px] text-muted truncate">{legalName}</div>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-faint font-semibold">Pendapatan</span>
-            <span className="text-[12.5px] font-bold text-navy-text tabular-nums">{formatMiliar(revenue)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-faint font-semibold">Laba Bersih</span>
-            <span className={`text-[12.5px] font-bold tabular-nums ${profit >= 0 ? "text-status-green" : "text-status-red"}`}>
-              {formatMiliar(profit)}
-            </span>
+
+          {/* Metrics */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-muted-faint">Pendapatan</span>
+              <span className="text-[13px] font-bold text-navy-text tabular-nums">{formatMiliar(revenue)}</span>
+            </div>
+            <div className="h-px bg-surface-subtle" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                {isProfit
+                  ? <TrendingUp size={11} className="text-status-green" />
+                  : <TrendingDown size={11} className="text-status-red" />}
+                <span className="text-[11px] font-semibold text-muted-faint">Laba Bersih</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isProfit ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"}`}>
+                  {margin}%
+                </span>
+                <span className={`text-[13px] font-bold tabular-nums ${isProfit ? "text-status-green" : "text-status-red"}`}>
+                  {formatMiliar(profit)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -56,7 +75,7 @@ export function EntityCardCompact({
   );
 }
 
-// Full card untuk tampilan per-entitas (detail)
+// ── Full card — entity-specific dashboard ────────────────────────────────────
 export function EntityCard({
   entityKey,
   name,
@@ -76,37 +95,74 @@ export function EntityCard({
   profit: number;
   interactive?: boolean;
 }) {
+  const isProfit = profit >= 0;
+  const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0.0";
+  const spendPct = revenue > 0 ? Math.min(Math.round((spend / revenue) * 100), 100) : 0;
+
   const content = (
     <div
-      className={`bg-surface-card rounded-2xl border border-border p-5 flex flex-col gap-3 ${
-        interactive ? "hover:shadow-[0_4px_16px_rgba(15,23,42,.06)] transition-shadow" : ""
+      className={`bg-surface-card rounded-2xl border border-border overflow-hidden ${
+        interactive ? "hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-all duration-200" : ""
       }`}
     >
-      <div className="flex items-center gap-2.5">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-none"
-          style={{ background: colorHex }}
-        >
-          {name[0]}
+      {/* Gradient header */}
+      <div
+        className="px-6 py-5 flex items-center justify-between"
+        style={{ background: `linear-gradient(135deg, ${colorHex}22 0%, ${colorHex}08 100%)` }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-lg font-extrabold flex-none shadow"
+            style={{ background: colorHex }}
+          >
+            {name[0]}
+          </div>
+          <div>
+            <div className="text-[17px] font-extrabold text-navy-text">{name}</div>
+            <div className="text-[11.5px] text-muted">{legalName}</div>
+          </div>
         </div>
-        <div className="min-w-0">
-          <div className="text-sm font-bold text-navy-text truncate">{name}</div>
-          <div className="text-[11px] text-muted truncate">{legalName}</div>
+
+        {/* Margin badge */}
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold ${
+          isProfit
+            ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
+            : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"
+        }`}>
+          {isProfit ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+          Margin {margin}%
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 pt-1">
-        <div>
-          <div className="text-[10.5px] text-muted-faint font-semibold">Pendapatan</div>
-          <div className="text-[12.5px] font-bold text-navy-text mt-0.5">{formatMiliar(revenue)}</div>
+
+      {/* Metrics row */}
+      <div className="grid grid-cols-3 divide-x divide-border">
+        {/* Pendapatan */}
+        <div className="px-6 py-4">
+          <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">Pendapatan</div>
+          <div className="text-[20px] font-extrabold text-navy-text tabular-nums">{formatMiliar(revenue)}</div>
         </div>
-        <div>
-          <div className="text-[10.5px] text-muted-faint font-semibold">Pengeluaran</div>
-          <div className="text-[12.5px] font-bold text-navy-text mt-0.5">{formatMiliar(spend)}</div>
+
+        {/* Pengeluaran */}
+        <div className="px-6 py-4">
+          <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">Pengeluaran</div>
+          <div className="text-[20px] font-extrabold text-navy-text tabular-nums">{formatMiliar(spend)}</div>
+          {/* Spend ratio bar */}
+          <div className="mt-2 h-1 rounded-full bg-surface-hover overflow-hidden">
+            <div
+              className={`h-full rounded-full ${spendPct > 90 ? "bg-status-red" : spendPct > 70 ? "bg-status-amber" : "bg-brand"}`}
+              style={{ width: `${spendPct}%` }}
+            />
+          </div>
+          <div className="text-[10px] text-muted-faint mt-0.5">{spendPct}% dari pendapatan</div>
         </div>
-        <div>
-          <div className="text-[10.5px] text-muted-faint font-semibold">Laba</div>
-          <div className={`text-[12.5px] font-bold mt-0.5 ${profit >= 0 ? "text-status-green" : "text-status-red"}`}>
-            {formatMiliar(profit)}
+
+        {/* Laba */}
+        <div className="px-6 py-4">
+          <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">
+            {isProfit ? "Laba Bersih" : "Rugi Bersih"}
+          </div>
+          <div className={`text-[20px] font-extrabold tabular-nums ${isProfit ? "text-status-green" : "text-status-red"}`}>
+            {isProfit ? "" : "-"}{formatMiliar(Math.abs(profit))}
           </div>
         </div>
       </div>

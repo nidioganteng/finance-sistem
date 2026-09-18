@@ -7,14 +7,24 @@ import { getNeracaData } from "@/lib/neraca";
 import { getArusKasData } from "@/lib/arus-kas";
 import { canViewGrupAggregate } from "@/lib/rbac";
 import { resolveEntityKey } from "@/lib/entity-prefs";
+import { logActivity } from "@/lib/actions/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { LaporanTabs } from "@/components/laporan/LaporanTabs";
 import { KomparasiControls } from "@/components/laporan/KomparasiControls";
-import { EntityMonthlyChart } from "@/components/laporan/EntityMonthlyChart";
-import { YearMonthlyChart } from "@/components/laporan/YearMonthlyChart";
 import { MultiYearChips } from "@/components/laporan/MultiYearChips";
+import { KomparasiLineChart } from "@/components/laporan/KomparasiLineChart";
+import { KomparasiEntityPills } from "@/components/laporan/KomparasiEntityPills";
+import { RingkasanTab } from "@/components/laporan/RingkasanTab";
+import { LabaRugiView } from "@/components/laporan/LabaRugiView";
+import { NeracaView } from "@/components/laporan/NeracaView";
+import { ArusKasView } from "@/components/laporan/ArusKasView";
+import {
+  getLaporanKeuanganData,
+  getLaporanJurnalData,
+  getLaporanBankData,
+} from "@/lib/laporan-keuangan";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -61,6 +71,7 @@ export default async function LaporanPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan" });
   if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -81,63 +92,75 @@ export default async function LaporanPage({
     : entities.map((e) => e.id);
 
   // Fetch data based on active tab
-  let labaRugiData = null;
-  let neracaData = null;
-  let arusKasData = null;
+  let laporanKeuanganData: Awaited<ReturnType<typeof getLaporanKeuanganData>> | null = null;
+  let jurnalData: Awaited<ReturnType<typeof getLaporanJurnalData>> | null = null;
+  let bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null = null;
+  let arusKasCombined: any = null;
 
-  if (tab === "ringkasan" || tab === "laba-rugi") {
-    const allLabaRugi = await Promise.all(entityIds.map((id) => getLabaRugiData(id, currentYear)));
-    labaRugiData = {
-      pendapatanList: [] as { code: string; name: string; total: number; totalFmt: string }[],
-      bebanList: [] as { code: string; name: string; total: number; totalFmt: string }[],
-      totalPendapatan: allLabaRugi.reduce((s, d) => s + d.pendapatanList.reduce((x, i) => x + i.total, 0), 0),
-      totalBeban: allLabaRugi.reduce((s, d) => s + d.bebanList.reduce((x, i) => x + i.total, 0), 0),
-      labaBersih: 0,
-      labaBersihPositive: true,
-      totalPendapatanFmt: "",
-      totalBebanFmt: "",
-      labaBersihFmt: "",
-    };
-    labaRugiData.labaBersih = labaRugiData.totalPendapatan - labaRugiData.totalBeban;
-    labaRugiData.labaBersihPositive = labaRugiData.labaBersih >= 0;
-    labaRugiData.totalPendapatanFmt = formatRupiah(labaRugiData.totalPendapatan);
-    labaRugiData.totalBebanFmt = formatRupiah(labaRugiData.totalBeban);
-    labaRugiData.labaBersihFmt = formatRupiah(Math.abs(labaRugiData.labaBersih));
-    // Merge lists
-    for (const d of allLabaRugi) {
-      for (const item of d.pendapatanList) {
-        const existing = labaRugiData.pendapatanList.find((x) => x.code === item.code);
-        if (existing) existing.total += item.total;
-        else labaRugiData.pendapatanList.push({ ...item });
-      }
-      for (const item of d.bebanList) {
-        const existing = labaRugiData.bebanList.find((x) => x.code === item.code);
-        if (existing) existing.total += item.total;
-        else labaRugiData.bebanList.push({ ...item });
-      }
-    }
-    labaRugiData.pendapatanList = labaRugiData.pendapatanList.map((i) => ({ ...i, totalFmt: formatRupiah(i.total) }));
-    labaRugiData.bebanList = labaRugiData.bebanList.map((i) => ({ ...i, totalFmt: formatRupiah(i.total) }));
-  }
+  if (tab === "ringkasan") {
+    const [laporan, jData, bData] = await Promise.all([
+      getLaporanKeuanganData(entityIds, currentYear),
+      getLaporanJurnalData(entityIds, currentYear, 80),
+      getLaporanBankData(entityIds, currentYear, 80),
+    ]);
+    laporanKeuanganData = laporan;
+    jurnalData = jData;
+    bankData = bData;
+  } else if (tab === "laba-rugi" || tab === "neraca") {
+    laporanKeuanganData = await getLaporanKeuanganData(entityIds, currentYear);
+  } else if (tab === "arus-kas") {
+    const [laporan, allArusKas] = await Promise.all([
+      getLaporanKeuanganData(entityIds, currentYear),
+      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear))),
+    ]);
+    laporanKeuanganData = laporan;
 
-  if (tab === "neraca") {
-    neracaData = await getNeracaData(entityIds[0] ?? "", currentYear);
-  }
+    const MONTHS_LABEL = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    ];
 
-  if (tab === "arus-kas") {
-    const allArusKas = await Promise.all(entityIds.map((id) => getArusKasData(id, currentYear)));
+    const monthlyCombined = MONTHS_LABEL.map((bulan, i) => {
+      const masuk = allArusKas.reduce((s, d) => s + (d.monthly[i]?.masuk || 0), 0);
+      const keluar = allArusKas.reduce((s, d) => s + (d.monthly[i]?.keluar || 0), 0);
+      const net = masuk - keluar;
+      return {
+        bulan,
+        masuk,
+        keluar,
+        net,
+        masukFmt: masuk > 0 ? formatRupiah(masuk) : "-",
+        keluarFmt: keluar > 0 ? formatRupiah(keluar) : "-",
+        netFmt: formatRupiah(Math.abs(net)),
+        netPositive: net >= 0,
+        hasData: masuk > 0 || keluar > 0,
+      };
+    });
+
     const totalMasuk = allArusKas.reduce((s, d) => s + d.monthly.reduce((x, m) => x + m.masuk, 0), 0);
     const totalKeluar = allArusKas.reduce((s, d) => s + d.monthly.reduce((x, m) => x + m.keluar, 0), 0);
-    arusKasData = allArusKas[0] ?? null;
-    if (arusKasData) {
-      arusKasData = {
-        ...arusKasData,
-        totalMasukFmt: formatRupiah(totalMasuk),
-        totalKeluarFmt: formatRupiah(totalKeluar),
-        netTotalFmt: formatRupiah(Math.abs(totalMasuk - totalKeluar)),
-        netTotalPositive: totalMasuk >= totalKeluar,
-      };
-    }
+    const netTotal = totalMasuk - totalKeluar;
+
+    arusKasCombined = {
+      monthly: monthlyCombined,
+      totalMasuk,
+      totalKeluar,
+      netTotal,
+      totalMasukFmt: formatRupiah(totalMasuk),
+      totalKeluarFmt: formatRupiah(totalKeluar),
+      netTotalFmt: formatRupiah(Math.abs(netTotal)),
+      netTotalPositive: netTotal >= 0,
+      kasAwalFmt: laporan.kasAwalFmt,
+      kasOperasiFmt: laporan.kasOperasiFmt,
+      kasInvestasiFmt: laporan.kasInvestasiFmt,
+      kasPendanaanFmt: laporan.kasPendanaanFmt,
+      kenaikanBersihFmt: laporan.kenaikanBersihFmt,
+      kasAkhirFmt: laporan.kasAkhirFmt,
+      kasOperasi: laporan.kasOperasi,
+      kasInvestasi: laporan.kasInvestasi,
+      kasPendanaan: laporan.kasPendanaan,
+      kenaikanBersihKas: laporan.kenaikanBersihKas,
+    };
   }
 
   // Komparasi antar-periode (bulan vs bulan, atau tahun vs tahun) — jangkauan
@@ -157,7 +180,7 @@ export default async function LaporanPage({
 
   type MonthRow = Record<string, string | number>;
   let komparasiChart:
-    | { type: "grup"; chartA: MonthRow[]; chartB: MonthRow[]; entities: { key: string; name: string; colorHex: string }[] }
+    | { type: "grup"; chartA: MonthRow[]; chartB: MonthRow[]; entities: { key: string; name: string; colorHex: string }[]; lineData: MonthRow[]; lineYears: number[] }
     | { type: "single"; data: MonthRow[]; years: number[] }
     | null = null;
 
@@ -166,7 +189,7 @@ export default async function LaporanPage({
     const nowYear = new Date().getFullYear();
     const nowMonth = new Date().getMonth() + 1;
     const periodA = parsePeriod(searchParams.periodA, mode, { year: nowYear, month: nowMonth });
-    const periodB = parsePeriod(searchParams.periodB, mode, { year: nowYear - 1, month: nowMonth });
+    const periodB = parsePeriod(searchParams.periodB, mode, { year: nowYear - 2, month: nowMonth });
 
     const dateRange = (p: Period) =>
       p.month
@@ -212,15 +235,34 @@ export default async function LaporanPage({
     if (mode === "tahunan") {
       if (!selectedEntity) {
         const entityKeysAll = entities.map((e) => e.key);
-        const [chartA, chartB] = await Promise.all([
-          getMonthlyChartData(entityKeysAll, periodA.year),
-          getMonthlyChartData(entityKeysAll, periodB.year),
-        ]);
+        const minYear = Math.min(periodA.year, periodB.year);
+        const maxYear = Math.max(periodA.year, periodB.year);
+        const allYears = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+
+        const allCharts = await Promise.all(allYears.map((y) => getMonthlyChartData(entityKeysAll, y)));
+        const chartByYear: Record<number, MonthRow[]> = {};
+        allYears.forEach((y, i) => { chartByYear[y] = allCharts[i]; });
+
+        const chartA = chartByYear[periodA.year];
+        const chartB = chartByYear[periodB.year];
+
+        // Line chart: per bulan, total semua entitas, satu garis per tahun
+        const lineData: MonthRow[] = chartA.map((rowA, mi) => {
+          const entry: MonthRow = { month: rowA.month };
+          for (const y of allYears) {
+            const row = chartByYear[y][mi];
+            entry[String(y)] = entityKeysAll.reduce((s, k) => s + (Number(row[k]) || 0), 0);
+          }
+          return entry;
+        });
+
         komparasiChart = {
           type: "grup",
           chartA,
           chartB,
           entities: entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex })),
+          lineData,
+          lineYears: allYears,
         };
       } else {
         const parsedYears = (searchParams.chartYears ?? "")
@@ -273,11 +315,18 @@ export default async function LaporanPage({
 
       {tab === "komparasi" && komparasiData && (
         <div className="flex flex-col gap-5">
-          <KomparasiControls
-            mode={komparasiData.mode}
-            periodA={komparasiData.periodA}
-            periodB={komparasiData.periodB}
-          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <KomparasiControls
+              mode={komparasiData.mode}
+              periodA={komparasiData.periodA}
+              periodB={komparasiData.periodB}
+            />
+            <KomparasiEntityPills
+              entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))}
+              currentEntityKey={selectedKey}
+              canGrup={canGrup}
+            />
+          </div>
 
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <table className="w-full text-sm">
@@ -332,129 +381,72 @@ export default async function LaporanPage({
           </div>
 
           {komparasiChart?.type === "grup" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <EntityMonthlyChart
-                title={komparasiData.labelA}
-                data={komparasiChart.chartA}
-                entities={komparasiChart.entities}
-              />
-              <EntityMonthlyChart
-                title={komparasiData.labelB}
-                data={komparasiChart.chartB}
-                entities={komparasiChart.entities}
-              />
-            </div>
+            <KomparasiLineChart
+              title={`Tren Pendapatan Bulanan — ${komparasiChart.lineYears.join(", ")}`}
+              data={komparasiChart.lineData}
+              lineKeys={komparasiChart.lineYears.map(String)}
+            />
           )}
 
           {komparasiChart?.type === "single" && (
             <div className="flex flex-col gap-3">
               <MultiYearChips selectedYears={komparasiChart.years} />
-              <YearMonthlyChart data={komparasiChart.data} years={komparasiChart.years} />
+              <KomparasiLineChart
+                title="Tren Pendapatan Bulanan Antar-Tahun"
+                data={komparasiChart.data}
+                lineKeys={komparasiChart.years.map(String)}
+              />
             </div>
           )}
         </div>
       )}
 
-      {tab === "ringkasan" && labaRugiData && (
-        <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: "Total Pendapatan", value: labaRugiData.totalPendapatanFmt, color: "text-status-green" },
-              { label: "Total Beban", value: labaRugiData.totalBebanFmt, color: "text-status-red" },
-              {
-                label: "Laba/Rugi Bersih",
-                value: (labaRugiData.labaBersihPositive ? "" : "-") + labaRugiData.labaBersihFmt,
-                color: labaRugiData.labaBersihPositive ? "text-status-green" : "text-status-red",
-              },
-              { label: "Total Transaksi", value: txCount.toString() + " transaksi", color: "text-navy-text" },
-            ].map((card) => (
-              <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-                <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
-                <div className={`text-[18px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {tab === "ringkasan" && laporanKeuanganData && jurnalData && bankData && (
+        <RingkasanTab
+          kpi={{
+            totalPendapatan: laporanKeuanganData.totalPendapatan,
+            totalBeban: laporanKeuanganData.totalBeban,
+            labaBersih: laporanKeuanganData.labaBersih,
+            totalPendapatanFmt: laporanKeuanganData.totalPendapatanFmt,
+            totalBebanFmt: laporanKeuanganData.totalBebanFmt,
+            labaBersihFmt: laporanKeuanganData.labaBersihFmt,
+            labaBersihPositive: laporanKeuanganData.labaBersihPositive,
+            txCount: jurnalData.totalCount,
+            marginPct:
+              laporanKeuanganData.totalPendapatan > 0
+                ? (laporanKeuanganData.labaBersih / laporanKeuanganData.totalPendapatan) * 100
+                : 0,
+          }}
+          jurnal={jurnalData}
+          bank={bankData}
+          entityName={entityLabel}
+          isGrup={!selectedEntity}
+          year={currentYear}
+        />
       )}
 
-      {tab === "laba-rugi" && labaRugiData && (
-        <div className="flex flex-col gap-5">
-          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-subtle font-bold text-navy-text">PENDAPATAN</div>
-            <table className="w-full text-sm">
-              <tbody>
-                {labaRugiData.pendapatanList.map((item) => (
-                  <tr key={item.code} className="border-b border-surface-subtle">
-                    <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                    <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-green">{item.totalFmt}</td>
-                  </tr>
-                ))}
-                <tr className="bg-green-50 dark:bg-green-500/15">
-                  <td className="py-3 px-6 font-extrabold text-navy-text">Total Pendapatan</td>
-                  <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-green">{labaRugiData.totalPendapatanFmt}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-subtle font-bold text-navy-text">BEBAN</div>
-            <table className="w-full text-sm">
-              <tbody>
-                {labaRugiData.bebanList.map((item) => (
-                  <tr key={item.code} className="border-b border-surface-subtle">
-                    <td className="py-2.5 px-6 text-[13px] text-muted-stronger">{item.code} — {item.name}</td>
-                    <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-status-red">{item.totalFmt}</td>
-                  </tr>
-                ))}
-                <tr className="bg-red-50 dark:bg-red-500/10">
-                  <td className="py-3 px-6 font-extrabold text-navy-text">Total Beban</td>
-                  <td className="py-3 px-6 text-right tabular-nums font-extrabold text-status-red">{labaRugiData.totalBebanFmt}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className={`px-6 py-5 rounded-[20px] border-2 ${labaRugiData.labaBersihPositive ? "border-green-300 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15" : "border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10"}`}>
-            <div className="text-[13px] font-semibold text-muted-stronger mb-1">
-              {labaRugiData.labaBersihPositive ? "LABA BERSIH" : "RUGI BERSIH"}
-            </div>
-            <div className={`text-[28px] font-extrabold tabular-nums ${labaRugiData.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
-              {labaRugiData.labaBersihPositive ? "" : "-"}{labaRugiData.labaBersihFmt}
-            </div>
-          </div>
-        </div>
+      {tab === "laba-rugi" && laporanKeuanganData && (
+        <LabaRugiView
+          data={laporanKeuanganData}
+          year={currentYear}
+          entityName={entityLabel}
+        />
       )}
 
-      {tab === "neraca" && neracaData && (
-        <div className="px-4 py-3 rounded-xl bg-surface-subtle border border-border-soft text-[13px] text-muted-stronger">
-          Neraca per 31 Desember {currentYear}. Lihat detail di halaman <a href="/neraca" className="text-brand font-semibold hover:underline">Neraca</a>.
-        </div>
+      {tab === "neraca" && laporanKeuanganData && (
+        <NeracaView
+          data={laporanKeuanganData}
+          year={currentYear}
+          entityName={entityLabel}
+        />
       )}
 
-      {tab === "arus-kas" && arusKasData && (
-        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-hover text-left">
-                <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Bulan</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Kas Masuk</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Kas Keluar</th>
-                <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Net</th>
-              </tr>
-            </thead>
-            <tbody>
-              {arusKasData.monthly.map((m) => (
-                <tr key={m.bulan} className={`border-b border-surface-subtle ${m.hasData ? "" : "opacity-40"}`}>
-                  <td className="py-3 px-6 font-semibold text-navy-text">{m.bulan}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-green">{m.masukFmt}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-red">{m.keluarFmt}</td>
-                  <td className={`py-3 px-6 text-right tabular-nums text-[13px] font-bold ${m.netPositive ? "text-status-green" : "text-status-red"}`}>
-                    {m.hasData ? (m.netPositive ? "+" : "-") + m.netFmt : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {tab === "arus-kas" && arusKasCombined && (
+        <ArusKasView
+          data={arusKasCombined}
+          year={currentYear}
+          entityName={entityLabel}
+        />
       )}
     </>
   );

@@ -330,7 +330,8 @@ export default async function LaporanPage({
           </div>
 
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b border-surface-hover text-left">
                   <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Metrik</th>
@@ -379,6 +380,7 @@ export default async function LaporanPage({
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
 
           {komparasiChart?.type === "grup" && (

@@ -4,8 +4,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Token warna sebagai CSS variable (format "R G B" tanpa fungsi rgb(),
+ * supaya bisa dipakai lewat rgb(var(--x) / <alpha>) di tailwind.config.ts
+ * dan otomatis ganti saat class "dark" ditambahkan ke <html> oleh ThemeToggle).
+ * Nilai light diambil persis dari token lama, nilai dark dipilih manual.
+ */
+:root {
+  --color-navy: 15 23 41;
+  --color-navy-text: 15 23 42;
+  --color-brand: 59 111 237;
+  --color-brand-hover: 41 82 196;
+  --color-brand-soft: 109 94 245;
+  --color-surface-page: 245 246 248;
+  --color-surface-card: 255 255 255;
+  --color-surface-subtle: 247 248 250;
+  --color-surface-input: 249 250 251;
+  --color-surface-hover: 241 242 245;
+  --color-border: 226 230 235;
+  --color-border-soft: 229 232 236;
+  --color-muted: 100 116 139;
+  --color-muted-strong: 71 85 105;
+  --color-muted-stronger: 51 65 85;
+  --color-muted-faint: 148 163 184;
+  --color-muted-faintest: 163 172 186;
+  --color-status-amber: 245 158 11;
+  --color-status-amberDark: 146 64 14;
+  --color-status-green: 31 157 85;
+  --color-status-red: 224 67 63;
+
+  color-scheme: light;
+}
+
+:root.dark {
+  --color-navy: 65 96 158;
+  --color-navy-text: 241 245 249;
+  --color-surface-page: 10 14 24;
+  --color-surface-card: 17 24 39;
+  --color-surface-subtle: 23 31 46;
+  --color-surface-input: 27 36 53;
+  --color-surface-hover: 31 41 58;
+  --color-border: 39 49 68;
+  --color-border-soft: 34 43 61;
+  --color-muted: 148 163 184;
+  --color-muted-strong: 203 213 225;
+  --color-muted-stronger: 226 232 240;
+  --color-muted-faint: 100 116 139;
+  --color-muted-faintest: 86 96 122;
+  --color-status-amber: 251 191 36;
+  --color-status-amberDark: 253 230 138;
+  --color-status-green: 52 211 153;
+  --color-status-red: 248 113 113;
+
+  color-scheme: dark;
+}
+
 body {
-  background: #f5f6f8;
+  background: rgb(var(--color-surface-page));
   -webkit-font-smoothing: antialiased;
 }
 
@@ -15,6 +70,20 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d8dce3;
+  background: rgb(var(--color-border));
   border-radius: 8px;
+}
+
+@media print {
+  body { background: white !important; }
+  main { padding: 1rem !important; gap: 1rem !important; }
+  .print\:hidden { display: none !important; }
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

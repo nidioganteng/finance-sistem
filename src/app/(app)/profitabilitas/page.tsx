@@ -3,14 +3,17 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getProfitabilitasData } from "@/lib/profitabilitas";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 const STATUS_BADGE: Record<string, string> = {
-  ON_TRACK: "bg-green-100 text-green-700",
-  AT_RISK: "bg-orange-100 text-orange-700",
-  NEEDS_AUDIT: "bg-red-100 text-red-700",
+  ON_TRACK: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+  AT_RISK: "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  NEEDS_AUDIT: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
 };
 const STATUS_LABEL: Record<string, string> = {
   ON_TRACK: "On Track",
@@ -25,13 +28,11 @@ export default async function ProfitabilitasPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Profitabilitas Proyek", "USER_ACTIVITY", { path: "/profitabilitas" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : entityKeys[0];
+  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
   if (!selectedEntity) {
@@ -41,7 +42,7 @@ export default async function ProfitabilitasPage({
   const data = await getProfitabilitasData(selectedEntity.id);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Profitabilitas Proyek"
         subtitle={`Analisis laba rugi per proyek — ${selectedEntity.name}`}
@@ -66,7 +67,7 @@ export default async function ProfitabilitasPage({
           },
           { label: "Rata-rata Margin", value: data.summary.avgMargin + "%", sub: "", color: "text-navy-text" },
         ].map((card) => (
-          <div key={card.label} className="bg-white rounded-[16px] border border-black/[.06] p-5">
+          <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
             <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
             <div className={`text-[20px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
             {card.sub && <div className="text-[11.5px] text-muted mt-1">{card.sub}</div>}
@@ -74,8 +75,9 @@ export default async function ProfitabilitasPage({
         ))}
       </div>
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Kode</th>
@@ -120,7 +122,8 @@ export default async function ProfitabilitasPage({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

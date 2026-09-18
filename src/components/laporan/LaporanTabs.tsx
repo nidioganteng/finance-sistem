@@ -7,6 +7,7 @@ const TABS = [
   { key: "laba-rugi", label: "Laba Rugi" },
   { key: "neraca", label: "Neraca" },
   { key: "arus-kas", label: "Arus Kas" },
+  { key: "komparasi", label: "Komparasi" },
 ];
 
 export function LaporanTabs({ currentTab }: { currentTab: string }) {
@@ -21,18 +22,20 @@ export function LaporanTabs({ currentTab }: { currentTab: string }) {
   }
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
-      {TABS.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => go(t.key)}
-          className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
-            currentTab === t.key ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
-          }`}
-        >
-          {t.label}
-        </button>
-      ))}
+    <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-max sm:w-fit min-w-full sm:min-w-0">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => go(t.key)}
+            className={`flex-none px-3.5 sm:px-4 py-2 rounded-[10px] text-[12.5px] sm:text-[13px] font-semibold transition-colors whitespace-nowrap ${
+              currentTab === t.key ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

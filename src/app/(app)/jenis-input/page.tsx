@@ -4,11 +4,13 @@ import { authOptions } from "@/lib/auth";
 import { getJenisInputList } from "@/lib/jenis-input";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { JenisInputClient } from "@/components/jenis-input/JenisInputClient";
+import { logActivity } from "@/lib/actions/log";
 
 export default async function JenisInputPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  if (role !== "STAF_KEUANGAN") redirect("/dashboard");
+  logActivity(session!.user.id, "Buka halaman Jenis Input Transaksi", "USER_ACTIVITY", { path: "/jenis-input" });
+  if (role !== "STAF_KEUANGAN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const data = await getJenisInputList();
 

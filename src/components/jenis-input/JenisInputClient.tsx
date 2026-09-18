@@ -46,7 +46,7 @@ export function JenisInputClient({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const canManage = userRole === "STAF_KEUANGAN";
+  const canManage = userRole === "STAF_KEUANGAN" || userRole === "MANAJER_KEUANGAN";
 
   function toggleLaporan(val: string) {
     setArahLaporan((prev) =>

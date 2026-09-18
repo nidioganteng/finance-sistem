@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
 
   let customInputs: { key: string; nama: string }[] = [];
-  if (session.user.role === "STAF_KEUANGAN") {
+  if (session.user.role === "STAF_KEUANGAN" || session.user.role === "MANAJER_KEUANGAN") {
     customInputs = await prisma.jenisInputTransaksi.findMany({
       where: { active: true, key: { notIn: SYSTEM_KEYS } },
       select: { key: true, nama: true },

@@ -348,7 +348,7 @@ export function KasTransactionForm({
           type="button"
           disabled={isPending || rowsTotal === 0}
           onClick={handleSave}
-          className="px-4 py-2.5 rounded-[10px] text-[13px] font-bold bg-navy text-white disabled:opacity-60"
+          className="px-4 py-2.5 rounded-[10px] text-[13px] font-bold bg-navy text-white disabled:opacity-60 active:scale-95 transition-transform"
         >
           {isPending ? "Menyimpan..." : isEdit ? "Simpan Perubahan" : "Simpan Transaksi"}
         </button>

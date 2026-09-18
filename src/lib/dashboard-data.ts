@@ -63,14 +63,6 @@ export async function getAccessibleEntities(entityKeys: string[]) {
   });
 }
 
-export async function getRecentNotifications(role: Role) {
-  return prisma.notifikasi.findMany({
-    where: { targetRole: role },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  });
-}
-
 export async function getUnreadNotificationCount(role: Role) {
   return prisma.notifikasi.count({ where: { targetRole: role, read: false } });
 }
@@ -128,6 +120,37 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
     for (const key of entityKeys) {
       entry[key] = rows
         .filter((r) => r.entity.key === key && new Date(r.tanggal).getMonth() === i)
+        .reduce((s, r) => s + Number(r.kredit), 0);
+    }
+    return entry;
+  });
+}
+
+// Pendapatan bulanan satu (atau beberapa) entitas, dipecah per TAHUN alih-alih
+// per entitas — dipakai chart komparasi antar-tahun saat cuma 1 entitas yang
+// dipilih (warna chart jadi merepresentasikan tahun, bukan entitas).
+export async function getMonthlyByYear(entityIds: string[], years: number[]) {
+  if (years.length === 0) return [];
+  const minYear = Math.min(...years);
+  const maxYear = Math.max(...years);
+
+  const rows = await prisma.transaction.findMany({
+    where: {
+      entityId: { in: entityIds },
+      tanggal: { gte: new Date(`${minYear}-01-01`), lt: new Date(`${maxYear + 1}-01-01`) },
+      coaAccount: { kategori: "PENDAPATAN" },
+    },
+    select: { tanggal: true, kredit: true },
+  });
+
+  return BULAN.map((month, i) => {
+    const entry: Record<string, string | number> = { month };
+    for (const y of years) {
+      entry[String(y)] = rows
+        .filter((r) => {
+          const d = new Date(r.tanggal);
+          return d.getFullYear() === y && d.getMonth() === i;
+        })
         .reduce((s, r) => s + Number(r.kredit), 0);
     }
     return entry;

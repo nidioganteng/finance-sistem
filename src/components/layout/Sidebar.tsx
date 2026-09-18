@@ -19,6 +19,7 @@ import {
   Scale,
   Layers,
   LogOut,
+  X,
 } from "lucide-react";
 import { getNavForRole, type NavItem } from "@/lib/rbac";
 
@@ -40,15 +41,18 @@ const ICONS: Record<NavItem["icon"], typeof LayoutGrid> = {
 export function Sidebar({
   role,
   customInputs = [],
+  onClose,
 }: {
   role: Role;
   customInputs?: { key: string; nama: string }[];
+  onClose?: () => void;
 }) {
   const pathname = usePathname();
   const sections = getNavForRole(role);
 
   return (
     <aside className="w-[260px] flex-none bg-surface-card border-r border-border-soft flex flex-col p-4 pt-5 sticky top-0 h-screen">
+      {/* Brand row */}
       <div className="flex items-center gap-2.5 px-2 pb-6">
         <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-brand to-brand-soft flex items-center justify-center flex-none">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -56,13 +60,22 @@ export function Sidebar({
             <rect x="10" y="14" width="4" height="6" fill="#fff" />
           </svg>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-extrabold text-[14.5px] text-navy-text leading-tight">Data Keuangan</div>
           <div className="text-[10px] text-muted-faint font-semibold">Gaharu Sempana Group</div>
         </div>
+        {/* Close button — hanya tampil di mobile drawer */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-faint transition-colors flex-none"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto">
+      <nav className="flex-1 overflow-y-auto scrollbar-hide">
         {sections.map((section) => (
           <div key={section.title} className="mb-3.5">
             <div className="text-[10.5px] font-bold text-muted-faintest tracking-wider uppercase px-2.5 pt-1.5 pb-2">
@@ -71,17 +84,20 @@ export function Sidebar({
             <div className="flex flex-col gap-0.5">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon];
-                const active = pathname === item.href;
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-colors ${
-                      active ? "bg-navy text-white" : "text-muted-strong hover:bg-surface-hover"
+                    onClick={onClose}
+                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 ${
+                      active
+                        ? "bg-navy text-white shadow-sm"
+                        : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
                     }`}
                   >
-                    <Icon size={17} strokeWidth={1.8} />
-                    {item.label}
+                    <Icon size={17} strokeWidth={1.8} className="flex-none" />
+                    <span className="truncate">{item.label}</span>
                   </Link>
                 );
               })}
@@ -89,7 +105,6 @@ export function Sidebar({
           </div>
         ))}
 
-        {/* Dynamic custom jenis inputs — hanya untuk STAF_KEUANGAN */}
         {customInputs.length > 0 && (
           <div className="mb-3.5">
             <div className="text-[10.5px] font-bold text-muted-faintest tracking-wider uppercase px-2.5 pt-1.5 pb-2">
@@ -103,12 +118,15 @@ export function Sidebar({
                   <Link
                     key={item.key}
                     href={href}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-colors ${
-                      active ? "bg-navy text-white" : "text-muted-strong hover:bg-surface-hover"
+                    onClick={onClose}
+                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 ${
+                      active
+                        ? "bg-navy text-white shadow-sm"
+                        : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
                     }`}
                   >
-                    <Layers size={17} strokeWidth={1.8} />
-                    {item.nama}
+                    <Layers size={17} strokeWidth={1.8} className="flex-none" />
+                    <span className="truncate">{item.nama}</span>
                   </Link>
                 );
               })}
@@ -119,7 +137,7 @@ export function Sidebar({
 
       <button
         onClick={() => signOut({ callbackUrl: "/login" })}
-        className="mt-2 px-3.5 py-2.5 border border-border-soft rounded-pill flex items-center gap-2 text-[13.5px] font-semibold text-muted-strong"
+        className="mt-2 px-3.5 py-2.5 border border-border-soft rounded-pill flex items-center gap-2 text-[13.5px] font-semibold text-muted-strong hover:bg-surface-hover hover:text-status-red hover:border-red-200 dark:hover:border-red-500/30 transition-all duration-150"
       >
         <LogOut size={16} strokeWidth={1.8} />
         Keluar Sistem

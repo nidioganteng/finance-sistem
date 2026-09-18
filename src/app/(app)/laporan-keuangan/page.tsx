@@ -5,11 +5,13 @@ import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { logActivity } from "@/lib/actions/log";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { LaporanKeuanganTabs } from "@/components/laporan-keuangan/LaporanKeuanganTabs";
 import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -18,6 +20,7 @@ export default async function LaporanKeuanganPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan-keuangan" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -34,7 +37,7 @@ export default async function LaporanKeuanganPage({
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={`Laporan Keuangan – ${selectedEntity.name}`}
         subtitle={`Ringkasan laporan keuangan — Periode ${currentYear}`}
@@ -63,7 +66,7 @@ export default async function LaporanKeuanganPage({
       {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
       {hasData && tab === "laba-rugi" && <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />}
       {hasData && tab === "arus-kas" && <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-    </>
+    </PageTransition>
   );
 }
 

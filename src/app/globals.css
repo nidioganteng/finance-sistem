@@ -79,3 +79,11 @@ body {
   main { padding: 1rem !important; gap: 1rem !important; }
   .print\:hidden { display: none !important; }
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

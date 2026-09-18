@@ -10,6 +10,7 @@ import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-
 import { computeNewTerminPercentage } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
+import { logActivity } from "@/lib/actions/log";
 
 type KasRowInput = { coaAccountId: string; nominal: number };
 
@@ -197,6 +198,8 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps, ...terminCreate]);
 
+  logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
+
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
   revalidatePath("/piutang");
@@ -228,6 +231,9 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
   ];
 
   await prisma.$transaction(deleteOps);
+
+  logActivity(session.user.id, `Hapus transaksi (${txIds.length} baris)`, "FINANCIAL_CHANGE", { txIds });
+
   revalidatePath(pagePath);
   revalidatePath("/jurnal");
   return { success: true };
@@ -364,6 +370,8 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);
 
+  logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
+
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
   return { success: true };
@@ -390,6 +398,8 @@ export async function updateKasTransactionGroup(input: {
       prisma.transaction.update({ where: { id: u.txId }, data: { coaAccountId: u.newCoaAccountId } })
     ),
   ]);
+
+  logActivity(session.user.id, `Update keterangan/COA transaksi – ${input.newNoBukti.trim()}`, "FINANCIAL_CHANGE", { txIds: input.txIds });
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");

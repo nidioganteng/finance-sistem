@@ -7,6 +7,8 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 const STATUS_BADGE: Record<string, string> = {
   ON_TRACK: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
@@ -26,6 +28,7 @@ export default async function ProfitabilitasPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Profitabilitas Proyek", "USER_ACTIVITY", { path: "/profitabilitas" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -39,7 +42,7 @@ export default async function ProfitabilitasPage({
   const data = await getProfitabilitasData(selectedEntity.id);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Profitabilitas Proyek"
         subtitle={`Analisis laba rugi per proyek — ${selectedEntity.name}`}
@@ -73,7 +76,8 @@ export default async function ProfitabilitasPage({
       </div>
 
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Kode</th>
@@ -118,7 +122,8 @@ export default async function ProfitabilitasPage({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

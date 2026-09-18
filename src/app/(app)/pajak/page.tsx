@@ -7,6 +7,8 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function PajakPage({
   searchParams,
@@ -15,6 +17,7 @@ export default async function PajakPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Laporan Pajak", "USER_ACTIVITY", { path: "/pajak" });
   if (role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -29,7 +32,7 @@ export default async function PajakPage({
   const data = await getLabaRugiData(selectedEntity.id, currentYear);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Rekonsiliasi Laporan Pajak"
         subtitle={`Kalkulasi awal Pajak Penghasilan Badan — ${selectedEntity.name} ${currentYear}`}
@@ -117,6 +120,6 @@ export default async function PajakPage({
           )}
         </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

@@ -28,7 +28,8 @@ const STATUS_LABEL: Record<UserStatus, string> = {
   INACTIVE: "Nonaktif",
 };
 
-const ROLE_OPTS: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_SUPER: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_MANAGER: Role[] = ["MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
 
 const FILTER_TABS = [
   { key: "semua", label: "Semua" },
@@ -40,10 +41,13 @@ const FILTER_TABS = [
 export function PenggunaClient({
   users,
   allEntities,
+  viewerRole,
 }: {
   users: UserItem[];
   allEntities: EntityItem[];
+  viewerRole: string;
 }) {
+  const roleOpts = viewerRole === "SUPER_ADMIN" ? ROLE_OPTS_SUPER : ROLE_OPTS_MANAGER;
   const [filter, setFilter] = useState("semua");
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [editEntityId, setEditEntityId] = useState<string | null>(null);
@@ -135,7 +139,8 @@ export function PenggunaClient({
       </div>
 
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Nama</th>
@@ -191,7 +196,7 @@ export function PenggunaClient({
                         <>
                           <button
                             onClick={() => startApprove(user)}
-                            className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12px] font-semibold"
+                            className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12px] font-semibold active:scale-95 transition-transform"
                           >
                             Approve
                           </button>
@@ -247,7 +252,7 @@ export function PenggunaClient({
                               onChange={(e) => setSelectedRole(e.target.value as Role)}
                               className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card"
                             >
-                              {ROLE_OPTS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                              {roleOpts.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                             </select>
                           </div>
                           <div>
@@ -271,7 +276,7 @@ export function PenggunaClient({
                           <button
                             onClick={() => handleApprove(user.id)}
                             disabled={isPending}
-                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1"
+                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform"
                           >
                             <Check size={14} /> Konfirmasi Approve
                           </button>
@@ -309,7 +314,7 @@ export function PenggunaClient({
                           <button
                             onClick={() => handleUpdateEntities(user.id)}
                             disabled={isPending}
-                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1"
+                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform"
                           >
                             <Check size={14} /> Simpan
                           </button>
@@ -328,6 +333,7 @@ export function PenggunaClient({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

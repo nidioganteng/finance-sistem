@@ -4,22 +4,30 @@ import { authOptions } from "@/lib/auth";
 import { getUserList, getAllEntities } from "@/lib/pengguna";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PenggunaClient } from "@/components/pengguna/PenggunaClient";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function PenggunaPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Manajemen Pengguna", "USER_ACTIVITY", { path: "/pengguna" });
   if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN") redirect("/dashboard");
 
   const [users, allEntities] = await Promise.all([getUserList(), getAllEntities()]);
 
+  // Manager Keuangan tidak boleh melihat atau mengedit akun Super Admin
+  const visibleUsers = role === "MANAJER_KEUANGAN"
+    ? users.filter((u) => u.role !== "SUPER_ADMIN")
+    : users;
+
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Manajemen Pengguna"
         subtitle="Kelola akses dan peran pengguna sistem"
       />
       <PenggunaClient
-        users={users.map((u) => ({
+        users={visibleUsers.map((u) => ({
           id: u.id,
           name: u.name,
           email: u.email,
@@ -29,7 +37,8 @@ export default async function PenggunaPage() {
           entityAccess: u.entityAccess,
         }))}
         allEntities={allEntities}
+        viewerRole={role}
       />
-    </>
+    </PageTransition>
   );
 }

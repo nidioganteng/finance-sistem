@@ -18,9 +18,9 @@ type UserItem = {
 };
 
 const STATUS_BADGE: Record<UserStatus, string> = {
-  PENDING: "bg-yellow-100 text-yellow-700",
-  ACTIVE: "bg-green-100 text-green-700",
-  INACTIVE: "bg-gray-100 text-gray-500",
+  PENDING: "bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
+  ACTIVE: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+  INACTIVE: "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400",
 };
 const STATUS_LABEL: Record<UserStatus, string> = {
   PENDING: "Menunggu",
@@ -28,7 +28,8 @@ const STATUS_LABEL: Record<UserStatus, string> = {
   INACTIVE: "Nonaktif",
 };
 
-const ROLE_OPTS: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_SUPER: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_MANAGER: Role[] = ["MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
 
 const FILTER_TABS = [
   { key: "semua", label: "Semua" },
@@ -40,10 +41,13 @@ const FILTER_TABS = [
 export function PenggunaClient({
   users,
   allEntities,
+  viewerRole,
 }: {
   users: UserItem[];
   allEntities: EntityItem[];
+  viewerRole: string;
 }) {
+  const roleOpts = viewerRole === "SUPER_ADMIN" ? ROLE_OPTS_SUPER : ROLE_OPTS_MANAGER;
   const [filter, setFilter] = useState("semua");
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [editEntityId, setEditEntityId] = useState<string | null>(null);
@@ -117,7 +121,7 @@ export function PenggunaClient({
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="px-4 py-3 rounded-xl bg-red-50 text-status-red text-sm">{error}</div>
+        <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
 
       <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
@@ -134,8 +138,9 @@ export function PenggunaClient({
         ))}
       </div>
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+        <div className="overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Nama</th>
@@ -191,7 +196,7 @@ export function PenggunaClient({
                         <>
                           <button
                             onClick={() => startApprove(user)}
-                            className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12px] font-semibold"
+                            className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12px] font-semibold active:scale-95 transition-transform"
                           >
                             Approve
                           </button>
@@ -245,9 +250,9 @@ export function PenggunaClient({
                             <select
                               value={selectedRole}
                               onChange={(e) => setSelectedRole(e.target.value as Role)}
-                              className="px-3 py-2 rounded-xl border border-border text-sm bg-white"
+                              className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card"
                             >
-                              {ROLE_OPTS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                              {roleOpts.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                             </select>
                           </div>
                           <div>
@@ -271,7 +276,7 @@ export function PenggunaClient({
                           <button
                             onClick={() => handleApprove(user.id)}
                             disabled={isPending}
-                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1"
+                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform"
                           >
                             <Check size={14} /> Konfirmasi Approve
                           </button>
@@ -309,7 +314,7 @@ export function PenggunaClient({
                           <button
                             onClick={() => handleUpdateEntities(user.id)}
                             disabled={isPending}
-                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1"
+                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform"
                           >
                             <Check size={14} /> Simpan
                           </button>
@@ -328,6 +333,7 @@ export function PenggunaClient({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

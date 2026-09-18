@@ -17,3 +17,18 @@ export async function markAllNotifikasiRead() {
   revalidatePath("/notifikasi");
   revalidatePath("/dashboard");
 }
+
+export async function markNotifikasiRead(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return;
+
+  // Notifikasi ditarget ke role (bukan per-user), jadi scoped ke targetRole
+  // biar user nggak bisa nandain notifikasi role lain sebagai dibaca.
+  await prisma.notifikasi.updateMany({
+    where: { id, targetRole: session.user.role },
+    data: { read: true },
+  });
+
+  revalidatePath("/notifikasi");
+  revalidatePath("/dashboard");
+}

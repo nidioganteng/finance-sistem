@@ -16,11 +16,11 @@ type COAItem = {
 const KATEGORI_OPTS: CoaKategori[] = ["PENDAPATAN", "BEBAN", "ASET", "KEWAJIBAN", "MODAL"];
 
 const KATEGORI_BADGE: Record<CoaKategori, string> = {
-  PENDAPATAN: "bg-green-100 text-green-700",
-  BEBAN: "bg-red-100 text-red-700",
-  ASET: "bg-blue-100 text-blue-700",
-  KEWAJIBAN: "bg-orange-100 text-orange-700",
-  MODAL: "bg-purple-100 text-purple-700",
+  PENDAPATAN: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+  BEBAN: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
+  ASET: "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
+  KEWAJIBAN: "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  MODAL: "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
 };
 
 export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
@@ -66,7 +66,7 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
   }
 
   return (
-    <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
+    <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-surface-subtle">
         <span className="text-sm font-bold text-navy-text">{initialCoa.length} Akun Terdaftar</span>
         <button
@@ -78,15 +78,15 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 text-status-red text-sm">{error}</div>
+        <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
 
       {showAdd && (
         <form action={handleCreate} className="px-6 py-4 border-b border-surface-subtle bg-surface-subtle">
           <div className="flex items-center gap-3 flex-wrap">
-            <input name="code" required placeholder="Kode (mis. 4-001)" className="px-3 py-2 rounded-xl border border-border text-sm w-36 bg-white" />
-            <input name="name" required placeholder="Nama Akun" className="px-3 py-2 rounded-xl border border-border text-sm flex-1 min-w-40 bg-white" />
-            <select name="kategori" required className="px-3 py-2 rounded-xl border border-border text-sm bg-white">
+            <input name="code" required placeholder="Kode (mis. 4-001)" className="px-3 py-2 rounded-xl border border-border text-sm w-36 bg-surface-card" />
+            <input name="name" required placeholder="Nama Akun" className="px-3 py-2 rounded-xl border border-border text-sm flex-1 min-w-40 bg-surface-card" />
+            <select name="kategori" required className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
               <option value="">Pilih Kategori</option>
               {KATEGORI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
@@ -123,9 +123,9 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
               <tr key={item.id} className="border-b border-surface-subtle bg-surface-subtle">
                 <td colSpan={5} className="px-6 py-3">
                   <form action={(fd) => handleUpdate(item.id, fd)} className="flex items-center gap-3 flex-wrap">
-                    <input name="code" required defaultValue={item.code} className="px-3 py-2 rounded-xl border border-border text-sm w-36 bg-white" />
-                    <input name="name" required defaultValue={item.name} className="px-3 py-2 rounded-xl border border-border text-sm flex-1 min-w-40 bg-white" />
-                    <select name="kategori" required defaultValue={item.kategori} className="px-3 py-2 rounded-xl border border-border text-sm bg-white">
+                    <input name="code" required defaultValue={item.code} className="px-3 py-2 rounded-xl border border-border text-sm w-36 bg-surface-card" />
+                    <input name="name" required defaultValue={item.name} className="px-3 py-2 rounded-xl border border-border text-sm flex-1 min-w-40 bg-surface-card" />
+                    <select name="kategori" required defaultValue={item.kategori} className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
                       {KATEGORI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
                     </select>
                     <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
@@ -154,7 +154,7 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
                     <button onClick={() => { setEditingId(item.id); setShowAdd(false); }} className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger" title="Edit">
                       <Pencil size={14} />
                     </button>
-                    <button onClick={() => handleDelete(item.id)} disabled={isPending} className="p-2 rounded-lg hover:bg-red-50 text-status-red" title="Hapus">
+                    <button onClick={() => handleDelete(item.id)} disabled={isPending} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red" title="Hapus">
                       <Trash2 size={14} />
                     </button>
                   </div>

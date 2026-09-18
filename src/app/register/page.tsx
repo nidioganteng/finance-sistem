@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { registerUser } from "@/lib/actions/auth";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +28,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-subtle p-6">
-      <div className="w-full max-w-[400px] bg-white border border-black/[.06] rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,.06)] p-10 px-9">
+    <div className="min-h-screen flex items-center justify-center bg-surface-subtle p-6 relative">
+      <div className="absolute top-6 right-6">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-[400px] bg-surface-card border border-border-soft rounded-[20px] shadow-[0_4px_24px_rgba(15,23,42,.06)] p-10 px-9">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand to-brand-soft flex items-center justify-center flex-none">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -36,7 +40,7 @@ export default function RegisterPage() {
               <rect x="10" y="14" width="4" height="6" fill="#fff" />
             </svg>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-extrabold text-[17px] text-navy-text leading-tight">Daftar Akun</div>
             <div className="text-[11px] text-muted font-semibold tracking-wide">GAHARU SEMPANA GROUP</div>
           </div>

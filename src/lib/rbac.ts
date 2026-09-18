@@ -6,7 +6,7 @@ export type NavItem = {
   icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale";
 };
 
-export type NavSection = {
+type NavSection = {
   title: string;
   items: NavItem[];
 };
@@ -26,44 +26,8 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
     },
-    {
-      title: "Pengaturan",
-      items: [{ label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" }],
-    },
   ],
   MANAJER_KEUANGAN: [
-    {
-      title: "Overview",
-      items: [
-        { label: "Dashboard", href: "/dashboard", icon: "grid" },
-        { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
-      ],
-    },
-    {
-      title: "Operasional",
-      items: [
-        { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
-        { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
-      ],
-    },
-    {
-      title: "Laporan",
-      items: [
-        { label: "Laporan Keuangan", href: "/laporan", icon: "fileText" },
-        { label: "Laporan Pajak", href: "/pajak", icon: "landmark" },
-      ],
-    },
-    {
-      title: "Pengaturan",
-      items: [
-        { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
-        { label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" },
-        { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
-        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" },
-      ],
-    },
-  ],
-  STAF_KEUANGAN: [
     {
       title: "Overview",
       items: [
@@ -79,16 +43,51 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Bank Buku", href: "/bank-buku", icon: "receipt" },
         { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
-        { label: "Neraca", href: "/neraca", icon: "scale" },
-        { label: "Laba Rugi", href: "/laba-rugi", icon: "fileText" },
-        { label: "Arus Kas", href: "/arus-kas", icon: "trendingUp" },
-        { label: "Profitabilitas Proyek", href: "/profitabilitas", icon: "trendingUp" },
+        { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
+      ],
+    },
+    {
+      title: "Laporan",
+      items: [
+        { label: "Laporan Keuangan", href: "/laporan", icon: "fileText" },
+        { label: "Laporan Pajak", href: "/pajak", icon: "landmark" },
+      ],
+    },
+    {
+      title: "Pengaturan",
+      items: [
+        { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
+        { label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" },
+        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" },
+        { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
+      ],
+    },
+  ],
+  STAF_KEUANGAN: [
+    {
+      title: "Overview",
+      items: [
+        { label: "Dashboard", href: "/dashboard", icon: "grid" },
+      ],
+    },
+    {
+      title: "Operasional",
+      items: [
+        { label: "Kas Kecil", href: "/kas-kecil", icon: "walletCards" },
+        { label: "Kas Besar", href: "/kas-besar", icon: "walletCards" },
+        { label: "Bank Buku", href: "/bank-buku", icon: "receipt" },
+        { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
+        { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
+        { label: "Laporan Keuangan", href: "/laporan-keuangan", icon: "fileText" },
         { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
       ],
     },
     {
       title: "Lainnya",
-      items: [{ label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" }],
+      items: [
+        { label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" },
+        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" },
+      ],
     },
   ],
   MANAGER_ADMIN: [
@@ -126,4 +125,11 @@ export function roleLabel(role: Role): string {
 // "grup" (agregat semua entity) hanya relevan untuk SUPER_ADMIN & MANAJER_KEUANGAN.
 export function canViewGrupAggregate(role: Role): boolean {
   return role === "SUPER_ADMIN" || role === "MANAJER_KEUANGAN";
+}
+
+// Siapa yang boleh input/edit/hapus transaksi Kas Kecil, Kas Besar, Bank Buku.
+// Manajer Keuangan awalnya cuma monitoring (read-only) — sekarang dikasih akses
+// penuh yang sama dengan Staf Keuangan (issue #5).
+export function canManageTransaksi(role: Role): boolean {
+  return role === "STAF_KEUANGAN" || role === "MANAJER_KEUANGAN";
 }

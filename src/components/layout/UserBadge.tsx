@@ -28,10 +28,10 @@ export function UserBadge({ name, role }: { name: string; role: Role }) {
 export function NotifBell({ unreadCount }: { unreadCount: number }) {
   return (
     <Link href="/notifikasi" className="relative block">
-      <div className="w-[38px] h-[38px] rounded-[11px] border border-border-soft flex items-center justify-center cursor-pointer bg-white relative hover:bg-surface-hover transition-colors">
+      <div className="w-[38px] h-[38px] rounded-[11px] border border-border-soft flex items-center justify-center cursor-pointer bg-surface-card relative hover:bg-surface-hover transition-colors">
         <Bell size={17} strokeWidth={1.8} className="text-muted-stronger" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-status-red text-white text-[9.5px] font-extrabold min-w-[16px] h-4 rounded-lg flex items-center justify-center px-1 border-2 border-white">
+          <span className="absolute -top-1 -right-1 bg-status-red text-white text-[9.5px] font-extrabold min-w-[16px] h-4 rounded-lg flex items-center justify-center px-1 border-2 border-surface-card">
             {unreadCount}
           </span>
         )}

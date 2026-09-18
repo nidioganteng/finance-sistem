@@ -14,7 +14,7 @@ export function NotifFilterSelect({
     <select
       value={current}
       onChange={(e) => router.push(`/notifikasi?filter=${e.target.value}`)}
-      className="px-3.5 py-2 rounded-pill border border-border-soft text-[13px] font-semibold text-muted-stronger bg-white"
+      className="px-3.5 py-2 rounded-pill border border-border-soft text-[13px] font-semibold text-muted-stronger bg-surface-card"
     >
       {options.map((o) => (
         <option key={o.key} value={o.key}>

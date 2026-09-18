@@ -3,9 +3,12 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getArusKasData } from "@/lib/arus-kas";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function ArusKasPage({
   searchParams,
@@ -14,13 +17,11 @@ export default async function ArusKasPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Arus Kas", "USER_ACTIVITY", { path: "/arus-kas" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey =
-    searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : entityKeys[0];
+  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
 
@@ -32,7 +33,7 @@ export default async function ArusKasPage({
   const hasData = data.monthly.some((m) => m.hasData);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Arus Kas"
         subtitle={`Ringkasan arus kas masuk dan keluar — ${selectedEntity.name} ${currentYear}`}
@@ -58,15 +59,16 @@ export default async function ArusKasPage({
             color: data.netTotalPositive ? "text-status-green" : "text-status-red",
           },
         ].map((card) => (
-          <div key={card.label} className="bg-white rounded-[16px] border border-black/[.06] p-5">
+          <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
             <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
             <div className={`text-[20px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-[20px] border border-black/[.06] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Bulan</th>
@@ -106,7 +108,8 @@ export default async function ArusKasPage({
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

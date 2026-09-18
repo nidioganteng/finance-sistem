@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import {
   getAccessibleEntities,
-  getRecentNotifications,
   getUnreadNotificationCount,
   getGrupPiutangMetrics,
   getMonthlyChartData,
@@ -15,6 +14,8 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { UserBadge, NotifBell } from "@/components/layout/UserBadge";
 import { EntityCard, EntityCardCompact } from "@/components/dashboard/EntityCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { EntityFinancialSummary } from "@/components/dashboard/EntityFinancialSummary";
+import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import {
   TrendingUp,
   TrendingDown,
@@ -22,14 +23,17 @@ import {
   AlertTriangle,
   CalendarClock,
 } from "lucide-react";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; chartYear?: string };
+  searchParams: { entity?: string; chartYear?: string; compareYears?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Dashboard", "USER_ACTIVITY", { path: "/dashboard" });
 
   const entities = await getAccessibleEntities(entityKeys);
   const canGrup = canViewGrupAggregate(role);
@@ -47,12 +51,27 @@ export default async function DashboardPage({
 
   const currentYear = new Date().getFullYear();
   const chartYear = searchParams.chartYear ? parseInt(searchParams.chartYear) : currentYear;
+  // Tahun pembanding tambahan (di luar chartYear) — maksimal 4 (jadi 5 tahun
+  // sekaligus), pembatasan lebih ketat (grup cuma 1) ditegakkan di RevenueChart
+  // lewat activeKeys (client-only state, jadi tidak bisa dibatasi di sini).
+  const compareYears = (searchParams.compareYears ?? "")
+    .split(",")
+    .map((y) => parseInt(y))
+    .filter((y, idx, arr) => !isNaN(y) && y !== chartYear && arr.indexOf(y) === idx)
+    .slice(0, 4);
+  const chartYears = [chartYear, ...compareYears];
 
-  const [notifications, unreadCount, piutangMetrics, monthlyData] = await Promise.all([
-    getRecentNotifications(role),
+  const targetEntityKeys = showingGrup ? entityKeys : selectedEntity ? [selectedEntity.key] : [];
+
+  const [unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData] = await Promise.all([
     getUnreadNotificationCount(role),
     showingGrup ? getGrupPiutangMetrics() : Promise.resolve(null),
-    showingGrup ? getMonthlyChartData(entityKeys, chartYear) : Promise.resolve([]),
+    targetEntityKeys.length > 0
+      ? Promise.all(chartYears.map((y) => getMonthlyChartData(targetEntityKeys, y)))
+      : Promise.resolve([]),
+    selectedEntity
+      ? getLaporanKeuanganData([selectedEntity.id], currentYear)
+      : Promise.resolve(null),
   ]);
 
   const rightSlot = (
@@ -106,7 +125,7 @@ export default async function DashboardPage({
   );
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={showingGrup ? "Master Dashboard" : `Dashboard ${selectedEntity?.name ?? ""}`}
         subtitle={
@@ -219,33 +238,11 @@ export default async function DashboardPage({
           </div>
 
           <RevenueChart
-            monthlyData={monthlyData}
+            monthlyDataByYear={monthlyDataByYear}
             entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))}
-            year={chartYear}
+            years={chartYears}
             currentYear={currentYear}
           />
-
-          {/* Notifikasi terbaru */}
-          <div className="bg-surface-card rounded-2xl border border-border p-5">
-            <div className="text-sm font-bold text-navy-text mb-4">Notifikasi Terbaru</div>
-            {notifications.length === 0 ? (
-              <p className="text-sm text-muted">Belum ada notifikasi.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {notifications.map((n) => (
-                  <div key={n.id} className="flex gap-2.5 items-start">
-                    <span className={`w-2 h-2 rounded-full mt-1.5 flex-none ${n.read ? "bg-border" : "bg-brand"}`} />
-                    <div>
-                      <div className="text-[12.5px] text-muted-stronger leading-snug">{n.text}</div>
-                      <div className="text-[11px] text-muted-faint mt-0.5">
-                        {new Date(n.createdAt).toLocaleString("id-ID")}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </>
       ) : selectedEntity ? (
         <>
@@ -260,9 +257,26 @@ export default async function DashboardPage({
             interactive={!isStaff}
           />
 
+          {entityLaporanData && (
+            <EntityFinancialSummary
+              data={entityLaporanData}
+              entityKey={selectedEntity.key}
+              year={currentYear}
+            />
+          )}
+
+          <RevenueChart
+            monthlyDataByYear={monthlyDataByYear}
+            entities={[{ key: selectedEntity.key, name: selectedEntity.name, colorHex: selectedEntity.colorHex }]}
+            years={chartYears}
+            currentYear={currentYear}
+            title={`Performa Bulanan ${selectedEntity.name}`}
+          />
+
           <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="text-left text-[11.5px] font-bold text-muted-faint">
                   <td className="pb-2">Kode</td>
@@ -273,28 +287,37 @@ export default async function DashboardPage({
                 </tr>
               </thead>
               <tbody>
-                {selectedEntity.projects.map((p) => (
-                  <tr key={p.code} className="border-t border-border">
-                    <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
-                    <td className="py-3">{p.name}</td>
-                    <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
-                    <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
-                    <td
-                      className={`py-3 text-right tabular-nums font-semibold ${
-                        p.profit >= 0 ? "text-status-green" : "text-status-red"
-                      }`}
-                    >
-                      {formatMiliar(p.profit)}
+                {selectedEntity.projects.length === 0 ? (
+                  <tr className="border-t border-border">
+                    <td colSpan={5} className="py-6 text-center text-sm text-muted">
+                      Belum ada proyek berjalan untuk entitas ini.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  selectedEntity.projects.map((p) => (
+                    <tr key={p.code} className="border-t border-border">
+                      <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
+                      <td className="py-3">{p.name}</td>
+                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
+                      <td
+                        className={`py-3 text-right tabular-nums font-semibold ${
+                          p.profit >= 0 ? "text-status-green" : "text-status-red"
+                        }`}
+                      >
+                        {formatMiliar(p.profit)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       ) : (
         <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun. Hubungi Manajer Keuangan.</p>
       )}
-    </>
+    </PageTransition>
   );
 }

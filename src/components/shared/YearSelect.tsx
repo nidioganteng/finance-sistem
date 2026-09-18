@@ -18,7 +18,7 @@ export function YearSelect({ currentYear }: { currentYear: number }) {
     <select
       value={currentYear}
       onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-2 rounded-[11px] border border-border-soft text-[13px] font-bold text-muted-stronger bg-surface-card cursor-pointer"
+      className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-[11px] border border-border-soft text-[12px] sm:text-[13px] font-bold text-muted-stronger bg-surface-card cursor-pointer"
     >
       {years.map((y) => (
         <option key={y} value={y}>

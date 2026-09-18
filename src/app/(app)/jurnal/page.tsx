@@ -10,6 +10,8 @@ import { PrintButton } from "@/components/shared/PrintButton";
 import { JurnalFilterChips } from "@/components/jurnal/JurnalFilterChips";
 import { JurnalExtraFilters } from "@/components/jurnal/JurnalExtraFilters";
 import { AlertTriangle } from "lucide-react";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function JurnalPage({
   searchParams,
@@ -18,6 +20,7 @@ export default async function JurnalPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Jurnal Umum", "USER_ACTIVITY", { path: "/jurnal" });
 
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
@@ -42,7 +45,7 @@ export default async function JurnalPage({
   const selisih = Math.abs(totalDebit - totalKredit);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title={`Jurnal Umum – ${selectedEntity.name}`}
         subtitle="Seluruh transaksi kas dan bank, tercatat otomatis dari setiap input"
@@ -184,6 +187,6 @@ export default async function JurnalPage({
           )}
         </table>
       </div>
-    </>
+    </PageTransition>
   );
 }

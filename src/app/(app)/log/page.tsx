@@ -5,6 +5,8 @@ import { getActivityLogs } from "@/lib/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LogTabs } from "@/components/log/LogTabs";
 import { roleLabel } from "@/lib/rbac";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function LogPage({
   searchParams,
@@ -13,6 +15,7 @@ export default async function LogPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Log Aktivitas", "USER_ACTIVITY", { path: "/log" });
   if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const tab = searchParams.tab === "financial" ? "financial" : "user";
@@ -20,7 +23,7 @@ export default async function LogPage({
   const logs = await getActivityLogs(category);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader title="Log Aktivitas" subtitle="Riwayat aktivitas pengguna dan perubahan finansial" />
 
       <div className="px-4 py-3 rounded-xl bg-surface-subtle border border-border-soft text-[13px] text-muted-stronger">
@@ -31,7 +34,8 @@ export default async function LogPage({
       <LogTabs currentTab={tab} />
 
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Waktu</th>
@@ -70,7 +74,8 @@ export default async function LogPage({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

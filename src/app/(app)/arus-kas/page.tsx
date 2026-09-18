@@ -7,6 +7,8 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
+import { logActivity } from "@/lib/actions/log";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function ArusKasPage({
   searchParams,
@@ -15,6 +17,7 @@ export default async function ArusKasPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
+  logActivity(session!.user.id, "Buka halaman Arus Kas", "USER_ACTIVITY", { path: "/arus-kas" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -30,7 +33,7 @@ export default async function ArusKasPage({
   const hasData = data.monthly.some((m) => m.hasData);
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         title="Arus Kas"
         subtitle={`Ringkasan arus kas masuk dan keluar — ${selectedEntity.name} ${currentYear}`}
@@ -64,7 +67,8 @@ export default async function ArusKasPage({
       </div>
 
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-surface-hover text-left">
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Bulan</th>
@@ -104,7 +108,8 @@ export default async function ArusKasPage({
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

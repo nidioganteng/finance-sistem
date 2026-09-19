@@ -126,7 +126,24 @@ export default async function JurnalPage({
                     {r.isKasEntry ? (
                       <span className="text-muted-faint italic text-[12px]">{r.keterangan}</span>
                     ) : (
-                      r.keterangan
+                      <>
+                        {r.keterangan}
+                        {r.arahLaporan.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {r.arahLaporan.map((a) => {
+                              const LABEL: Record<string, string> = {
+                                JURNAL_UMUM: "Jurnal", BUKU_BESAR: "Buku Besar",
+                                LAPORAN_KEUANGAN: "Lap. Keuangan", PIUTANG: "Piutang", PAJAK: "Pajak",
+                              };
+                              return (
+                                <span key={a} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-navy/10 dark:bg-navy/30 text-navy dark:text-blue-300">
+                                  {LABEL[a] ?? a}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="py-2.5 px-1.5 text-[12px] font-mono text-muted">{r.kodeAkun}</td>

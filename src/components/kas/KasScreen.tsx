@@ -63,6 +63,8 @@ export async function KasScreen({
   ]);
 
   const coaList = coaOptions.map((c) => ({ id: c.id, code: c.code, name: c.name }));
+  const extra = jenisInput.extraFieldsJson as { arahLaporan?: string[] } | null;
+  const defaultArahLaporan = Array.isArray(extra?.arahLaporan) ? extra.arahLaporan : [];
 
   return (
     <>
@@ -89,6 +91,7 @@ export async function KasScreen({
         selectedRekeningId={selectedRekeningId}
         allEntities={entities.map((e) => ({ key: e.key, name: e.name }))}
         projectOptions={projectOptions}
+        defaultArahLaporan={defaultArahLaporan}
       />
     </>
   );

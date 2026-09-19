@@ -34,6 +34,23 @@ export async function updateTerminStatus(terminId: string, status: TerminStatus)
   revalidatePath("/piutang");
 }
 
+// Menyelesaikan proyek: status jadi COMPLETED, hilang dari Kontrol Piutang.
+// Transaksi di jurnal tetap ada — hanya tampilan piutang yang menyembunyikannya.
+export async function completeProject(projectId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Belum login.");
+  if (session.user.role !== "MANAJER_KEUANGAN" && session.user.role !== "SUPER_ADMIN") {
+    throw new Error("Hanya Manajer Keuangan yang bisa menyelesaikan proyek.");
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { code: true, name: true } });
+  await prisma.project.update({ where: { id: projectId }, data: { status: "COMPLETED" } });
+
+  logActivity(session.user.id, `Selesaikan proyek ${project?.code ?? projectId} – ${project?.name ?? ""}`, "FINANCIAL_CHANGE", { projectId });
+  revalidatePath("/piutang");
+  revalidatePath("/dashboard");
+}
+
 // Membatalkan proyek: termin yang belum terbayar (sisa termin berjalan) dihapus
 // supaya proyek dianggap selesai dan tidak terus memicu warning piutang.
 export async function cancelProject(projectId: string) {

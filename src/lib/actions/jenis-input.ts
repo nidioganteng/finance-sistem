@@ -27,7 +27,7 @@ function slugify(nama: string) {
     .replace(/\s+/g, "_");
 }
 
-export async function createJenisInput(data: { nama: string; arahLaporan: string[] }) {
+export async function createJenisInput(data: { nama: string; arahLaporan: string[]; entityKeys: string[] }) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
   if (session.user.role !== "STAF_KEUANGAN" && session.user.role !== "MANAJER_KEUANGAN") throw new Error("Akses ditolak.");
@@ -38,6 +38,9 @@ export async function createJenisInput(data: { nama: string; arahLaporan: string
   const arahLaporan = data.arahLaporan.filter((a) => VALID_LAPORAN.includes(a));
   if (arahLaporan.length === 0) throw new Error("Pilih minimal satu tujuan pencatatan.");
 
+  // entityKeys kosong = global (semua entitas), non-kosong = hanya entitas yang dipilih
+  const entityKeys = Array.isArray(data.entityKeys) ? data.entityKeys : [];
+
   const baseKey = slugify(nama);
   let key = baseKey;
   let suffix = 1;
@@ -46,7 +49,7 @@ export async function createJenisInput(data: { nama: string; arahLaporan: string
   }
 
   await prisma.jenisInputTransaksi.create({
-    data: { key, nama, createdById: session.user.id, extraFieldsJson: { arahLaporan } },
+    data: { key, nama, createdById: session.user.id, extraFieldsJson: { arahLaporan, entityKeys } },
   });
 
   const now = new Date();
@@ -65,7 +68,7 @@ export async function createJenisInput(data: { nama: string; arahLaporan: string
   }
   await prisma.notifikasi.createMany({ data: notifTargets });
 
-  logActivity(session.user.id, `Tambah jenis input "${nama}"`, "USER_ACTIVITY", { key, nama, arahLaporan });
+  logActivity(session.user.id, `Tambah jenis input "${nama}"`, "USER_ACTIVITY", { key, nama, arahLaporan, entityKeys });
   revalidatePath("/jenis-input");
 }
 

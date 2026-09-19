@@ -17,7 +17,7 @@ export default async function CustomInputPage({
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
 
-  if (role !== "STAF_KEUANGAN") redirect("/dashboard");
+  if (role !== "STAF_KEUANGAN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const jenisInput = await getJenisInput(params.key);
   if (!jenisInput || !jenisInput.active || SYSTEM_KEYS.includes(params.key)) {
@@ -34,10 +34,20 @@ export default async function CustomInputPage({
 
   const extra = jenisInput.extraFieldsJson as Record<string, unknown> | null;
   const arahLaporan = Array.isArray(extra?.arahLaporan) ? (extra.arahLaporan as string[]) : [];
+  const scopeKeys = Array.isArray(extra?.entityKeys) ? (extra.entityKeys as string[]) : [];
+
   const subtitle =
     arahLaporan.length > 0
       ? `Dicatat ke: ${arahLaporan.map((k) => LAPORAN_LABEL[k] ?? k).join(", ")}`
       : "Input dan riwayat transaksi";
+
+  // Jika jenis input punya scope entitas, hanya tampilkan entitas yang masuk scope
+  // excludeEntityKeys = semua entitas user yang TIDAK ada di scope
+  const { entityKeys: userEntityKeys } = session!.user;
+  const excludeEntityKeys =
+    scopeKeys.length > 0
+      ? userEntityKeys.filter((k) => !scopeKeys.includes(k))
+      : [];
 
   return (
     <PageTransition>
@@ -47,6 +57,7 @@ export default async function CustomInputPage({
         subtitle={subtitle}
         pagePath={`/input/${params.key}`}
         searchParams={searchParams}
+        excludeEntityKeys={excludeEntityKeys}
       />
     </PageTransition>
   );

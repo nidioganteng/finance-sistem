@@ -42,6 +42,7 @@ export function KasScreenClient({
   selectedRekeningId,
   allEntities = [],
   projectOptions = [],
+  defaultArahLaporan = [],
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -54,6 +55,7 @@ export function KasScreenClient({
   selectedRekeningId?: string;
   allEntities?: { key: string; name: string }[];
   projectOptions?: ProjectOption[];
+  defaultArahLaporan?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -114,6 +116,7 @@ export function KasScreenClient({
               rekeningOptions={rekeningOptions}
               defaultRekeningId={selectedRekeningId}
               allEntities={allEntities}
+              defaultArahLaporan={defaultArahLaporan}
               initialValues={{
                 tanggal: editingRow.tanggalRaw,
                 noBukti: editingRow.noBukti,
@@ -188,6 +191,7 @@ export function KasScreenClient({
           defaultRekeningId={selectedRekeningId}
           allEntities={allEntities}
           projectOptions={projectOptions}
+          defaultArahLaporan={defaultArahLaporan}
           onClose={() => setPanelOpen(false)}
         />
       )}

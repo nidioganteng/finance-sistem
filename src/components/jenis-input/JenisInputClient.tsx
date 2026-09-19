@@ -13,6 +13,7 @@ type JenisInputItem = {
   createdBy: { name: string } | null;
   createdAt: Date;
   arahLaporan: string[];
+  entityKeys: string[];
 };
 
 const LAPORAN_OPTIONS = [
@@ -35,14 +36,17 @@ const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
 
 export function JenisInputClient({
   initialData,
+  entities,
   userRole,
 }: {
   initialData: JenisInputItem[];
+  entities: { key: string; name: string }[];
   userRole: string;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [nama, setNama] = useState("");
   const [arahLaporan, setArahLaporan] = useState<string[]>(["JURNAL_UMUM"]);
+  const [selectedEntityKeys, setSelectedEntityKeys] = useState<string[]>([]); // kosong = semua entitas
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -54,14 +58,21 @@ export function JenisInputClient({
     );
   }
 
+  function toggleEntityKey(key: string) {
+    setSelectedEntityKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  }
+
   function handleCreate() {
     setError(null);
     startTransition(async () => {
       try {
-        await createJenisInput({ nama, arahLaporan });
+        await createJenisInput({ nama, arahLaporan, entityKeys: selectedEntityKeys });
         setShowAdd(false);
         setNama("");
         setArahLaporan(["JURNAL_UMUM"]);
+        setSelectedEntityKeys([]);
       } catch (e: any) {
         setError(e.message);
       }
@@ -158,6 +169,40 @@ export function JenisInputClient({
               </p>
             </div>
 
+            {entities.length > 1 && (
+              <div>
+                <label className="text-xs font-semibold text-muted-stronger block mb-1.5">
+                  Berlaku untuk Entitas{" "}
+                  <span className="text-[10.5px] font-normal text-muted-faint">(kosongkan = semua entitas)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {entities.map((e) => {
+                    const selected = selectedEntityKeys.includes(e.key);
+                    return (
+                      <button
+                        key={e.key}
+                        type="button"
+                        onClick={() => toggleEntityKey(e.key)}
+                        className={`px-3 py-1.5 rounded-[8px] text-[12px] font-semibold border transition-colors ${
+                          selected
+                            ? "bg-brand text-white border-brand"
+                            : "bg-surface-card text-muted-stronger border-border hover:border-brand/40 hover:text-navy-text"
+                        }`}
+                      >
+                        {selected && <span className="mr-1">✓</span>}
+                        {e.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedEntityKeys.length === 0 && (
+                  <p className="text-[11px] text-muted-faint mt-1.5">
+                    Tidak ada yang dipilih — jenis input ini muncul di semua entitas.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-2.5 pt-1">
               <button
                 onClick={() => setShowAdd(false)}
@@ -184,6 +229,7 @@ export function JenisInputClient({
             <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Nama</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Key / Halaman</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Dicatat ke</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Entitas</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Status</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Dibuat Oleh</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Tanggal</th>
@@ -239,6 +285,22 @@ export function JenisInputClient({
                       <span className="text-[11px] text-muted-faint">—</span>
                     )}
                   </div>
+                </td>
+                <td className="py-3 px-3">
+                  {item.entityKeys.length === 0 ? (
+                    <span className="text-[11px] text-muted-faint">Semua Entitas</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {item.entityKeys.map((ek) => {
+                        const e = entities.find((en) => en.key === ek);
+                        return (
+                          <span key={ek} className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-brand/10 text-brand">
+                            {e?.name ?? ek}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </td>
                 <td className="py-3 px-3">
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${item.active ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400"}`}>

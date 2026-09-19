@@ -7,6 +7,8 @@ const TABS = [
   { key: "laba-rugi", label: "Laba Rugi" },
   { key: "neraca", label: "Neraca" },
   { key: "arus-kas", label: "Arus Kas" },
+  { key: "piutang", label: "Piutang" },
+  { key: "utang-aset", label: "Utang & Aset" },
   { key: "komparasi", label: "Komparasi" },
 ];
 

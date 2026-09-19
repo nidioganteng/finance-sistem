@@ -26,6 +26,7 @@ export type CreateKasTransactionInput = {
   rekeningId?: string; // khusus Bank Buku
   crossingEntityKeys?: string[]; // crossing antar entitas (opsional, bisa lebih dari satu)
   projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
+  arahLaporan?: string[]; // override output keuangan per transaksi (custom jenis input)
 };
 
 const KAS_KECIL_COA: Record<string, string> = {
@@ -84,6 +85,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
 
   const crossingEntityKeys = (input.crossingEntityKeys ?? []).filter(Boolean);
   const crossingGroupId = crossingEntityKeys.length > 0 ? randomUUID() : undefined;
+  const arahLaporan = Array.isArray(input.arahLaporan) && input.arahLaporan.length > 0 ? input.arahLaporan : undefined;
 
   // Pre-calculate crossing entity saldos (read-only, safe to do before transaction)
   type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number };
@@ -113,6 +115,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
+        ...(arahLaporan ? { extraFieldsJson: { arahLaporan } } : {}),
       },
     })
   );
@@ -127,6 +130,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         isKasEntry: true,
         ...(rekeningNama ? { rekeningNama } : {}),
         ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
+        ...(arahLaporan ? { arahLaporan } : {}),
       },
     },
   });
@@ -159,6 +163,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
           },
         })
       );
+      // Termin 100% → proyek otomatis selesai, hilang dari Kontrol Piutang.
+      // Jurnal transaksinya tetap ada.
+      if (newPct >= 100) {
+        terminCreate.push(
+          prisma.project.update({ where: { id: input.projectId }, data: { status: "COMPLETED" } }) as never
+        );
+      }
     }
   }
 
@@ -242,7 +253,7 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
 export async function replaceKasTransaction(input: CreateKasTransactionInput & { existingTxIds: string[] }) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: "Belum login." };
-  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa mengedit transaksi." };
+  if (!canManageTransaksi(session.user.role)) return { error: "Kamu tidak punya akses untuk mengedit transaksi." };
   if (!session.user.entityKeys.includes(input.entityKey)) return { error: "Kamu tidak punya akses ke entity ini." };
   if (input.existingTxIds.length === 0) return { error: "Tidak ada transaksi lama untuk diganti." };
 
@@ -289,6 +300,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
 
   const crossingEntityKeys = (input.crossingEntityKeys ?? []).filter(Boolean);
   const crossingGroupId = crossingEntityKeys.length > 0 ? randomUUID() : undefined;
+  const arahLaporan = Array.isArray(input.arahLaporan) && input.arahLaporan.length > 0 ? input.arahLaporan : undefined;
 
   type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number };
   const crossingEntries: CrossingEntry[] = [];
@@ -317,6 +329,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
+        ...(arahLaporan ? { extraFieldsJson: { arahLaporan } } : {}),
       },
     })
   );
@@ -331,6 +344,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         isKasEntry: true,
         ...(rekeningNama ? { rekeningNama } : {}),
         ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
+        ...(arahLaporan ? { arahLaporan } : {}),
       },
     },
   });

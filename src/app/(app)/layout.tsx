@@ -12,11 +12,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   let customInputs: { key: string; nama: string }[] = [];
   if (session.user.role === "STAF_KEUANGAN" || session.user.role === "MANAJER_KEUANGAN") {
-    customInputs = await prisma.jenisInputTransaksi.findMany({
+    const allCustom = await prisma.jenisInputTransaksi.findMany({
       where: { active: true, key: { notIn: SYSTEM_KEYS } },
-      select: { key: true, nama: true },
+      select: { key: true, nama: true, extraFieldsJson: true },
       orderBy: { createdAt: "asc" },
     });
+    const userEntityKeys = session.user.entityKeys;
+    customInputs = allCustom
+      .filter((ji) => {
+        const extra = ji.extraFieldsJson as { entityKeys?: string[] } | null;
+        const scope = Array.isArray(extra?.entityKeys) ? extra.entityKeys : [];
+        // scope kosong = global; non-kosong = hanya tampil jika irisan dengan entitas user
+        return scope.length === 0 || scope.some((k) => userEntityKeys.includes(k));
+      })
+      .map(({ key, nama }) => ({ key, nama }));
   }
 
   return (

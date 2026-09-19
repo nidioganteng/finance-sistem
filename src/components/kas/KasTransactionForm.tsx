@@ -20,6 +20,16 @@ type InitialValues = {
   existingTxIds: string[];
 };
 
+const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
+
+const LAPORAN_OPTIONS = [
+  { value: "JURNAL_UMUM", label: "Jurnal Umum" },
+  { value: "BUKU_BESAR", label: "Buku Besar" },
+  { value: "LAPORAN_KEUANGAN", label: "Laporan Keuangan" },
+  { value: "PIUTANG", label: "Piutang" },
+  { value: "PAJAK", label: "Laporan Pajak" },
+];
+
 const ENTITY_CODE: Record<string, string> = {
   gaharu: "GS",
   kencana: "KAK",
@@ -48,6 +58,7 @@ export function KasTransactionForm({
   defaultRekeningId,
   allEntities = [],
   projectOptions = [],
+  defaultArahLaporan = [],
   initialValues,
   onClose,
 }: {
@@ -59,6 +70,7 @@ export function KasTransactionForm({
   defaultRekeningId?: string;
   allEntities?: { key: string; name: string }[];
   projectOptions?: ProjectOption[];
+  defaultArahLaporan?: string[];
   initialValues?: InitialValues;
   onClose: () => void;
 }) {
@@ -72,6 +84,8 @@ export function KasTransactionForm({
   const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
   const [crossingEntityKeys, setCrossingEntityKeys] = useState<string[]>(initialValues?.crossingEntityKeys ?? []);
   const [projectId, setProjectId] = useState<string>("");
+  const [arahLaporan, setArahLaporan] = useState<string[]>(defaultArahLaporan);
+  const isCustomInput = !SYSTEM_KEYS.includes(jenisInputKey);
   const [rows, setRows] = useState<Row[]>(
     initialValues?.rows.map((r, i) => ({ id: i, coaAccountId: r.coaAccountId, nominal: r.nominal })) ??
       [{ id: 0, coaAccountId: "", nominal: "" }]
@@ -129,6 +143,7 @@ export function KasTransactionForm({
       ...(isBankBuku ? { rekeningId } : {}),
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(arah === "masuk" && projectId ? { projectId } : {}),
+      ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
     };
     startTransition(async () => {
       const result = isEdit
@@ -282,6 +297,40 @@ export function KasTransactionForm({
               Transaksi akan dicatat di Kas Kecil/Besar/Bank Buku masing-masing entitas yang dipilih.
             </p>
           )}
+        </div>
+      )}
+
+      {/* Output Keuangan — hanya untuk jenis input custom */}
+      {isCustomInput && defaultArahLaporan.length > 0 && (
+        <div>
+          <label className="text-xs font-semibold text-muted-stronger block mb-1.5">
+            Output Keuangan{" "}
+            <span className="text-[10.5px] font-normal text-muted-faint">(bisa diubah per transaksi)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {LAPORAN_OPTIONS.map((opt) => {
+              const selected = arahLaporan.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    setArahLaporan((prev) =>
+                      prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                    )
+                  }
+                  className={`px-3 py-1.5 rounded-[8px] text-[12px] font-semibold border transition-colors ${
+                    selected
+                      ? "bg-navy text-white border-navy"
+                      : "bg-surface-card text-muted-stronger border-border hover:border-navy/40 hover:text-navy-text"
+                  }`}
+                >
+                  {selected && <span className="mr-1">✓</span>}
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

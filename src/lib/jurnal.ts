@@ -95,6 +95,8 @@ export async function getJurnalRows(
       const debit = Number(r.debit);
       const kredit = Number(r.kredit);
 
+      const arahLaporan = Array.isArray(extra?.arahLaporan) ? (extra.arahLaporan as string[]) : [];
+
       return {
         id: r.id,
         tanggal: r.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
@@ -110,6 +112,7 @@ export async function getJurnalRows(
         kreditFmt: kredit > 0 ? formatRupiah(kredit) : "-",
         staffName: r.staff.name,
         staffInitial: r.staff.name.split(" ").map((p) => p[0]).slice(0, 2).join(""),
+        arahLaporan,
       };
     }),
     totalDebit,

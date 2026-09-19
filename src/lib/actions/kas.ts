@@ -249,7 +249,7 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
 export async function replaceKasTransaction(input: CreateKasTransactionInput & { existingTxIds: string[] }) {
   const session = await getServerSession(authOptions);
   if (!session) return { error: "Belum login." };
-  if (session.user.role !== "STAF_KEUANGAN") return { error: "Hanya Staf Keuangan yang bisa mengedit transaksi." };
+  if (!canManageTransaksi(session.user.role)) return { error: "Kamu tidak punya akses untuk mengedit transaksi." };
   if (!session.user.entityKeys.includes(input.entityKey)) return { error: "Kamu tidak punya akses ke entity ini." };
   if (input.existingTxIds.length === 0) return { error: "Tidak ada transaksi lama untuk diganti." };
 

@@ -25,6 +25,10 @@ import {
   getLaporanJurnalData,
   getLaporanBankData,
 } from "@/lib/laporan-keuangan";
+import { getLaporanPiutangData } from "@/lib/laporan-piutang";
+import { getLaporanUtangAsetData } from "@/lib/laporan-utang-aset";
+import { PiutangView } from "@/components/laporan/PiutangView";
+import { UtangAsetView } from "@/components/laporan/UtangAsetView";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -97,6 +101,8 @@ export default async function LaporanPage({
   let jurnalData: Awaited<ReturnType<typeof getLaporanJurnalData>> | null = null;
   let bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null = null;
   let arusKasCombined: any = null;
+  let piutangData: Awaited<ReturnType<typeof getLaporanPiutangData>> | null = null;
+  let utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null = null;
 
   if (tab === "ringkasan") {
     const [laporan, jData, bData] = await Promise.all([
@@ -162,6 +168,10 @@ export default async function LaporanPage({
       kasPendanaan: laporan.kasPendanaan,
       kenaikanBersihKas: laporan.kenaikanBersihKas,
     };
+  } else if (tab === "piutang") {
+    piutangData = await getLaporanPiutangData(entityIds);
+  } else if (tab === "utang-aset") {
+    utangAsetData = await getLaporanUtangAsetData(entityIds, currentYear);
   }
 
   // Komparasi antar-periode (bulan vs bulan, atau tahun vs tahun) — jangkauan
@@ -450,6 +460,14 @@ export default async function LaporanPage({
           year={currentYear}
           entityName={entityLabel}
         />
+      )}
+
+      {tab === "piutang" && piutangData && (
+        <PiutangView data={piutangData} />
+      )}
+
+      {tab === "utang-aset" && utangAsetData && (
+        <UtangAsetView data={utangAsetData} />
       )}
     </PageTransition>
   );

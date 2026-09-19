@@ -74,6 +74,7 @@ model UserEntityAccess {
 
 enum ProjectStatus {
   ACTIVE
+  COMPLETED
   CANCELLED
 }
 

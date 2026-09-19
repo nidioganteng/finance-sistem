@@ -159,6 +159,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
           },
         })
       );
+      // Termin 100% → proyek otomatis selesai, hilang dari Kontrol Piutang.
+      // Jurnal transaksinya tetap ada.
+      if (newPct >= 100) {
+        terminCreate.push(
+          prisma.project.update({ where: { id: input.projectId }, data: { status: "COMPLETED" } }) as never
+        );
+      }
     }
   }
 

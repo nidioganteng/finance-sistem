@@ -6,7 +6,7 @@ import { formatRupiah } from "./dashboard-data";
 // sekalian jadi pembayaran termin proyek tertentu.
 export async function getProjectOptions(entityId: string) {
   const projects = await prisma.project.findMany({
-    where: { entityId },
+    where: { entityId, status: "ACTIVE" },
     select: { id: true, code: true, name: true },
     orderBy: { createdAt: "asc" },
   });
@@ -30,7 +30,7 @@ export function computeNewTerminPercentage(
 export async function getPiutangData(entityId: string) {
   const [projects, loadingDockList] = await Promise.all([
     prisma.project.findMany({
-      where: { entityId },
+      where: { entityId, status: { in: ["ACTIVE", "CANCELLED"] } },
       include: {
         termin: {
           include: { auditedBy: { select: { name: true } } },
@@ -51,7 +51,7 @@ export async function getPiutangData(entityId: string) {
 
   const projectList = projects.map((p) => {
     const contractValue = Number(p.contractValue);
-    const isCancelled = p.status === "CANCELLED";
+    const isCancelled = p.status === "CANCELLED" || p.status === "COMPLETED";
 
     // Progress tertagih = persentase termin tertinggi × nilai kontrak
     const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);

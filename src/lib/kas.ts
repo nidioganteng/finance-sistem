@@ -2,11 +2,11 @@ import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
 export const ENTITY_PREFIX: Record<string, string> = {
-  gaharu: "GS",
-  kencana: "KAK",
-  tataring: "TB",
-  ciptaAsri: "CAD",
-  umum: "KP",
+  gaharu: "GH",
+  kencana: "KC",
+  tataring: "TT",
+  ciptaAsri: "CA",
+  umum: "UM",
 };
 
 export async function getJenisInput(key: string) {
@@ -105,7 +105,7 @@ export async function getKasLedger(
       ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
     },
     include: { coaAccount: true },
-    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "desc" }],
     take: 2000,
   });
 

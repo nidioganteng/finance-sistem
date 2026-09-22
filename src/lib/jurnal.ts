@@ -48,7 +48,7 @@ export async function getJurnalRows(
     prisma.transaction.findMany({
       where,
       include: { jenisInput: true, coaAccount: true, project: true, staff: true },
-      orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -73,12 +73,21 @@ export async function getJurnalRows(
 
   // Konvensi jurnal: dalam satu noBukti, baris Debit selalu di atas Kredit.
   // createdAt bisa sama persis (satu $transaction), jadi tidak bisa dijadikan
-  // tiebreaker — gunakan nilai debit untuk memastikan urutan yang benar.
+  // tiebreaker tunggal — gunakan noBukti DESC untuk urutan antar kelompok,
+  // dan nilai debit DESC untuk urutan dalam kelompok yang sama.
   allRows = allRows.slice().sort((a, b) => {
     const dateDiff = b.tanggal.getTime() - a.tanggal.getTime();
     if (dateDiff !== 0) return dateDiff;
-    if (a.noBukti !== b.noBukti) return b.createdAt.getTime() - a.createdAt.getTime();
-    return Number(b.debit) - Number(a.debit);
+    if (a.noBukti !== b.noBukti) {
+      const createdDiff = b.createdAt.getTime() - a.createdAt.getTime();
+      if (createdDiff !== 0) return createdDiff;
+      return b.noBukti.localeCompare(a.noBukti);
+    }
+    // Dalam satu kelompok noBukti: debit > 0 selalu di atas kredit > 0
+    const aIsDebit = Number(a.debit) > 0;
+    const bIsDebit = Number(b.debit) > 0;
+    if (aIsDebit !== bIsDebit) return aIsDebit ? -1 : 1;
+    return 0;
   });
 
   const totalDebit = allRows.reduce((s, r) => s + Number(r.debit), 0);

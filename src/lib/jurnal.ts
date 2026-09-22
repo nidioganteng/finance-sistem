@@ -108,6 +108,7 @@ export async function getJurnalRows(
         isKasEntry,
         kodeAkun,
         namaAkun,
+        canEditKodeAkun: !isKasEntry && !!r.coaAccount,
         debitFmt: debit > 0 ? formatRupiah(debit) : "-",
         kreditFmt: kredit > 0 ? formatRupiah(kredit) : "-",
         staffName: r.staff.name,

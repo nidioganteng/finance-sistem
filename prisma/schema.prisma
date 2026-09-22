@@ -125,16 +125,26 @@ enum CoaKategori {
 }
 
 model CoaAccount {
-  id        String      @id @default(cuid())
-  code      String
-  name      String
-  kategori  CoaKategori
-  scope     String      @default("KAS") // "KAS" = kas kecil+besar, "BANK" = bank buku
-  createdAt DateTime    @default(now())
+  id         String      @id @default(cuid())
+  code       String
+  name       String
+  kategori   CoaKategori
+  scope      String      @default("KAS") // "KAS" = kas kecil+besar, "BANK" = bank buku
+  reportType ReportType  @default(NERACA) // "Rumah Akun" — laporan tempat akun ini otomatis masuk
+  createdAt  DateTime    @default(now())
 
   transactions Transaction[]
 
   @@unique([code, scope])
+}
+
+// "Rumah Akun" — dipilih manual saat daftar akun (issue #28), lebih presisi dari
+// `kategori` untuk ASET: sebagian ASET adalah kas/bank (masuk Arus Kas), sebagian
+// lagi piutang/aktiva tetap/dst (cuma masuk Neraca).
+enum ReportType {
+  NERACA
+  LABA_RUGI
+  ARUS_KAS
 }
 
 // Jenis input transaksi yang bisa ditambah langsung oleh Staf Keuangan

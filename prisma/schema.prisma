@@ -200,6 +200,10 @@ model Transaction {
   project    Project?             @relation(fields: [projectId], references: [id])
   coaAccount CoaAccount?          @relation(fields: [coaAccountId], references: [id])
   staff      User                 @relation("TransactionStaff", fields: [staffId], references: [id])
+
+  @@index([entityId, jenisInputId, tanggal])
+  @@index([entityId, coaAccountId])
+  @@index([entityId, tanggal])
 }
 
 enum LoadingDockStatus {

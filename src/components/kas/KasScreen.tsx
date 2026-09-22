@@ -56,7 +56,7 @@ export async function KasScreen({
   const selectedRekeningNama = rekeningOptions.find((r) => r.id === selectedRekeningId)?.nama;
 
   const [coaOptions, saldo, ledger, projectOptions] = await Promise.all([
-    getCoaOptions(isBankBuku ? "BANK" : "KAS"),
+    getCoaOptions(),
     getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama),
     getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama),
     getProjectOptions(selectedEntity.id),

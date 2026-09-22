@@ -185,19 +185,17 @@ async function main() {
     return ReportType.NERACA;
   }
 
-  for (const scope of ["KAS", "BANK"]) {
-    for (const c of coaMaster) {
-      const reportType = deriveReportType(c.kategori, c.name);
-      await prisma.coaAccount.upsert({
-        where: { code_scope: { code: c.code, scope } },
-        update: { name: c.name, kategori: c.kategori, reportType },
-        create: { code: c.code, name: c.name, kategori: c.kategori, scope, reportType },
-      });
-    }
+  for (const c of coaMaster) {
+    const reportType = deriveReportType(c.kategori, c.name);
+    await prisma.coaAccount.upsert({
+      where: { code: c.code },
+      update: { name: c.name, kategori: c.kategori, reportType },
+      create: { code: c.code, name: c.name, kategori: c.kategori, reportType },
+    });
   }
 
   console.log("✅ Seed selesai. Entitas, user, jenis input, dan COA sudah siap.");
-  console.log("   " + coaMaster.length + " akun × 2 scope (KAS & BANK) = " + coaMaster.length * 2 + " baris COA");
+  console.log("   " + coaMaster.length + " akun COA (dipakai bareng di Kas & Bank)");
   console.log("");
   console.log("Akun (password: password123):");
   console.log("  superadmin@gaharusempana.com  →  Super Admin");

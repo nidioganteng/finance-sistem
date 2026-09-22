@@ -92,6 +92,7 @@ export default async function JurnalPage({
         isBalanced={isBalanced}
         totalDebitFmt={totalDebitFmt}
         totalKreditFmt={totalKreditFmt}
+        coaOptions={coaList}
         canEditAkun={canManageTransaksi(role)}
       />
     </PageTransition>

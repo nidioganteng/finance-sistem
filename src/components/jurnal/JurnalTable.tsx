@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import { updateKodeAkunJurnal } from "@/lib/actions/jurnal";
+import { CoaCombobox } from "@/components/kas/CoaCombobox";
 
 type JurnalRow = {
   id: string;
@@ -35,6 +36,7 @@ export function JurnalTable({
   totalDebitFmt,
   totalKreditFmt,
   canEditAkun,
+  coaOptions,
 }: {
   rows: JurnalRow[];
   entityId: string;
@@ -42,18 +44,29 @@ export function JurnalTable({
   totalDebitFmt: string;
   totalKreditFmt: string;
   canEditAkun: boolean;
+  coaOptions: { code: string; name: string }[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCode, setEditCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handleSave(id: string, formData: FormData) {
-    const kode = (formData.get("kodeAkun") as string)?.trim();
-    if (!kode) return;
+  // CoaCombobox butuh field "id" — di sini kode akun itu sendiri yang jadi id,
+  // karena tujuan akhirnya memang milih salah satu kode yang sudah terdaftar.
+  const comboOptions = coaOptions.map((c) => ({ id: c.code, code: c.code, name: c.name }));
+
+  function startEdit(r: JurnalRow) {
+    setError(null);
+    setEditCode(r.kodeAkun);
+    setEditingId(r.id);
+  }
+
+  function handleSave(id: string) {
+    if (!editCode) return;
     setError(null);
     startTransition(async () => {
       try {
-        await updateKodeAkunJurnal(id, entityId, kode);
+        await updateKodeAkunJurnal(id, entityId, editCode);
         setEditingId(null);
       } catch (e: any) {
         setError(e.message);
@@ -123,26 +136,28 @@ export function JurnalTable({
                 </td>
                 <td className="py-2.5 px-1.5 text-[12px] font-mono text-muted">
                   {editingId === r.id ? (
-                    <form action={(fd) => handleSave(r.id, fd)} className="flex items-center gap-1">
-                      <input
-                        name="kodeAkun"
-                        required
-                        autoFocus
-                        defaultValue={r.kodeAkun}
-                        className="w-20 px-1.5 py-1 rounded-md border border-border text-[12px] font-mono bg-surface-card"
-                      />
-                      <button type="submit" disabled={isPending} className="p-1 rounded hover:bg-surface-hover text-status-green" title="Simpan">
+                    <div className="flex items-center gap-1 w-52">
+                      <div className="flex-1">
+                        <CoaCombobox value={editCode} onChange={setEditCode} options={comboOptions} placeholder="Ketik kode akun..." />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSave(r.id)}
+                        disabled={isPending || !comboOptions.some((o) => o.code === editCode)}
+                        className="p-1 rounded hover:bg-surface-hover text-status-green disabled:opacity-40"
+                        title="Simpan"
+                      >
                         <Check size={13} />
                       </button>
                       <button type="button" onClick={() => setEditingId(null)} className="p-1 rounded hover:bg-surface-hover text-muted-stronger" title="Batal">
                         <X size={13} />
                       </button>
-                    </form>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
                       {r.kodeAkun}
                       {canEditAkun && r.canEditKodeAkun && (
-                        <button onClick={() => setEditingId(r.id)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit kode akun">
+                        <button onClick={() => startEdit(r)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit kode akun">
                           <Pencil size={11} />
                         </button>
                       )}

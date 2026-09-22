@@ -125,9 +125,9 @@ export function roleLabel(role: Role): string {
 
 // Entity yang boleh dilihat lewat dropdown switcher = entity yang di-assign
 // ke user (UserEntityAccess), bukan bebas pilih semua seperti di mockup.
-// "grup" (agregat semua entity) hanya relevan untuk SUPER_ADMIN & MANAJER_KEUANGAN.
+// "grup" (agregat semua entity) — SUPER_ADMIN, MANAJER_KEUANGAN, dan STAF_KEUANGAN.
 export function canViewGrupAggregate(role: Role): boolean {
-  return role === "SUPER_ADMIN" || role === "MANAJER_KEUANGAN";
+  return role === "SUPER_ADMIN" || role === "MANAJER_KEUANGAN" || role === "STAF_KEUANGAN";
 }
 
 // Siapa yang boleh input/edit/hapus transaksi Kas Kecil, Kas Besar, Buku Bank.

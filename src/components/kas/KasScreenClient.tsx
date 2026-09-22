@@ -9,7 +9,7 @@ import type { RekeningOption } from "@/lib/bank-accounts";
 import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
-type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number };
+type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; itemDescription?: string };
 type LedgerRow = {
   tanggal: string;
   tanggalRaw: string;
@@ -331,15 +331,20 @@ export function KasScreenClient({
                       )}
                     </td>
                     <td className="py-2.5 px-1.5">
-                      <div className="flex gap-1 flex-wrap">
-                        {(expanded ? r.akunTags : shown).map((tag, i) => (
-                          <span key={i} className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md">
-                            {tag}
-                          </span>
+                      <div className="flex flex-col gap-1">
+                        {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                          <div key={i} className="flex flex-col">
+                            <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md">
+                              {cr.coaName}
+                            </span>
+                            {cr.itemDescription && (
+                              <span className="text-[10px] text-muted px-1 mt-0.5 italic">{cr.itemDescription}</span>
+                            )}
+                          </div>
                         ))}
-                        {!expanded && rest > 0 && (
-                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1">
-                            +{rest} lagi
+                        {!expanded && r.coaRows.length > 2 && (
+                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left">
+                            +{r.coaRows.length - 2} lagi
                           </button>
                         )}
                       </div>

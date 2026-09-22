@@ -47,7 +47,7 @@ export async function generateNoBukti(entityKey: string, tanggal: string): Promi
   return `${pattern}${maxSeq + 1}`;
 }
 
-type KasRowInput = { coaAccountId: string; nominal: number };
+type KasRowInput = { coaAccountId: string; nominal: number; keterangan?: string };
 
 export type CreateKasTransactionInput = {
   entityKey: string;
@@ -157,7 +157,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...(arahLaporan ? { extraFieldsJson: { arahLaporan } } : {}),
+        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
       },
     })
   );
@@ -371,7 +371,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...(arahLaporan ? { extraFieldsJson: { arahLaporan } } : {}),
+        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
       },
     })
   );

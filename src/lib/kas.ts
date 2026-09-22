@@ -91,7 +91,7 @@ export async function getKasLedger(
       saldo: number;
       hasKasEntry: boolean;
       allTxIds: string[];
-      coaRows: { id: string; coaAccountId: string; coaName: string; nominal: number }[];
+      coaRows: { id: string; coaAccountId: string; coaName: string; nominal: number; itemDescription?: string }[];
     }
   >();
 
@@ -137,8 +137,9 @@ export async function getKasLedger(
       if (extra?.crossingGroupId) g.crossingGroupId = String(extra.crossingGroupId);
     } else {
       if (r.coaAccount) {
-        g.akunTags.push(r.coaAccount.name);
-        g.coaRows.push({ id: r.id, coaAccountId: r.coaAccount.id, coaName: r.coaAccount.name, nominal: Number(r.debit || r.kredit) });
+        const itemDesc = typeof extra?.itemDescription === "string" ? extra.itemDescription : undefined;
+        g.akunTags.push(itemDesc ?? r.coaAccount.name);
+        g.coaRows.push({ id: r.id, coaAccountId: r.coaAccount.id, coaName: r.coaAccount.name, nominal: Number(r.debit || r.kredit), itemDescription: itemDesc });
       }
       if (!extra && !g.hasKasEntry) {
         g.masuk += Number(r.debit);

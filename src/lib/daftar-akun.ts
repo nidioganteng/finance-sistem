@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
-import { hitungSaldoAkhir } from "./akuntansi";
+import { hitungSaldoAkhir, hitungAlokasi } from "./akuntansi";
 
 // Semua akun COA (termasuk yang belum pernah dipakai transaksi), LEFT JOIN
 // saldo awal + rekap debit/kredit periode berjalan (issue #37).
@@ -48,6 +48,7 @@ export async function getDaftarAkunData(entityId: string, year: number) {
       saldoAkhirFmt: formatRupiah(Math.abs(saldoAkhir)),
       saldoAkhirNegatif: saldoAkhir < 0,
       punyaTransaksi: debit > 0 || kredit > 0,
+      alokasi: hitungAlokasi(coa.kategori),
     };
   });
 

@@ -2,11 +2,11 @@ import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
 export const ENTITY_PREFIX: Record<string, string> = {
-  gaharu: "GS",
-  kencana: "KAK",
-  tataring: "TB",
-  ciptaAsri: "CAD",
-  umum: "KP",
+  gaharu: "GH",
+  kencana: "KC",
+  tataring: "TT",
+  ciptaAsri: "CA",
+  umum: "UM",
 };
 
 export async function getJenisInput(key: string) {
@@ -78,12 +78,15 @@ export async function getSaldoSebelum(
   return rows.length > 0 ? Number(rows[0].saldoSetelah) : 0;
 }
 
+const KAS_PAGE_SIZE = 25;
+
 export async function getKasLedger(
   entityId: string,
   jenisInputId: string,
   rekeningNama?: string,
   dari?: string,
   sampai?: string,
+  page = 1,
 ) {
   const tanggalFilter =
     dari || sampai
@@ -93,6 +96,8 @@ export async function getKasLedger(
         }
       : undefined;
 
+  // Fetch all rows first (needed for group-by-noBukti logic),
+  // then paginate the resulting groups.
   const rows = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -100,7 +105,7 @@ export async function getKasLedger(
       ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
     },
     include: { coaAccount: true },
-    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "desc" }],
     take: 2000,
   });
 
@@ -185,22 +190,32 @@ export async function getKasLedger(
     ? allGroups.filter((g) => !g.hasKasEntry || g.rekening === rekeningNama)
     : allGroups;
 
-  return filtered.map((g) => ({
-    tanggal: g.tanggal,
-    tanggalRaw: g.tanggalRaw,
-    noBukti: g.noBukti,
-    keterangan: g.keterangan,
-    akunTags: g.akunTags,
-    rekening: g.rekening,
-    crossingEntityKeys: g.crossingEntityKeys,
-    crossingFromEntityKey: g.crossingFromEntityKey,
-    masuk: g.masuk,
-    keluar: g.keluar,
-    saldo: g.saldo,
-    masukFmt: g.masuk > 0 ? formatRupiah(g.masuk) : "-",
-    keluarFmt: g.keluar > 0 ? formatRupiah(g.keluar) : "-",
-    saldoFmt: formatRupiah(g.saldo),
-    allTxIds: g.allTxIds,
-    coaRows: g.coaRows,
-  }));
+  const totalGroups = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalGroups / KAS_PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const paginated = filtered.slice((safePage - 1) * KAS_PAGE_SIZE, safePage * KAS_PAGE_SIZE);
+
+  return {
+    totalCount: totalGroups,
+    totalPages,
+    page: safePage,
+    entries: paginated.map((g) => ({
+      tanggal: g.tanggal,
+      tanggalRaw: g.tanggalRaw,
+      noBukti: g.noBukti,
+      keterangan: g.keterangan,
+      akunTags: g.akunTags,
+      rekening: g.rekening,
+      crossingEntityKeys: g.crossingEntityKeys,
+      crossingFromEntityKey: g.crossingFromEntityKey,
+      masuk: g.masuk,
+      keluar: g.keluar,
+      saldo: g.saldo,
+      masukFmt: g.masuk > 0 ? formatRupiah(g.masuk) : "-",
+      keluarFmt: g.keluar > 0 ? formatRupiah(g.keluar) : "-",
+      saldoFmt: formatRupiah(g.saldo),
+      allTxIds: g.allTxIds,
+      coaRows: g.coaRows,
+    })),
+  };
 }

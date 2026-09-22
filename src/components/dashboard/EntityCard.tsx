@@ -128,36 +128,50 @@ export function EntityCard({
   const content = (
     <motion.div
       whileHover={interactive ? { y: -2, transition: { duration: 0.15 } } : undefined}
-      className={`bg-surface-card rounded-2xl border border-border overflow-hidden ${
-        interactive ? "hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200" : ""
+      className={`rounded-2xl overflow-hidden ${
+        interactive ? "hover:shadow-[0_8px_32px_rgba(15,23,42,.15)] transition-shadow duration-200" : ""
       }`}
     >
-      {/* Gradient header */}
+      {/* Colored hero header */}
       <div
-        className="px-6 py-5 flex items-center justify-between"
-        style={{ background: `linear-gradient(135deg, ${colorHex}22 0%, ${colorHex}08 100%)` }}
+        className="relative px-6 py-5 overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${colorHex} 0%, ${colorHex}cc 100%)` }}
       >
-        <div className="flex items-center gap-3">
-          <EntityAvatar entityKey={entityKey} name={name} colorHex={colorHex} size="lg" />
-          <div>
-            <div className="text-[17px] font-extrabold text-navy-text">{name}</div>
-            <div className="text-[11.5px] text-muted">{legalName}</div>
-          </div>
-        </div>
+        {/* Dot pattern */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+        />
+        {/* Glow */}
+        <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)" }}
+        />
 
-        {/* Margin badge */}
-        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold ${
-          isProfit
-            ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
-            : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"
-        }`}>
-          {isProfit ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-          Margin {margin}%
+        <div className="relative z-10 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* Logo on white bg */}
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center flex-none shadow-md overflow-hidden">
+              {ENTITY_LOGO[entityKey]
+                ? <img src={ENTITY_LOGO[entityKey]} alt={name} className="w-full h-full object-contain p-0.5" />
+                : <span className="text-[18px] font-extrabold" style={{ color: colorHex }}>{name[0]}</span>
+              }
+            </div>
+            <div>
+              <div className="text-[18px] font-extrabold text-white leading-tight">{name}</div>
+              <div className="text-[11.5px] text-white/65 mt-0.5">{legalName}</div>
+            </div>
+          </div>
+
+          {/* Margin badge */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold flex-none"
+            style={{ background: "rgba(255,255,255,0.18)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}>
+            {isProfit ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+            Margin {margin}%
+          </div>
         </div>
       </div>
 
       {/* Metrics row */}
-      <div className="grid grid-cols-3 divide-x divide-border">
+      <div className="grid grid-cols-3 divide-x divide-border bg-surface-card border-x border-b border-border rounded-b-2xl">
         {/* Pendapatan */}
         <div className="px-6 py-4">
           <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">Pendapatan</div>
@@ -168,7 +182,6 @@ export function EntityCard({
         <div className="px-6 py-4">
           <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">Pengeluaran</div>
           <div className="text-[20px] font-extrabold text-navy-text tabular-nums">{formatMiliar(spend)}</div>
-          {/* Spend ratio bar */}
           <div className="mt-2 h-1 rounded-full bg-surface-hover overflow-hidden">
             <div
               className={`h-full rounded-full ${spendPct > 90 ? "bg-status-red" : spendPct > 70 ? "bg-status-amber" : "bg-brand"}`}

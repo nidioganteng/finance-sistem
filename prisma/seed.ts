@@ -185,12 +185,13 @@ async function main() {
     return ReportType.NERACA;
   }
 
-  for (const c of coaMaster) {
+  for (let i = 0; i < coaMaster.length; i++) {
+    const c = coaMaster[i];
     const reportType = deriveReportType(c.kategori, c.name);
     await prisma.coaAccount.upsert({
       where: { code: c.code },
-      update: { name: c.name, kategori: c.kategori, reportType },
-      create: { code: c.code, name: c.name, kategori: c.kategori, reportType },
+      update: { name: c.name, kategori: c.kategori, reportType, urutan: i },
+      create: { code: c.code, name: c.name, kategori: c.kategori, reportType, urutan: i },
     });
   }
 

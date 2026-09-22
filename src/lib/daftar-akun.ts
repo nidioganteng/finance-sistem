@@ -6,7 +6,7 @@ import { hitungSaldoAkhir, hitungAlokasi } from "./akuntansi";
 // saldo awal + rekap debit/kredit periode berjalan (issue #37).
 export async function getDaftarAkunData(entityId: string, year: number) {
   const [allCoa, transactions, saldoAwalRows] = await Promise.all([
-    prisma.coaAccount.findMany({ orderBy: { code: "asc" } }),
+    prisma.coaAccount.findMany({ orderBy: { urutan: "asc" } }),
     prisma.transaction.findMany({
       where: {
         entityId,

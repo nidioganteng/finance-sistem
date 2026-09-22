@@ -20,7 +20,21 @@ export async function getCoaOptions() {
 
 // rekeningNama dipakai untuk Buku Bank agar saldo dihitung per rekening, bukan per entity
 export async function getRunningSaldo(entityId: string, jenisInputId: string, rekeningNama?: string) {
-  const kasEntries = await prisma.transaction.findMany({
+  if (rekeningNama) {
+    const rows = await prisma.transaction.findMany({
+      where: {
+        entityId,
+        jenisInputId,
+        extraFieldsJson: { path: "$.isKasEntry", equals: true },
+      },
+      orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+      take: 50,
+    });
+    const match = rows.find((e) => (e.extraFieldsJson as Record<string, unknown> | null)?.rekeningNama === rekeningNama);
+    return match ? Number(match.saldoSetelah) : 0;
+  }
+
+  const last = await prisma.transaction.findFirst({
     where: {
       entityId,
       jenisInputId,
@@ -28,22 +42,13 @@ export async function getRunningSaldo(entityId: string, jenisInputId: string, re
     },
     orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
   });
+  if (last) return Number(last.saldoSetelah);
 
-  if (rekeningNama) {
-    const match = kasEntries.find((e) => {
-      const extra = e.extraFieldsJson as Record<string, unknown> | null;
-      return extra?.rekeningNama === rekeningNama;
-    });
-    return match ? Number(match.saldoSetelah) : 0;
-  }
-
-  if (kasEntries.length > 0) return Number(kasEntries[0].saldoSetelah);
-
-  const last = await prisma.transaction.findFirst({
+  const fallback = await prisma.transaction.findFirst({
     where: { entityId, jenisInputId },
     orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
   });
-  return last ? Number(last.saldoSetelah) : 0;
+  return fallback ? Number(fallback.saldoSetelah) : 0;
 }
 
 // Ledger dikelompokkan per noBukti.
@@ -96,6 +101,7 @@ export async function getKasLedger(
     },
     include: { coaAccount: true },
     orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+    take: 2000,
   });
 
   const groups = new Map<

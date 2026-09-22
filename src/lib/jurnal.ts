@@ -17,15 +17,7 @@ export async function getJenisInputChips(entityId: string) {
 
 export async function getCoaList() {
   const all = await prisma.coaAccount.findMany({ select: { code: true, name: true } });
-  // Dedup by (code, name) — KAS dan BANK scope bisa punya kode sama dengan nama berbeda,
-  // keduanya ditampilkan; kode sama + nama sama hanya ditampilkan sekali.
-  const seen = new Set<string>();
-  const unique: { code: string; name: string }[] = [];
-  for (const a of all.sort((x, y) => parseInt(x.code) - parseInt(y.code))) {
-    const key = `${a.code}|${a.name}`;
-    if (!seen.has(key)) { seen.add(key); unique.push(a); }
-  }
-  return unique;
+  return all.sort((x, y) => parseInt(x.code) - parseInt(y.code));
 }
 
 export async function getJurnalRows(

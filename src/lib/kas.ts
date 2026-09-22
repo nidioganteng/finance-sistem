@@ -5,8 +5,8 @@ export async function getJenisInput(key: string) {
   return prisma.jenisInputTransaksi.findUnique({ where: { key } });
 }
 
-export async function getCoaOptions(scope: "KAS" | "BANK" = "KAS") {
-  const accounts = await prisma.coaAccount.findMany({ where: { scope } });
+export async function getCoaOptions() {
+  const accounts = await prisma.coaAccount.findMany();
   return accounts.sort((a, b) => parseInt(a.code) - parseInt(b.code));
 }
 

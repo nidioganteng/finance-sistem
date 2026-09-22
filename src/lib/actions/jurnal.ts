@@ -11,9 +11,10 @@ import { logActivity } from "@/lib/actions/log";
 // di tabel CoaAccount yang di-share lintas entitas, jadi kita TIDAK BOLEH update
 // baris CoaAccount itu langsung — itu bakal ikut mengubah kode akun di semua
 // entitas lain yang kebetulan pakai akun yang sama. Sebagai gantinya, transaksi
-// ini dialihkan (coaAccountId) ke CoaAccount lain yang kodenya sudah sesuai
-// (dicari dulu, baru dibuat kalau belum ada) — supaya perubahan cuma berlaku
-// untuk transaksi di entitas ini.
+// ini dialihkan (coaAccountId) ke CoaAccount lain yang kodenya sudah sesuai —
+// supaya perubahan cuma berlaku untuk transaksi di entitas ini. Kode baru WAJIB
+// sudah terdaftar di Bagan Akun (dipilih dari daftar via combobox di UI); kalau
+// tidak ketemu, ditolak — tidak ada auto-create akun baru dari sini.
 export async function updateKodeAkunJurnal(transactionId: string, entityId: string, newCode: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user.id || !canManageTransaksi(session.user.role)) {
@@ -38,16 +39,12 @@ export async function updateKodeAkunJurnal(transactionId: string, entityId: stri
   const oldAccount = transaction.coaAccount;
   if (oldAccount.code === code) return;
 
-  const targetAccount = await prisma.coaAccount.upsert({
+  const targetAccount = await prisma.coaAccount.findUnique({
     where: { code_scope: { code, scope: oldAccount.scope } },
-    update: {},
-    create: {
-      code,
-      name: oldAccount.name,
-      kategori: oldAccount.kategori,
-      scope: oldAccount.scope,
-    },
   });
+  if (!targetAccount) {
+    throw new Error(`Kode akun "${code}" tidak ditemukan di Bagan Akun. Pilih salah satu dari daftar yang muncul.`);
+  }
 
   const { count } = await prisma.transaction.updateMany({
     where: { id: transactionId, entityId },

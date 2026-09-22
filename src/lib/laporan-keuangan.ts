@@ -153,6 +153,7 @@ export type LaporanJurnalRow = {
   sumberColor: string;
   keterangan: string;
   isKasEntry: boolean;
+  isKredit: boolean;
   kodeAkun: string;
   namaAkun: string;
   debit: number;
@@ -193,6 +194,14 @@ export async function getLaporanJurnalData(
     }),
   ]);
 
+  // Konvensi jurnal: dalam satu noBukti, baris Debit selalu di atas Kredit
+  rows.sort((a, b) => {
+    const dateDiff = b.tanggal.getTime() - a.tanggal.getTime();
+    if (dateDiff !== 0) return dateDiff;
+    if (a.noBukti !== b.noBukti) return b.createdAt.getTime() - a.createdAt.getTime();
+    return Number(b.debit) - Number(a.debit);
+  });
+
   const totalDebit = rows.reduce((s, r) => s + Number(r.debit), 0);
   const totalKredit = rows.reduce((s, r) => s + Number(r.kredit), 0);
   const isBalanced = Math.round(totalDebit * 100) === Math.round(totalKredit * 100);
@@ -229,6 +238,7 @@ export async function getLaporanJurnalData(
       sumberColor: style.color,
       keterangan: r.keterangan,
       isKasEntry,
+      isKredit: kredit > 0 && debit === 0,
       kodeAkun,
       namaAkun,
       debit,

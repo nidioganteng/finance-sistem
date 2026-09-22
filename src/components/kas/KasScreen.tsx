@@ -9,6 +9,7 @@ import { getProjectOptions } from "@/lib/piutang";
 import { REKENING_BY_ENTITY, type RekeningOption } from "@/lib/bank-accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
+import { PaginationNav } from "@/components/shared/PaginationNav";
 import { KasScreenClient } from "./KasScreenClient";
 import { logActivity } from "@/lib/actions/log";
 
@@ -24,7 +25,7 @@ export async function KasScreen({
   title: string;
   subtitle: string;
   pagePath: string;
-  searchParams: { entity?: string; rekening?: string; dari?: string; sampai?: string };
+  searchParams: { entity?: string; rekening?: string; dari?: string; sampai?: string; page?: string };
   excludeEntityKeys?: string[];
 }) {
   const session = await getServerSession(authOptions);
@@ -59,15 +60,19 @@ export async function KasScreen({
       : undefined;
   const selectedRekeningNama = rekeningOptions.find((r) => r.id === selectedRekeningId)?.nama;
 
-  const [coaOptions, saldo, ledger, projectOptions, saldoAwal] = await Promise.all([
+  const kasPage = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+
+  const [coaOptions, saldo, kasLedger, projectOptions, saldoAwal] = await Promise.all([
     getCoaOptions(),
     getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama),
-    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama, searchParams.dari, searchParams.sampai),
+    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama, searchParams.dari, searchParams.sampai, kasPage),
     getProjectOptions(selectedEntity.id),
     searchParams.dari
       ? getSaldoSebelum(selectedEntity.id, jenisInput.id, searchParams.dari, selectedRekeningNama)
       : Promise.resolve(0),
   ]);
+
+  const { entries: ledger, totalPages: ledgerTotalPages, page: ledgerPage } = kasLedger;
 
   const totalMasuk = ledger.reduce((s, r) => s + r.masuk, 0);
   const totalKeluar = ledger.reduce((s, r) => s + r.keluar, 0);
@@ -108,6 +113,19 @@ export async function KasScreen({
         bukuBankRekeningOptions={bukuBankRekeningOptions}
         dari={searchParams.dari ?? ""}
         sampai={searchParams.sampai ?? ""}
+      />
+      <PaginationNav
+        page={ledgerPage}
+        totalPages={ledgerTotalPages}
+        buildHref={(p) => {
+          const params = new URLSearchParams();
+          if (selectedEntity.key) params.set("entity", selectedEntity.key);
+          if (searchParams.rekening) params.set("rekening", searchParams.rekening);
+          if (searchParams.dari) params.set("dari", searchParams.dari);
+          if (searchParams.sampai) params.set("sampai", searchParams.sampai);
+          params.set("page", String(p));
+          return `${pagePath}?${params.toString()}`;
+        }}
       />
     </>
   );

@@ -1,9 +1,21 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { CoaKategori } from "@prisma/client";
-import { isDebetNormal } from "./akuntansi";
+import {
+  isDebetNormal,
+  isContraAset,
+  isAktivaTetap,
+  isLabaDitahan,
+  hitungSaldoAkhir,
+} from "./akuntansi";
 
-export type CoaLine = { code: string; name: string; saldo: number; saldoFmt: string };
+export type CoaLine = {
+  code: string;
+  name: string;
+  saldo: number;
+  saldoFmt: string;
+  isContra?: boolean;
+};
 
 const SUMBER_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   kasKecil: { bg: "#fef3c7", color: "#92400e", label: "Kas Kecil" },
@@ -13,82 +25,198 @@ const SUMBER_STYLE: Record<string, { bg: string; color: string; label: string }>
 
 export async function getLaporanKeuanganData(entityIds: string[] | string, year: number) {
   const ids = Array.isArray(entityIds) ? entityIds : [entityIds];
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      entityId: { in: ids },
-      coaAccountId: { not: null },
-      tanggal: {
-        gte: new Date(`${year}-01-01`),
-        lte: new Date(`${year}-12-31T23:59:59`),
+
+  const [allCoa, saldoAwalRows, transactions] = await Promise.all([
+    prisma.coaAccount.findMany({ orderBy: { urutan: "asc" } }),
+    prisma.saldoAwal.findMany({
+      where: {
+        entityId: { in: ids },
+        year,
       },
-    },
-    include: { coaAccount: true },
-    orderBy: { tanggal: "asc" },
-  });
+    }),
+    prisma.transaction.findMany({
+      where: {
+        entityId: { in: ids },
+        coaAccountId: { not: null },
+        tanggal: {
+          gte: new Date(`${year}-01-01`),
+          lte: new Date(`${year}-12-31T23:59:59`),
+        },
+      },
+      include: { coaAccount: true },
+      orderBy: { tanggal: "asc" },
+    }),
+  ]);
 
-  // Build saldo per COA (correct normal balance direction)
-  const coaMap = new Map<string, { id: string; code: string; name: string; kategori: CoaKategori; saldo: number }>();
-
+  // Agregasi debit & kredit transaksi per akun COA
+  const totalsByAccount = new Map<string, { debit: number; kredit: number }>();
   for (const t of transactions) {
-    if (!t.coaAccount) continue;
-    const id = t.coaAccountId!;
-    if (!coaMap.has(id)) {
-      coaMap.set(id, { id, code: t.coaAccount.code, name: t.coaAccount.name, kategori: t.coaAccount.kategori, saldo: 0 });
-    }
-    const item = coaMap.get(id)!;
-    item.saldo += isDebetNormal(t.coaAccount.kategori, t.coaAccount.code)
-      ? Number(t.debit) - Number(t.kredit)
-      : Number(t.kredit) - Number(t.debit);
+    if (!t.coaAccountId) continue;
+    const cur = totalsByAccount.get(t.coaAccountId) ?? { debit: 0, kredit: 0 };
+    cur.debit += Number(t.debit);
+    cur.kredit += Number(t.kredit);
+    totalsByAccount.set(t.coaAccountId, cur);
   }
 
-  const bySaldo = (kat: CoaKategori): CoaLine[] =>
-    Array.from(coaMap.values())
-      .filter((i) => i.kategori === kat)
-      .sort((a, b) => a.code.localeCompare(b.code))
-      .map((i) => ({ code: i.code, name: i.name, saldo: i.saldo, saldoFmt: formatRupiah(Math.abs(i.saldo)) }));
-
-  const aset = bySaldo(CoaKategori.ASET);
-  const kewajiban = bySaldo(CoaKategori.KEWAJIBAN);
-  const modal = bySaldo(CoaKategori.MODAL);
-  const pendapatan = bySaldo(CoaKategori.PENDAPATAN);
-  const beban = bySaldo(CoaKategori.BEBAN);
+  // Agregasi saldo awal per akun COA across entityIds
+  const saldoAwalByAccount = new Map<string, number>();
+  for (const s of saldoAwalRows) {
+    saldoAwalByAccount.set(
+      s.coaAccountId,
+      (saldoAwalByAccount.get(s.coaAccountId) ?? 0) + Number(s.nominal)
+    );
+  }
 
   // ── Laba Rugi ──────────────────────────────────────────────────────
+  const pendapatan: CoaLine[] = [];
+  const beban: CoaLine[] = [];
+
+  for (const coa of allCoa) {
+    const { debit, kredit } = totalsByAccount.get(coa.id) ?? { debit: 0, kredit: 0 };
+    if (coa.kategori === CoaKategori.PENDAPATAN) {
+      const saldo = kredit - debit;
+      if (saldo !== 0 || debit !== 0 || kredit !== 0) {
+        pendapatan.push({
+          code: coa.code,
+          name: coa.name,
+          saldo,
+          saldoFmt: formatRupiah(Math.abs(saldo)),
+        });
+      }
+    } else if (coa.kategori === CoaKategori.BEBAN) {
+      const saldo = debit - kredit;
+      if (saldo !== 0 || debit !== 0 || kredit !== 0) {
+        beban.push({
+          code: coa.code,
+          name: coa.name,
+          saldo,
+          saldoFmt: formatRupiah(Math.abs(saldo)),
+        });
+      }
+    }
+  }
+
   const totalPendapatan = pendapatan.reduce((s, i) => s + i.saldo, 0);
   const totalBeban = beban.reduce((s, i) => s + i.saldo, 0);
-  const labaBersih = totalPendapatan - totalBeban; // angka ini SAMA di Neraca & Arus Kas
+  const labaBersih = totalPendapatan - totalBeban; // Laba Tahun Berjalan
 
   // ── Neraca ─────────────────────────────────────────────────────────
-  const totalAset = aset.reduce((s, i) => s + i.saldo, 0);
-  const totalKewajiban = kewajiban.reduce((s, i) => s + i.saldo, 0);
-  const totalModal = modal.reduce((s, i) => s + i.saldo, 0);
-  // Laba Tahun Berjalan diinjeksi ke Modal (angka sama dari Laba Rugi)
-  const totalPassiva = totalKewajiban + totalModal + labaBersih;
-  const neracaBalanced = Math.abs(totalAset - totalPassiva) < 1;
+  const aktivaLancar: CoaLine[] = [];
+  const aktivaTetap: CoaLine[] = [];
+  const kewajiban: CoaLine[] = [];
+  const modal: CoaLine[] = [];
+  let labaDitahanSaldo = 0;
+
+  const formatSaldo = (val: number, isContra: boolean) => {
+    const abs = formatRupiah(Math.abs(val));
+    if (isContra) return `(${abs})`;
+    return val < 0 ? `-${abs}` : abs;
+  };
+
+  for (const coa of allCoa) {
+    const saldoAwal = saldoAwalByAccount.get(coa.id) ?? 0;
+    const { debit, kredit } = totalsByAccount.get(coa.id) ?? { debit: 0, kredit: 0 };
+    const saldo = hitungSaldoAkhir(coa.kategori, coa.code, saldoAwal, debit, kredit);
+    const hasActivity = saldoAwal !== 0 || debit !== 0 || kredit !== 0;
+    const contra = isContraAset(coa.code);
+
+    const line: CoaLine = {
+      code: coa.code,
+      name: coa.name,
+      saldo,
+      saldoFmt: formatSaldo(saldo, contra),
+      isContra: contra,
+    };
+
+    if (coa.kategori === CoaKategori.ASET) {
+      if (isAktivaTetap(coa.code, coa.name)) {
+        if (hasActivity || coa.code === "100" || coa.code === "1001") {
+          aktivaTetap.push(line);
+        }
+      } else {
+        if (hasActivity) {
+          aktivaLancar.push(line);
+        }
+      }
+    } else if (coa.kategori === CoaKategori.KEWAJIBAN) {
+      if (hasActivity) {
+        kewajiban.push(line);
+      }
+    } else if (coa.kategori === CoaKategori.MODAL) {
+      if (isLabaDitahan(coa.code, coa.name)) {
+        labaDitahanSaldo = saldo;
+      } else {
+        if (hasActivity || coa.code === "320") {
+          modal.push(line);
+        }
+      }
+    }
+  }
+
+  // Formula Neraca (Issue 38):
+  // • Total Aktiva Lancar: akun debet ditambah, akun kontra dikurangkan
+  const totalAktivaLancar = aktivaLancar.reduce(
+    (sum, item) => sum + (item.isContra ? -item.saldo : item.saldo),
+    0
+  );
+
+  // • Total Aktiva Tetap: Nilai Perolehan Aktiva Tetap - Akumulasi Penyusutan (kontra)
+  const totalAktivaTetap = aktivaTetap.reduce(
+    (sum, item) => sum + (item.isContra ? -item.saldo : item.saldo),
+    0
+  );
+
+  // • Total Aktiva = Total Aktiva Lancar + Total Aktiva Tetap
+  const totalAktiva = totalAktivaLancar + totalAktivaTetap;
+  const totalAset = totalAktiva;
+
+  // • Kewajiban
+  const totalKewajiban = kewajiban.reduce((sum, item) => sum + item.saldo, 0);
+
+  // • Modal & Laba Ditahan
+  // Total Pasiva = Kewajiban + Modal + Laba Ditahan
+  // di mana Laba Ditahan = Saldo Akun 310 + Laba Tahun Berjalan
+  const totalModal = modal.reduce((sum, item) => sum + item.saldo, 0);
+  const totalLabaDitahan = labaDitahanSaldo + labaBersih;
+  const totalEkuitas = totalModal + totalLabaDitahan;
+  const totalPassiva = totalKewajiban + totalEkuitas;
+
+  const neracaBalanced = Math.abs(totalAktiva - totalPassiva) < 1;
+  const aset = [...aktivaLancar, ...aktivaTetap];
 
   // ── Arus Kas — Metode Tidak Langsung ──────────────────────────────
-  // Kas/bank ASET = accounts with code starting "1-"
-  const kasAset = aset.filter((i) => i.code.startsWith("1-"));
-  const asetNonKas = aset.filter((i) => !i.code.startsWith("1-"));
-  const totalKasBank = kasAset.reduce((s, i) => s + i.saldo, 0);
+  // Kas/bank ASET = akun-akun kas dan rekening bank
+  const kasAset = aktivaLancar.filter((i) => /kas|bank|bri|bpd|bni|mdr/i.test(i.name));
+  const asetNonKas = [...aktivaLancar.filter((i) => !/kas|bank|bri|bpd|bni|mdr/i.test(i.name)), ...aktivaTetap];
+  const totalKasBank = kasAset.reduce((s, i) => s + (i.isContra ? -i.saldo : i.saldo), 0);
 
-  const kasAwal = 0; // saldo awal periode (belum ada carry-over)
+  // Saldo awal kas/bank dari Saldo Awal yang diinput
+  const kasAwal = kasAset.reduce((s, i) => {
+    const coa = allCoa.find((c) => c.code === i.code);
+    return s + (coa ? saldoAwalByAccount.get(coa.id) ?? 0 : 0);
+  }, 0);
 
-  // Aktivitas Operasi (indirect): Laba Bersih ± penyesuaian
-  const perubahanAsetNonKas = -(asetNonKas.reduce((s, i) => s + i.saldo, 0));
+  // Aktivitas Operasi (indirect): Laba Bersih ± penyesuaian modal kerja
+  const perubahanAsetNonKas = -(
+    asetNonKas.reduce((s, i) => {
+      const coa = allCoa.find((c) => c.code === i.code);
+      const sa = coa ? saldoAwalByAccount.get(coa.id) ?? 0 : 0;
+      const netVal = i.isContra ? -i.saldo : i.saldo;
+      const netSa = i.isContra ? -sa : sa;
+      return s + (netVal - netSa);
+    }, 0)
+  );
   const perubahanKewajiban = totalKewajiban;
   const kasOperasi = labaBersih + perubahanAsetNonKas + perubahanKewajiban;
 
-  // Aktivitas Investasi: perolehan/pelepasan aset tetap
-  // Aset tetap = ASET non-kas non-piutang; untuk saat ini belum ada
+  // Aktivitas Investasi: perolehan aset tetap
   const kasInvestasi = 0;
 
-  // Aktivitas Pendanaan: perubahan modal bersih dari transaksi
+  // Aktivitas Pendanaan: perubahan modal
   const kasPendanaan = totalModal;
 
   const kenaikanBersihKas = kasOperasi + kasInvestasi + kasPendanaan;
   const kasAkhir = kasAwal + kenaikanBersihKas;
-  // Validasi: kasAkhir harus sama dengan total Kas+Bank di Neraca
   const arusKasBalanced = Math.abs(kasAkhir - totalKasBank) < 1;
 
   return {
@@ -104,6 +232,15 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     labaBersihPositive: labaBersih >= 0,
 
     // ── Neraca
+    aktivaLancar,
+    aktivaTetap,
+    totalAktivaLancar,
+    totalAktivaTetap,
+    totalAktiva,
+    totalAktivaLancarFmt: formatRupiah(Math.abs(totalAktivaLancar)),
+    totalAktivaTetapFmt: formatRupiah(Math.abs(totalAktivaTetap)),
+    totalAktivaFmt: totalAktiva < 0 ? `-${formatRupiah(Math.abs(totalAktiva))}` : formatRupiah(totalAktiva),
+
     aset,
     kewajiban,
     modal,
@@ -111,11 +248,18 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     totalKewajiban,
     totalModal,
     totalPassiva,
+    labaDitahan: labaDitahanSaldo,
+    labaDitahanFmt: formatRupiah(Math.abs(labaDitahanSaldo)),
+    totalLabaDitahan,
+    totalLabaDitahanFmt: formatRupiah(Math.abs(totalLabaDitahan)),
+    totalEkuitas,
+    totalEkuitasFmt: formatRupiah(Math.abs(totalEkuitas)),
+    totalModalDanLabaFmt: formatRupiah(Math.abs(totalEkuitas)),
     neracaBalanced,
-    totalAsetFmt: formatRupiah(totalAset),
-    totalKewajibanFmt: formatRupiah(totalKewajiban),
-    totalModalFmt: formatRupiah(totalModal),
-    totalPassivaFmt: formatRupiah(totalPassiva),
+    totalAsetFmt: totalAset < 0 ? `-${formatRupiah(Math.abs(totalAset))}` : formatRupiah(totalAset),
+    totalKewajibanFmt: formatRupiah(Math.abs(totalKewajiban)),
+    totalModalFmt: formatRupiah(Math.abs(totalModal)),
+    totalPassivaFmt: totalPassiva < 0 ? `-${formatRupiah(Math.abs(totalPassiva))}` : formatRupiah(totalPassiva),
 
     // ── Arus Kas
     kasAwal,

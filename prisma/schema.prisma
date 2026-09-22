@@ -60,6 +60,7 @@ model Entity {
   projects     Project[]
   transactions Transaction[]
   loadingDock  LoadingDockTransaksi[]
+  saldoAwal    SaldoAwal[]
 }
 
 model UserEntityAccess {
@@ -130,9 +131,28 @@ model CoaAccount {
   name       String
   kategori   CoaKategori
   reportType ReportType  @default(NERACA) // "Rumah Akun" — laporan tempat akun ini otomatis masuk
+  urutan     Int         @default(0) // urutan tampil di Daftar Akun/Bagan Akun (issue #37) — bukan urut kode, ngikutin urutan referensi Excel user
   createdAt  DateTime    @default(now())
 
   transactions Transaction[]
+  saldoAwal    SaldoAwal[]
+}
+
+// Saldo awal per akun, per entitas, per tahun buku (issue #37) — dasar
+// perhitungan Saldo Akhir di Daftar Akun & Buku Besar (Saldo Akhir = Saldo
+// Awal + Debit - Kredit, dibalik untuk akun kredit-normal).
+model SaldoAwal {
+  id           String   @id @default(cuid())
+  entityId     String
+  coaAccountId String
+  year         Int
+  nominal      Decimal  @db.Decimal(18, 2) @default(0)
+  updatedAt    DateTime @updatedAt
+
+  entity     Entity     @relation(fields: [entityId], references: [id])
+  coaAccount CoaAccount @relation(fields: [coaAccountId], references: [id])
+
+  @@unique([entityId, coaAccountId, year])
 }
 
 // "Rumah Akun" — dipilih manual saat daftar akun (issue #28), lebih presisi dari

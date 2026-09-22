@@ -1,8 +1,7 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { CoaKategori } from "@prisma/client";
-
-const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];
+import { isDebetNormal } from "./akuntansi";
 
 export type CoaLine = { code: string; name: string; saldo: number; saldoFmt: string };
 
@@ -37,7 +36,7 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
       coaMap.set(id, { id, code: t.coaAccount.code, name: t.coaAccount.name, kategori: t.coaAccount.kategori, saldo: 0 });
     }
     const item = coaMap.get(id)!;
-    item.saldo += DEBET_NORMAL.includes(t.coaAccount.kategori)
+    item.saldo += isDebetNormal(t.coaAccount.kategori, t.coaAccount.code)
       ? Number(t.debit) - Number(t.kredit)
       : Number(t.kredit) - Number(t.debit);
   }

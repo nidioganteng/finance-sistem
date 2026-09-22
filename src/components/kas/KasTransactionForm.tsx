@@ -8,7 +8,7 @@ import { CoaCombobox } from "./CoaCombobox";
 
 type CoaOption = { id: string; code: string; name: string };
 type ProjectOption = { id: string; code: string; name: string };
-type Row = { id: number; coaAccountId: string; nominal: string };
+type Row = { id: number; coaAccountId: string; nominal: string; keterangan?: string };
 type InitialValues = {
   tanggal: string;
   noBukti: string;
@@ -16,7 +16,7 @@ type InitialValues = {
   arah: "masuk" | "keluar";
   rekeningId?: string;
   crossingEntityKeys?: string[];
-  rows: { coaAccountId: string; nominal: string }[];
+  rows: { coaAccountId: string; nominal: string; keterangan?: string }[];
   existingTxIds: string[];
 };
 
@@ -77,8 +77,8 @@ export function KasTransactionForm({
   const [arahLaporan, setArahLaporan] = useState<string[]>(defaultArahLaporan);
   const isCustomInput = !SYSTEM_KEYS.includes(jenisInputKey);
   const [rows, setRows] = useState<Row[]>(
-    initialValues?.rows.map((r, i) => ({ id: i, coaAccountId: r.coaAccountId, nominal: r.nominal })) ??
-      [{ id: 0, coaAccountId: "", nominal: "" }]
+    initialValues?.rows.map((r, i) => ({ id: i, coaAccountId: r.coaAccountId, nominal: r.nominal, keterangan: r.keterangan ?? "" })) ??
+      [{ id: 0, coaAccountId: "", nominal: "", keterangan: "" }]
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +92,7 @@ export function KasTransactionForm({
 
   function addRow() {
     rowIdSeq += 1;
-    setRows((prev) => [...prev, { id: rowIdSeq, coaAccountId: "", nominal: "" }]);
+    setRows((prev) => [...prev, { id: rowIdSeq, coaAccountId: "", nominal: "", keterangan: "" }]);
   }
 
   function removeRow(id: number) {
@@ -128,7 +128,7 @@ export function KasTransactionForm({
       noBukti,
       keterangan,
       arah,
-      rows: validRows.map((r) => ({ coaAccountId: r.coaAccountId, nominal: Number(r.nominal) })),
+      rows: validRows.map((r) => ({ coaAccountId: r.coaAccountId, nominal: Number(r.nominal), ...(r.keterangan?.trim() ? { keterangan: r.keterangan.trim() } : {}) })),
       pagePath,
       ...(isBankBuku ? { rekeningId } : {}),
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
@@ -335,26 +335,34 @@ export function KasTransactionForm({
         </div>
         <div className="flex flex-col gap-2">
           {rows.map((r) => (
-            <div key={r.id} className="grid grid-cols-[1fr_160px_32px] gap-2.5 items-center">
-              <CoaCombobox
-                value={r.coaAccountId}
-                onChange={(id) => updateRow(r.id, { coaAccountId: id })}
-                options={coaOptions}
-              />
+            <div key={r.id} className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-[1fr_160px_32px] gap-2.5 items-center">
+                <CoaCombobox
+                  value={r.coaAccountId}
+                  onChange={(id) => updateRow(r.id, { coaAccountId: id })}
+                  options={coaOptions}
+                />
+                <input
+                  value={r.nominal}
+                  onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
+                  placeholder="Nominal"
+                  className="w-full px-2.5 py-2 rounded-[9px] border border-border text-[13px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(r.id)}
+                  disabled={rows.length === 1}
+                  className="text-muted-faint text-base disabled:opacity-30"
+                >
+                  ×
+                </button>
+              </div>
               <input
-                value={r.nominal}
-                onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
-                placeholder="Nominal"
-                className="w-full px-2.5 py-2 rounded-[9px] border border-border text-[13px]"
+                value={r.keterangan ?? ""}
+                onChange={(e) => updateRow(r.id, { keterangan: e.target.value })}
+                placeholder="Keterangan item (opsional)"
+                className="w-full px-2.5 py-1.5 rounded-[8px] border border-border text-[12px] text-muted-stronger bg-surface-input"
               />
-              <button
-                type="button"
-                onClick={() => removeRow(r.id)}
-                disabled={rows.length === 1}
-                className="text-muted-faint text-base disabled:opacity-30"
-              >
-                ×
-              </button>
             </div>
           ))}
         </div>

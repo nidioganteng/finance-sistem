@@ -321,10 +321,11 @@ export function RingkasanTab({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-[12.5px] text-navy-text">{row.keterangan}</td>
-                    <td className="py-3 px-3 text-[11px] font-mono text-muted-faintest whitespace-nowrap">
+                    <td className={`py-3 px-3 text-[11px] font-mono text-muted-faintest whitespace-nowrap ${row.isKredit ? "pl-7" : ""}`}>
+                      {row.isKredit && <span className="text-muted-faint select-none mr-1">↳</span>}
                       {row.kodeAkun}
                     </td>
-                    <td className="py-3 px-4 text-[12.5px] text-muted-stronger font-medium">{row.namaAkun}</td>
+                    <td className={`py-3 px-4 text-[12.5px] text-muted-stronger font-medium ${row.isKredit ? "pl-7 italic" : ""}`}>{row.namaAkun}</td>
                     <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-navy-text">
                       {row.debitFmt}
                     </td>

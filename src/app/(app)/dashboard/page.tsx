@@ -22,6 +22,7 @@ import {
   BarChart3,
   AlertTriangle,
   CalendarClock,
+  Sparkles,
 } from "lucide-react";
 import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -94,22 +95,50 @@ export default async function DashboardPage({
   const mainEntities = entities.filter((e) => !e.isUmum);
   const umumEntity = entities.find((e) => e.isUmum);
 
+  const now = new Date();
+  const dateLabel = now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const greeting = now.getHours() < 11 ? "Selamat Pagi" : now.getHours() < 15 ? "Selamat Siang" : now.getHours() < 18 ? "Selamat Sore" : "Selamat Malam";
+
   const welcomeBanner = (
-    <div className="relative overflow-hidden rounded-[20px] px-10 py-8 flex items-center justify-between gap-6 bg-gradient-to-br from-[#2f5fe0] via-[#6a4de0] to-[#9145d6]">
-      <div className="relative z-10">
-        <div className="text-2xl font-extrabold text-white">Selamat Datang, {name}! 👋</div>
-        <div className="text-[13.5px] text-white/85 mt-2 flex items-center gap-2.5 flex-wrap">
-          Sistem Data Keuangan Gaharu Sempana Group, Anda masuk sebagai
-          <span className="bg-white/20 px-3 py-1 rounded-full font-bold text-[11.5px] text-white tracking-wide">
-            {roleLabel(role)}
-          </span>
+    <div className="relative overflow-hidden rounded-[20px]" style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1a2f5a 60%, #1e3a6e 100%)" }}>
+      {/* Dot pattern */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+      />
+      {/* Glow accent */}
+      <div className="absolute -top-10 -right-10 w-52 h-52 rounded-full pointer-events-none"
+        style={{ background: "radial-gradient(circle, rgba(99,130,255,0.18) 0%, transparent 70%)" }}
+      />
+
+      <div className="relative z-10 px-7 py-6 flex items-center justify-between gap-6">
+        <div className="min-w-0">
+          {/* Date */}
+          <div className="flex items-center gap-1.5 mb-3">
+            <CalendarClock size={12} className="flex-none" style={{ color: "rgba(255,255,255,0.45)" }} />
+            <span className="text-[11.5px] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>{dateLabel}</span>
+          </div>
+          {/* Greeting */}
+          <div className="flex items-center gap-2.5 mb-2">
+            <h2 className="text-[22px] font-extrabold text-white leading-tight">{greeting}, {name}</h2>
+            <Sparkles size={16} style={{ color: "rgba(180,200,255,0.8)", flexShrink: 0 }} />
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-[13px]" style={{ color: "rgba(255,255,255,0.55)" }}>Sistem Data Keuangan · Gaharu Sempana Group</span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+              style={{ background: "rgba(255,255,255,0.12)", color: "rgba(200,215,255,0.95)", border: "1px solid rgba(255,255,255,0.18)" }}>
+              {roleLabel(role)}
+            </span>
+          </div>
         </div>
-      </div>
-      <div className="flex-none w-16 h-16 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="8" r="4" fill="rgba(255,255,255,0.8)" />
-          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="rgba(255,255,255,0.8)" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
+
+        {/* Right avatar */}
+        <div className="flex-none hidden sm:flex w-14 h-14 rounded-2xl items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="8" r="4" fill="rgba(180,200,255,0.85)" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="rgba(180,200,255,0.85)" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </div>
       </div>
     </div>
   );

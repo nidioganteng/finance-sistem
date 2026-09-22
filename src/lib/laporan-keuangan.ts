@@ -43,7 +43,14 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
           lte: new Date(`${year}-12-31T23:59:59`),
         },
       },
-      include: { coaAccount: true },
+      select: {
+        id: true,
+        coaAccountId: true,
+        debit: true,
+        kredit: true,
+        tanggal: true,
+        jenisInputId: true,
+      },
       orderBy: { tanggal: "asc" },
     }),
   ]);

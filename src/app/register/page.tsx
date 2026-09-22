@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Eye, EyeOff } from "lucide-react";
 import { registerUser } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
@@ -21,6 +22,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
   const [slideIdx, setSlideIdx] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -68,6 +71,11 @@ export default function RegisterPage() {
         <ThemeToggle />
       </div>
 
+      {/* Copyright */}
+      <div className="absolute bottom-5 right-6 z-20">
+        <p className="text-[11px] text-white/30">© 2026 Gaharu Sempana Group</p>
+      </div>
+
       {/* Label kiri atas */}
       <div className="absolute top-7 left-8 z-20 hidden lg:block">
         <div className="text-white text-[15px] font-extrabold tracking-widest uppercase" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>Gaharu Sempana Group</div>
@@ -97,11 +105,11 @@ export default function RegisterPage() {
       </div>
 
       {/* Panel form — tengah */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-[440px] flex flex-col
           bg-white/15 dark:bg-black/40 backdrop-blur-2xl
-          rounded-[28px] border border-white/25 dark:border-white/10
-          px-10 py-10 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
+          rounded-[20px] sm:rounded-[28px] border border-white/25 dark:border-white/10
+          px-6 py-8 sm:px-10 sm:py-10 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
 
           {/* Heading */}
           <div className="mb-7">
@@ -120,11 +128,31 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className={labelClass}>Password</label>
-              <input name="password" type="password" required minLength={8} placeholder="Minimal 8 karakter" className={inputClass} />
+              <div className="relative">
+                <input name="password" type={showPassword ? "text" : "password"} required minLength={8} placeholder="Minimal 8 karakter" className={`${inputClass} pr-11`} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <div>
               <label className={labelClass}>Konfirmasi Password</label>
-              <input name="confirm" type="password" required placeholder="Ulangi password" className={inputClass} />
+              <div className="relative">
+                <input name="confirm" type={showConfirm ? "text" : "password"} required placeholder="Ulangi password" className={`${inputClass} pr-11`} />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {pwError && (
@@ -141,16 +169,12 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-5 pt-5 border-t border-white/15 text-center">
-            <p className="text-[12px] text-white/50 mb-3">
-              Setelah mendaftar, akun Anda menunggu persetujuan Manajer Keuangan.
-            </p>
             <p className="text-[12.5px] text-white/60">
               Sudah punya akun?{" "}
               <Link href="/login" className="text-white font-semibold hover:underline">Masuk</Link>
             </p>
           </div>
 
-          <p className="text-center text-[11px] text-white/30 mt-6">© 2026 Gaharu Sempana Group</p>
         </div>
       </div>
     </div>

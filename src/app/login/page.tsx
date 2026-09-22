@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const SLIDESHOW_IMAGES = ["/img/login/gambar2.webp", "/img/login/gambar3.webp", "/img/login/gambar6.webp"];
@@ -31,6 +32,7 @@ function LoginForm() {
   const justRegistered = searchParams.get("registered") === "1";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [slideIdx, setSlideIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,6 +78,11 @@ function LoginForm() {
         <ThemeToggle />
       </div>
 
+      {/* Copyright */}
+      <div className="absolute bottom-5 right-6 z-20">
+        <p className="text-[11px] text-white/30">© 2026 Gaharu Sempana Group</p>
+      </div>
+
       {/* Label kiri atas */}
       <div className="absolute top-7 left-8 z-20 hidden lg:block drop-shadow-lg">
         <div className="text-white text-[15px] font-extrabold tracking-widest uppercase" style={{textShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>Gaharu Sempana Group</div>
@@ -107,11 +114,11 @@ function LoginForm() {
       </div>
 
       {/* ── Panel form — tengah, frosted glass ── */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-[420px] flex flex-col justify-center
           bg-white/15 dark:bg-black/40 backdrop-blur-2xl
-          rounded-[28px] border border-white/25 dark:border-white/10
-          px-10 py-12 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
+          rounded-[20px] sm:rounded-[28px] border border-white/25 dark:border-white/10
+          px-6 py-8 sm:px-10 sm:py-12 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
 
           {/* Logo mobile */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
@@ -148,14 +155,24 @@ function LoginForm() {
             </div>
             <div>
               <label className="text-[11px] font-bold text-white/70 uppercase tracking-widest block mb-1.5">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-[12px] border border-white/20 bg-white/10 text-[13.5px] text-white placeholder:text-white/40 focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 pr-11 rounded-[12px] border border-white/20 bg-white/10 text-[13.5px] text-white placeholder:text-white/40 focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -186,7 +203,6 @@ function LoginForm() {
             </Link>
           </p>
 
-          <p className="text-center text-[11px] text-white/30 mt-8">© 2026 Gaharu Sempana Group</p>
         </div>
       </div>
     </div>

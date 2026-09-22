@@ -20,11 +20,14 @@ export async function getCoaList() {
   return all.sort((x, y) => parseInt(x.code) - parseInt(y.code));
 }
 
+const PAGE_SIZE = 25;
+
 export async function getJurnalRows(
   entityId: string,
   filterKey?: string,
   bulan?: string,    // format "YYYY-MM"
   akunCode?: string, // filter by code akun (bisa match KAS & BANK)
+  page = 1,
 ) {
   // Bangun filter tanggal dari bulan jika ada
   let tanggalFilter: { gte?: Date; lt?: Date } | undefined;
@@ -33,16 +36,23 @@ export async function getJurnalRows(
     tanggalFilter = { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
   }
 
-  const rows = await prisma.transaction.findMany({
-    where: {
-      entityId,
-      ...(filterKey && filterKey !== "semua" ? { jenisInput: { key: filterKey } } : {}),
-      ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
-      ...(akunCode ? { coaAccount: { code: akunCode } } : {}),
-    },
-    include: { jenisInput: true, coaAccount: true, project: true, staff: true },
-    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
-  });
+  const where = {
+    entityId,
+    ...(filterKey && filterKey !== "semua" ? { jenisInput: { key: filterKey } } : {}),
+    ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
+    ...(akunCode ? { coaAccount: { code: akunCode } } : {}),
+  };
+
+  const [totalCount, rows] = await Promise.all([
+    prisma.transaction.count({ where }),
+    prisma.transaction.findMany({
+      where,
+      include: { jenisInput: true, coaAccount: true, project: true, staff: true },
+      orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+  ]);
 
   // Kalau filter akun aktif, juga ambil kas entry pasangan dari noBukti yang sama
   // supaya pembaca bisa lihat jurnal lengkap per transaksi
@@ -121,5 +131,8 @@ export async function getJurnalRows(
     isBalanced,
     totalDebitFmt: formatRupiah(totalDebit),
     totalKreditFmt: formatRupiah(totalKredit),
+    totalCount,
+    totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
+    page,
   };
 }

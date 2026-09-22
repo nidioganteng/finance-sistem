@@ -49,9 +49,27 @@ export async function getRunningSaldo(entityId: string, jenisInputId: string, re
 // Ledger dikelompokkan per noBukti.
 // crossingEntityKeys: transaksi ini dikirim DARI entitas ini KE entitas-entitas lain.
 // crossingFromEntityKey: transaksi ini DITERIMA dari entitas lain (sisi destinasi crossing).
-export async function getKasLedger(entityId: string, jenisInputId: string, rekeningNama?: string) {
+export async function getKasLedger(
+  entityId: string,
+  jenisInputId: string,
+  rekeningNama?: string,
+  dari?: string,
+  sampai?: string,
+) {
+  const tanggalFilter =
+    dari || sampai
+      ? {
+          ...(dari ? { gte: new Date(dari) } : {}),
+          ...(sampai ? { lte: new Date(`${sampai}T23:59:59`) } : {}),
+        }
+      : undefined;
+
   const rows = await prisma.transaction.findMany({
-    where: { entityId, jenisInputId },
+    where: {
+      entityId,
+      jenisInputId,
+      ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
+    },
     include: { coaAccount: true },
     orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
   });

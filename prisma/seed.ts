@@ -70,7 +70,7 @@ async function main() {
   for (const j of [
     { key: "kasKecil", nama: "Kas Kecil" },
     { key: "kasBesar", nama: "Kas Besar" },
-    { key: "bankBuku", nama: "Bank Buku" },
+    { key: "bankBuku", nama: "Buku Bank" },
   ]) {
     await prisma.jenisInputTransaksi.upsert({
       where: { key: j.key }, update: {}, create: { key: j.key, nama: j.nama, active: true },

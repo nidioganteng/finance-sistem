@@ -258,7 +258,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   if (isSyncMode) {
     const bankJenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "bankBuku" } });
     if (bankJenisInput) {
-      const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId);
+      const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId!);
       const bankPrevSaldo = await getRunningSaldo(entity.id, bankJenisInput.id, rekeningNama);
       const bankNewSaldo = bankPrevSaldo - total;
       await prisma.transaction.create({

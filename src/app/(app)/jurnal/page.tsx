@@ -8,6 +8,7 @@ import { canManageTransaksi } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PrintButton } from "@/components/shared/PrintButton";
+import { PaginationNav } from "@/components/shared/PaginationNav";
 import { JurnalFilterChips } from "@/components/jurnal/JurnalFilterChips";
 import { JurnalExtraFilters } from "@/components/jurnal/JurnalExtraFilters";
 import { JurnalTable } from "@/components/jurnal/JurnalTable";
@@ -18,7 +19,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function JurnalPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; filter?: string; bulan?: string; akunCode?: string };
+  searchParams: { entity?: string; filter?: string; bulan?: string; akunCode?: string; page?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -32,16 +33,17 @@ export default async function JurnalPage({
   const filter = searchParams.filter ?? "semua";
   const bulan = searchParams.bulan ?? "";
   const akunCode = searchParams.akunCode ?? "";
+  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const [chips, coaList, { rows, totalDebit, totalKredit, isBalanced, totalDebitFmt, totalKreditFmt }] =
+  const [chips, coaList, { rows, totalDebit, totalKredit, isBalanced, totalDebitFmt, totalKreditFmt, totalPages }] =
     await Promise.all([
       getJenisInputChips(selectedEntity.id),
       getCoaList(),
-      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined),
+      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined, page),
     ]);
 
   const selisih = Math.abs(totalDebit - totalKredit);
@@ -94,6 +96,20 @@ export default async function JurnalPage({
         totalKreditFmt={totalKreditFmt}
         coaOptions={coaList}
         canEditAkun={canManageTransaksi(role)}
+      />
+
+      <PaginationNav
+        page={page}
+        totalPages={totalPages}
+        buildHref={(p) => {
+          const params = new URLSearchParams();
+          if (selectedEntity.key) params.set("entity", selectedEntity.key);
+          if (filter && filter !== "semua") params.set("filter", filter);
+          if (bulan) params.set("bulan", bulan);
+          if (akunCode) params.set("akunCode", akunCode);
+          params.set("page", String(p));
+          return `/jurnal?${params.toString()}`;
+        }}
       />
     </PageTransition>
   );

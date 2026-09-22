@@ -43,6 +43,7 @@ export function KasScreenClient({
   allEntities = [],
   projectOptions = [],
   defaultArahLaporan = [],
+  bukuBankRekeningOptions = [],
   dari = "",
   sampai = "",
 }: {
@@ -58,6 +59,7 @@ export function KasScreenClient({
   allEntities?: { key: string; name: string }[];
   projectOptions?: ProjectOption[];
   defaultArahLaporan?: string[];
+  bukuBankRekeningOptions?: RekeningOption[];
   dari?: string;
   sampai?: string;
 }) {
@@ -249,6 +251,7 @@ export function KasScreenClient({
           allEntities={allEntities}
           projectOptions={projectOptions}
           defaultArahLaporan={defaultArahLaporan}
+          bukuBankRekeningOptions={bukuBankRekeningOptions}
           onClose={() => setPanelOpen(false)}
         />
       )}

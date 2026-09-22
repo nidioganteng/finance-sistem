@@ -40,7 +40,7 @@ export async function updateKodeAkunJurnal(transactionId: string, entityId: stri
   if (oldAccount.code === code) return;
 
   const targetAccount = await prisma.coaAccount.findUnique({
-    where: { code_scope: { code, scope: oldAccount.scope } },
+    where: { code },
   });
   if (!targetAccount) {
     throw new Error(`Kode akun "${code}" tidak ditemukan di Bagan Akun. Pilih salah satu dari daftar yang muncul.`);

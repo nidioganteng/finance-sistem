@@ -45,7 +45,6 @@ export async function updateKodeAkunJurnal(transactionId: string, entityId: stri
       code,
       name: oldAccount.name,
       kategori: oldAccount.kategori,
-      reportType: oldAccount.reportType,
       scope: oldAccount.scope,
     },
   });

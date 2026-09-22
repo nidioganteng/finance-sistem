@@ -192,7 +192,7 @@ export function KasTransactionForm({
         />
       </div>
 
-      {/* Rekening/Bank — hanya tampil di Bank Buku */}
+      {/* Rekening/Bank — hanya tampil di Buku Bank */}
       {isBankBuku && rekeningOptions.length > 0 && (
         <div>
           <label className="text-xs font-semibold text-muted-stronger block mb-1.5">Rekening / Bank</label>
@@ -294,7 +294,7 @@ export function KasTransactionForm({
           </div>
           {crossingEntityKeys.length > 0 && (
             <p className="text-[11px] text-muted-faint mt-1.5">
-              Transaksi akan dicatat di Kas Kecil/Besar/Bank Buku masing-masing entitas yang dipilih.
+              Transaksi akan dicatat di Kas Kecil/Besar/Buku Bank masing-masing entitas yang dipilih.
             </p>
           )}
         </div>

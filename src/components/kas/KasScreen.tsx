@@ -44,7 +44,7 @@ export async function KasScreen({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  // Rekening per entitas — hanya relevan untuk Bank Buku
+  // Rekening per entitas — hanya relevan untuk Buku Bank
   const isBankBuku = jenisInputKey === "bankBuku";
   const rekeningOptions: RekeningOption[] = isBankBuku
     ? (REKENING_BY_ENTITY[selectedKey] ?? [])

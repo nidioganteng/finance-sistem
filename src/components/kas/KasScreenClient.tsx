@@ -6,7 +6,7 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number };
@@ -66,6 +66,7 @@ export function KasScreenClient({
   const [deletingRow, setDeletingRow] = useState<LedgerRow | null>(null);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(false);
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -206,7 +207,15 @@ export function KasScreenClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
-              <td className="py-2 px-1.5">TANGGAL</td>
+              <td className="py-2 px-1.5">
+                <button
+                  onClick={() => setSortAsc((v) => !v)}
+                  className="flex items-center gap-1 hover:text-navy-text transition-colors"
+                  title={sortAsc ? "Urutkan terbaru dulu" : "Urutkan terlama dulu"}
+                >
+                  TANGGAL <ArrowUpDown size={10} />
+                </button>
+              </td>
               <td className="py-2 px-1.5">NO. BUKTI</td>
               <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5">AKUN</td>
@@ -224,7 +233,10 @@ export function KasScreenClient({
                 </td>
               </tr>
             ) : (
-              ledger.map((r, idx) => {
+              [...ledger].sort((a, b) => {
+                const diff = new Date(a.tanggalRaw).getTime() - new Date(b.tanggalRaw).getTime();
+                return sortAsc ? diff : -diff;
+              }).map((r, idx) => {
                 const shown = r.akunTags.slice(0, 2);
                 const rest = r.akunTags.length - shown.length;
                 const expanded = expandedIdx === idx;

@@ -42,6 +42,7 @@ export function KasTransactionForm({
   allEntities = [],
   projectOptions = [],
   defaultArahLaporan = [],
+  bukuBankRekeningOptions = [],
   initialValues,
   onClose,
 }: {
@@ -52,6 +53,7 @@ export function KasTransactionForm({
   rekeningOptions?: RekeningOption[];
   defaultRekeningId?: string;
   allEntities?: { key: string; name: string }[];
+  bukuBankRekeningOptions?: RekeningOption[];
   projectOptions?: ProjectOption[];
   defaultArahLaporan?: string[];
   initialValues?: InitialValues;
@@ -82,7 +84,11 @@ export function KasTransactionForm({
   );
   const [error, setError] = useState<string | null>(null);
 
+  const [syncBukuBank, setSyncBukuBank] = useState(false);
+  const [syncRekeningId, setSyncRekeningId] = useState(bukuBankRekeningOptions[0]?.id ?? "");
+
   const isBankBuku = jenisInputKey === "bankBuku";
+  const isKasKecil = jenisInputKey === "kasKecil";
   const rowsTotal = rows.reduce((sum, r) => sum + (Number(r.nominal) || 0), 0);
   const selectedRekeningNama = rekeningOptions.find((r) => r.id === rekeningId)?.nama;
 
@@ -134,6 +140,7 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(arah === "masuk" && projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
+      ...(isKasKecil && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
       const result = isEdit
@@ -182,6 +189,32 @@ export function KasTransactionForm({
           className="w-full px-3 py-2.5 rounded-[10px] border border-border text-[13.5px]"
         />
       </div>
+
+      {/* Auto-sync ke Buku Bank — hanya tampil di Kas Kecil + arah masuk */}
+      {isKasKecil && arah === "masuk" && bukuBankRekeningOptions.length > 0 && !isEdit && (
+        <div className="rounded-[11px] border border-border-soft bg-surface-subtle/50 p-3 space-y-2">
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={syncBukuBank}
+              onChange={(e) => setSyncBukuBank(e.target.checked)}
+              className="accent-navy w-4 h-4"
+            />
+            <span className="text-[13px] font-semibold text-navy-text">Catat juga keluar di Buku Bank</span>
+          </label>
+          {syncBukuBank && (
+            <select
+              value={syncRekeningId}
+              onChange={(e) => setSyncRekeningId(e.target.value)}
+              className="w-full px-3 py-2 rounded-[9px] border border-border text-[13px] bg-surface-input"
+            >
+              {bukuBankRekeningOptions.map((r) => (
+                <option key={r.id} value={r.id}>{r.nama}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {/* Rekening/Bank — hanya tampil di Buku Bank */}
       {isBankBuku && rekeningOptions.length > 0 && (

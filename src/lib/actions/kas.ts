@@ -62,6 +62,7 @@ export type CreateKasTransactionInput = {
   crossingEntityKeys?: string[]; // crossing antar entitas (opsional, bisa lebih dari satu)
   projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
   arahLaporan?: string[]; // override output keuangan per transaksi (custom jenis input)
+  syncBukuBankRekeningId?: string; // Kas Kecil masuk dari Buku Bank → auto-catat di Buku Bank
 };
 
 const KAS_KECIL_COA: Record<string, string> = {
@@ -250,6 +251,36 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   });
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps, ...terminCreate]);
+
+  // Auto-sync Kas Kecil masuk → Buku Bank keluar (jika dipilih)
+  if (input.jenisInputKey === "kasKecil" && input.arah === "masuk" && input.syncBukuBankRekeningId) {
+    const bankJenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "bankBuku" } });
+    if (bankJenisInput) {
+      const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId);
+      const bankPrevSaldo = await getRunningSaldo(entity.id, bankJenisInput.id, rekeningNama);
+      const bankNewSaldo = bankPrevSaldo - total;
+      await prisma.transaction.create({
+        data: {
+          entityId: entity.id,
+          jenisInputId: bankJenisInput.id,
+          tanggal: new Date(input.tanggal),
+          noBukti: input.noBukti,
+          keterangan: `[Auto] ${input.keterangan}`,
+          staffId: session.user.id,
+          coaAccountId: null,
+          debit: 0,
+          kredit: total,
+          saldoSetelah: bankNewSaldo,
+          extraFieldsJson: {
+            isKasEntry: true,
+            rekeningNama,
+            syncFromKasKecil: true,
+          },
+        },
+      });
+      revalidatePath("/bank-buku");
+    }
+  }
 
   logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
 

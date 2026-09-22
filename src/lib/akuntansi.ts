@@ -1,15 +1,26 @@
 import { CoaKategori } from "@prisma/client";
 
 // Debet-normal: saldo bertambah saat debet, berkurang saat kredit.
-export const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];
+const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];
+
+// Akun kontra-aset: kategorinya tetep ASET (buat pengelompokan di Neraca),
+// tapi saldo normalnya KREDIT — karena isinya nilai pengurang aset, bukan
+// aset itu sendiri. Kode 210 (Cadangan CKPN) dikonfirmasi atasan.
+const KREDIT_NORMAL_OVERRIDE_CODES = new Set<string>(["210"]);
+
+export function isDebetNormal(kategori: CoaKategori, code: string): boolean {
+  if (KREDIT_NORMAL_OVERRIDE_CODES.has(code)) return false;
+  return DEBET_NORMAL.includes(kategori);
+}
 
 export function hitungSaldoAkhir(
   kategori: CoaKategori,
+  code: string,
   saldoAwal: number,
   totalDebet: number,
   totalKredit: number
 ) {
-  return DEBET_NORMAL.includes(kategori)
+  return isDebetNormal(kategori, code)
     ? saldoAwal + totalDebet - totalKredit
     : saldoAwal + totalKredit - totalDebet;
 }

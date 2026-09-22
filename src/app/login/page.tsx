@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+
+const SLIDESHOW_IMAGES = ["/img/gambar1.png", "/img/gambar2.png"];
 
 export default function LoginPage() {
   return (
@@ -28,6 +30,14 @@ function LoginForm() {
   const justRegistered = searchParams.get("registered") === "1";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [slideIdx, setSlideIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSlideIdx((i) => (i + 1) % SLIDESHOW_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -46,10 +56,18 @@ function LoginForm() {
     <div className="min-h-screen flex">
       {/* ── Kiri: gambar + overlay ── */}
       <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative overflow-hidden">
-        {/* Background image — ganti file public/login-bg.jpg untuk ubah gambar */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-navy">
-          {/* Uncomment baris di bawah setelah taruh file public/login-bg.jpg */}
-          {/* <Image src="/login-bg.jpg" alt="background" fill className="object-cover opacity-60" priority /> */}
+        {/* Slideshow background */}
+        <div className="absolute inset-0 bg-slate-900">
+          {SLIDESHOW_IMAGES.map((src, i) => (
+            <Image
+              key={src}
+              src={src}
+              alt="background"
+              fill
+              className={`object-cover transition-opacity duration-1000 ${i === slideIdx ? "opacity-70" : "opacity-0"}`}
+              priority={i === 0}
+            />
+          ))}
         </div>
 
         {/* Overlay gradient bawah */}
@@ -65,10 +83,10 @@ function LoginForm() {
             <div className="text-white/60 text-[12px] mt-0.5">Sistem Data Keuangan</div>
           </div>
 
-          {/* Bottom: 4 logo entitas */}
+          {/* Bottom: 4 logo entitas + dot indicator */}
           <div>
             <div className="text-white/50 text-[11px] font-semibold uppercase tracking-widest mb-3">Entitas Grup</div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-4">
               {ENTITY_LOGOS.map((e) => (
                 <div key={e.key} className="flex flex-col items-center gap-1.5">
                   <div className="w-12 h-12 rounded-[14px] bg-white shadow-lg flex items-center justify-center overflow-hidden border border-white/20">
@@ -76,6 +94,16 @@ function LoginForm() {
                   </div>
                   <span className="text-white/70 text-[10.5px] font-semibold">{e.name}</span>
                 </div>
+              ))}
+            </div>
+            {/* Slideshow dots */}
+            <div className="flex gap-1.5">
+              {SLIDESHOW_IMAGES.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSlideIdx(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${i === slideIdx ? "w-6 bg-white" : "w-1.5 bg-white/40"}`}
+                />
               ))}
             </div>
           </div>

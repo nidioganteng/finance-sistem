@@ -13,10 +13,9 @@ export async function createCOA(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
   const reportType = formData.get("reportType") as ReportType;
-
   const scope = (formData.get("scope") as string) || "KAS";
 
-  if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
+  if (!code || !name || !kategori || !reportType || !scope) throw new Error("Semua field wajib diisi.");
 
   await prisma.coaAccount.create({ data: { code, name, kategori, reportType, scope } });
   if (session?.user.id) {
@@ -31,12 +30,13 @@ export async function updateCOA(id: string, formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
   const reportType = formData.get("reportType") as ReportType;
+  const scope = formData.get("scope") as string;
 
-  if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
+  if (!code || !name || !kategori || !reportType || !scope) throw new Error("Semua field wajib diisi.");
 
-  await prisma.coaAccount.update({ where: { id }, data: { code, name, kategori, reportType } });
+  await prisma.coaAccount.update({ where: { id }, data: { code, name, kategori, reportType, scope } });
   if (session?.user.id) {
-    logActivity(session.user.id, `Update COA ${code} – ${name}`, "FINANCIAL_CHANGE", { id, code, name, kategori, reportType });
+    logActivity(session.user.id, `Update COA ${code} – ${name}`, "FINANCIAL_CHANGE", { id, code, name, kategori, reportType, scope });
   }
   revalidatePath("/coa");
 }

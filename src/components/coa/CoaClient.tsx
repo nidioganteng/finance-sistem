@@ -11,7 +11,20 @@ type COAItem = {
   name: string;
   kategori: CoaKategori;
   reportType: ReportType;
+  scope: string;
   createdAt: Date;
+};
+
+const SCOPE_OPTS = ["KAS", "BANK"] as const;
+
+const SCOPE_LABEL: Record<string, string> = {
+  KAS: "Kas Kecil/Besar",
+  BANK: "Bank Buku",
+};
+
+const SCOPE_BADGE: Record<string, string> = {
+  KAS: "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400",
+  BANK: "bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400",
 };
 
 const KATEGORI_OPTS: CoaKategori[] = ["PENDAPATAN", "BEBAN", "ASET", "KEWAJIBAN", "MODAL"];
@@ -103,6 +116,9 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
               <option value="" disabled>Rumah Akun</option>
               {REPORT_TYPE_OPTS.map((r) => <option key={r} value={r}>{REPORT_TYPE_LABEL[r]}</option>)}
             </select>
+            <select name="scope" required defaultValue="KAS" className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
+              {SCOPE_OPTS.map((s) => <option key={s} value={s}>{SCOPE_LABEL[s]}</option>)}
+            </select>
             <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
               <Check size={14} /> Simpan
             </button>
@@ -110,6 +126,9 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
               <X size={14} />
             </button>
           </div>
+          <p className="text-[11.5px] text-muted mt-2">
+            Kas Kecil/Besar dan Bank Buku dianggap 2 akun terpisah walau kode &amp; namanya sama — pilih modul yang akan pakai akun ini.
+          </p>
         </form>
       )}
 
@@ -120,6 +139,7 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Nama Akun</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Kategori</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Rumah Akun</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Scope</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Dibuat</th>
             <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Aksi</th>
           </tr>
@@ -127,7 +147,7 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
         <tbody>
           {initialCoa.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-10 text-center text-sm text-muted">
+              <td colSpan={7} className="py-10 text-center text-sm text-muted">
                 Belum ada akun COA. Klik &quot;Tambah Akun&quot; untuk memulai.
               </td>
             </tr>
@@ -135,7 +155,7 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
           {initialCoa.map((item) =>
             editingId === item.id ? (
               <tr key={item.id} className="border-b border-surface-subtle bg-surface-subtle">
-                <td colSpan={6} className="px-6 py-3">
+                <td colSpan={7} className="px-6 py-3">
                   <form action={(fd) => handleUpdate(item.id, fd)} className="flex items-center gap-3 flex-wrap">
                     <input name="code" required defaultValue={item.code} className="px-3 py-2 rounded-xl border border-border text-sm w-36 bg-surface-card" />
                     <input name="name" required defaultValue={item.name} className="px-3 py-2 rounded-xl border border-border text-sm flex-1 min-w-40 bg-surface-card" />
@@ -144,6 +164,9 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
                     </select>
                     <select name="reportType" required defaultValue={item.reportType} className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
                       {REPORT_TYPE_OPTS.map((r) => <option key={r} value={r}>{REPORT_TYPE_LABEL[r]}</option>)}
+                    </select>
+                    <select name="scope" required defaultValue={item.scope} className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
+                      {SCOPE_OPTS.map((s) => <option key={s} value={s}>{SCOPE_LABEL[s]}</option>)}
                     </select>
                     <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
                       <Check size={14} /> Simpan
@@ -165,6 +188,11 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
                 </td>
                 <td className="py-3 px-3 text-[12.5px] text-muted-stronger">
                   {REPORT_TYPE_LABEL[item.reportType]}
+                </td>
+                <td className="py-3 px-3">
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap ${SCOPE_BADGE[item.scope] ?? ""}`}>
+                    {SCOPE_LABEL[item.scope] ?? item.scope}
+                  </span>
                 </td>
                 <td className="py-3 px-3 text-[12.5px] text-muted">
                   {new Date(item.createdAt).toLocaleDateString("id-ID")}

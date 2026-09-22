@@ -23,7 +23,7 @@ export type CreateKasTransactionInput = {
   arah: "masuk" | "keluar";
   rows: KasRowInput[];
   pagePath: string; // path buat revalidate, mis. "/kas-kecil"
-  rekeningId?: string; // khusus Bank Buku
+  rekeningId?: string; // khusus Buku Bank
   crossingEntityKeys?: string[]; // crossing antar entitas (opsional, bisa lebih dari satu)
   projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
   arahLaporan?: string[]; // override output keuangan per transaksi (custom jenis input)
@@ -65,7 +65,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   if (!input.noBukti || !input.keterangan) return { error: "No. bukti dan keterangan wajib diisi." };
 
   if (input.jenisInputKey === "bankBuku") {
-    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Bank Buku." };
+    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Buku Bank." };
     if (!isValidRekening(input.entityKey, input.rekeningId)) {
       return { error: "Rekening yang dipilih tidak sesuai dengan entitas ini." };
     }
@@ -262,7 +262,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   if (!input.noBukti || !input.keterangan) return { error: "No. bukti dan keterangan wajib diisi." };
 
   if (input.jenisInputKey === "bankBuku") {
-    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Bank Buku." };
+    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Buku Bank." };
     if (!isValidRekening(input.entityKey, input.rekeningId)) return { error: "Rekening yang dipilih tidak sesuai dengan entitas ini." };
   }
 

@@ -46,7 +46,11 @@ export async function KasScreen({
 
   // Rekening per entitas — hanya relevan untuk Buku Bank
   const isBankBuku = jenisInputKey === "bankBuku";
+  const isKasKecil = jenisInputKey === "kasKecil";
   const rekeningOptions: RekeningOption[] = isBankBuku
+    ? (REKENING_BY_ENTITY[selectedKey] ?? [])
+    : [];
+  const bukuBankRekeningOptions: RekeningOption[] = isKasKecil
     ? (REKENING_BY_ENTITY[selectedKey] ?? [])
     : [];
   const selectedRekeningId =
@@ -92,6 +96,7 @@ export async function KasScreen({
         allEntities={entities.map((e) => ({ key: e.key, name: e.name }))}
         projectOptions={projectOptions}
         defaultArahLaporan={defaultArahLaporan}
+        bukuBankRekeningOptions={bukuBankRekeningOptions}
         dari={searchParams.dari ?? ""}
         sampai={searchParams.sampai ?? ""}
       />

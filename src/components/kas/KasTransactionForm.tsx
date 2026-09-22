@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createKasTransaction, replaceKasTransaction } from "@/lib/actions/kas";
+import { createKasTransaction, replaceKasTransaction, generateNoBukti } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { CoaCombobox } from "./CoaCombobox";
 
@@ -30,24 +30,7 @@ const LAPORAN_OPTIONS = [
   { value: "PAJAK", label: "Laporan Pajak" },
 ];
 
-const ENTITY_CODE: Record<string, string> = {
-  gaharu: "GS",
-  kencana: "KAK",
-  tataring: "TB",
-  ciptaAsri: "CAD",
-  umum: "KP",
-};
-
 let rowIdSeq = 1;
-
-function genNoBukti(entityKey: string) {
-  const code = ENTITY_CODE[entityKey] ?? entityKey.toUpperCase().slice(0, 3);
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const seq = String(Math.floor(Math.random() * 900) + 100);
-  return `${code}/${dd}${mm}${seq}`;
-}
 
 export function KasTransactionForm({
   entityKey,
@@ -78,7 +61,14 @@ export function KasTransactionForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? new Date().toISOString().slice(0, 10));
-  const [noBukti, setNoBukti] = useState(initialValues?.noBukti ?? genNoBukti(entityKey));
+  const [noBukti, setNoBukti] = useState(initialValues?.noBukti ?? "");
+  const noBuktiManualRef = useRef(false);
+
+  // Auto-generate noBukti saat form baru dibuka atau tanggal berubah (kecuali user sudah edit manual)
+  useEffect(() => {
+    if (isEdit || noBuktiManualRef.current) return;
+    generateNoBukti(entityKey, tanggal).then(setNoBukti).catch(() => {});
+  }, [entityKey, tanggal, isEdit]);
   const [keterangan, setKeterangan] = useState(initialValues?.keterangan ?? "");
   const [arah, setArah] = useState<"masuk" | "keluar">(initialValues?.arah ?? "keluar");
   const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
@@ -176,8 +166,9 @@ export function KasTransactionForm({
           <label className="text-xs font-semibold text-muted-stronger block mb-1.5">No. Bukti</label>
           <input
             value={noBukti}
-            onChange={(e) => setNoBukti(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-[10px] border border-border text-[13.5px] font-mono"
+            onChange={(e) => { noBuktiManualRef.current = true; setNoBukti(e.target.value); }}
+            className="w-full px-3 py-2.5 rounded-[10px] border border-border text-[13.5px] font-mono bg-surface-input"
+            placeholder="Generating..."
           />
         </div>
       </div>

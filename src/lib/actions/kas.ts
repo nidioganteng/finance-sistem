@@ -5,12 +5,47 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getRunningSaldo } from "@/lib/kas";
+import { getRunningSaldo, ENTITY_PREFIX } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
 import { computeNewTerminPercentage } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
+
+// Format: {PREFIX}/{MMDD}{SEQ} — SEQ mulai dari 1, naik per hari per entitas
+export async function generateNoBukti(entityKey: string, tanggal: string): Promise<string> {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Belum login.");
+
+  const prefix = ENTITY_PREFIX[entityKey] ?? entityKey.toUpperCase().slice(0, 3);
+  const d = new Date(tanggal);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const dayPart = `${mm}${dd}`;
+  const pattern = `${prefix}/${dayPart}`;
+
+  const entity = await prisma.entity.findUnique({ where: { key: entityKey } });
+  if (!entity) throw new Error("Entity tidak ditemukan.");
+
+  // Ambil semua noBukti hari itu lalu cari sequence tertinggi
+  const existing = await prisma.transaction.findMany({
+    where: {
+      entityId: entity.id,
+      noBukti: { startsWith: pattern },
+    },
+    select: { noBukti: true },
+    distinct: ["noBukti"],
+  });
+
+  let maxSeq = 0;
+  for (const row of existing) {
+    const seqStr = row.noBukti.slice(pattern.length);
+    const seq = parseInt(seqStr, 10);
+    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  }
+
+  return `${pattern}${maxSeq + 1}`;
+}
 
 type KasRowInput = { coaAccountId: string; nominal: number };
 
@@ -74,6 +109,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   const entity = await prisma.entity.findUnique({ where: { key: input.entityKey } });
   const jenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: input.jenisInputKey } });
   if (!entity || !jenisInput) return { error: "Entity atau jenis input tidak ditemukan." };
+
+  // Cek duplikat noBukti per entitas
+  const dupCheck = await prisma.transaction.findFirst({
+    where: { entityId: entity.id, noBukti: input.noBukti },
+    select: { id: true },
+  });
+  if (dupCheck) return { error: `No. bukti "${input.noBukti}" sudah dipakai di entitas ini.` };
 
   const rekeningNama = input.rekeningId ? getRekeningNama(input.entityKey, input.rekeningId) : undefined;
   const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.entityKey, input.rekeningId);

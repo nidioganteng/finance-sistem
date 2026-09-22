@@ -1,6 +1,14 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
+export const ENTITY_PREFIX: Record<string, string> = {
+  gaharu: "GS",
+  kencana: "KAK",
+  tataring: "TB",
+  ciptaAsri: "CAD",
+  umum: "KP",
+};
+
 export async function getJenisInput(key: string) {
   return prisma.jenisInputTransaksi.findUnique({ where: { key } });
 }

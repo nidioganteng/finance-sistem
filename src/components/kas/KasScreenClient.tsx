@@ -7,6 +7,7 @@ import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lucide-react";
+import { formatRupiah } from "@/lib/dashboard-data";
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; itemDescription?: string };
@@ -46,6 +47,9 @@ export function KasScreenClient({
   bukuBankRekeningOptions = [],
   dari = "",
   sampai = "",
+  saldoAwal = 0,
+  totalMasuk = 0,
+  totalKeluar = 0,
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -62,6 +66,9 @@ export function KasScreenClient({
   bukuBankRekeningOptions?: RekeningOption[];
   dari?: string;
   sampai?: string;
+  saldoAwal?: number;
+  totalMasuk?: number;
+  totalKeluar?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -173,6 +180,21 @@ export function KasScreenClient({
           isPending={isPending}
         />
       )}
+
+      {/* Ringkasan saldo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Saldo Awal", value: saldoAwal, color: "text-muted-stronger" },
+          { label: "Mutasi Masuk", value: totalMasuk, color: "text-status-green" },
+          { label: "Mutasi Keluar", value: totalKeluar, color: "text-status-red" },
+          { label: "Saldo Akhir", value: saldoAwal + totalMasuk - totalKeluar, color: "text-navy-text" },
+        ].map((s) => (
+          <div key={s.label} className="bg-surface-card border border-border-soft rounded-[14px] px-4 py-3">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wide mb-1">{s.label}</p>
+            <p className={`text-[15px] font-extrabold tabular-nums ${s.color}`}>{formatRupiah(s.value)}</p>
+          </div>
+        ))}
+      </div>
 
       {/* Filter tanggal */}
       <div className="flex items-center gap-2 flex-wrap">

@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 export type NavItem = {
   label: string;
   href: string;
-  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale";
+  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList";
 };
 
 type NavSection = {
@@ -38,13 +38,13 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
     {
       title: "Operasional",
       items: [
-        { label: "Kas Kecil", href: "/kas-kecil", icon: "walletCards" },
-        { label: "Kas Besar", href: "/kas-besar", icon: "walletCards" },
-        { label: "Buku Bank", href: "/bank-buku", icon: "receipt" },
-        { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
+        { label: "Kas Kecil", href: "/kas-kecil", icon: "wallet" },
+        { label: "Kas Besar", href: "/kas-besar", icon: "banknote" },
+        { label: "Buku Bank", href: "/bank-buku", icon: "building2" },
+        { label: "Jurnal Umum", href: "/jurnal", icon: "scrollText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
-        { label: "Daftar Akun", href: "/daftar-akun", icon: "listChecks" },
-        { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
+        { label: "Daftar Akun", href: "/daftar-akun", icon: "table2" },
+        { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "handCoins" },
       ],
     },
     {
@@ -58,8 +58,8 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Pengaturan",
       items: [
         { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
-        { label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" },
-        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" },
+        { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
+        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "settings2" },
         { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },
@@ -74,22 +74,22 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
     {
       title: "Operasional",
       items: [
-        { label: "Kas Kecil", href: "/kas-kecil", icon: "walletCards" },
-        { label: "Kas Besar", href: "/kas-besar", icon: "walletCards" },
-        { label: "Buku Bank", href: "/bank-buku", icon: "receipt" },
-        { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
+        { label: "Kas Kecil", href: "/kas-kecil", icon: "wallet" },
+        { label: "Kas Besar", href: "/kas-besar", icon: "banknote" },
+        { label: "Buku Bank", href: "/bank-buku", icon: "building2" },
+        { label: "Jurnal Umum", href: "/jurnal", icon: "scrollText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
-        { label: "Daftar Akun", href: "/daftar-akun", icon: "listChecks" },
+        { label: "Daftar Akun", href: "/daftar-akun", icon: "table2" },
         { label: "Laporan Keuangan", href: "/laporan-keuangan", icon: "fileText" },
-        { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
+        { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "handCoins" },
       ],
     },
     {
       title: "Lainnya",
       items: [
         { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
-        { label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" },
-        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" },
+        { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
+        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "settings2" },
       ],
     },
   ],

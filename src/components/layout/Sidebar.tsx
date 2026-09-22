@@ -20,6 +20,15 @@ import {
   Layers,
   LogOut,
   X,
+  Wallet,
+  Banknote,
+  Building2,
+  ScrollText,
+  Table2,
+  HandCoins,
+  FolderOpen,
+  Settings2,
+  ClipboardList,
 } from "lucide-react";
 import { getNavForRole, type NavItem } from "@/lib/rbac";
 
@@ -36,6 +45,15 @@ const ICONS: Record<NavItem["icon"], typeof LayoutGrid> = {
   walletCards: WalletCards,
   trendingUp: TrendingUp,
   scale: Scale,
+  wallet: Wallet,
+  banknote: Banknote,
+  building2: Building2,
+  scrollText: ScrollText,
+  table2: Table2,
+  handCoins: HandCoins,
+  folderOpen: FolderOpen,
+  settings2: Settings2,
+  clipboardList: ClipboardList,
 };
 
 export function Sidebar({

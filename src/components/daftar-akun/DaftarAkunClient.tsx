@@ -16,6 +16,7 @@ type Row = {
   saldoAkhirFmt: string;
   saldoAkhirNegatif: boolean;
   punyaTransaksi: boolean;
+  alokasi: "NERACA" | "LABA_RUGI";
 };
 
 const KATEGORI_BADGE: Record<string, string> = {
@@ -24,6 +25,16 @@ const KATEGORI_BADGE: Record<string, string> = {
   ASET: "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
   KEWAJIBAN: "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
   MODAL: "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
+};
+
+const ALOKASI_LABEL: Record<Row["alokasi"], string> = {
+  NERACA: "Neraca",
+  LABA_RUGI: "Laba Rugi",
+};
+
+const ALOKASI_BADGE: Record<Row["alokasi"], string> = {
+  NERACA: "bg-slate-100 dark:bg-slate-500/20 text-slate-700 dark:text-slate-300",
+  LABA_RUGI: "bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400",
 };
 
 export function DaftarAkunClient({
@@ -72,6 +83,7 @@ export function DaftarAkunClient({
               <th className="py-3 px-3 text-right">TOTAL DEBET</th>
               <th className="py-3 px-3 text-right">TOTAL KREDIT</th>
               <th className="py-3 px-5 text-right">SALDO AKHIR</th>
+              <th className="py-3 px-5">ALOKASI</th>
             </tr>
           </thead>
           <tbody>
@@ -125,6 +137,11 @@ export function DaftarAkunClient({
                 <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold">
                   <span className={r.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}>
                     {r.saldoAkhirNegatif ? "-" : ""}{r.saldoAkhirFmt}
+                  </span>
+                </td>
+                <td className="py-3 px-5">
+                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${ALOKASI_BADGE[r.alokasi]}`}>
+                    {ALOKASI_LABEL[r.alokasi]}
                   </span>
                 </td>
               </tr>

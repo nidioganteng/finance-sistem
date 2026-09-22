@@ -7,7 +7,8 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
-const SLIDESHOW_IMAGES = ["/img/gambar1.png", "/img/gambar2.png"];
+const SLIDESHOW_IMAGES = ["/img/login/gambar2.webp", "/img/login/gambar3.webp", "/img/login/gambar6.webp"];
+const SLIDE_DELAY = 8000;
 
 const ENTITY_LOGOS = [
   { key: "gaharu", src: "/logo-entitas/gaharu.webp", name: "Gaharu" },
@@ -37,7 +38,7 @@ function LoginForm() {
   useEffect(() => {
     const timer = setInterval(() => {
       setSlideIdx((i) => (i + 1) % SLIDESHOW_IMAGES.length);
-    }, 5000);
+    }, SLIDE_DELAY);
     return () => clearInterval(timer);
   }, []);
 

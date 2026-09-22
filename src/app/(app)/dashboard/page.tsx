@@ -37,15 +37,12 @@ export default async function DashboardPage({
 
   const entities = await getAccessibleEntities(entityKeys);
   const canGrup = canViewGrupAggregate(role);
-  const isStaff = role === "STAF_KEUANGAN";
 
-  const selectedKey = isStaff
-    // Staff selalu punya entity aktif — baca cookie kalau URL tidak ada entity
-    ? resolveEntityKey(searchParams.entity, entityKeys)
-    // Manager/Admin: kalau URL tidak ada entity → tampilkan grup (undefined)
-    : searchParams.entity && entityKeys.includes(searchParams.entity)
-      ? searchParams.entity
-      : searchParams.entity; // undefined → grup
+  const selectedKey = canGrup
+    // Semua role yang boleh lihat grup: kalau URL tidak ada entity → tampilkan grup (undefined)
+    ? (searchParams.entity && entityKeys.includes(searchParams.entity) ? searchParams.entity : searchParams.entity)
+    // Role tanpa akses grup: selalu resolve ke entity pertama
+    : resolveEntityKey(searchParams.entity, entityKeys);
   const showingGrup = canGrup && !selectedKey;
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
@@ -76,19 +73,12 @@ export default async function DashboardPage({
 
   const rightSlot = (
     <>
-      {!isStaff && <NotifBell unreadCount={unreadCount} />}
+      <NotifBell unreadCount={unreadCount} />
       {canGrup && (
         <EntitySwitcher
           entities={entities.map((e) => ({ key: e.key, name: e.name }))}
           showGrupOption={true}
           currentEntityKey={selectedKey ?? "grup"}
-        />
-      )}
-      {isStaff && entities.length > 1 && (
-        <EntitySwitcher
-          entities={entities.map((e) => ({ key: e.key, name: e.name }))}
-          showGrupOption={false}
-          currentEntityKey={selectedKey ?? entityKeys[0]}
         />
       )}
       <UserBadge name={name} role={role} />
@@ -141,12 +131,6 @@ export default async function DashboardPage({
       />
 
       {welcomeBanner}
-
-      {isStaff && (
-        <span className="text-[10.5px] font-bold text-muted-faint bg-surface-hover px-2.5 py-1 rounded-full w-fit">
-          Mode Tampilan Saja
-        </span>
-      )}
 
       {/* Grup / Master Dashboard view */}
       {showingGrup ? (
@@ -254,7 +238,7 @@ export default async function DashboardPage({
             revenue={selectedEntity.revenue}
             spend={selectedEntity.spend}
             profit={selectedEntity.profit}
-            interactive={!isStaff}
+            interactive={true}
           />
 
           {entityLaporanData && (

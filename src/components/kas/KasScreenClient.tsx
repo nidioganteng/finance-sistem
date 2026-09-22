@@ -153,7 +153,7 @@ export function KasScreenClient({
             {saldoLabel}: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
           </div>
 
-          {/* Rekening switcher — hanya tampil di Bank Buku */}
+          {/* Rekening switcher — hanya tampil di Buku Bank */}
           {rekeningOptions.length > 1 && (
             <div className="flex items-center gap-1 bg-surface-hover rounded-pill p-1">
               {rekeningOptions.map((r) => (

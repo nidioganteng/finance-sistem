@@ -10,7 +10,7 @@ export async function getCoaOptions(scope: "KAS" | "BANK" = "KAS") {
   return accounts.sort((a, b) => parseInt(a.code) - parseInt(b.code));
 }
 
-// rekeningNama dipakai untuk Bank Buku agar saldo dihitung per rekening, bukan per entity
+// rekeningNama dipakai untuk Buku Bank agar saldo dihitung per rekening, bukan per entity
 export async function getRunningSaldo(entityId: string, jenisInputId: string, rekeningNama?: string) {
   const kasEntries = await prisma.transaction.findMany({
     where: {

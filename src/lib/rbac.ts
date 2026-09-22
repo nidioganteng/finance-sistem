@@ -40,7 +40,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       items: [
         { label: "Kas Kecil", href: "/kas-kecil", icon: "walletCards" },
         { label: "Kas Besar", href: "/kas-besar", icon: "walletCards" },
-        { label: "Bank Buku", href: "/bank-buku", icon: "receipt" },
+        { label: "Buku Bank", href: "/bank-buku", icon: "receipt" },
         { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
         { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "receipt" },
@@ -75,7 +75,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       items: [
         { label: "Kas Kecil", href: "/kas-kecil", icon: "walletCards" },
         { label: "Kas Besar", href: "/kas-besar", icon: "walletCards" },
-        { label: "Bank Buku", href: "/bank-buku", icon: "receipt" },
+        { label: "Buku Bank", href: "/bank-buku", icon: "receipt" },
         { label: "Jurnal Umum", href: "/jurnal", icon: "fileText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
         { label: "Laporan Keuangan", href: "/laporan-keuangan", icon: "fileText" },
@@ -127,7 +127,7 @@ export function canViewGrupAggregate(role: Role): boolean {
   return role === "SUPER_ADMIN" || role === "MANAJER_KEUANGAN";
 }
 
-// Siapa yang boleh input/edit/hapus transaksi Kas Kecil, Kas Besar, Bank Buku.
+// Siapa yang boleh input/edit/hapus transaksi Kas Kecil, Kas Besar, Buku Bank.
 // Manajer Keuangan awalnya cuma monitoring (read-only) — sekarang dikasih akses
 // penuh yang sama dengan Staf Keuangan (issue #5).
 export function canManageTransaksi(role: Role): boolean {

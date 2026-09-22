@@ -244,7 +244,7 @@ export function RingkasanTab({
               { key: "semua", label: "Semua" },
               { key: "kasKecil", label: "Kas Kecil" },
               { key: "kasBesar", label: "Kas Besar" },
-              { key: "bankBuku", label: "Bank Buku" },
+              { key: "bankBuku", label: "Buku Bank" },
             ].map((chip) => (
               <button
                 key={chip.key}

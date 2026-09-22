@@ -1,4 +1,4 @@
-import { PrismaClient, Role, UserStatus, CoaKategori } from "@prisma/client";
+import { PrismaClient, Role, UserStatus, CoaKategori, ReportType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -260,11 +260,20 @@ async function main() {
     { code: "1500", name: "Kas Kecil KP",                kategori: A, scope: "BANK" },
   ];
 
+  // "Rumah Akun" (issue #28): ASET yang namanya kas/bank masuk Arus Kas,
+  // ASET lainnya (piutang, proyek, aktiva tetap) cuma masuk Neraca.
+  function deriveReportType(kategori: CoaKategori, name: string): ReportType {
+    if (kategori === CoaKategori.PENDAPATAN || kategori === CoaKategori.BEBAN) return ReportType.LABA_RUGI;
+    if (kategori === CoaKategori.ASET && /kas|bank|bri|bpd|bni|mdr/i.test(name)) return ReportType.ARUS_KAS;
+    return ReportType.NERACA;
+  }
+
   for (const c of [...coaKas, ...coaBank]) {
+    const reportType = deriveReportType(c.kategori, c.name);
     await prisma.coaAccount.upsert({
       where: { code_scope: { code: c.code, scope: c.scope } },
-      update: { name: c.name, kategori: c.kategori },
-      create: c,
+      update: { name: c.name, kategori: c.kategori, reportType },
+      create: { ...c, reportType },
     });
   }
 

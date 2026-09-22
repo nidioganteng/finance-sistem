@@ -7,8 +7,10 @@ const MONTHS = [
 ];
 
 export async function getArusKasData(entityId: string, year: number) {
-  // Filter ke akun ASET (kas & bank) saja — debit = kas masuk, kredit = kas keluar.
-  // Kalau kita ambil semua transaksi, debit total == kredit total (balanced) → net selalu 0.
+  // Filter ke akun ber-reportType ARUS_KAS (kas & bank) saja — debit = kas masuk,
+  // kredit = kas keluar. Kalau kita ambil semua transaksi, debit total == kredit
+  // total (balanced) → net selalu 0. Sebelumnya filter pakai kategori "ASET" yang
+  // terlalu luas (ikut menghitung piutang/aktiva tetap sebagai kas — issue #28).
   const transactions = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -16,7 +18,7 @@ export async function getArusKasData(entityId: string, year: number) {
         gte: new Date(`${year}-01-01`),
         lte: new Date(`${year}-12-31T23:59:59`),
       },
-      coaAccount: { kategori: "ASET" },
+      coaAccount: { reportType: "ARUS_KAS" },
     },
     orderBy: { tanggal: "asc" },
   });

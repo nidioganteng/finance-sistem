@@ -85,6 +85,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
     {
       title: "Lainnya",
       items: [
+        { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "bookOpen" },
         { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "listChecks" },
       ],

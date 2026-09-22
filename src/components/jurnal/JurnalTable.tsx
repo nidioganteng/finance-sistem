@@ -14,6 +14,7 @@ type JurnalRow = {
   sumberColor: string;
   sumberLabel: string;
   isKasEntry: boolean;
+  isKredit: boolean;
   kodeAkun: string;
   namaAkun: string;
   canEditKodeAkun: boolean;
@@ -134,7 +135,7 @@ export function JurnalTable({
                     </>
                   )}
                 </td>
-                <td className="py-2.5 px-1.5 text-[12px] font-mono text-muted">
+                <td className={`py-2.5 px-1.5 text-[12px] font-mono text-muted ${r.isKredit ? "pl-6" : ""}`}>
                   {editingId === r.id ? (
                     <div className="flex items-center gap-1 w-52">
                       <div className="flex-1">
@@ -155,6 +156,7 @@ export function JurnalTable({
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
+                      {r.isKredit && <span className="text-muted-faint select-none">↳</span>}
                       {r.kodeAkun}
                       {canEditAkun && r.canEditKodeAkun && (
                         <button onClick={() => startEdit(r)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit kode akun">
@@ -164,7 +166,7 @@ export function JurnalTable({
                     </div>
                   )}
                 </td>
-                <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
+                <td className={`py-2.5 px-1.5 text-[13px] font-semibold text-navy-text ${r.isKredit ? "pl-6 italic" : ""}`}>
                   {r.namaAkun}
                   {r.isKasEntry && (
                     <span className="ml-1.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded">

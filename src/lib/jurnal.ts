@@ -58,11 +58,18 @@ export async function getJurnalRows(
       },
       include: { jenisInput: true, coaAccount: true, project: true, staff: true },
     });
-    // Gabung dan urutkan ulang
-    const combined = [...rows, ...kasEntries];
-    combined.sort((a, b) => b.tanggal.getTime() - a.tanggal.getTime() || b.createdAt.getTime() - a.createdAt.getTime());
-    allRows = combined;
+    allRows = [...rows, ...kasEntries];
   }
+
+  // Konvensi jurnal: dalam satu noBukti, baris Debit selalu di atas Kredit.
+  // createdAt bisa sama persis (satu $transaction), jadi tidak bisa dijadikan
+  // tiebreaker — gunakan nilai debit untuk memastikan urutan yang benar.
+  allRows = allRows.slice().sort((a, b) => {
+    const dateDiff = b.tanggal.getTime() - a.tanggal.getTime();
+    if (dateDiff !== 0) return dateDiff;
+    if (a.noBukti !== b.noBukti) return b.createdAt.getTime() - a.createdAt.getTime();
+    return Number(b.debit) - Number(a.debit);
+  });
 
   const totalDebit = allRows.reduce((s, r) => s + Number(r.debit), 0);
   const totalKredit = allRows.reduce((s, r) => s + Number(r.kredit), 0);
@@ -98,6 +105,7 @@ export async function getJurnalRows(
         sumberColor: style.color,
         sumberLabel: style.label,
         isKasEntry,
+        isKredit: kredit > 0 && debit === 0,
         kodeAkun,
         namaAkun,
         canEditKodeAkun: !isKasEntry && !!r.coaAccount,

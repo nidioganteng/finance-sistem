@@ -32,7 +32,7 @@ export async function getDaftarAkunData(entityId: string, year: number) {
   const rows = allCoa.map((coa) => {
     const { debit, kredit } = totalsByAccount.get(coa.id) ?? { debit: 0, kredit: 0 };
     const saldoAwal = saldoAwalByAccount.get(coa.id) ?? 0;
-    const saldoAkhir = hitungSaldoAkhir(coa.kategori, saldoAwal, debit, kredit);
+    const saldoAkhir = hitungSaldoAkhir(coa.kategori, coa.code, saldoAwal, debit, kredit);
     return {
       coaId: coa.id,
       code: coa.code,

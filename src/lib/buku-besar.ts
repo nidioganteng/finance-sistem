@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { CoaKategori } from "@prisma/client";
-import { DEBET_NORMAL, hitungSaldoAkhir } from "./akuntansi";
+import { isDebetNormal, hitungSaldoAkhir } from "./akuntansi";
 
 // ── Tampilan Rekap ───────────────────────────────────────────────
 // Satu baris per akun COA: Saldo Awal | Total Debet | Total Kredit | Saldo Akhir
@@ -47,7 +47,7 @@ export async function getBukuBesarRekap(entityId: string, year: number) {
     .sort((a, b) => a.code.localeCompare(b.code))
     .map((g) => {
       const saldoAwal = saldoAwalByAccount.get(g.coaId) ?? 0;
-      const saldoAkhir = hitungSaldoAkhir(g.kategori, saldoAwal, g.totalDebet, g.totalKredit);
+      const saldoAkhir = hitungSaldoAkhir(g.kategori, g.code, saldoAwal, g.totalDebet, g.totalKredit);
       return {
         coaId: g.coaId,
         code: g.code,
@@ -99,13 +99,13 @@ export async function getBukuBesarDrilldown(entityId: string, coaId: string, yea
     orderBy: [{ tanggal: "asc" }, { createdAt: "asc" }],
   });
 
-  const isDebetNormal = DEBET_NORMAL.includes(coa.kategori);
+  const debetNormal = isDebetNormal(coa.kategori, coa.code);
   let saldo = saldoAwal;
 
   const entries = transactions.map((t) => {
     const debit = Number(t.debit);
     const kredit = Number(t.kredit);
-    saldo += isDebetNormal ? debit - kredit : kredit - debit;
+    saldo += debetNormal ? debit - kredit : kredit - debit;
     return {
       tanggal: t.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
       noBukti: t.noBukti,

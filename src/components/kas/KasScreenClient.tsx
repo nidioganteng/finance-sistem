@@ -256,7 +256,7 @@ export function KasScreenClient({
 
         <button
           onClick={() => setPanelOpen((v) => !v)}
-          className="px-4.5 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold"
+          className="px-7 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold"
         >
           {panelOpen ? "Tutup Form" : "+ Transaksi Baru"}
         </button>

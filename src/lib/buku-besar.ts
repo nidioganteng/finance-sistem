@@ -1,33 +1,25 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { CoaKategori } from "@prisma/client";
-
-// Debet-normal: saldo bertambah saat debet, berkurang saat kredit
-const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];
-
-function hitungSaldoAkhir(
-  kategori: CoaKategori,
-  saldoAwal: number,
-  totalDebet: number,
-  totalKredit: number
-) {
-  return DEBET_NORMAL.includes(kategori)
-    ? saldoAwal + totalDebet - totalKredit
-    : saldoAwal + totalKredit - totalDebet;
-}
+import { isDebetNormal, hitungSaldoAkhir } from "./akuntansi";
 
 // ── Tampilan Rekap ───────────────────────────────────────────────
 // Satu baris per akun COA: Saldo Awal | Total Debet | Total Kredit | Saldo Akhir
 export async function getBukuBesarRekap(entityId: string, year: number) {
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      entityId,
-      coaAccountId: { not: null },
-      tanggal: { gte: new Date(`${year}-01-01`), lte: new Date(`${year}-12-31T23:59:59`) },
-    },
-    include: { coaAccount: true },
-    orderBy: [{ tanggal: "asc" }, { createdAt: "asc" }],
-  });
+  const [transactions, saldoAwalRows] = await Promise.all([
+    prisma.transaction.findMany({
+      where: {
+        entityId,
+        coaAccountId: { not: null },
+        tanggal: { gte: new Date(`${year}-01-01`), lte: new Date(`${year}-12-31T23:59:59`) },
+      },
+      include: { coaAccount: true },
+      orderBy: [{ tanggal: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.saldoAwal.findMany({ where: { entityId, year } }),
+  ]);
+
+  const saldoAwalByAccount = new Map(saldoAwalRows.map((s) => [s.coaAccountId, Number(s.nominal)]));
 
   const grouped = new Map<
     string,
@@ -54,9 +46,8 @@ export async function getBukuBesarRekap(entityId: string, year: number) {
   const rows = Array.from(grouped.values())
     .sort((a, b) => a.code.localeCompare(b.code))
     .map((g) => {
-      // Saldo awal carry-over belum diimplementasi (belum ada data periode sebelumnya)
-      const saldoAwal = 0;
-      const saldoAkhir = hitungSaldoAkhir(g.kategori, saldoAwal, g.totalDebet, g.totalKredit);
+      const saldoAwal = saldoAwalByAccount.get(g.coaId) ?? 0;
+      const saldoAkhir = hitungSaldoAkhir(g.kategori, g.code, saldoAwal, g.totalDebet, g.totalKredit);
       return {
         coaId: g.coaId,
         code: g.code,
@@ -66,7 +57,7 @@ export async function getBukuBesarRekap(entityId: string, year: number) {
         totalDebet: g.totalDebet,
         totalKredit: g.totalKredit,
         saldoAkhir,
-        saldoAwalFmt: formatRupiah(saldoAwal),
+        saldoAwalFmt: formatRupiah(Math.abs(saldoAwal)),
         totalDebetFmt: formatRupiah(g.totalDebet),
         totalKreditFmt: formatRupiah(g.totalKredit),
         saldoAkhirFmt: formatRupiah(Math.abs(saldoAkhir)),
@@ -91,8 +82,13 @@ export async function getBukuBesarRekap(entityId: string, year: number) {
 // ── Tampilan Drill-down ──────────────────────────────────────────
 // Semua baris jurnal yang menyentuh satu akun, dengan saldo berjalan per akun
 export async function getBukuBesarDrilldown(entityId: string, coaId: string, year: number) {
-  const coa = await prisma.coaAccount.findUnique({ where: { id: coaId } });
+  const [coa, saldoAwalRow] = await Promise.all([
+    prisma.coaAccount.findUnique({ where: { id: coaId } }),
+    prisma.saldoAwal.findUnique({ where: { entityId_coaAccountId_year: { entityId, coaAccountId: coaId, year } } }),
+  ]);
   if (!coa) return null;
+
+  const saldoAwal = Number(saldoAwalRow?.nominal ?? 0);
 
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -103,13 +99,13 @@ export async function getBukuBesarDrilldown(entityId: string, coaId: string, yea
     orderBy: [{ tanggal: "asc" }, { createdAt: "asc" }],
   });
 
-  const isDebetNormal = DEBET_NORMAL.includes(coa.kategori);
-  let saldo = 0;
+  const debetNormal = isDebetNormal(coa.kategori, coa.code);
+  let saldo = saldoAwal;
 
   const entries = transactions.map((t) => {
     const debit = Number(t.debit);
     const kredit = Number(t.kredit);
-    saldo += isDebetNormal ? debit - kredit : kredit - debit;
+    saldo += debetNormal ? debit - kredit : kredit - debit;
     return {
       tanggal: t.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
       noBukti: t.noBukti,
@@ -127,6 +123,9 @@ export async function getBukuBesarDrilldown(entityId: string, coaId: string, yea
   return {
     coa: { id: coa.id, code: coa.code, name: coa.name, kategori: coa.kategori },
     entries,
+    saldoAwal,
+    saldoAwalFmt: formatRupiah(Math.abs(saldoAwal)),
+    saldoAwalNegatif: saldoAwal < 0,
     totalDebetFmt: formatRupiah(totalDebet),
     totalKreditFmt: formatRupiah(totalKredit),
     saldoAkhirFmt: formatRupiah(Math.abs(saldo)),

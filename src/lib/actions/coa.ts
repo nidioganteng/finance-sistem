@@ -16,7 +16,10 @@ export async function createCOA(formData: FormData) {
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 
-  await prisma.coaAccount.create({ data: { code, name, kategori, reportType } });
+  const last = await prisma.coaAccount.findFirst({ orderBy: { urutan: "desc" }, select: { urutan: true } });
+  const urutan = (last?.urutan ?? -1) + 1;
+
+  await prisma.coaAccount.create({ data: { code, name, kategori, reportType, urutan } });
   if (session?.user.id) {
     logActivity(session.user.id, `Tambah COA ${code} – ${name}`, "FINANCIAL_CHANGE", { code, name, kategori, reportType });
   }

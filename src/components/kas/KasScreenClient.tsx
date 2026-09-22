@@ -6,7 +6,7 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number };
@@ -43,6 +43,8 @@ export function KasScreenClient({
   allEntities = [],
   projectOptions = [],
   defaultArahLaporan = [],
+  dari = "",
+  sampai = "",
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -56,6 +58,8 @@ export function KasScreenClient({
   allEntities?: { key: string; name: string }[];
   projectOptions?: ProjectOption[];
   defaultArahLaporan?: string[];
+  dari?: string;
+  sampai?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,6 +71,26 @@ export function KasScreenClient({
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(false);
+  const [filterDari, setFilterDari] = useState(dari);
+  const [filterSampai, setFilterSampai] = useState(sampai);
+
+  function applyDateFilter() {
+    const params = new URLSearchParams(searchParams.toString());
+    if (filterDari) params.set("dari", filterDari); else params.delete("dari");
+    if (filterSampai) params.set("sampai", filterSampai); else params.delete("sampai");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function resetDateFilter() {
+    setFilterDari("");
+    setFilterSampai("");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("dari");
+    params.delete("sampai");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  const isFiltered = !!dari || !!sampai;
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -147,6 +171,38 @@ export function KasScreenClient({
           isPending={isPending}
         />
       )}
+
+      {/* Filter tanggal */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <CalendarDays size={14} className="text-muted-faint flex-none" />
+        <input
+          type="date"
+          value={filterDari}
+          onChange={(e) => setFilterDari(e.target.value)}
+          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
+        />
+        <span className="text-[12px] text-muted-faint">—</span>
+        <input
+          type="date"
+          value={filterSampai}
+          onChange={(e) => setFilterSampai(e.target.value)}
+          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
+        />
+        <button
+          onClick={applyDateFilter}
+          className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold"
+        >
+          Terapkan
+        </button>
+        {isFiltered && (
+          <button
+            onClick={resetDateFilter}
+            className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
+          >
+            <X size={11} /> Reset
+          </button>
+        )}
+      </div>
 
       <div className="flex items-center justify-between flex-wrap gap-3.5">
         <div className="flex items-center gap-2 flex-wrap">

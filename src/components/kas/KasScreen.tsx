@@ -24,7 +24,7 @@ export async function KasScreen({
   title: string;
   subtitle: string;
   pagePath: string;
-  searchParams: { entity?: string; rekening?: string };
+  searchParams: { entity?: string; rekening?: string; dari?: string; sampai?: string };
   excludeEntityKeys?: string[];
 }) {
   const session = await getServerSession(authOptions);
@@ -58,7 +58,7 @@ export async function KasScreen({
   const [coaOptions, saldo, ledger, projectOptions] = await Promise.all([
     getCoaOptions(),
     getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama),
-    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama),
+    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama, searchParams.dari, searchParams.sampai),
     getProjectOptions(selectedEntity.id),
   ]);
 
@@ -92,6 +92,8 @@ export async function KasScreen({
         allEntities={entities.map((e) => ({ key: e.key, name: e.name }))}
         projectOptions={projectOptions}
         defaultArahLaporan={defaultArahLaporan}
+        dari={searchParams.dari ?? ""}
+        sampai={searchParams.sampai ?? ""}
       />
     </>
   );

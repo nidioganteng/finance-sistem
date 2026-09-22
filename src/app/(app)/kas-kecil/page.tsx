@@ -1,7 +1,7 @@
 import { KasScreen } from "@/components/kas/KasScreen";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export default function KasKecilPage({ searchParams }: { searchParams: { entity?: string } }) {
+export default function KasKecilPage({ searchParams }: { searchParams: { entity?: string; dari?: string; sampai?: string } }) {
   return (
     <PageTransition>
       <KasScreen

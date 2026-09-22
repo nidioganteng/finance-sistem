@@ -243,7 +243,9 @@ async function DrilldownView({
               <td colSpan={5} className="py-2.5 px-5 text-[12px] font-semibold text-muted-faint italic">
                 Saldo Awal {year}
               </td>
-              <td className="py-2.5 px-5 text-right tabular-nums text-[12px] font-bold text-muted">Rp 0</td>
+              <td className={`py-2.5 px-5 text-right tabular-nums text-[12px] font-bold ${data.saldoAwalNegatif ? "text-status-red" : "text-muted"}`}>
+                {data.saldoAwalNegatif ? "-" : ""}{data.saldoAwalFmt}
+              </td>
             </tr>
 
             {data.entries.length === 0 ? (

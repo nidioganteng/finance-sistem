@@ -250,10 +250,12 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     return [...crossAkun, crossKas];
   });
 
-  await prisma.$transaction([...akunRows, kasEntry, ...crossingOps, ...terminCreate]);
+  // Saat auto-sync aktif, skip akunRows — Buku Bank keluar sudah jadi counterpart-nya
+  const isSyncMode = !!(input.jenisInputKey === "kasKecil" && input.arah === "masuk" && input.syncBukuBankRekeningId);
+  await prisma.$transaction([...(isSyncMode ? [] : akunRows), kasEntry, ...crossingOps, ...terminCreate]);
 
   // Auto-sync Kas Kecil masuk → Buku Bank keluar (jika dipilih)
-  if (input.jenisInputKey === "kasKecil" && input.arah === "masuk" && input.syncBukuBankRekeningId) {
+  if (isSyncMode) {
     const bankJenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "bankBuku" } });
     if (bankJenisInput) {
       const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId);

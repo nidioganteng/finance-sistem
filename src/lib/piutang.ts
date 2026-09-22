@@ -2,7 +2,7 @@ import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
 // Daftar proyek satu entitas buat dropdown "Proyek Terkait" di form transaksi
-// Kas/Bank Buku — dipakai staf/manajer keuangan pas mencatat uang masuk yang
+// Kas/Buku Bank — dipakai staf/manajer keuangan pas mencatat uang masuk yang
 // sekalian jadi pembayaran termin proyek tertentu.
 export async function getProjectOptions(entityId: string) {
   const projects = await prisma.project.findMany({

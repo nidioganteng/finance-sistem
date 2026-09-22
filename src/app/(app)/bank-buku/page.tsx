@@ -6,7 +6,7 @@ export default function BankBukuPage({ searchParams }: { searchParams: { entity?
     <PageTransition>
       <KasScreen
         jenisInputKey="bankBuku"
-        title="Bank Buku"
+        title="Buku Bank"
         subtitle="Input dan riwayat transaksi rekening bank"
         pagePath="/bank-buku"
         searchParams={searchParams}

@@ -9,7 +9,7 @@ export type CoaLine = { code: string; name: string; saldo: number; saldoFmt: str
 const SUMBER_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   kasKecil: { bg: "#fef3c7", color: "#92400e", label: "Kas Kecil" },
   kasBesar: { bg: "#dbeafe", color: "#1e40af", label: "Kas Besar" },
-  bankBuku: { bg: "#dcfce7", color: "#166534", label: "Bank Buku" },
+  bankBuku: { bg: "#dcfce7", color: "#166534", label: "Buku Bank" },
 };
 
 export async function getLaporanKeuanganData(entityIds: string[] | string, year: number) {

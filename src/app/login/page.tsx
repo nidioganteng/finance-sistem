@@ -105,12 +105,12 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* ── Panel form — kanan, frosted glass ── */}
-      <div className="relative z-10 min-h-screen flex items-center justify-end pr-0">
-        <div className="w-full lg:w-[420px] min-h-screen lg:min-h-0 flex flex-col justify-center
-          bg-white/10 lg:bg-white/15 backdrop-blur-xl
-          lg:rounded-l-[32px] border-l border-white/20
-          px-10 py-14 shadow-2xl">
+      {/* ── Panel form — tengah, frosted glass ── */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-[420px] flex flex-col justify-center
+          bg-white/10 backdrop-blur-xl
+          rounded-[28px] border border-white/20
+          px-10 py-12 shadow-2xl">
 
           {/* Logo mobile */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">

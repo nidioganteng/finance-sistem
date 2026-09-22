@@ -49,6 +49,30 @@ export async function getRunningSaldo(entityId: string, jenisInputId: string, re
 // Ledger dikelompokkan per noBukti.
 // crossingEntityKeys: transaksi ini dikirim DARI entitas ini KE entitas-entitas lain.
 // crossingFromEntityKey: transaksi ini DITERIMA dari entitas lain (sisi destinasi crossing).
+// Saldo terakhir yang tercatat SEBELUM tanggal `sebelum` (untuk hitung Saldo Awal periode)
+export async function getSaldoSebelum(
+  entityId: string,
+  jenisInputId: string,
+  sebelum: string,
+  rekeningNama?: string,
+): Promise<number> {
+  const rows = await prisma.transaction.findMany({
+    where: {
+      entityId,
+      jenisInputId,
+      tanggal: { lt: new Date(sebelum) },
+      extraFieldsJson: { path: "$.isKasEntry", equals: true },
+    },
+    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+    take: 10,
+  });
+  if (rekeningNama) {
+    const match = rows.find((r) => (r.extraFieldsJson as Record<string, unknown>)?.rekeningNama === rekeningNama);
+    return match ? Number(match.saldoSetelah) : 0;
+  }
+  return rows.length > 0 ? Number(rows[0].saldoSetelah) : 0;
+}
+
 export async function getKasLedger(
   entityId: string,
   jenisInputId: string,

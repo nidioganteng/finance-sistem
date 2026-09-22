@@ -40,16 +40,16 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
   if (jenisInputKey === "kasKecil") {
     const code = KAS_KECIL_COA[entityKey];
     if (!code) return null;
-    return (await prisma.coaAccount.findUnique({ where: { code_scope: { code, scope: "KAS" } } }))?.id ?? null;
+    return (await prisma.coaAccount.findUnique({ where: { code } }))?.id ?? null;
   }
   if (jenisInputKey === "kasBesar") {
     const code = KAS_BESAR_COA[entityKey];
     if (!code) return null;
-    return (await prisma.coaAccount.findUnique({ where: { code_scope: { code, scope: "KAS" } } }))?.id ?? null;
+    return (await prisma.coaAccount.findUnique({ where: { code } }))?.id ?? null;
   }
   if (jenisInputKey === "bankBuku" && rekeningId) {
     const coaCode = REKENING_COA_CODE[rekeningId];
-    if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code_scope: { code: coaCode, scope: "BANK" } } }))?.id ?? null;
+    if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code: coaCode } }))?.id ?? null;
   }
   return null;
 }

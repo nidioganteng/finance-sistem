@@ -21,7 +21,7 @@ export const REKENING_BY_ENTITY: Record<string, RekeningOption[]> = {
   umum:      [{ id: "kp-bpd",  nama: "BPD KP"  }],
 };
 
-// Kode COA BANK scope untuk setiap rekening
+// Kode COA untuk setiap rekening
 export const REKENING_COA_CODE: Record<string, string> = {
   "kak-bri": "11",
   "kak-bpd": "12",

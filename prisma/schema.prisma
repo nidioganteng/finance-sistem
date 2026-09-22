@@ -126,16 +126,13 @@ enum CoaKategori {
 
 model CoaAccount {
   id         String      @id @default(cuid())
-  code       String
+  code       String      @unique // 1 kode = 1 akun, dipakai bareng di Kas Kecil/Besar & Bank Buku (issue #28)
   name       String
   kategori   CoaKategori
-  scope      String      @default("KAS") // "KAS" = kas kecil+besar, "BANK" = bank buku
   reportType ReportType  @default(NERACA) // "Rumah Akun" — laporan tempat akun ini otomatis masuk
   createdAt  DateTime    @default(now())
 
   transactions Transaction[]
-
-  @@unique([code, scope])
 }
 
 // "Rumah Akun" — dipilih manual saat daftar akun (issue #28), lebih presisi dari

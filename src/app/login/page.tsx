@@ -76,21 +76,21 @@ function LoginForm() {
       </div>
 
       {/* Label kiri atas */}
-      <div className="absolute top-6 left-8 z-20 hidden lg:block">
-        <div className="text-white/90 text-[13px] font-bold tracking-widest uppercase">Gaharu Sempana Group</div>
-        <div className="text-white/60 text-[11.5px] mt-0.5">Sistem Data Keuangan</div>
+      <div className="absolute top-7 left-8 z-20 hidden lg:block drop-shadow-lg">
+        <div className="text-white text-[15px] font-extrabold tracking-widest uppercase" style={{textShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>Gaharu Sempana Group</div>
+        <div className="text-white/80 text-[12.5px] mt-0.5 font-semibold" style={{textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>Sistem Data Keuangan</div>
       </div>
 
       {/* Logo entitas + dots — kiri bawah */}
       <div className="absolute bottom-8 left-8 z-20 hidden lg:block">
-        <div className="text-white/50 text-[10.5px] font-semibold uppercase tracking-widest mb-2.5">Entitas Grup</div>
-        <div className="flex items-center gap-3 mb-3">
+        <div className="text-white text-[11px] font-bold uppercase tracking-widest mb-3" style={{textShadow:"0 1px 4px rgba(0,0,0,0.6)"}}>Entitas Grup</div>
+        <div className="flex items-center gap-4 mb-4">
           {ENTITY_LOGOS.map((e) => (
-            <div key={e.key} className="flex flex-col items-center gap-1.5">
-              <div className="w-11 h-11 rounded-[13px] bg-white shadow-lg flex items-center justify-center overflow-hidden">
-                <Image src={e.src} alt={e.name} width={40} height={40} className="object-contain p-1" />
+            <div key={e.key} className="flex flex-col items-center gap-2">
+              <div className="w-14 h-14 rounded-[16px] bg-white flex items-center justify-center overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.35)]">
+                <Image src={e.src} alt={e.name} width={52} height={52} className="object-contain p-1" />
               </div>
-              <span className="text-white/70 text-[10px] font-semibold">{e.name}</span>
+              <span className="text-white text-[11px] font-bold" style={{textShadow:"0 1px 4px rgba(0,0,0,0.6)"}}>{e.name}</span>
             </div>
           ))}
         </div>
@@ -99,7 +99,7 @@ function LoginForm() {
             <button
               key={i}
               onClick={() => setSlideIdx(i)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${i === slideIdx ? "w-6 bg-white" : "w-1.5 bg-white/40"}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === slideIdx ? "w-6 bg-white" : "w-1.5 bg-white/50"}`}
             />
           ))}
         </div>
@@ -108,9 +108,9 @@ function LoginForm() {
       {/* ── Panel form — tengah, frosted glass ── */}
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-[420px] flex flex-col justify-center
-          bg-white/10 backdrop-blur-xl
-          rounded-[28px] border border-white/20
-          px-10 py-12 shadow-2xl">
+          bg-white/15 dark:bg-black/40 backdrop-blur-2xl
+          rounded-[28px] border border-white/25 dark:border-white/10
+          px-10 py-12 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
 
           {/* Logo mobile */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">

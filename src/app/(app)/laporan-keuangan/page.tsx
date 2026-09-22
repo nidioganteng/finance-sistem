@@ -195,19 +195,62 @@ function NeracaTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ── Aktiva ── */}
-        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-          <SectionHeader color="blue" label="Aktiva" />
-          <div className="divide-y divide-surface-subtle">
-            {data.aset.length === 0 ? (
-              <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aset.</p>
-            ) : (
-              data.aset.map((item) => (
-                <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
-              ))
-            )}
+        <div className="flex flex-col gap-4">
+          {/* I. Aktiva Lancar */}
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+            <SectionHeader color="blue" label="I. Aktiva Lancar" />
+            <div className="divide-y divide-surface-subtle">
+              {data.aktivaLancar.length === 0 ? (
+                <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva lancar.</p>
+              ) : (
+                data.aktivaLancar.map((item) => (
+                  <ItemRow
+                    key={item.code}
+                    code={item.code}
+                    name={item.name + (item.isContra ? " (Kontra)" : "")}
+                    amount={item.saldoFmt}
+                    amountClass={item.isContra ? "text-status-amber" : "text-navy-text"}
+                  />
+                ))
+              )}
+            </div>
+            <SubtotalRow
+              label="Total Aktiva Lancar"
+              amount={data.totalAktivaLancarFmt}
+              bgClass="bg-blue-50/50 dark:bg-blue-500/10"
+              borderClass="border-blue-100 dark:border-blue-500/20"
+            />
           </div>
+
+          {/* II. Aktiva Tetap */}
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+            <SectionHeader color="blue" label="II. Aktiva Tetap" />
+            <div className="divide-y divide-surface-subtle">
+              {data.aktivaTetap.length === 0 ? (
+                <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva tetap.</p>
+              ) : (
+                data.aktivaTetap.map((item) => (
+                  <ItemRow
+                    key={item.code}
+                    code={item.code}
+                    name={item.name + (item.isContra ? " (Pengurang)" : "")}
+                    amount={item.saldoFmt}
+                    amountClass={item.isContra ? "text-status-amber" : "text-navy-text"}
+                  />
+                ))
+              )}
+            </div>
+            <SubtotalRow
+              label="Total Aktiva Tetap (Net)"
+              amount={data.totalAktivaTetapFmt}
+              bgClass="bg-cyan-50/50 dark:bg-cyan-500/10"
+              borderClass="border-cyan-100 dark:border-cyan-500/20"
+            />
+          </div>
+
+          {/* Total Aktiva */}
           <TotalRow
-            label="Total Aktiva"
+            label="Total Aktiva (Lancar + Tetap)"
             amount={data.totalAsetFmt}
             amountClass={data.neracaBalanced ? "text-blue-700 dark:text-blue-400" : "text-status-red"}
             bgClass="bg-blue-50 dark:bg-blue-500/15"
@@ -219,7 +262,7 @@ function NeracaTab({
         <div className="flex flex-col gap-4">
           {/* Kewajiban */}
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="orange" label="Kewajiban" />
+            <SectionHeader color="orange" label="I. Kewajiban" />
             <div className="divide-y divide-surface-subtle">
               {data.kewajiban.length === 0 ? (
                 <p className="py-4 px-5 text-[13px] text-muted-faint italic">Tidak ada kewajiban.</p>
@@ -237,13 +280,24 @@ function NeracaTab({
             />
           </div>
 
-          {/* Modal */}
+          {/* Modal & Ekuitas */}
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="violet" label="Modal" />
+            <SectionHeader color="violet" label="II. Modal & Ekuitas" />
             <div className="divide-y divide-surface-subtle">
               {data.modal.map((item) => (
                 <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
               ))}
+              {/* Laba Ditahan (Akun 310) */}
+              <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-violet-50/30 dark:bg-violet-500/5">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <code className="text-[10.5px] text-muted-faintest font-mono shrink-0">310</code>
+                  <span className="text-[13px] text-muted-stronger">Laba Ditahan</span>
+                </div>
+                <span className="tabular-nums text-[13px] font-semibold shrink-0 text-navy-text">
+                  {data.labaDitahanFmt}
+                </span>
+              </div>
+              {/* Laba Tahun Berjalan */}
               <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-green-50/40 dark:bg-green-500/10">
                 <span className="text-[13px] font-semibold text-muted-stronger">Laba Tahun Berjalan {year}</span>
                 <span className={`tabular-nums text-[13px] font-bold shrink-0 ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
@@ -252,8 +306,8 @@ function NeracaTab({
               </div>
             </div>
             <SubtotalRow
-              label="Total Modal"
-              amount={formatRupiah(Math.abs(data.totalModal + data.labaBersih))}
+              label="Total Modal & Laba"
+              amount={data.totalModalDanLabaFmt}
               bgClass="bg-violet-50/50 dark:bg-violet-500/10"
               borderClass="border-violet-100 dark:border-violet-500/20"
             />
@@ -266,7 +320,7 @@ function NeracaTab({
               : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"
           }`}>
             <div>
-              <p className="font-extrabold text-[13px] text-navy-text">Total Kewajiban + Modal</p>
+              <p className="font-extrabold text-[13px] text-navy-text">Total Pasiva (Kewajiban + Modal + Laba)</p>
               <p className={`text-[11.5px] font-semibold mt-0.5 ${
                 data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
               }`}>

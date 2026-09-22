@@ -1,8 +1,34 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { formatMiliar } from "@/lib/dashboard-data";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
+
+const ENTITY_LOGO: Record<string, string> = {
+  gaharu: "/logo-entitas/gaharu.webp",
+  kencana: "/logo-entitas/kencana.webp",
+  tataring: "/logo-entitas/tataring.webp",
+  ciptaAsri: "/logo-entitas/cipta-asri.webp",
+};
+
+function EntityAvatar({ entityKey, name, colorHex, size = "md" }: { entityKey: string; name: string; colorHex: string; size?: "sm" | "md" | "lg" }) {
+  const logo = ENTITY_LOGO[entityKey];
+  const dim = size === "sm" ? "w-8 h-8" : size === "lg" ? "w-11 h-11" : "w-9 h-9";
+  const rounded = size === "lg" ? "rounded-2xl" : "rounded-xl";
+  if (logo) {
+    return (
+      <div className={`${dim} ${rounded} bg-white flex items-center justify-center flex-none shadow-sm overflow-hidden border border-border-soft`}>
+        <Image src={logo} alt={name} width={36} height={36} className="object-contain w-full h-full p-0.5" />
+      </div>
+    );
+  }
+  return (
+    <div className={`${dim} ${rounded} flex items-center justify-center text-white font-extrabold flex-none shadow-sm`} style={{ background: colorHex }}>
+      {name[0]}
+    </div>
+  );
+}
 
 // ── Compact card — Master Dashboard (grup view) ──────────────────────────────
 export function EntityCardCompact({
@@ -37,12 +63,7 @@ export function EntityCardCompact({
         <div className="p-4">
           {/* Header */}
           <div className="flex items-center gap-2.5 mb-3">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[13px] font-extrabold flex-none shadow-sm"
-              style={{ background: colorHex }}
-            >
-              {name[0]}
-            </div>
+            <EntityAvatar entityKey={entityKey} name={name} colorHex={colorHex} size="sm" />
             <div className="min-w-0">
               <div className="text-[13.5px] font-extrabold text-navy-text truncate">{name}</div>
               {!isUmum && <div className="text-[10.5px] text-muted truncate">{legalName}</div>}
@@ -117,12 +138,7 @@ export function EntityCard({
         style={{ background: `linear-gradient(135deg, ${colorHex}22 0%, ${colorHex}08 100%)` }}
       >
         <div className="flex items-center gap-3">
-          <div
-            className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-lg font-extrabold flex-none shadow"
-            style={{ background: colorHex }}
-          >
-            {name[0]}
-          </div>
+          <EntityAvatar entityKey={entityKey} name={name} colorHex={colorHex} size="lg" />
           <div>
             <div className="text-[17px] font-extrabold text-navy-text">{name}</div>
             <div className="text-[11.5px] text-muted">{legalName}</div>

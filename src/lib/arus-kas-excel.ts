@@ -17,14 +17,15 @@ export async function generateArusKasExcel(data: ArusKasPresisiData): Promise<Bu
     { key: "nominal", width: 26 },
   ];
 
-  const accountingFormat = '#,##0;(#,##0);"-"';
+  const accountingFormat = '"Rp "#,##0;"Rp "(#,##0);"Rp -"';
 
   // 1. Title Rows
   const titleRow1 = worksheet.addRow([data.entityName.toUpperCase()]);
   titleRow1.font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
   titleRow1.alignment = { vertical: "middle", horizontal: "left" };
 
-  const titleRow2 = worksheet.addRow(["LAPORAN ARUS KAS"]);
+  const versionSuffix = data.version === "UMUM" ? " (VERSI UMUM)" : " (VERSI INTERNAL)";
+  const titleRow2 = worksheet.addRow([`LAPORAN ARUS KAS${versionSuffix}`]);
   titleRow2.font = { bold: true, size: 14, color: { argb: "FF0F172A" } };
   titleRow2.alignment = { vertical: "middle", horizontal: "left" };
 

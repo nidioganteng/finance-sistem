@@ -34,8 +34,7 @@ export default async function LaporanKeuanganPage({
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const rawTab = searchParams.tab ?? "neraca";
-  const tab = currentVersion === "UMUM" && rawTab === "arus-kas" ? "neraca" : rawTab;
+  const tab = searchParams.tab ?? "neraca";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;

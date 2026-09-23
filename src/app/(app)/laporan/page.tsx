@@ -96,8 +96,7 @@ export default async function LaporanPage({
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const rawTab = searchParams.tab ?? "ringkasan";
-  const tab = currentVersion === "UMUM" && rawTab === "arus-kas" ? "ringkasan" : rawTab;
+  const tab = searchParams.tab ?? "ringkasan";
 
   // For group view, aggregate all entity data
   const entityIds = selectedEntity

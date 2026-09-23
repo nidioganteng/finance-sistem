@@ -1,8 +1,6 @@
 import { prisma } from "./prisma";
 import { getPenyusutanSummary } from "./aset-tetap";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
 import type { ReportVersion } from "./laba-rugi";
-import type { ReportCategory } from "@prisma/client";
 
 export interface ArusKasRow {
   label: string;
@@ -69,7 +67,7 @@ export interface ArusKasPresisiData {
 export function formatRupiahArusKas(val: number): string {
   if (val === 0 || Math.round(val) === 0) return "Rp -";
   const abs = Math.abs(Math.round(val)).toLocaleString("id-ID");
-  return val < 0 ? `-Rp ${abs}` : `Rp ${abs}`;
+  return val < 0 ? `Rp (${abs})` : `Rp ${abs}`;
 }
 
 export async function getArusKasPresisiData(
@@ -78,7 +76,6 @@ export async function getArusKasPresisiData(
   version: ReportVersion = "INTERNAL"
 ): Promise<ArusKasPresisiData> {
   const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const allowedCategories: ReportCategory[] = normVersion === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const entity = await prisma.entity.findUnique({
     where: { id: entityId },
@@ -88,18 +85,15 @@ export async function getArusKasPresisiData(
   const start = new Date(`${year}-01-01`);
   const end = new Date(`${year}-12-31T23:59:59`);
 
-  const [excludedNoBukti, penyusutanSummary, allAccounts, saldoAwalList, transactions, assetsList] = await Promise.all([
-    getExcludedNoBuktiForVersion(entityId, year, normVersion),
+  const [penyusutanSummary, allAccounts, saldoAwalList, transactions, assetsList] = await Promise.all([
     getPenyusutanSummary(entityId, year),
     prisma.coaAccount.findMany({
-      where: { reportCategory: { in: allowedCategories } },
       orderBy: { code: "asc" },
     }),
     prisma.saldoAwal.findMany({
       where: {
         entityId,
         year,
-        coaAccount: { reportCategory: { in: allowedCategories } },
       },
     }),
     prisma.transaction.findMany({
@@ -107,7 +101,6 @@ export async function getArusKasPresisiData(
         entityId,
         tanggal: { gte: start, lte: end },
         coaAccountId: { not: null },
-        coaAccount: { reportCategory: { in: allowedCategories } },
       },
       include: { coaAccount: true },
     }),
@@ -116,8 +109,7 @@ export async function getArusKasPresisiData(
     }),
   ]);
 
-  const excludedSet = new Set(excludedNoBukti);
-  const activeTx = transactions.filter((t) => !excludedSet.has(t.noBukti));
+  const activeTx = transactions;
 
   // Map Saldo Awal per CoaAccount ID & Code
   const saldoAwalMap = new Map<string, number>();

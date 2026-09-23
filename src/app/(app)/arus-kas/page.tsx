@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getArusKasData } from "@/lib/arus-kas";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -10,6 +11,7 @@ import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
 
 export default async function ArusKasPage({
   searchParams,
@@ -31,14 +33,17 @@ export default async function ArusKasPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getArusKasData(selectedEntity.id, currentYear, currentVersion);
+  const [data, presisiData] = await Promise.all([
+    getArusKasData(selectedEntity.id, currentYear, currentVersion),
+    getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion),
+  ]);
   const hasData = data.monthly.some((m) => m.hasData);
 
   return (
     <PageTransition>
       <PageHeader
         title="Arus Kas"
-        subtitle={`Ringkasan arus kas masuk dan keluar — ${selectedEntity.name} ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
+        subtitle={`Laporan Arus Kas — ${selectedEntity.name} ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
         rightSlot={
           <>
             <YearSelect currentYear={currentYear} />
@@ -51,13 +56,18 @@ export default async function ArusKasPage({
         }
       />
 
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total Kas Masuk", value: data.totalMasukFmt, color: "text-status-green" },
-          { label: "Total Kas Keluar", value: data.totalKeluarFmt, color: "text-status-red" },
-          {
-            label: "Net Arus Kas",
-            value: (data.netTotalPositive ? "" : "-") + data.netTotalFmt,
+      <ArusKasTabWrapper
+        presisiData={presisiData}
+        entityId={selectedEntity.id}
+        standardView={
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Total Kas Masuk", value: data.totalMasukFmt, color: "text-status-green" },
+                { label: "Total Kas Keluar", value: data.totalKeluarFmt, color: "text-status-red" },
+                {
+                  label: "Net Arus Kas",
+                  value: (data.netTotalPositive ? "" : "-") + data.netTotalFmt,
             color: data.netTotalPositive ? "text-status-green" : "text-status-red",
           },
         ].map((card) => (
@@ -112,6 +122,9 @@ export default async function ArusKasPage({
         </table>
         </div>
       </div>
-    </PageTransition>
-  );
+    </div>
+  }
+/>
+</PageTransition>
+);
 }

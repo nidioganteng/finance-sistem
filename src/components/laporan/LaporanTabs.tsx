@@ -8,24 +8,15 @@ export function LaporanTabs({ currentTab }: { currentTab: string }) {
   const pathname = usePathname();
   const isUmum = searchParams.get("version")?.toLowerCase() === "umum";
 
-  const tabs = isUmum
-    ? [
-        { key: "ringkasan", label: "Ringkasan" },
-        { key: "laba-rugi", label: "Laba Rugi" },
-        { key: "neraca", label: "Neraca" },
-        { key: "piutang", label: "Piutang" },
-        { key: "utang-aset", label: "Utang & Aset" },
-        { key: "komparasi", label: "Komparasi" },
-      ]
-    : [
-        { key: "ringkasan", label: "Ringkasan" },
-        { key: "laba-rugi", label: "Laba Rugi" },
-        { key: "neraca", label: "Neraca" },
-        { key: "arus-kas", label: "Arus Kas" },
-        { key: "piutang", label: "Piutang" },
-        { key: "utang-aset", label: "Utang & Aset" },
-        { key: "komparasi", label: "Komparasi" },
-      ];
+  const tabs = [
+    { key: "ringkasan", label: "Ringkasan" },
+    { key: "laba-rugi", label: "Laba Rugi" },
+    { key: "neraca", label: "Neraca" },
+    { key: "arus-kas", label: "Arus Kas" },
+    { key: "piutang", label: "Piutang" },
+    { key: "utang-aset", label: "Utang & Aset" },
+    { key: "komparasi", label: "Komparasi" },
+  ];
 
   function go(key: string) {
     const params = new URLSearchParams(searchParams.toString());

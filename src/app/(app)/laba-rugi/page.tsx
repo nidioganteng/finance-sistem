@@ -7,9 +7,11 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { logActivity } from "@/lib/actions/log";
 import type { ReportVersion } from "@/lib/laba-rugi";
+import { getLaporanPajakData } from "@/lib/pajak";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
 
 export default async function LabaRugiPage({
   searchParams,
@@ -31,7 +33,12 @@ export default async function LabaRugiPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getLabaRugiData(selectedEntity.id, currentYear, undefined, currentVersion);
+  const [data, taxData] = await Promise.all([
+    getLabaRugiData(selectedEntity.id, currentYear, undefined, currentVersion),
+    currentVersion === "UMUM"
+      ? getLaporanPajakData(selectedEntity.id, currentYear)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <PageTransition>
@@ -50,7 +57,9 @@ export default async function LabaRugiPage({
         }
       />
 
-      {data.pendapatanList.length === 0 && data.bebanList.length === 0 ? (
+      {currentVersion === "UMUM" && taxData ? (
+        <LabaRugiUmumView data={taxData} entityKey={selectedKey} />
+      ) : data.pendapatanList.length === 0 && data.bebanList.length === 0 ? (
         <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
           <div className="text-sm font-semibold text-muted-stronger mb-1">Tidak ada data</div>
           <p className="text-[13px] text-muted">Isi data COA (Pendapatan/Beban) dan transaksi terlebih dahulu.</p>

@@ -18,7 +18,7 @@ import { KomparasiLineChart } from "@/components/laporan/KomparasiLineChart";
 import { KomparasiEntityPills } from "@/components/laporan/KomparasiEntityPills";
 import { RingkasanTab } from "@/components/laporan/RingkasanTab";
 import { LabaRugiView } from "@/components/laporan/LabaRugiView";
-import { LabaRugiTabWrapper } from "@/components/laporan/LabaRugiTabWrapper";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
 import { getLaporanPajakData } from "@/lib/pajak";
 import { NeracaView } from "@/components/laporan/NeracaView";
 import { ArusKasView } from "@/components/laporan/ArusKasView";
@@ -460,18 +460,8 @@ export default async function LaporanPage({
       )}
 
       {tab === "laba-rugi" && laporanKeuanganData && (
-        taxData ? (
-          <LabaRugiTabWrapper
-            standardView={
-              <LabaRugiView
-                data={laporanKeuanganData}
-                year={currentYear}
-                entityName={entityLabel}
-              />
-            }
-            taxData={taxData}
-            entityKey={selectedKey ?? ""}
-          />
+        currentVersion === "UMUM" && taxData ? (
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} />
         ) : (
           <LabaRugiView
             data={laporanKeuanganData}

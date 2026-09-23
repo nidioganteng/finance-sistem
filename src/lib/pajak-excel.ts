@@ -6,33 +6,31 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   workbook.creator = "Finance Sistem - SDK Gaharu Sempana";
   workbook.created = new Date();
 
-  const worksheet = workbook.addWorksheet(`Pajak ${data.year}`);
+  const worksheet = workbook.addWorksheet(`Laba Rugi ${data.year}`);
 
   // Page setup
   worksheet.views = [{ showGridLines: true }];
 
-  // Column definitions
+  // Column definitions: 3 columns (Code, Keterangan, Jumlah)
   worksheet.columns = [
-    { key: "code", width: 14 },
-    { key: "name", width: 42 },
-    { key: "komersial", width: 22 },
-    { key: "koreksi", width: 20 },
-    { key: "fiskal", width: 22 },
+    { key: "code", width: 16 },
+    { key: "name", width: 55 },
+    { key: "jumlah", width: 28 },
   ];
 
   const accountingFormat = '#,##0;(#,##0);"-"';
 
   // 1. Title Rows
-  const titleRow1 = worksheet.addRow(["", "LAPORAN REKONSILIASI FISKAL"]);
+  const titleRow1 = worksheet.addRow(["", "LAPORAN LABA RUGI"]);
   titleRow1.font = { bold: true, size: 14, color: { argb: "FF0F172A" } };
 
-  const titleRow2 = worksheet.addRow(["", `KOMERSIAL VS FISKAL — ${data.entityName.toUpperCase()} TAHUN ${data.year}`]);
+  const titleRow2 = worksheet.addRow(["", `${data.entityName.toUpperCase()} — TAHUN ${data.year}`]);
   titleRow2.font = { bold: true, size: 11, color: { argb: "FF475569" } };
 
   worksheet.addRow([]); // Blank spacer
 
   // 2. Table Header
-  const headerRow = worksheet.addRow(["NO AKUN", "KETERANGAN", "KOMERSIAL", "KOREKSI FISKAL", "FISKAL"]);
+  const headerRow = worksheet.addRow(["NO AKUN", "KETERANGAN", "JUMLAH"]);
   headerRow.height = 26;
   headerRow.eachCell((cell, colNumber) => {
     cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
@@ -62,8 +60,8 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
     return row;
   };
 
-  const addDataRow = (code: string, name: string, komersial: number, koreksi: number, fiskal: number) => {
-    const row = worksheet.addRow([code, name, komersial, koreksi, fiskal]);
+  const addDataRow = (code: string, name: string, amount: number) => {
+    const row = worksheet.addRow([code, name, amount]);
     row.height = 20;
 
     // Code
@@ -76,13 +74,11 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
     cellName.alignment = { vertical: "middle", horizontal: "left" };
     cellName.font = { size: 10 };
 
-    // Numbers
-    [3, 4, 5].forEach((colIdx) => {
-      const cell = row.getCell(colIdx);
-      cell.numFmt = accountingFormat;
-      cell.alignment = { vertical: "middle", horizontal: "right" };
-      cell.font = { size: 10 };
-    });
+    // Amount
+    const cellAmount = row.getCell(3);
+    cellAmount.numFmt = accountingFormat;
+    cellAmount.alignment = { vertical: "middle", horizontal: "right" };
+    cellAmount.font = { size: 10 };
 
     row.eachCell((cell) => {
       cell.border = {
@@ -97,12 +93,10 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
 
   const addTotalRow = (
     label: string,
-    komersial: number,
-    koreksi: number,
-    fiskal: number,
+    amount: number,
     isMajor = false
   ) => {
-    const row = worksheet.addRow(["", label.toUpperCase(), komersial, koreksi, fiskal]);
+    const row = worksheet.addRow(["", label.toUpperCase(), amount]);
     row.height = isMajor ? 24 : 22;
 
     const bgColor = isMajor ? "FFF1F5F9" : "FFF8FAFC";
@@ -113,7 +107,7 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
         pattern: "solid",
         fgColor: { argb: bgColor },
       };
-      if (colIdx >= 3) {
+      if (colIdx === 3) {
         cell.numFmt = accountingFormat;
         cell.alignment = { vertical: "middle", horizontal: "right" };
       } else if (colIdx === 2) {
@@ -133,13 +127,12 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   // Section 1: PENDAPATAN
   addCategoryHeader("PENDAPATAN :");
   for (const item of data.pendapatan.items) {
-    addDataRow(item.code, item.name, item.komersial, item.koreksi, item.fiskal);
+    addDataRow(item.code, item.name, item.komersial);
   }
   addTotalRow(
     "TOTAL PENDAPATAN USAHA BERSIH",
     data.pendapatan.totalKomersial,
-    data.pendapatan.totalKoreksi,
-    data.pendapatan.totalFiskal
+    true
   );
 
   worksheet.addRow([]); // Spacer
@@ -147,13 +140,12 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   // Section 2: BIAYA LANGSUNG
   addCategoryHeader("BIAYA LANGSUNG :");
   for (const item of data.biayaLangsung.items) {
-    addDataRow(item.code, item.name, item.komersial, item.koreksi, item.fiskal);
+    addDataRow(item.code, item.name, item.komersial);
   }
   addTotalRow(
     "TOTAL BIAYA LANGSUNG",
     data.biayaLangsung.totalKomersial,
-    data.biayaLangsung.totalKoreksi,
-    data.biayaLangsung.totalFiskal
+    true
   );
 
   worksheet.addRow([]); // Spacer
@@ -162,8 +154,6 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   addTotalRow(
     "LABA KOTOR",
     data.labaKotor.komersial,
-    data.labaKotor.koreksi,
-    data.labaKotor.fiskal,
     true
   );
 
@@ -172,13 +162,12 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   // Section 4: BIAYA OPERASIONAL
   addCategoryHeader("BIAYA OPERASIONAL :");
   for (const item of data.biayaOperasional.items) {
-    addDataRow(item.code, item.name, item.komersial, item.koreksi, item.fiskal);
+    addDataRow(item.code, item.name, item.komersial);
   }
   addTotalRow(
     "TOTAL BIAYA OPERASIONAL",
     data.biayaOperasional.totalKomersial,
-    data.biayaOperasional.totalKoreksi,
-    data.biayaOperasional.totalFiskal
+    true
   );
 
   worksheet.addRow([]); // Spacer
@@ -187,49 +176,50 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   addTotalRow(
     "LABA OPERASIONAL",
     data.labaOperasional.komersial,
-    data.labaOperasional.koreksi,
-    data.labaOperasional.fiskal,
     true
   );
 
   worksheet.addRow([]); // Spacer
 
-  // Section 6: PPH FINAL (Akun 534)
+  // Section 6: PPH FINAL
+  addCategoryHeader("PPH FINAL PASAL 4 AYAT 2 :");
   for (const item of data.pphFinal.items) {
-    addDataRow(item.code, item.name, item.komersial, item.koreksi, item.fiskal);
+    addDataRow(item.code, item.name, item.komersial);
   }
+  addTotalRow(
+    "TOTAL PPH FINAL",
+    data.pphFinal.totalKomersial,
+    false
+  );
+
+  worksheet.addRow([]); // Spacer
 
   // Section 7: LABA SETELAH PAJAK
   addTotalRow(
     "LABA SETELAH PAJAK",
     data.labaSetelahPajak.komersial,
-    data.labaSetelahPajak.koreksi,
-    data.labaSetelahPajak.fiskal,
     true
   );
 
   worksheet.addRow([]); // Spacer
 
-  // Section 8: PENDAPATAN & BIAYA LAIN - LAIN
-  addCategoryHeader("PENDAPATAN & BIAYA LAIN - LAIN :");
+  // Section 8: PENDAPATAN DAN BIAYA LAIN-LAIN
+  addCategoryHeader("PENDAPATAN DAN BIAYA LAIN-LAIN :");
   for (const item of data.pendapatanBiayaLain.items) {
-    addDataRow(item.code, item.name, item.komersial, item.koreksi, item.fiskal);
+    addDataRow(item.code, item.name, item.komersial);
   }
   addTotalRow(
-    "TOTAL PENDAPATAN & BIAYA LAIN - LAIN",
+    "TOTAL PENDAPATAN DAN BIAYA LAIN-LAIN",
     data.pendapatanBiayaLain.totalKomersial,
-    data.pendapatanBiayaLain.totalKoreksi,
-    data.pendapatanBiayaLain.totalFiskal
+    false
   );
 
   worksheet.addRow([]); // Spacer
 
   // Section 9: RUGI / LABA BERSIH
   addTotalRow(
-    "RUGI / LABA BERSIH",
+    data.labaBersih.komersial >= 0 ? "LABA BERSIH" : "RUGI BERSIH",
     data.labaBersih.komersial,
-    data.labaBersih.koreksi,
-    data.labaBersih.fiskal,
     true
   );
 

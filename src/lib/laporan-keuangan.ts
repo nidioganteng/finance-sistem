@@ -8,6 +8,7 @@ import {
   isLabaDitahan,
   hitungSaldoAkhir,
 } from "./akuntansi";
+import { calculateAsetDepreciation } from "./aset-tetap";
 
 export type CoaLine = {
   code: string;
@@ -26,7 +27,7 @@ const SUMBER_STYLE: Record<string, { bg: string; color: string; label: string }>
 export async function getLaporanKeuanganData(entityIds: string[] | string, year: number) {
   const ids = Array.isArray(entityIds) ? entityIds : [entityIds];
 
-  const [allCoa, saldoAwalRows, transactions] = await Promise.all([
+  const [allCoa, saldoAwalRows, transactions, rawAsetTetap] = await Promise.all([
     prisma.coaAccount.findMany({ orderBy: { urutan: "asc" } }),
     prisma.saldoAwal.findMany({
       where: {
@@ -53,6 +54,9 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
       },
       orderBy: { tanggal: "asc" },
     }),
+    prisma.asetTetap.findMany({
+      where: { entityId: { in: ids } },
+    }),
   ]);
 
   // Agregasi debit & kredit transaksi per akun COA
@@ -74,6 +78,15 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     );
   }
 
+  // Perhitungan otomatis jadwal penyusutan dari Modul Aset Tetap (Issue 39)
+  const activeAssets = rawAsetTetap
+    .map((a) => calculateAsetDepreciation(a, year))
+    .filter((a) => new Date(a.tanggalPerolehan) <= new Date(year, 11, 31, 23, 59, 59));
+
+  const totalHargaPerolehanAset = activeAssets.reduce((s, a) => s + a.hargaPerolehanNum, 0);
+  const totalBebanPenyusutanAset = activeAssets.reduce((s, a) => s + a.bebanPeriodeIni, 0);
+  const totalAkumulasiPenyusutanAset = activeAssets.reduce((s, a) => s + a.akumulasiPenyusutan, 0);
+
   // ── Laba Rugi ──────────────────────────────────────────────────────
   const pendapatan: CoaLine[] = [];
   const beban: CoaLine[] = [];
@@ -91,15 +104,36 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
         });
       }
     } else if (coa.kategori === CoaKategori.BEBAN) {
-      const saldo = debit - kredit;
-      if (saldo !== 0 || debit !== 0 || kredit !== 0) {
-        beban.push({
-          code: coa.code,
-          name: coa.name,
-          saldo,
-          saldoFmt: formatRupiah(Math.abs(saldo)),
-        });
+      const isDeprCoa = coa.code === "512" || coa.code === "540" || /penyusutan/i.test(coa.name);
+      if (isDeprCoa && totalBebanPenyusutanAset > 0) {
+        // Disinkronkan otomatis dari modul aset tetap di bawah
+      } else {
+        const saldo = debit - kredit;
+        if (saldo !== 0 || debit !== 0 || kredit !== 0) {
+          beban.push({
+            code: coa.code,
+            name: coa.name,
+            saldo,
+            saldoFmt: formatRupiah(Math.abs(saldo)),
+          });
+        }
       }
+    }
+  }
+
+  // Issue 39: Biaya penyusutan aset otomatis ditarik dari Modul Aktiva Tetap
+  if (totalBebanPenyusutanAset > 0) {
+    const existing = beban.find((b) => b.code === "512" || b.code === "540" || /penyusutan/i.test(b.name));
+    if (existing) {
+      existing.saldo = totalBebanPenyusutanAset;
+      existing.saldoFmt = formatRupiah(totalBebanPenyusutanAset);
+    } else {
+      beban.push({
+        code: "512",
+        name: "Beban Penyusutan Aset Tetap",
+        saldo: totalBebanPenyusutanAset,
+        saldoFmt: formatRupiah(totalBebanPenyusutanAset),
+      });
     }
   }
 
@@ -160,7 +194,41 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     }
   }
 
-  // Formula Neraca (Issue 38):
+  // Issue 39: Sinkronkan saldo Aktiva Tetap & Akumulasi Penyusutan dari Modul Aset Tetap
+  if (activeAssets.length > 0) {
+    let akmLine = aktivaTetap.find((a) => a.isContra || a.code === "1001" || /penyusutan/i.test(a.name));
+    if (akmLine) {
+      akmLine.saldo = totalAkumulasiPenyusutanAset;
+      akmLine.saldoFmt = formatSaldo(akmLine.saldo, true);
+      akmLine.isContra = true;
+    } else if (totalAkumulasiPenyusutanAset > 0) {
+      aktivaTetap.push({
+        code: "1001",
+        name: "Akumulasi Penyusutan Aset",
+        saldo: totalAkumulasiPenyusutanAset,
+        saldoFmt: formatSaldo(totalAkumulasiPenyusutanAset, true),
+        isContra: true,
+      });
+    }
+
+    let perolehanLine = aktivaTetap.find((a) => !a.isContra && (a.code === "100" || /aktiva tetap|aset tetap/i.test(a.name)));
+    if (perolehanLine) {
+      if (perolehanLine.saldo === 0 || perolehanLine.saldo < totalHargaPerolehanAset) {
+        perolehanLine.saldo = totalHargaPerolehanAset;
+        perolehanLine.saldoFmt = formatSaldo(perolehanLine.saldo, false);
+      }
+    } else if (totalHargaPerolehanAset > 0) {
+      aktivaTetap.unshift({
+        code: "100",
+        name: "Aktiva Tetap (Perolehan)",
+        saldo: totalHargaPerolehanAset,
+        saldoFmt: formatSaldo(totalHargaPerolehanAset, false),
+        isContra: false,
+      });
+    }
+  }
+
+  // Formula Neraca (Issue 38 & 39):
   // • Total Aktiva Lancar: akun debet ditambah, akun kontra dikurangkan
   const totalAktivaLancar = aktivaLancar.reduce(
     (sum, item) => sum + (item.isContra ? -item.saldo : item.saldo),
@@ -194,7 +262,7 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
   // ── Arus Kas — Metode Tidak Langsung ──────────────────────────────
   // Kas/bank ASET = akun-akun kas dan rekening bank
   const kasAset = aktivaLancar.filter((i) => /kas|bank|bri|bpd|bni|mdr/i.test(i.name));
-  const asetNonKas = [...aktivaLancar.filter((i) => !/kas|bank|bri|bpd|bni|mdr/i.test(i.name)), ...aktivaTetap];
+  const asetNonKas = aktivaLancar.filter((i) => !/kas|bank|bri|bpd|bni|mdr/i.test(i.name));
   const totalKasBank = kasAset.reduce((s, i) => s + (i.isContra ? -i.saldo : i.saldo), 0);
 
   // Saldo awal kas/bank dari Saldo Awal yang diinput
@@ -203,7 +271,8 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     return s + (coa ? saldoAwalByAccount.get(coa.id) ?? 0 : 0);
   }, 0);
 
-  // Aktivitas Operasi (indirect): Laba Bersih ± penyesuaian modal kerja
+  // Aktivitas Operasi (indirect): Laba Bersih + penyesuaian non-kas (penyusutan) + modal kerja
+  const penyesuaianNonKas = totalBebanPenyusutanAset;
   const perubahanAsetNonKas = -(
     asetNonKas.reduce((s, i) => {
       const coa = allCoa.find((c) => c.code === i.code);
@@ -214,13 +283,17 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     }, 0)
   );
   const perubahanKewajiban = totalKewajiban;
-  const kasOperasi = labaBersih + perubahanAsetNonKas + perubahanKewajiban;
+  const kasOperasi = labaBersih + penyesuaianNonKas + perubahanAsetNonKas + perubahanKewajiban;
 
-  // Aktivitas Investasi: perolehan aset tetap
+  // Aktivitas Investasi: perolehan aset tetap tahun berjalan
   const kasInvestasi = 0;
 
-  // Aktivitas Pendanaan: perubahan modal
-  const kasPendanaan = totalModal;
+  // Aktivitas Pendanaan: perubahan modal tahun berjalan
+  const modalAwal = modal.reduce((s, i) => {
+    const coa = allCoa.find((c) => c.code === i.code);
+    return s + (coa ? saldoAwalByAccount.get(coa.id) ?? 0 : 0);
+  }, 0);
+  const kasPendanaan = totalModal - modalAwal;
 
   const kenaikanBersihKas = kasOperasi + kasInvestasi + kasPendanaan;
   const kasAkhir = kasAwal + kenaikanBersihKas;
@@ -260,8 +333,8 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     totalLabaDitahan,
     totalLabaDitahanFmt: formatRupiah(Math.abs(totalLabaDitahan)),
     totalEkuitas,
-    totalEkuitasFmt: formatRupiah(Math.abs(totalEkuitas)),
-    totalModalDanLabaFmt: formatRupiah(Math.abs(totalEkuitas)),
+    totalEkuitasFmt: totalEkuitas < 0 ? `-${formatRupiah(Math.abs(totalEkuitas))}` : formatRupiah(totalEkuitas),
+    totalModalDanLabaFmt: totalEkuitas < 0 ? `-${formatRupiah(Math.abs(totalEkuitas))}` : formatRupiah(totalEkuitas),
     neracaBalanced,
     totalAsetFmt: totalAset < 0 ? `-${formatRupiah(Math.abs(totalAset))}` : formatRupiah(totalAset),
     totalKewajibanFmt: formatRupiah(Math.abs(totalKewajiban)),
@@ -279,6 +352,10 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     arusKasBalanced,
     perubahanAsetNonKas,
     perubahanKewajiban,
+    penyesuaianNonKas,
+    penyesuaianNonKasFmt: formatRupiah(penyesuaianNonKas),
+    penyusutanOtomatis: totalBebanPenyusutanAset,
+    akumulasiPenyusutanOtomatis: totalAkumulasiPenyusutanAset,
     kasAwalFmt: formatRupiah(Math.abs(kasAwal)),
     kasOperasiFmt: formatRupiah(Math.abs(kasOperasi)),
     kasInvestasiFmt: formatRupiah(Math.abs(kasInvestasi)),

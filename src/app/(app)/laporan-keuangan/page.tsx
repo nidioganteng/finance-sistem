@@ -15,7 +15,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 
 import type { ReportVersion } from "@/lib/laba-rugi";
 import { getLaporanPajakData } from "@/lib/pajak";
-import { LabaRugiTabWrapper } from "@/components/laporan/LabaRugiTabWrapper";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
 import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { ArusKasPresisiClient } from "@/components/laporan/ArusKasPresisiClient";
 
@@ -79,11 +79,11 @@ export default async function LaporanKeuanganPage({
 
       {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
       {hasData && tab === "laba-rugi" && (
-        <LabaRugiTabWrapper
-          standardView={<LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-          taxData={taxData}
-          entityKey={selectedKey}
-        />
+        currentVersion === "UMUM" && taxData ? (
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey} />
+        ) : (
+          <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />
+        )
       )}
       {hasData && tab === "arus-kas" && arusKasPresisiData && (
         <ArusKasPresisiClient

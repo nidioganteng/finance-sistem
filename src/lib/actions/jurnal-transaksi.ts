@@ -9,14 +9,7 @@ import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 import { REKENING_BY_ENTITY, REKENING_COA_CODE } from "@/lib/bank-accounts";
 
-type JurnalRow = {
-  coaAccountId: string;
-  debit: number;
-  kredit: number;
-  noBukti: string;
-  tanggal: string;
-  keterangan: string;
-};
+type JurnalRow = { coaAccountId: string; debit: number; kredit: number; keterangan: string };
 
 const KAS_KECIL_COA: Record<string, string> = {
   kencana: "1100", gaharu: "1200", tataring: "1300", ciptaAsri: "1400", umum: "1500",
@@ -45,10 +38,15 @@ export async function saveJurnalTransaksi(formData: FormData) {
     return { error: "Kamu tidak punya akses untuk input jurnal transaksi." };
   }
 
+  const tanggal = (formData.get("tanggal") as string | null)?.trim() ?? "";
   const entityKey = (formData.get("entityKey") as string | null)?.trim() ?? "";
-  const editNoBuktis: string[] = JSON.parse((formData.get("editNoBuktis") as string | null) ?? "[]");
+  const noBukti = (formData.get("noBukti") as string | null)?.trim() ?? "";
+  const editNoBukti = (formData.get("editNoBukti") as string | null)?.trim() ?? "";
 
+  if (!tanggal) return { error: "Tanggal wajib diisi." };
+  if (!noBukti) return { error: "No. Bukti wajib diisi." };
   if (!entityKey) return { error: "Entity tidak ditemukan." };
+
   if (!session.user.entityKeys.includes(entityKey)) {
     return { error: "Kamu tidak punya akses ke entity ini." };
   }
@@ -61,12 +59,9 @@ export async function saveJurnalTransaksi(formData: FormData) {
     return { error: "Format baris tidak valid." };
   }
 
-  const validRows = rows.filter(
-    (r) => r.coaAccountId && r.noBukti && r.tanggal && r.keterangan && (r.debit > 0 || r.kredit > 0)
-  );
-
+  const validRows = rows.filter((r) => r.coaAccountId && (r.debit > 0 || r.kredit > 0));
   if (validRows.length < 1) {
-    return { error: "Isi minimal satu baris lengkap (No. Bukti, Tanggal, Keterangan, Akun, dan nominal)." };
+    return { error: "Isi minimal satu baris akun dengan nominal." };
   }
 
   const entity = await prisma.entity.findUnique({ where: { key: entityKey } });
@@ -75,32 +70,25 @@ export async function saveJurnalTransaksi(formData: FormData) {
   const jenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "jurnalTransaksi" } });
   if (!jenisInput) return { error: "Jenis input 'Jurnal Transaksi' belum dikonfigurasi di sistem." };
 
-  // Edit mode: delete old rows (journal + auto-posted) for each noBukti being replaced
-  if (editNoBuktis.length > 0) {
-    for (const nb of editNoBuktis) {
-      await prisma.transaction.deleteMany({
-        where: { entityId: entity.id, jenisInputId: jenisInput.id, noBukti: nb },
-      });
-      await prisma.transaction.deleteMany({
-        where: {
-          noBukti: nb,
-          extraFieldsJson: { path: "$.autoPostedFromJurnal", equals: true },
-        },
-      });
-    }
+  if (editNoBukti) {
+    await prisma.transaction.deleteMany({
+      where: { entityId: entity.id, jenisInputId: jenisInput.id, noBukti: editNoBukti },
+    });
+    await prisma.transaction.deleteMany({
+      where: {
+        noBukti: editNoBukti,
+        extraFieldsJson: { path: "$.autoPostedFromJurnal", equals: true },
+      },
+    });
   } else {
-    // Check for duplicate noBukti per row
-    const uniqueNoBuktis = [...new Set(validRows.map((r) => r.noBukti))];
-    for (const nb of uniqueNoBuktis) {
-      const dup = await prisma.transaction.findFirst({
-        where: { entityId: entity.id, noBukti: nb },
-        select: { id: true },
-      });
-      if (dup) return { error: `No. Bukti "${nb}" sudah dipakai di entitas ini.` };
-    }
+    const dup = await prisma.transaction.findFirst({
+      where: { entityId: entity.id, noBukti },
+      select: { id: true },
+    });
+    if (dup) return { error: `No. Bukti "${noBukti}" sudah dipakai di entitas ini.` };
   }
 
-  // Fetch COA data for auto-detection
+  try {
   const coaIds = [...new Set(validRows.map((r) => r.coaAccountId))];
   const coaList = await prisma.coaAccount.findMany({
     where: { id: { in: coaIds } },
@@ -115,34 +103,36 @@ export async function saveJurnalTransaksi(formData: FormData) {
   type Ops = ReturnType<typeof prisma.transaction.create>;
   const allOps: Ops[] = [];
 
+  // Main journal rows
   for (const row of validRows) {
-    const coa = coaMap.get(row.coaAccountId);
-    const debit = row.debit ?? 0;
-    const kredit = row.kredit ?? 0;
-    const arahMasuk = debit > 0;
-    const nominal = arahMasuk ? debit : kredit;
-
-    // Main journal row
     allOps.push(
       prisma.transaction.create({
         data: {
           entityId: entity.id,
           jenisInputId: jenisInput.id,
-          tanggal: new Date(row.tanggal),
-          noBukti: row.noBukti,
-          keterangan: row.keterangan,
+          tanggal: new Date(tanggal),
+          noBukti,
+          keterangan: row.keterangan?.trim() ?? "",
           coaAccountId: row.coaAccountId,
-          debit,
-          kredit,
+          debit: row.debit ?? 0,
+          kredit: row.kredit ?? 0,
           saldoSetelah: 0,
           staffId: session.user.id,
         },
       })
     );
+  }
 
+  // Auto-post ke kas/bank ledger jika COA cocok
+  for (const row of validRows) {
+    const coa = coaMap.get(row.coaAccountId);
     if (!coa) continue;
 
-    // Detect auto-post target
+    const debit = row.debit ?? 0;
+    const kredit = row.kredit ?? 0;
+    const arahMasuk = debit > 0;
+    const nominal = arahMasuk ? debit : kredit;
+
     let targetEntityId: string | null = null;
     let targetJenisInputId: string | null = null;
     let rekeningNama: string | undefined;
@@ -152,9 +142,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
       const tEntity = await prisma.entity.findUnique({ where: { key: bankMatch.entityKey } });
       const tJenis = await prisma.jenisInputTransaksi.findUnique({ where: { key: "bankBuku" } });
       if (tEntity && tJenis) {
-        targetEntityId = tEntity.id;
-        targetJenisInputId = tJenis.id;
-        rekeningNama = bankMatch.rekeningNama;
+        targetEntityId = tEntity.id; targetJenisInputId = tJenis.id; rekeningNama = bankMatch.rekeningNama;
       }
     } else {
       const kkKey = kasKecilCodeToEntity[coa.code];
@@ -182,9 +170,9 @@ export async function saveJurnalTransaksi(formData: FormData) {
         data: {
           entityId: targetEntityId,
           jenisInputId: targetJenisInputId,
-          tanggal: new Date(row.tanggal),
-          noBukti: row.noBukti,
-          keterangan: row.keterangan,
+          tanggal: new Date(tanggal),
+          noBukti,
+          keterangan: row.keterangan?.trim() ?? "",
           coaAccountId: row.coaAccountId,
           debit: arahMasuk ? nominal : 0,
           kredit: arahMasuk ? 0 : nominal,
@@ -202,12 +190,12 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   await prisma.$transaction(allOps);
 
-  const uniqueCount = new Set(validRows.map((r) => r.noBukti)).size;
+  const firstKeterangan = validRows[0]?.keterangan?.trim() ?? "";
   logActivity(
     session.user.id,
-    `${editNoBuktis.length > 0 ? "Edit" : "Input"} Jurnal Transaksi – ${uniqueCount} bukti (${entity.name})`,
+    `${editNoBukti ? "Edit" : "Input"} Jurnal Transaksi – ${noBukti} (${entity.name})${firstKeterangan ? ": " + firstKeterangan : ""}`,
     "FINANCIAL_CHANGE",
-    { entityKey, count: validRows.length }
+    { entityKey, noBukti, rowCount: validRows.length }
   );
 
   revalidatePath("/jurnal-transaksi");
@@ -216,6 +204,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
   revalidatePath("/kas-besar");
   revalidatePath("/buku-bank");
   return { success: true };
+  } catch (e) {
+    console.error("[saveJurnalTransaksi]", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    return { error: `Gagal menyimpan jurnal: ${msg}` };
+  }
 }
 
 export async function deleteJurnalTransaksi(txIds: string[]) {

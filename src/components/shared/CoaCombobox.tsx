@@ -103,7 +103,7 @@ export function CoaCombobox({
   return (
     <>
       <div ref={wrapperRef} className={`relative ${className}`}>
-        <div className="flex items-center h-8 rounded-[8px] border border-border-soft bg-surface-input focus-within:border-brand transition-colors">
+        <div className="flex items-center h-full min-h-[2rem] rounded-[9px] border border-border-soft bg-surface-input focus-within:border-brand transition-colors">
           <input
             ref={inputRef}
             type="text"

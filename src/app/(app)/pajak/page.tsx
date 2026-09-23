@@ -21,7 +21,7 @@ export default async function PajakPage({
 
   const { role, entityKeys } = session.user;
   logActivity(session.user.id, "Buka halaman Laporan Pajak", "USER_ACTIVITY", { path: "/pajak" });
-  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN") redirect("/dashboard");
+  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);

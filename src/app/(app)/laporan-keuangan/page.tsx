@@ -13,10 +13,12 @@ import { LaporanKeuanganTabs } from "@/components/laporan-keuangan/LaporanKeuang
 import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
+import { ReportVersionSwitcher, ReportVersion } from "@/components/shared/ReportVersionSwitcher";
+
 export default async function LaporanKeuanganPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string; tab?: string };
+  searchParams: { entity?: string; year?: string; tab?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -27,22 +29,24 @@ export default async function LaporanKeuanganPage({
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const tab = searchParams.tab ?? "neraca";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getLaporanKeuanganData(selectedEntity.id, currentYear);
+  const data = await getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion);
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   return (
     <PageTransition>
       <PageHeader
         title={`Laporan Keuangan – ${selectedEntity.name}`}
-        subtitle={`Ringkasan laporan keuangan — Periode ${currentYear}`}
+        subtitle={`Ringkasan laporan keuangan — Periode ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
         rightSlot={
           <>
+            <ReportVersionSwitcher currentVersion={currentVersion} />
             <PrintButton />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher

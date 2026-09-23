@@ -9,7 +9,7 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { ReportVersionSwitcher, ReportVersion } from "@/components/shared/ReportVersionSwitcher";
+import type { ReportVersion } from "@/lib/laba-rugi";
 
 export default async function NeracaPage({
   searchParams,
@@ -40,7 +40,6 @@ export default async function NeracaPage({
         subtitle={`Posisi keuangan per 31 Desember ${currentYear} — ${selectedEntity.name} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
         rightSlot={
           <>
-            <ReportVersionSwitcher currentVersion={currentVersion} />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

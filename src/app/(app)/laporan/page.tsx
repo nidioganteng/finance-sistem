@@ -32,7 +32,7 @@ import { UtangAsetView } from "@/components/laporan/UtangAsetView";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { ReportVersionSwitcher, ReportVersion } from "@/components/shared/ReportVersionSwitcher";
+import type { ReportVersion } from "@/lib/laba-rugi";
 
 const BULAN_LABEL = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -316,7 +316,6 @@ export default async function LaporanPage({
         }
         rightSlot={
           <>
-            <ReportVersionSwitcher currentVersion={currentVersion} />
             {tab !== "komparasi" && <YearSelect currentYear={currentYear} />}
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

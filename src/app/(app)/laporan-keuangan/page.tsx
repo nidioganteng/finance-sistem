@@ -13,7 +13,7 @@ import { LaporanKeuanganTabs } from "@/components/laporan-keuangan/LaporanKeuang
 import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-import { ReportVersionSwitcher, ReportVersion } from "@/components/shared/ReportVersionSwitcher";
+import type { ReportVersion } from "@/lib/laba-rugi";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -47,7 +47,6 @@ export default async function LaporanKeuanganPage({
         subtitle={`Posisi dan ringkasan keuangan — Periode ${currentYear}`}
         rightSlot={
           <>
-            <ReportVersionSwitcher currentVersion={currentVersion} />
             <PrintButton />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher

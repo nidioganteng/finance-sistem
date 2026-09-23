@@ -8,16 +8,11 @@ export function LaporanKeuanganTabs({ currentTab }: { currentTab: string }) {
   const pathname = usePathname();
   const isUmum = searchParams.get("version")?.toLowerCase() === "umum";
 
-  const tabs = isUmum
-    ? [
-        { key: "neraca", label: "Neraca" },
-        { key: "laba-rugi", label: "Laba Rugi" },
-      ]
-    : [
-        { key: "neraca", label: "Neraca" },
-        { key: "laba-rugi", label: "Laba Rugi" },
-        { key: "arus-kas", label: "Arus Kas" },
-      ];
+  const tabs = [
+    { key: "neraca", label: "Neraca" },
+    { key: "laba-rugi", label: "Laba Rugi" },
+    { key: "arus-kas", label: "Arus Kas" },
+  ];
 
   function go(key: string) {
     const params = new URLSearchParams(searchParams.toString());

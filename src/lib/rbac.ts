@@ -76,7 +76,6 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
           ],
         },
-        { label: "Laporan Pajak", href: "/pajak", icon: "landmark" },
       ],
     },
     {

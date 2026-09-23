@@ -14,6 +14,12 @@ import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 import type { ReportVersion } from "@/lib/laba-rugi";
+import { getLaporanPajakData } from "@/lib/pajak";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
+import { ArusKasPresisiClient } from "@/components/laporan/ArusKasPresisiClient";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
+import { NeracaView } from "@/components/laporan/NeracaView";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -21,23 +27,27 @@ export default async function LaporanKeuanganPage({
   searchParams: { entity?: string; year?: string; tab?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
+  const { entityKeys } = session!.user;
   logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan-keuangan" });
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const rawTab = searchParams.tab ?? "neraca";
-  const tab = currentVersion === "UMUM" && rawTab === "arus-kas" ? "neraca" : rawTab;
+  const tab = searchParams.tab ?? "neraca";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion);
+  const [data, taxData, arusKasPresisiData] = await Promise.all([
+    getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
+    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion),
+    tab === "arus-kas"
+      ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
+      : Promise.resolve(null),
+  ]);
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   return (
@@ -67,9 +77,23 @@ export default async function LaporanKeuanganPage({
         </div>
       )}
 
-      {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-      {hasData && tab === "laba-rugi" && <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-      {hasData && tab === "arus-kas" && <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />}
+      {hasData && tab === "neraca" && <NeracaView data={data} year={currentYear} entityName={selectedEntity.name} />}
+      {hasData && tab === "laba-rugi" && (
+        taxData ? (
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
+        ) : (
+          <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />
+        )
+      )}
+      {hasData && tab === "arus-kas" && arusKasPresisiData && (
+        <ArusKasTabWrapper
+          presisiData={arusKasPresisiData}
+          entityId={selectedEntity.id}
+          standardView={
+            <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />
+          }
+        />
+      )}
     </PageTransition>
   );
 }

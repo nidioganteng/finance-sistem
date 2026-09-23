@@ -30,9 +30,11 @@ export async function getAccessibleEntities(entityKeys: string[], targetYear: nu
         coaAccount: { select: { kategori: true } },
       },
     }),
-    prisma.asetTetap.findMany({
-      where: { entity: { key: { in: entityKeys } } },
-    }),
+    Boolean((prisma as any).asetTetap)
+      ? prisma.asetTetap.findMany({
+          where: { entity: { key: { in: entityKeys } } },
+        })
+      : Promise.resolve([]),
   ]);
 
   const revenueMap = new Map<string, number>();

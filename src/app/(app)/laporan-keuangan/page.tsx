@@ -14,6 +14,10 @@ import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 import type { ReportVersion } from "@/lib/laba-rugi";
+import { getLaporanPajakData } from "@/lib/pajak";
+import { LabaRugiTabWrapper } from "@/components/laporan/LabaRugiTabWrapper";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -37,7 +41,13 @@ export default async function LaporanKeuanganPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion);
+  const [data, taxData, arusKasPresisiData] = await Promise.all([
+    getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
+    getLaporanPajakData(selectedEntity.id, currentYear),
+    tab === "arus-kas"
+      ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
+      : Promise.resolve(null),
+  ]);
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   return (
@@ -68,8 +78,20 @@ export default async function LaporanKeuanganPage({
       )}
 
       {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-      {hasData && tab === "laba-rugi" && <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-      {hasData && tab === "arus-kas" && <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />}
+      {hasData && tab === "laba-rugi" && (
+        <LabaRugiTabWrapper
+          standardView={<LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />}
+          taxData={taxData}
+          entityKey={selectedKey}
+        />
+      )}
+      {hasData && tab === "arus-kas" && arusKasPresisiData && (
+        <ArusKasTabWrapper
+          standardView={<ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />}
+          presisiData={arusKasPresisiData}
+          entityId={selectedEntity.id}
+        />
+      )}
     </PageTransition>
   );
 }

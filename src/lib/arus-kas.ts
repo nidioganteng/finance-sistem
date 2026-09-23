@@ -6,11 +6,23 @@ const MONTHS = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-export async function getArusKasData(entityId: string, year: number) {
-  // Filter ke akun ber-reportType ARUS_KAS (kas & bank) saja — debit = kas masuk,
-  // kredit = kas keluar. Kalau kita ambil semua transaksi, debit total == kredit
-  // total (balanced) → net selalu 0. Sebelumnya filter pakai kategori "ASET" yang
-  // terlalu luas (ikut menghitung piutang/aktiva tetap sebagai kas — issue #28).
+import { ReportCategory } from "@prisma/client";
+import { getExcludedNoBuktiForVersion } from "./akuntansi";
+
+export type ReportVersion = "INTERNAL" | "UMUM";
+
+export async function getArusKasData(
+  entityId: string,
+  year: number,
+  version: ReportVersion | string = "INTERNAL"
+) {
+  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const allowedCategories: ReportCategory[] =
+    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
+
+  const excludedNoBukti = await getExcludedNoBuktiForVersion(entityId, year, normVersion);
+
+  // Filter ke akun ber-reportType ARUS_KAS (kas & bank) saja dan sesuai reportCategory
   const transactions = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -18,7 +30,11 @@ export async function getArusKasData(entityId: string, year: number) {
         gte: new Date(`${year}-01-01`),
         lte: new Date(`${year}-12-31T23:59:59`),
       },
-      coaAccount: { reportType: "ARUS_KAS" },
+      coaAccount: {
+        reportType: "ARUS_KAS",
+        reportCategory: { in: allowedCategories },
+      },
+      ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
     },
     orderBy: { tanggal: "asc" },
   });
@@ -51,5 +67,6 @@ export async function getArusKasData(entityId: string, year: number) {
     totalKeluarFmt: formatRupiah(totalKeluar),
     netTotalFmt: formatRupiah(Math.abs(netTotal)),
     netTotalPositive: netTotal >= 0,
+    version: normVersion,
   };
 }

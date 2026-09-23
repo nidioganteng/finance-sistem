@@ -1,4 +1,5 @@
-import { CoaKategori } from "@prisma/client";
+import { prisma } from "./prisma";
+import { CoaKategori, ReportCategory } from "@prisma/client";
 
 // Debet-normal: saldo bertambah saat debet, berkurang saat kredit.
 const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];
@@ -7,6 +8,38 @@ const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];
 // tapi saldo normalnya KREDIT — karena isinya nilai pengurang aset, bukan
 // aset itu sendiri. Kode 210 (Cadangan CKPN) dan 1001 (Akm Penyusutan).
 const KREDIT_NORMAL_OVERRIDE_CODES = new Set<string>(["210", "1001"]);
+
+/**
+ * Menemukan nomor bukti transaksi yang harus dikecualikan untuk versi laporan tertentu (issue #40).
+ * Jika versi = UMUM, transaksi yang menyentuh akun INTERNAL dikecualikan secara utuh agar Neraca tetap balance.
+ * Jika versi = INTERNAL, transaksi yang menyentuh akun UMUM dikecualikan.
+ */
+export async function getExcludedNoBuktiForVersion(
+  entityIds: string[] | string,
+  year: number,
+  version: "INTERNAL" | "UMUM"
+): Promise<string[]> {
+  const ids = Array.isArray(entityIds) ? entityIds : [entityIds];
+  const targetCategory: ReportCategory = version === "UMUM" ? ReportCategory.INTERNAL : ReportCategory.UMUM;
+
+  const rows = await prisma.transaction.findMany({
+    where: {
+      entityId: { in: ids },
+      tanggal: {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31T23:59:59`),
+      },
+      coaAccount: {
+        reportCategory: targetCategory,
+      },
+      noBukti: { not: "" },
+    },
+    select: { noBukti: true },
+    distinct: ["noBukti"],
+  });
+
+  return rows.map((r) => r.noBukti).filter(Boolean);
+}
 
 export function isDebetNormal(kategori: CoaKategori, code: string): boolean {
   if (KREDIT_NORMAL_OVERRIDE_CODES.has(code)) return false;

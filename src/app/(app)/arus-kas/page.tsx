@@ -9,11 +9,12 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { ReportVersionSwitcher, ReportVersion } from "@/components/shared/ReportVersionSwitcher";
 
 export default async function ArusKasPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string };
+  searchParams: { entity?: string; year?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -24,21 +25,23 @@ export default async function ArusKasPage({
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getArusKasData(selectedEntity.id, currentYear);
+  const data = await getArusKasData(selectedEntity.id, currentYear, currentVersion);
   const hasData = data.monthly.some((m) => m.hasData);
 
   return (
     <PageTransition>
       <PageHeader
         title="Arus Kas"
-        subtitle={`Ringkasan arus kas masuk dan keluar — ${selectedEntity.name} ${currentYear}`}
+        subtitle={`Ringkasan arus kas masuk dan keluar — ${selectedEntity.name} ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
         rightSlot={
           <>
+            <ReportVersionSwitcher currentVersion={currentVersion} />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

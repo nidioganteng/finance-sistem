@@ -1,12 +1,13 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
-import { CoaKategori } from "@prisma/client";
+import { CoaKategori, ReportCategory } from "@prisma/client";
 import {
   isDebetNormal,
   isContraAset,
   isAktivaTetap,
   isLabaDitahan,
   hitungSaldoAkhir,
+  getExcludedNoBuktiForVersion,
 } from "./akuntansi";
 import { calculateAsetDepreciation } from "./aset-tetap";
 
@@ -18,46 +19,63 @@ export type CoaLine = {
   isContra?: boolean;
 };
 
+export type ReportVersion = "INTERNAL" | "UMUM";
+
 const SUMBER_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   kasKecil: { bg: "#fef3c7", color: "#92400e", label: "Kas Kecil" },
   kasBesar: { bg: "#dbeafe", color: "#1e40af", label: "Kas Besar" },
   bankBuku: { bg: "#dcfce7", color: "#166534", label: "Buku Bank" },
 };
 
-export async function getLaporanKeuanganData(entityIds: string[] | string, year: number) {
+export async function getLaporanKeuanganData(
+  entityIds: string[] | string,
+  year: number,
+  version: ReportVersion | string = "INTERNAL"
+) {
   const ids = Array.isArray(entityIds) ? entityIds : [entityIds];
+  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const allowedCategories: ReportCategory[] =
+    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
 
-  const [allCoa, saldoAwalRows, transactions, rawAsetTetap] = await Promise.all([
-    prisma.coaAccount.findMany({ orderBy: { urutan: "asc" } }),
+  const [allCoa, saldoAwalRows, excludedNoBukti, rawAsetTetap] = await Promise.all([
+    prisma.coaAccount.findMany({
+      where: { reportCategory: { in: allowedCategories } },
+      orderBy: { urutan: "asc" },
+    }),
     prisma.saldoAwal.findMany({
       where: {
         entityId: { in: ids },
         year,
+        coaAccount: { reportCategory: { in: allowedCategories } },
       },
     }),
-    prisma.transaction.findMany({
-      where: {
-        entityId: { in: ids },
-        coaAccountId: { not: null },
-        tanggal: {
-          gte: new Date(`${year}-01-01`),
-          lte: new Date(`${year}-12-31T23:59:59`),
-        },
-      },
-      select: {
-        id: true,
-        coaAccountId: true,
-        debit: true,
-        kredit: true,
-        tanggal: true,
-        jenisInputId: true,
-      },
-      orderBy: { tanggal: "asc" },
-    }),
+    getExcludedNoBuktiForVersion(ids, year, normVersion),
     prisma.asetTetap.findMany({
       where: { entityId: { in: ids } },
     }),
   ]);
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      entityId: { in: ids },
+      coaAccountId: { not: null },
+      tanggal: {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31T23:59:59`),
+      },
+      coaAccount: { reportCategory: { in: allowedCategories } },
+      ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
+    },
+    select: {
+      id: true,
+      coaAccountId: true,
+      debit: true,
+      kredit: true,
+      tanggal: true,
+      jenisInputId: true,
+    },
+    orderBy: { tanggal: "asc" },
+  });
 
   // Agregasi debit & kredit transaksi per akun COA
   const totalsByAccount = new Map<string, { debit: number; kredit: number }>();
@@ -363,6 +381,7 @@ export async function getLaporanKeuanganData(entityIds: string[] | string, year:
     kenaikanBersihFmt: formatRupiah(Math.abs(kenaikanBersihKas)),
     kasAkhirFmt: formatRupiah(Math.abs(kasAkhir)),
     kasAsetFmt: formatRupiah(totalKasBank),
+    version: normVersion,
   };
 }
 

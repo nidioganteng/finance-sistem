@@ -32,6 +32,7 @@ import { UtangAsetView } from "@/components/laporan/UtangAsetView";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { ReportVersionSwitcher, ReportVersion } from "@/components/shared/ReportVersionSwitcher";
 
 const BULAN_LABEL = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -72,6 +73,7 @@ export default async function LaporanPage({
     periodA?: string;
     periodB?: string;
     chartYears?: string;
+    version?: string;
   };
 }) {
   const session = await getServerSession(authOptions);
@@ -89,6 +91,7 @@ export default async function LaporanPage({
       : resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const tab = searchParams.tab ?? "ringkasan";
 
   // For group view, aggregate all entity data
@@ -106,7 +109,7 @@ export default async function LaporanPage({
 
   if (tab === "ringkasan") {
     const [laporan, jData, bData] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear),
+      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
       getLaporanJurnalData(entityIds, currentYear, 80),
       getLaporanBankData(entityIds, currentYear, 80),
     ]);
@@ -114,11 +117,11 @@ export default async function LaporanPage({
     jurnalData = jData;
     bankData = bData;
   } else if (tab === "laba-rugi" || tab === "neraca") {
-    laporanKeuanganData = await getLaporanKeuanganData(entityIds, currentYear);
+    laporanKeuanganData = await getLaporanKeuanganData(entityIds, currentYear, currentVersion);
   } else if (tab === "arus-kas") {
     const [laporan, allArusKas] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear),
-      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear))),
+      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
     ]);
     laporanKeuanganData = laporan;
 
@@ -208,8 +211,8 @@ export default async function LaporanPage({
         : { gte: new Date(`${p.year}-01-01`), lte: new Date(`${p.year}-12-31T23:59:59`) };
 
     const [labaRugiA, labaRugiB, txCountA, txCountB] = await Promise.all([
-      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month))),
-      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month))),
+      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month, currentVersion))),
+      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month, currentVersion))),
       prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodA) } }),
       prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodB) } }),
     ]);
@@ -307,11 +310,12 @@ export default async function LaporanPage({
         title="Laporan Keuangan"
         subtitle={
           tab === "komparasi" && komparasiData
-            ? `Komparasi laporan keuangan — ${entityLabel} · ${komparasiData.labelA} vs ${komparasiData.labelB}`
-            : `Ringkasan laporan keuangan — ${entityLabel} ${currentYear}`
+            ? `Komparasi laporan keuangan — ${entityLabel} · ${komparasiData.labelA} vs ${komparasiData.labelB} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`
+            : `Ringkasan laporan keuangan — ${entityLabel} ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`
         }
         rightSlot={
           <>
+            <ReportVersionSwitcher currentVersion={currentVersion} />
             {tab !== "komparasi" && <YearSelect currentYear={currentYear} />}
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

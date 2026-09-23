@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { Role, ReportCategory } from "@prisma/client";
+import { Role, type ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
 
 export function formatRupiah(n: number) {
@@ -20,7 +20,7 @@ export async function getAccessibleEntities(entityKeys: string[], targetYear: nu
         entity: { key: { in: entityKeys } },
         coaAccount: {
           kategori: { in: ["PENDAPATAN", "BEBAN"] },
-          reportCategory: { in: [ReportCategory.INTERNAL, ReportCategory.SEMUA] },
+          reportCategory: { in: ["INTERNAL", "SEMUA"] },
         },
       },
       select: {
@@ -125,7 +125,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
       tanggal: { gte: start, lt: end },
       coaAccount: {
         kategori: "PENDAPATAN",
-        reportCategory: { in: [ReportCategory.INTERNAL, ReportCategory.SEMUA] },
+        reportCategory: { in: ["INTERNAL", "SEMUA"] },
       },
     },
     select: {
@@ -160,7 +160,7 @@ export async function getMonthlyByYear(entityIds: string[], years: number[]) {
       tanggal: { gte: new Date(`${minYear}-01-01`), lt: new Date(`${maxYear + 1}-01-01`) },
       coaAccount: {
         kategori: "PENDAPATAN",
-        reportCategory: { in: [ReportCategory.INTERNAL, ReportCategory.SEMUA] },
+        reportCategory: { in: ["INTERNAL", "SEMUA"] },
       },
     },
     select: { tanggal: true, kredit: true },

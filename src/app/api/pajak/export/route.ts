@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const entityKey = searchParams.get("entityKey");
   const yearParam = searchParams.get("year");
   const year = parseInt(yearParam ?? "") || new Date().getFullYear();
+  const versionParam = searchParams.get("version");
+  const version = versionParam?.toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
 
   let targetEntityId = entityId;
 
@@ -48,11 +50,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await getLaporanPajakData(targetEntityId, year);
-    const excelBuffer = await generateLaporanPajakExcel(data);
+    const data = await getLaporanPajakData(targetEntityId, year, version);
+    const excelBuffer = await generateLaporanPajakExcel(data, version);
 
     const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const filename = `Laporan_Pajak_${safeName}_${year}.xlsx`;
+    const filename = `Laporan_Laba_Rugi_${safeName}_${year}_${version.toLowerCase()}.xlsx`;
 
     return new NextResponse(new Uint8Array(excelBuffer), {
       status: 200,

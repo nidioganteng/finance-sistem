@@ -127,7 +127,7 @@ export default async function LaporanPage({
     const [laporan, tax] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
       tab === "laba-rugi" && selectedEntity
-        ? getLaporanPajakData(selectedEntity.id, currentYear)
+        ? getLaporanPajakData(selectedEntity.id, currentYear, currentVersion)
         : Promise.resolve(null),
     ]);
     laporanKeuanganData = laporan;
@@ -461,7 +461,7 @@ export default async function LaporanPage({
 
       {tab === "laba-rugi" && laporanKeuanganData && (
         currentVersion === "UMUM" && taxData ? (
-          <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} />
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
         ) : (
           <LabaRugiView
             data={laporanKeuanganData}

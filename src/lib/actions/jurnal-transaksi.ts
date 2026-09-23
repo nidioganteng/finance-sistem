@@ -9,7 +9,7 @@ import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 import { REKENING_BY_ENTITY, REKENING_COA_CODE } from "@/lib/bank-accounts";
 
-type JurnalRow = { coaAccountId: string; debit: number; kredit: number };
+type JurnalRow = { coaAccountId: string; debit: number; kredit: number; keterangan: string };
 
 const KAS_KECIL_COA: Record<string, string> = {
   kencana: "1100", gaharu: "1200", tataring: "1300", ciptaAsri: "1400", umum: "1500",
@@ -38,13 +38,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
     return { error: "Kamu tidak punya akses untuk input jurnal transaksi." };
   }
 
-  const keterangan = (formData.get("keterangan") as string | null)?.trim() ?? "";
   const tanggal = (formData.get("tanggal") as string | null)?.trim() ?? "";
   const entityKey = (formData.get("entityKey") as string | null)?.trim() ?? "";
   const noBukti = (formData.get("noBukti") as string | null)?.trim() ?? "";
   const editNoBukti = (formData.get("editNoBukti") as string | null)?.trim() ?? "";
 
-  if (!keterangan) return { error: "Keterangan wajib diisi." };
   if (!tanggal) return { error: "Tanggal wajib diisi." };
   if (!noBukti) return { error: "No. Bukti wajib diisi." };
   if (!entityKey) return { error: "Entity tidak ditemukan." };
@@ -113,7 +111,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           jenisInputId: jenisInput.id,
           tanggal: new Date(tanggal),
           noBukti,
-          keterangan,
+          keterangan: row.keterangan?.trim() ?? "",
           coaAccountId: row.coaAccountId,
           debit: row.debit ?? 0,
           kredit: row.kredit ?? 0,
@@ -173,7 +171,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           jenisInputId: targetJenisInputId,
           tanggal: new Date(tanggal),
           noBukti,
-          keterangan,
+          keterangan: row.keterangan?.trim() ?? "",
           coaAccountId: row.coaAccountId,
           debit: arahMasuk ? nominal : 0,
           kredit: arahMasuk ? 0 : nominal,
@@ -191,9 +189,10 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   await prisma.$transaction(allOps);
 
+  const firstKeterangan = validRows[0]?.keterangan?.trim() ?? "";
   logActivity(
     session.user.id,
-    `${editNoBukti ? "Edit" : "Input"} Jurnal Transaksi – ${noBukti} (${entity.name})`,
+    `${editNoBukti ? "Edit" : "Input"} Jurnal Transaksi – ${noBukti} (${entity.name})${firstKeterangan ? ": " + firstKeterangan : ""}`,
     "FINANCIAL_CHANGE",
     { entityKey, noBukti, rowCount: validRows.length }
   );

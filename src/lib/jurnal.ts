@@ -36,11 +36,20 @@ export async function getJurnalRows(
     tanggalFilter = { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
   }
 
+  // Exclude auto-posted rows (pakai raw SQL karena Prisma NOT+JSON path tidak handle NULL)
+  const autoPosted = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM \`Transaction\`
+    WHERE entityId = ${entityId}
+    AND JSON_EXTRACT(extraFieldsJson, '$.autoPostedFromJurnal') = true
+  `;
+  const excludeIds = autoPosted.map((r) => r.id);
+
   const where = {
     entityId,
     ...(filterKey && filterKey !== "semua" ? { jenisInput: { key: filterKey } } : {}),
     ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
     ...(akunCode ? { coaAccount: { code: akunCode } } : {}),
+    ...(excludeIds.length > 0 ? { NOT: { id: { in: excludeIds } } } : {}),
   };
 
   const [totalCount, rows] = await Promise.all([

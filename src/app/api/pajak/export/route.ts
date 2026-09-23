@@ -44,8 +44,8 @@ export async function GET(req: NextRequest) {
   }
 
   const { role, entityKeys } = session.user;
-  const isSuperAdmin = role === "SUPER_ADMIN";
-  if (!isSuperAdmin && !entityKeys.includes(entity.key)) {
+  const isPrivileged = role === "SUPER_ADMIN" || role === "MANAJER_KEUANGAN";
+  if (!isPrivileged && !entityKeys.includes(entity.key)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

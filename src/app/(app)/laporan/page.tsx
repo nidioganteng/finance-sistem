@@ -125,8 +125,8 @@ export default async function LaporanPage({
   } else if (tab === "laba-rugi" || tab === "neraca") {
     const [laporan, tax] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
-      tab === "laba-rugi" && selectedEntity
-        ? getLaporanPajakData(selectedEntity.id, currentYear, currentVersion)
+      tab === "laba-rugi"
+        ? getLaporanPajakData(entityIds, currentYear, currentVersion)
         : Promise.resolve(null),
     ]);
     laporanKeuanganData = laporan;
@@ -135,9 +135,7 @@ export default async function LaporanPage({
     const [laporan, allArusKas, presisi] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
       Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
-      selectedEntity
-        ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
-        : Promise.resolve(null),
+      getArusKasPresisiData(entityIds, currentYear, currentVersion),
     ]);
     laporanKeuanganData = laporan;
     arusKasPresisiData = presisi;
@@ -479,7 +477,7 @@ export default async function LaporanPage({
       )}
 
       {tab === "arus-kas" && arusKasCombined && (
-        arusKasPresisiData && selectedEntity ? (
+        arusKasPresisiData ? (
           <ArusKasTabWrapper
             standardView={
               <ArusKasView
@@ -489,7 +487,7 @@ export default async function LaporanPage({
               />
             }
             presisiData={arusKasPresisiData}
-            entityId={selectedEntity.id}
+            entityId={selectedEntity?.id ?? entityIds[0]}
           />
         ) : (
           <ArusKasView

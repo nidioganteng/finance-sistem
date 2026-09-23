@@ -18,9 +18,8 @@ export default async function LabaRugiPage({
   searchParams: { entity?: string; year?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
+  const { entityKeys } = session!.user;
   logActivity(session!.user.id, "Buka halaman Laba Rugi", "USER_ACTIVITY", { path: "/laba-rugi" });
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);

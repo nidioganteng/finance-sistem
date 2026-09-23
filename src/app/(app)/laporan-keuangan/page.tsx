@@ -18,6 +18,8 @@ import { getLaporanPajakData } from "@/lib/pajak";
 import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
 import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { ArusKasPresisiClient } from "@/components/laporan/ArusKasPresisiClient";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
+import { NeracaView } from "@/components/laporan/NeracaView";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -25,9 +27,8 @@ export default async function LaporanKeuanganPage({
   searchParams: { entity?: string; year?: string; tab?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
+  const { entityKeys } = session!.user;
   logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan-keuangan" });
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
@@ -76,7 +77,7 @@ export default async function LaporanKeuanganPage({
         </div>
       )}
 
-      {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
+      {hasData && tab === "neraca" && <NeracaView data={data} year={currentYear} entityName={selectedEntity.name} />}
       {hasData && tab === "laba-rugi" && (
         taxData ? (
           <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
@@ -85,9 +86,12 @@ export default async function LaporanKeuanganPage({
         )
       )}
       {hasData && tab === "arus-kas" && arusKasPresisiData && (
-        <ArusKasPresisiClient
-          data={arusKasPresisiData}
+        <ArusKasTabWrapper
+          presisiData={arusKasPresisiData}
           entityId={selectedEntity.id}
+          standardView={
+            <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />
+          }
         />
       )}
     </PageTransition>

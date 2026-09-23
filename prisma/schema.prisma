@@ -61,6 +61,7 @@ model Entity {
   transactions Transaction[]
   loadingDock  LoadingDockTransaksi[]
   saldoAwal    SaldoAwal[]
+  asetTetap    AsetTetap[]
 }
 
 model UserEntityAccess {
@@ -278,3 +279,27 @@ model ActivityLog {
 
   actor User @relation("ActivityActor", fields: [actorId], references: [id])
 }
+
+// Modul Aktiva Tetap (Issue 39 & SRS v2.0 Bagian 3.4)
+// Menyimpan inventaris aset fisik dan jadwal penyusutan otomatis garis lurus.
+// Saldo akumulasi penyusutan dan biaya penyusutan otomatis ditarik (linked) ke Laba Rugi dan Neraca.
+model AsetTetap {
+  id               String   @id @default(cuid())
+  entityId         String
+  kode             String   // Kode registrasi / nomor stiker / tagging fisik aset
+  nama             String   // Nama barang / aset tetap
+  kategori         String   @default("KENDARAAN") // KENDARAAN, PERALATAN, MESIN, GEDUNG, INVENTARIS, LAINNYA
+  tanggalPerolehan DateTime
+  hargaPerolehan   Decimal  @db.Decimal(18, 2)
+  nilaiResidu      Decimal  @default(0.00) @db.Decimal(18, 2)
+  umurBulan        Int      @default(48) // Umur ekonomis dalam bulan (contoh: 48 bulan = 4 tahun)
+  metode           String   @default("GARIS_LURUS")
+  keterangan       String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id])
+
+  @@index([entityId])
+}
+

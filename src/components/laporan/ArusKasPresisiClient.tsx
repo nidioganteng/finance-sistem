@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, Printer, CheckCircle2, TrendingUp, TrendingDown, FileSpreadsheet } from "lucide-react";
+import { Download, Printer, CheckCircle2, TrendingUp, TrendingDown, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import type { ArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { formatRupiahArusKas } from "@/lib/arus-kas-presisi";
 
@@ -20,32 +20,49 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
     setTimeout(() => setIsExporting(false), 2000);
   };
 
+  const isPositive = data.kenaikanBersihKas >= 0;
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Top action toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-            <CheckCircle2 size={13} />
-            Metode Tidak Langsung
-          </span>
-          <span className="text-xs text-muted">
-            Rincian Modal Kerja & Pihak Berelasi
-          </span>
+      {/* ── Header Laporan Resmi (Sesuai Desain Standar) ── */}
+      <div className="bg-surface-card border border-border-soft rounded-[22px] px-7 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-extrabold text-muted-faintest uppercase tracking-[0.16em]">
+              {data.entityName}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-border-soft" />
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">
+              Laporan Arus Kas
+            </span>
+          </div>
+          <h2 className="text-[22px] font-extrabold text-navy-text mt-1">Arus Kas (Cash Flow)</h2>
+          <p className="text-[13px] text-muted mt-1">
+            Arus Kas Aktivitas Operasi, Investasi, & Pendanaan Periode {data.year} · Metode Tidak Langsung · Standar SAK
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="shrink-0 flex flex-wrap items-center gap-2.5 print:hidden">
+          <span
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-extrabold shadow-xs ${
+              isPositive
+                ? "bg-green-500 text-white"
+                : "bg-red-500 text-white"
+            }`}
+          >
+            {isPositive ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+            {isPositive ? "ARUS KAS SURPLUS" : "ARUS KAS DEFISIT"}
+          </span>
           <button
             onClick={handleExportExcel}
             disabled={isExporting}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
           >
             <FileSpreadsheet size={15} />
-            {isExporting ? "Menyiapkan Excel..." : "Ekspor Excel (.xlsx)"}
+            {isExporting ? "Menyiapkan..." : "Ekspor Excel"}
           </button>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-muted-stronger bg-surface-card border border-border-soft hover:bg-surface-hover active:scale-95 transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-muted-stronger bg-surface-card border border-border-soft hover:bg-surface-hover active:scale-95 transition-all shadow-xs cursor-pointer"
           >
             <Printer size={15} />
             Cetak PDF
@@ -53,54 +70,50 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
         </div>
       </div>
 
-      {/* KPI Cards Ringkasan */}
+      {/* ── Top Metric Cards (Sesuai Desain Standar) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
-        <div className="bg-surface-card p-4 rounded-2xl border border-border-soft flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-            I. Kas Aktivitas Operasi
-          </span>
-          <span
-            className={`text-lg font-bold tabular-nums ${
-              data.totalArusKasOperasi >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-            }`}
-          >
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Arus Kas Operasi</div>
+          <div className="text-[22px] font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">
             {formatRupiahArusKas(data.totalArusKasOperasi)}
-          </span>
-          <span className="text-xs text-muted">Laba operasi + modal kerja</span>
+          </div>
+          <div className="text-[11.5px] text-muted mt-2">Laba operasi & modal kerja</div>
         </div>
 
-        <div className="bg-surface-card p-4 rounded-2xl border border-border-soft flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-            II. Kas Aktivitas Investasi
-          </span>
-          <span className="text-lg font-bold tabular-nums text-navy-text">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Arus Kas Investasi</div>
+          <div className="text-[22px] font-extrabold text-orange-600 dark:text-orange-400 tabular-nums">
             {formatRupiahArusKas(data.totalArusKasInvestasi)}
-          </span>
-          <span className="text-xs text-muted">Perolehan aset tetap</span>
+          </div>
+          <div className="text-[11.5px] text-muted mt-2">Perolehan aset tetap tahun berjalan</div>
         </div>
 
-        <div className="bg-surface-card p-4 rounded-2xl border border-border-soft flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-            III. Kas Aktivitas Pendanaan
-          </span>
-          <span
-            className={`text-lg font-bold tabular-nums ${
-              data.totalArusKasPendanaan >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-            }`}
-          >
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Arus Kas Pendanaan</div>
+          <div className="text-[22px] font-extrabold text-violet-600 dark:text-violet-400 tabular-nums">
             {formatRupiahArusKas(data.totalArusKasPendanaan)}
-          </span>
-          <span className="text-xs text-muted">Laba ditahan / ekuitas</span>
+          </div>
+          <div className="text-[11.5px] text-muted mt-2">Laba ditahan & ekuitas modal</div>
         </div>
 
-        <div className="bg-surface-card p-4 rounded-2xl border border-border-soft flex flex-col gap-1.5 bg-navy/5 dark:bg-navy/15">
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-            Kas & Setara Kas Akhir
-          </span>
-          <span className="text-lg font-extrabold tabular-nums text-navy-text">
+        <div
+          className={`rounded-[20px] border p-5 shadow-xs ${
+            isPositive
+              ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
+              : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
+          }`}
+        >
+          <div className="text-[12px] font-bold uppercase tracking-wider mb-2">
+            <span className={isPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+              Kas & Setara Kas Akhir
+            </span>
+          </div>
+          <div className={`text-[20px] font-extrabold tabular-nums ${isPositive ? "text-status-green" : "text-status-red"}`}>
             {formatRupiahArusKas(data.kasAkhirPeriode)}
-          </span>
-          <span className="text-xs text-muted">Konsisten dengan saldo Neraca</span>
+          </div>
+          <div className="text-[11.5px] text-muted mt-2">
+            Kenaikan bersih: {formatRupiahArusKas(data.kenaikanBersihKas)}
+          </div>
         </div>
       </div>
 

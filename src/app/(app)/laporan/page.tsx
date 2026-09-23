@@ -92,7 +92,8 @@ export default async function LaporanPage({
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const tab = searchParams.tab ?? "ringkasan";
+  const rawTab = searchParams.tab ?? "ringkasan";
+  const tab = currentVersion === "UMUM" && rawTab === "arus-kas" ? "ringkasan" : rawTab;
 
   // For group view, aggregate all entity data
   const entityIds = selectedEntity
@@ -307,7 +308,7 @@ export default async function LaporanPage({
   return (
     <PageTransition>
       <PageHeader
-        title="Laporan Keuangan"
+        title={`Laporan Keuangan ${currentVersion === "UMUM" ? "Umum" : "Internal"}`}
         subtitle={
           tab === "komparasi" && komparasiData
             ? `Komparasi laporan keuangan — ${entityLabel} · ${komparasiData.labelA} vs ${komparasiData.labelB} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`

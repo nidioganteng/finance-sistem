@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Role } from "@prisma/client";
 import {
@@ -29,6 +30,7 @@ import {
   FolderOpen,
   Settings2,
   ClipboardList,
+  ChevronDown,
 } from "lucide-react";
 import { getNavForRole, type NavItem } from "@/lib/rbac";
 
@@ -66,7 +68,18 @@ export function Sidebar({
   onClose?: () => void;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentVersionParam = searchParams.get("version")?.toLowerCase();
   const sections = getNavForRole(role);
+
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => ({
+    "/laporan": true,
+    "/laporan-keuangan": true,
+  }));
+
+  function toggleDropdown(href: string) {
+    setOpenDropdowns((prev) => ({ ...prev, [href]: !prev[href] }));
+  }
 
   return (
     <aside className="w-[260px] flex-none bg-surface-card border-r border-border-soft flex flex-col p-4 pt-5 sticky top-0 h-screen">
@@ -102,14 +115,72 @@ export function Sidebar({
             <div className="flex flex-col gap-0.5">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon];
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const isParentActive = pathname === item.href || pathname.startsWith(item.href + "/");
+
+                if (item.subItems && item.subItems.length > 0) {
+                  const isOpen = openDropdowns[item.href] ?? isParentActive;
+                  return (
+                    <div key={item.href} className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => toggleDropdown(item.href)}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                          isParentActive
+                            ? "bg-surface-hover/80 text-navy-text font-bold"
+                            : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon size={17} strokeWidth={1.8} className="flex-none" />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        <ChevronDown
+                          size={15}
+                          className={`text-muted-faint transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {isOpen && (
+                        <div className="ml-4 pl-3.5 border-l-2 border-border-soft flex flex-col gap-1 mt-1 mb-1.5">
+                          {item.subItems.map((sub) => {
+                            const isSubActive =
+                              isParentActive &&
+                              (sub.version === "umum"
+                                ? currentVersionParam === "umum"
+                                : currentVersionParam !== "umum");
+                            return (
+                              <Link
+                                key={sub.href}
+                                href={sub.href}
+                                onClick={onClose}
+                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-150 ${
+                                  isSubActive
+                                    ? "bg-navy text-white shadow-sm"
+                                    : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full flex-none ${
+                                    isSubActive ? "bg-white" : "bg-muted-faint"
+                                  }`}
+                                />
+                                <span className="truncate">{sub.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
                     className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 ${
-                      active
+                      isParentActive
                         ? "bg-navy text-white shadow-sm"
                         : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
                     }`}

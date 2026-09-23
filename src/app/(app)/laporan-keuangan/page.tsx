@@ -30,7 +30,8 @@ export default async function LaporanKeuanganPage({
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const tab = searchParams.tab ?? "neraca";
+  const rawTab = searchParams.tab ?? "neraca";
+  const tab = currentVersion === "UMUM" && rawTab === "arus-kas" ? "neraca" : rawTab;
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
@@ -42,8 +43,8 @@ export default async function LaporanKeuanganPage({
   return (
     <PageTransition>
       <PageHeader
-        title={`Laporan Keuangan – ${selectedEntity.name}`}
-        subtitle={`Ringkasan laporan keuangan — Periode ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
+        title={`Laporan Keuangan ${currentVersion === "UMUM" ? "Umum" : "Internal"} – ${selectedEntity.name}`}
+        subtitle={`Posisi dan ringkasan keuangan — Periode ${currentYear}`}
         rightSlot={
           <>
             <ReportVersionSwitcher currentVersion={currentVersion} />

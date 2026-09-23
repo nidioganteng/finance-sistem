@@ -68,7 +68,7 @@ export default async function DashboardPage({
       ? Promise.all(chartYears.map((y) => getMonthlyChartData(targetEntityKeys, y)))
       : Promise.resolve([]),
     selectedEntity
-      ? getLaporanKeuanganData([selectedEntity.id], currentYear)
+      ? getLaporanKeuanganData([selectedEntity.id], currentYear, "INTERNAL")
       : Promise.resolve(null),
   ]);
 

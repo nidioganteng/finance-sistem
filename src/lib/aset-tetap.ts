@@ -123,12 +123,10 @@ export async function getPenyusutanSummary(
   year: number,
   month?: number
 ): Promise<PenyusutanSummary> {
-  const assetsRaw = Boolean((prisma as any).asetTetap)
-    ? await prisma.asetTetap.findMany({
-        where: { entityId },
-        orderBy: [{ tanggalPerolehan: "asc" }, { kode: "asc" }],
-      })
-    : [];
+  const assetsRaw = await prisma.asetTetap.findMany({
+    where: { entityId },
+    orderBy: [{ tanggalPerolehan: "asc" }, { kode: "asc" }],
+  });
 
   const assets = assetsRaw.map((a) => calculateAsetDepreciation(a, year, month));
 

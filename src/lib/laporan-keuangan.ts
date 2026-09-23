@@ -50,11 +50,9 @@ export async function getLaporanKeuanganData(
       },
     }),
     getExcludedNoBuktiForVersion(ids, year, normVersion),
-    Boolean((prisma as any).asetTetap)
-      ? prisma.asetTetap.findMany({
-          where: { entityId: { in: ids } },
-        })
-      : Promise.resolve([]),
+    prisma.asetTetap.findMany({
+      where: { entityId: { in: ids } },
+    }),
   ]);
 
   const transactions = await prisma.transaction.findMany({

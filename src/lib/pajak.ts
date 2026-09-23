@@ -77,10 +77,10 @@ export interface LaporanPajakData {
 }
 
 export function formatAccounting(val: number): string {
-  if (!val || Math.round(val) === 0) return "-";
+  if (!val || Math.round(val) === 0) return "Rp -";
   const rounded = Math.round(val);
   const formatted = Math.abs(rounded).toLocaleString("id-ID");
-  return rounded < 0 ? `(${formatted})` : formatted;
+  return rounded < 0 ? `Rp (${formatted})` : `Rp ${formatted}`;
 }
 
 // Template standar akun sesuai format spreadsheet Excel acuan
@@ -201,11 +201,16 @@ export async function getLaporanPajakData(
     accountNameMap.set(acc.code, acc.name);
   }
 
+  // Pilih sumber nilai komersial berdasarkan versi laporan:
+  // Versi INTERNAL memakai komersialMap (transaksi internal + semua)
+  // Versi UMUM memakai fiskalMap (transaksi umum + semua tanpa nomor bukti yang dikecualikan)
+  const activeAmountMap = version === "UMUM" ? fiskalMap : komersialMap;
+
   // 1. PENDAPATAN
   // Akun 400 (Pendapatan Usaha) dan akun 616/535 (PPN)
-  const pend400Komersial = komersialMap.get("400") ?? 0;
+  const pend400Komersial = activeAmountMap.get("400") ?? 0;
   const pend400Fiskal = fiskalMap.get("400") ?? 0;
-  const ppnKomersial = (komersialMap.get("616") ?? 0) || (komersialMap.get("535") ?? 0);
+  const ppnKomersial = (activeAmountMap.get("616") ?? 0) || (activeAmountMap.get("535") ?? 0);
   const ppnFiskal = (fiskalMap.get("616") ?? 0) || (fiskalMap.get("535") ?? 0);
 
   const pendapatanRows: TaxReportRow[] = [
@@ -228,7 +233,7 @@ export async function getLaporanPajakData(
   // Tambahkan akun pendapatan usaha lain (selain 400 dan 410 Giro) jika ada
   for (const acc of allAccounts) {
     if (acc.kategori === "PENDAPATAN" && acc.code !== "400" && acc.code !== "410") {
-      const k = komersialMap.get(acc.code) ?? 0;
+      const k = activeAmountMap.get(acc.code) ?? 0;
       const f = fiskalMap.get(acc.code) ?? 0;
       if (k !== 0 || f !== 0) {
         pendapatanRows.push({
@@ -254,7 +259,7 @@ export async function getLaporanPajakData(
 
   const biayaLangsungCodes = new Set(templateBiayaLangsung.map((t) => t.code));
   const biayaLangsungRows: TaxReportRow[] = templateBiayaLangsung.map((item) => {
-    const k = komersialMap.get(item.code) ?? 0;
+    const k = activeAmountMap.get(item.code) ?? 0;
     const f = fiskalMap.get(item.code) ?? 0;
     return {
       code: item.code,
@@ -275,7 +280,7 @@ export async function getLaporanPajakData(
       acc.code !== "616" &&
       (version !== "UMUM" || acc.code !== "628")
     ) {
-      const k = komersialMap.get(acc.code) ?? 0;
+      const k = activeAmountMap.get(acc.code) ?? 0;
       const f = fiskalMap.get(acc.code) ?? 0;
       if (k !== 0 || f !== 0) {
         biayaLangsungRows.push({
@@ -300,7 +305,7 @@ export async function getLaporanPajakData(
   // 4. BIAYA OPERASIONAL (Akun 5xx, 611 Gaji Direktur, 633 By Ijin Usaha)
   const biayaOperasionalCodes = new Set(TEMPLATE_BIAYA_OPERASIONAL.map((t) => t.code));
   const biayaOperasionalRows: TaxReportRow[] = TEMPLATE_BIAYA_OPERASIONAL.map((item) => {
-    const k = komersialMap.get(item.code) ?? 0;
+    const k = activeAmountMap.get(item.code) ?? 0;
     const f = fiskalMap.get(item.code) ?? 0;
     return {
       code: item.code,
@@ -321,7 +326,7 @@ export async function getLaporanPajakData(
       acc.code !== "535" &&
       acc.code !== "536"
     ) {
-      const k = komersialMap.get(acc.code) ?? 0;
+      const k = activeAmountMap.get(acc.code) ?? 0;
       const f = fiskalMap.get(acc.code) ?? 0;
       if (k !== 0 || f !== 0) {
         biayaOperasionalRows.push({
@@ -344,7 +349,7 @@ export async function getLaporanPajakData(
   const labaOperasionalFiskal = labaKotorFiskal - totalBiayaOperasionalFiskal;
 
   // 6. PPH FINAL (Akun 534)
-  const pphFinalKomersial = komersialMap.get("534") ?? 0;
+  const pphFinalKomersial = activeAmountMap.get("534") ?? 0;
   const pphFinalFiskal = fiskalMap.get("534") ?? 0;
   const pphFinalRows: TaxReportRow[] = [
     {
@@ -362,9 +367,9 @@ export async function getLaporanPajakData(
 
   // 8. PENDAPATAN & BIAYA LAIN - LAIN
   // 410 Pendapatan Jasa Giro & 532 By. Adm & Pjk bank
-  const jasaGiroKomersial = komersialMap.get("410") ?? 0;
+  const jasaGiroKomersial = activeAmountMap.get("410") ?? 0;
   const jasaGiroFiskal = fiskalMap.get("410") ?? 0;
-  const admBankKomersial = komersialMap.get("532") ?? 0;
+  const admBankKomersial = activeAmountMap.get("532") ?? 0;
   const admBankFiskal = fiskalMap.get("532") ?? 0;
 
   const pendapatanBiayaLainRows: TaxReportRow[] = [

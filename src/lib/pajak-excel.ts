@@ -21,7 +21,7 @@ export async function generateLaporanPajakExcel(
     { key: "komersial", width: 28 },
   ];
 
-  const accountingFormat = '#,##0;(#,##0);"-"';
+  const accountingFormat = '"Rp "#,##0;"Rp "(#,##0);"Rp -"';
 
   // 1. Title Rows
   const versionSuffix = version === "UMUM" ? " (VERSI UMUM)" : " (VERSI INTERNAL)";

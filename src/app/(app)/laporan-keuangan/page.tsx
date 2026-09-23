@@ -79,7 +79,7 @@ export default async function LaporanKeuanganPage({
 
       {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
       {hasData && tab === "laba-rugi" && (
-        currentVersion === "UMUM" && taxData ? (
+        taxData ? (
           <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
         ) : (
           <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />

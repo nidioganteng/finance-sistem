@@ -31,6 +31,7 @@ import {
   Settings2,
   ClipboardList,
   ChevronDown,
+  PenLine,
 } from "lucide-react";
 import { getNavForRole, type NavItem } from "@/lib/rbac";
 
@@ -56,6 +57,7 @@ const ICONS: Record<NavItem["icon"], typeof LayoutGrid> = {
   folderOpen: FolderOpen,
   settings2: Settings2,
   clipboardList: ClipboardList,
+  penLine: PenLine,
 };
 
 export function Sidebar({

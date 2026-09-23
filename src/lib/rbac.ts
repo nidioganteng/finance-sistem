@@ -9,7 +9,7 @@ export type NavSubItem = {
 export type NavItem = {
   label: string;
   href: string;
-  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList";
+  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList" | "penLine";
   subItems?: NavSubItem[];
 };
 
@@ -55,6 +55,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       items: [
         { label: "Kas Kecil", href: "/kas-kecil", icon: "wallet" },
         { label: "Kas Besar", href: "/kas-besar", icon: "banknote" },
+        { label: "Entry Jurnal", href: "/jurnal-transaksi", icon: "penLine" },
         { label: "Buku Bank", href: "/bank-buku", icon: "building2" },
         { label: "Jurnal Umum", href: "/jurnal", icon: "scrollText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
@@ -100,6 +101,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       items: [
         { label: "Kas Kecil", href: "/kas-kecil", icon: "wallet" },
         { label: "Kas Besar", href: "/kas-besar", icon: "banknote" },
+        { label: "Entry Jurnal", href: "/jurnal-transaksi", icon: "penLine" },
         { label: "Buku Bank", href: "/bank-buku", icon: "building2" },
         { label: "Jurnal Umum", href: "/jurnal", icon: "scrollText" },
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },

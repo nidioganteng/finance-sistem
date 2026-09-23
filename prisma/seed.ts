@@ -71,6 +71,7 @@ async function main() {
     { key: "kasKecil", nama: "Kas Kecil" },
     { key: "kasBesar", nama: "Kas Besar" },
     { key: "bankBuku", nama: "Buku Bank" },
+    { key: "jurnalTransaksi", nama: "Jurnal Transaksi" },
   ]) {
     await prisma.jenisInputTransaksi.upsert({
       where: { key: j.key }, update: {}, create: { key: j.key, nama: j.nama, active: true },

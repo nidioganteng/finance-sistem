@@ -116,7 +116,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
             Pendapatan Usaha
           </span>
           <span className="text-lg font-bold tabular-nums text-status-green">
-            Rp {data.pendapatan.totalKomersial.toLocaleString("id-ID")}
+            {formatAccounting(data.pendapatan.totalKomersial)}
           </span>
           <span className="text-xs text-muted">Akun Pendapatan 400</span>
         </div>
@@ -126,7 +126,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
             Biaya Langsung Proyek
           </span>
           <span className="text-lg font-bold tabular-nums text-status-red">
-            Rp {data.biayaLangsung.totalKomersial.toLocaleString("id-ID")}
+            {formatAccounting(data.biayaLangsung.totalKomersial)}
           </span>
           <span className="text-xs text-muted">
             {version === "UMUM" ? "Akun 6xx (Tanpa By Marketing)" : "Akun 6xx (Termasuk By Marketing)"}
@@ -138,7 +138,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
             Biaya Operasional
           </span>
           <span className="text-lg font-bold tabular-nums text-status-red">
-            Rp {data.biayaOperasional.totalKomersial.toLocaleString("id-ID")}
+            {formatAccounting(data.biayaOperasional.totalKomersial)}
           </span>
           <span className="text-xs text-muted">Beban Operasional & Penyusutan</span>
         </div>
@@ -152,7 +152,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
               data.labaBersih.komersial >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
             }`}
           >
-            Rp {data.labaBersih.komersial.toLocaleString("id-ID")}
+            {formatAccounting(data.labaBersih.komersial)}
           </span>
           <span className="text-xs text-muted">Laba Tahun Berjalan</span>
         </div>

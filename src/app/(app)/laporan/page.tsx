@@ -460,7 +460,7 @@ export default async function LaporanPage({
       )}
 
       {tab === "laba-rugi" && laporanKeuanganData && (
-        currentVersion === "UMUM" && taxData ? (
+        taxData ? (
           <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
         ) : (
           <LabaRugiView

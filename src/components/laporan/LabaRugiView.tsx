@@ -1,6 +1,7 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Percent, Award, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Percent, Award, ArrowUpRight, ArrowDownRight, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
 import type { CoaLine } from "@/lib/laporan-keuangan";
 
 interface LabaRugiViewProps {
@@ -46,7 +47,7 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
             Periode Akuntansi 1 Januari s/d 31 Desember {year} · Standar Pelaporan Akuntansi SAK
           </p>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-wrap items-center gap-2.5">
           <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-extrabold shadow-xs ${
             data.labaBersihPositive
               ? "bg-green-500 text-white"

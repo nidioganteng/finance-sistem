@@ -6,9 +6,6 @@ const MONTHS = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-import type { ReportCategory } from "@prisma/client";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
-
 export type ReportVersion = "INTERNAL" | "UMUM";
 
 export async function getArusKasData(
@@ -17,12 +14,8 @@ export async function getArusKasData(
   version: ReportVersion | string = "INTERNAL"
 ) {
   const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const allowedCategories: ReportCategory[] =
-    normVersion === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
-  const excludedNoBukti = await getExcludedNoBuktiForVersion(entityId, year, normVersion);
-
-  // Filter ke akun ber-reportType ARUS_KAS (kas & bank) saja dan sesuai reportCategory
+  // Filter ke semua akun ber-reportType ARUS_KAS (kas & bank) — sama untuk internal dan umum
   const transactions = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -32,9 +25,7 @@ export async function getArusKasData(
       },
       coaAccount: {
         reportType: "ARUS_KAS",
-        reportCategory: { in: allowedCategories },
       },
-      ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
     },
     orderBy: { tanggal: "asc" },
   });

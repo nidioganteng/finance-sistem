@@ -18,8 +18,12 @@ import { KomparasiLineChart } from "@/components/laporan/KomparasiLineChart";
 import { KomparasiEntityPills } from "@/components/laporan/KomparasiEntityPills";
 import { RingkasanTab } from "@/components/laporan/RingkasanTab";
 import { LabaRugiView } from "@/components/laporan/LabaRugiView";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
+import { getLaporanPajakData } from "@/lib/pajak";
 import { NeracaView } from "@/components/laporan/NeracaView";
 import { ArusKasView } from "@/components/laporan/ArusKasView";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import {
   getLaporanKeuanganData,
   getLaporanJurnalData,
@@ -92,8 +96,7 @@ export default async function LaporanPage({
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const rawTab = searchParams.tab ?? "ringkasan";
-  const tab = currentVersion === "UMUM" && rawTab === "arus-kas" ? "ringkasan" : rawTab;
+  const tab = searchParams.tab ?? "ringkasan";
 
   // For group view, aggregate all entity data
   const entityIds = selectedEntity
@@ -105,8 +108,10 @@ export default async function LaporanPage({
   let jurnalData: Awaited<ReturnType<typeof getLaporanJurnalData>> | null = null;
   let bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null = null;
   let arusKasCombined: any = null;
+  let arusKasPresisiData: Awaited<ReturnType<typeof getArusKasPresisiData>> | null = null;
   let piutangData: Awaited<ReturnType<typeof getLaporanPiutangData>> | null = null;
   let utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null = null;
+  let taxData: Awaited<ReturnType<typeof getLaporanPajakData>> | null = null;
 
   if (tab === "ringkasan") {
     const [laporan, jData, bData] = await Promise.all([
@@ -118,13 +123,22 @@ export default async function LaporanPage({
     jurnalData = jData;
     bankData = bData;
   } else if (tab === "laba-rugi" || tab === "neraca") {
-    laporanKeuanganData = await getLaporanKeuanganData(entityIds, currentYear, currentVersion);
-  } else if (tab === "arus-kas") {
-    const [laporan, allArusKas] = await Promise.all([
+    const [laporan, tax] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
-      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
+      tab === "laba-rugi"
+        ? getLaporanPajakData(entityIds, currentYear, currentVersion)
+        : Promise.resolve(null),
     ]);
     laporanKeuanganData = laporan;
+    taxData = tax;
+  } else if (tab === "arus-kas") {
+    const [laporan, allArusKas, presisi] = await Promise.all([
+      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
+      getArusKasPresisiData(entityIds, currentYear, currentVersion),
+    ]);
+    laporanKeuanganData = laporan;
+    arusKasPresisiData = presisi;
 
     const MONTHS_LABEL = [
       "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -443,11 +457,15 @@ export default async function LaporanPage({
       )}
 
       {tab === "laba-rugi" && laporanKeuanganData && (
-        <LabaRugiView
-          data={laporanKeuanganData}
-          year={currentYear}
-          entityName={entityLabel}
-        />
+        taxData ? (
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
+        ) : (
+          <LabaRugiView
+            data={laporanKeuanganData}
+            year={currentYear}
+            entityName={entityLabel}
+          />
+        )
       )}
 
       {tab === "neraca" && laporanKeuanganData && (
@@ -459,11 +477,25 @@ export default async function LaporanPage({
       )}
 
       {tab === "arus-kas" && arusKasCombined && (
-        <ArusKasView
-          data={arusKasCombined}
-          year={currentYear}
-          entityName={entityLabel}
-        />
+        arusKasPresisiData ? (
+          <ArusKasTabWrapper
+            standardView={
+              <ArusKasView
+                data={arusKasCombined}
+                year={currentYear}
+                entityName={entityLabel}
+              />
+            }
+            presisiData={arusKasPresisiData}
+            entityId={selectedEntity?.id ?? entityIds[0]}
+          />
+        ) : (
+          <ArusKasView
+            data={arusKasCombined}
+            year={currentYear}
+            entityName={entityLabel}
+          />
+        )
       )}
 
       {tab === "piutang" && piutangData && (

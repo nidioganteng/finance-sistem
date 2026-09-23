@@ -2,7 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
-import { CoaKategori, ReportType, ReportCategory } from "@prisma/client";
+import { CoaKategori, ReportType, type ReportCategory } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/actions/log";
@@ -13,7 +13,7 @@ export async function createCOA(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
   const reportType = formData.get("reportType") as ReportType;
-  const reportCategory = (formData.get("reportCategory") as ReportCategory) || ReportCategory.SEMUA;
+  const reportCategory = (formData.get("reportCategory") as ReportCategory) || "SEMUA";
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 
@@ -33,7 +33,7 @@ export async function updateCOA(id: string, formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
   const reportType = formData.get("reportType") as ReportType;
-  const reportCategory = (formData.get("reportCategory") as ReportCategory) || ReportCategory.SEMUA;
+  const reportCategory = (formData.get("reportCategory") as ReportCategory) || "SEMUA";
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 

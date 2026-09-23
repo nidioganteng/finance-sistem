@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
-import { CoaKategori, ReportCategory } from "@prisma/client";
+import { CoaKategori, type ReportCategory } from "@prisma/client";
 import {
   isDebetNormal,
   isContraAset,
@@ -28,7 +28,7 @@ export async function getNeracaData(
 ) {
   const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const allowedCategories: ReportCategory[] =
-    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
+    normVersion === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const [allCoa, saldoAwalRows, excludedNoBukti, penyusutanSummary] = await Promise.all([
     prisma.coaAccount.findMany({

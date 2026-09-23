@@ -11,13 +11,13 @@ import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
 
 type CoaOption = { id: string; code: string; name: string };
 
-// Satu baris COA: akun + debit atau kredit
-type CoaRow = { uid: string; coaAccountId: string; debitRaw: string; kreditRaw: string };
+// Satu baris COA: akun + deskripsi + debit atau kredit
+type CoaRow = { uid: string; coaAccountId: string; keterangan: string; debitRaw: string; kreditRaw: string };
 
 let _counter = 0;
 function uid() { return `r${++_counter}`; }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
-function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", debitRaw: "", kreditRaw: "" }; }
+function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", keterangan: "", debitRaw: "", kreditRaw: "" }; }
 function parseNum(s: string) { return parseInt(s.replace(/\./g, "").replace(/[^0-9]/g, ""), 10) || 0; }
 function fmtNum(raw: string) {
   const n = parseInt(raw.replace(/\./g, "").replace(/[^0-9]/g, ""), 10);
@@ -51,7 +51,6 @@ export function JurnalTransaksiClient({
   // Form state: header fields + multiple COA rows
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
-  const [keterangan, setKeterangan] = useState("");
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -60,10 +59,10 @@ export function JurnalTransaksiClient({
   const totalKredit = coaRows.reduce((s, r) => s + parseNum(r.kreditRaw), 0);
   const isBalanced = totalDebit > 0 && totalKredit > 0 && totalDebit === totalKredit;
   const validRowCount = coaRows.filter((r) => r.coaAccountId && (parseNum(r.debitRaw) > 0 || parseNum(r.kreditRaw) > 0)).length;
-  const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && keterangan.trim().length > 0 && validRowCount >= 1 && !isPending;
+  const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && validRowCount >= 1 && !isPending;
 
   function resetForm() {
-    setNoBukti(""); setTanggal(todayStr()); setKeterangan("");
+    setNoBukti(""); setTanggal(todayStr());
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -73,10 +72,10 @@ export function JurnalTransaksiClient({
     setEditingGroup(group);
     setNoBukti(group.noBukti);
     setTanggal(group.tanggalRaw.slice(0, 10));
-    setKeterangan(group.keterangan);
     setCoaRows(group.rows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
+      keterangan: r.keterangan,
       debitRaw: r.debit > 0 ? r.debit.toLocaleString("id-ID") : "",
       kreditRaw: r.kredit > 0 ? r.kredit.toLocaleString("id-ID") : "",
     })));
@@ -92,6 +91,10 @@ export function JurnalTransaksiClient({
       if (field === "kreditRaw" && value) updated.debitRaw = "";
       return updated;
     }));
+  }
+
+  function setRowKeterangan(rowUid: string, value: string) {
+    setCoaRows((prev) => prev.map((r) => r.uid === rowUid ? { ...r, keterangan: value } : r));
   }
 
   function applyDateFilter() {
@@ -116,12 +119,11 @@ export function JurnalTransaksiClient({
     fd.set("entityKey", entityKey);
     fd.set("noBukti", noBukti);
     fd.set("tanggal", tanggal);
-    fd.set("keterangan", keterangan);
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
         .filter((r) => r.coaAccountId)
-        .map((r) => ({ coaAccountId: r.coaAccountId, debit: parseNum(r.debitRaw), kredit: parseNum(r.kreditRaw) }))
+        .map((r) => ({ coaAccountId: r.coaAccountId, keterangan: r.keterangan, debit: parseNum(r.debitRaw), kredit: parseNum(r.kreditRaw) }))
     ));
     startTransition(async () => {
       const result = await saveJurnalTransaksi(fd);
@@ -213,8 +215,8 @@ export function JurnalTransaksiClient({
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Header: No. Bukti, Tanggal, Keterangan */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
+            {/* Header: No. Bukti, Tanggal */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
                 <input type="text" value={noBukti} onChange={(e) => setNoBukti(e.target.value)}
@@ -226,12 +228,6 @@ export function JurnalTransaksiClient({
                 <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
                   className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">Keterangan</label>
-                <input type="text" value={keterangan} onChange={(e) => setKeterangan(e.target.value)}
-                  placeholder="Misal: Konsumsi rapat proyek" required
-                  className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text placeholder:text-muted focus:outline-none focus:border-brand transition-colors" />
-              </div>
             </div>
 
             {/* Tabel baris COA */}
@@ -240,7 +236,8 @@ export function JurnalTransaksiClient({
                 <thead>
                   <tr className="bg-surface-subtle border-b border-border-soft">
                     <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-7">#</th>
-                    <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint">AKUN COA</th>
+                    <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-[28%]">AKUN COA</th>
+                    <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint">KETERANGAN</th>
                     <th className="text-right px-3 py-2.5 text-[10.5px] font-bold text-blue-500 w-36">DEBIT (Rp)</th>
                     <th className="text-right px-3 py-2.5 text-[10.5px] font-bold text-status-green w-36">KREDIT (Rp)</th>
                     <th className="px-2 py-2.5 w-8" />
@@ -257,6 +254,12 @@ export function JurnalTransaksiClient({
                           options={coa}
                           className="h-8"
                         />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={row.keterangan}
+                          onChange={(e) => setRowKeterangan(row.uid, e.target.value)}
+                          placeholder="Deskripsi transaksi…"
+                          className="w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand transition-colors" />
                       </td>
                       <td className="px-3 py-2">
                         <input type="text" inputMode="numeric" value={row.debitRaw}
@@ -283,7 +286,7 @@ export function JurnalTransaksiClient({
                 </tbody>
                 <tfoot>
                   <tr className="bg-surface-subtle border-t border-border-soft">
-                    <td colSpan={2} className="px-3 py-2.5 text-[12px] font-bold text-muted-stronger">Total</td>
+                    <td colSpan={3} className="px-3 py-2.5 text-[12px] font-bold text-muted-stronger">Total</td>
                     <td className="px-3 py-2.5 text-right">
                       <span className={`text-[13px] font-bold tabular-nums ${totalDebit > 0 ? (isBalanced ? "text-status-green" : "text-blue-500") : "text-muted"}`}>
                         {totalDebit > 0 ? formatRupiah(totalDebit) : "—"}
@@ -343,8 +346,8 @@ export function JurnalTransaksiClient({
                 </button>
               </td>
               <td className="py-2 px-1.5">NO. BUKTI</td>
-              <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5">AKUN</td>
+              <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5 text-right text-blue-500">DEBIT</td>
               <td className="py-2 px-1.5 text-right text-status-green">KREDIT</td>
               <td className="py-2 px-1.5 text-right">AKSI</td>
@@ -362,14 +365,14 @@ export function JurnalTransaksiClient({
                       <>
                         <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
                         <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{group.noBukti}</td>
-                        <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text max-w-[180px] truncate">{group.keterangan}</td>
                       </>
                     ) : (
-                      <><td className="py-2.5 px-1.5" /><td className="py-2.5 px-1.5" /><td className="py-2.5 px-1.5" /></>
+                      <><td className="py-2.5 px-1.5" /><td className="py-2.5 px-1.5" /></>
                     )}
                     <td className="py-2.5 px-1.5 text-[12.5px] text-muted-stronger">
                       <span className="font-mono text-[11px] text-muted mr-1.5">{row.coaCode}</span>{row.coaName}
                     </td>
+                    <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px] truncate">{row.keterangan || <span className="text-muted-faint">—</span>}</td>
                     <td className="py-2.5 px-1.5 text-[13px] font-bold text-right tabular-nums text-blue-600 dark:text-blue-400">
                       {row.debit > 0 ? formatRupiah(row.debit) : <span className="text-muted-faint font-normal">—</span>}
                     </td>

@@ -8,7 +8,7 @@ export type JurnalTransaksiGroup = {
   tanggal: string;
   tanggalRaw: string;
   keterangan: string;
-  rows: { coaAccountId: string; coaName: string; coaCode: string; debit: number; kredit: number }[];
+  rows: { coaAccountId: string; coaName: string; coaCode: string; keterangan: string; debit: number; kredit: number }[];
   totalDebit: number;
   totalKredit: number;
   allTxIds: string[];
@@ -95,6 +95,7 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
       coaAccountId: row.coaAccountId ?? "",
       coaCode: row.coaAccount?.code ?? "—",
       coaName: row.coaAccount?.name ?? "—",
+      keterangan: row.keterangan,
       debit,
       kredit,
     });

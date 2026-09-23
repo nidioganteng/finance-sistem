@@ -116,7 +116,7 @@ export function LaporanPajakClient({ data, entityKey }: LaporanPajakClientProps)
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
             <CheckCircle2 size={13} />
-            Format Komersial vs Fiskal Presisi
+            Laporan Rekonsiliasi Fiskal
           </span>
           <span className="text-xs text-muted">
             Sinkron dengan Modul Aktiva Tetap & Transaksi Riil

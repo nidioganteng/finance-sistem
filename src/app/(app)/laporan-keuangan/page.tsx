@@ -17,7 +17,7 @@ import type { ReportVersion } from "@/lib/laba-rugi";
 import { getLaporanPajakData } from "@/lib/pajak";
 import { LabaRugiTabWrapper } from "@/components/laporan/LabaRugiTabWrapper";
 import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
-import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
+import { ArusKasPresisiClient } from "@/components/laporan/ArusKasPresisiClient";
 
 export default async function LaporanKeuanganPage({
   searchParams,
@@ -86,9 +86,8 @@ export default async function LaporanKeuanganPage({
         />
       )}
       {hasData && tab === "arus-kas" && arusKasPresisiData && (
-        <ArusKasTabWrapper
-          standardView={<ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-          presisiData={arusKasPresisiData}
+        <ArusKasPresisiClient
+          data={arusKasPresisiData}
           entityId={selectedEntity.id}
         />
       )}

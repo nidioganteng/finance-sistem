@@ -47,7 +47,7 @@ export function LabaRugiTabWrapper({
               }`}
             >
               <FileSpreadsheet size={14} />
-              Komersial vs Fiskal (Template Excel)
+              Komersial vs Fiskal
             </button>
           </div>
         </div>

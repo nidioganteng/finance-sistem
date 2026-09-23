@@ -126,21 +126,30 @@ const TEMPLATE_BIAYA_OPERASIONAL = [
 ];
 
 export async function getLaporanPajakData(
-  entityId: string,
+  entityId: string | string[],
   year: number,
   version: ReportVersion = "INTERNAL"
 ): Promise<LaporanPajakData> {
-  const entity = await prisma.entity.findUnique({
-    where: { id: entityId },
-    select: { id: true, name: true },
-  });
+  const ids = Array.isArray(entityId) ? entityId : [entityId];
+  let entityName = "Semua Entitas (Grup)";
+  let primaryEntityId = ids[0] ?? "";
+  if (ids.length === 1) {
+    const entity = await prisma.entity.findUnique({
+      where: { id: ids[0] },
+      select: { id: true, name: true },
+    });
+    if (entity) {
+      entityName = entity.name;
+      primaryEntityId = entity.id;
+    }
+  }
 
   const start = new Date(`${year}-01-01`);
   const end = new Date(`${year}-12-31T23:59:59`);
 
-  const [excludedNoBuktiUmum, penyusutanSummary, allAccounts, transactions] = await Promise.all([
-    getExcludedNoBuktiForVersion(entityId, year, "UMUM"),
-    getPenyusutanSummary(entityId, year),
+  const [excludedNoBuktiUmum, penyusutanSummaries, allAccounts, transactions] = await Promise.all([
+    getExcludedNoBuktiForVersion(ids, year, "UMUM"),
+    Promise.all(ids.map((id) => getPenyusutanSummary(id, year))),
     prisma.coaAccount.findMany({
       where: {
         OR: [
@@ -152,7 +161,7 @@ export async function getLaporanPajakData(
     }),
     prisma.transaction.findMany({
       where: {
-        entityId,
+        entityId: { in: ids },
         tanggal: { gte: start, lte: end },
         coaAccountId: { not: null },
       },
@@ -189,10 +198,11 @@ export async function getLaporanPajakData(
   }
 
   // Set nilai penyusutan otomatis dari modul aktiva tetap
-  if (penyusutanSummary.totalBebanPenyusutan > 0) {
+  const totalBebanPenyusutan = penyusutanSummaries.reduce((sum, s) => sum + s.totalBebanPenyusutan, 0);
+  if (totalBebanPenyusutan > 0) {
     const penyusutanCode = "512";
-    komersialMap.set(penyusutanCode, penyusutanSummary.totalBebanPenyusutan);
-    fiskalMap.set(penyusutanCode, penyusutanSummary.totalBebanPenyusutan);
+    komersialMap.set(penyusutanCode, totalBebanPenyusutan);
+    fiskalMap.set(penyusutanCode, totalBebanPenyusutan);
   }
 
   // Buat map nama akun dari DB untuk fallback nama yang tepat
@@ -397,8 +407,8 @@ export async function getLaporanPajakData(
   const labaBersihFiskal = labaSetelahPajakFiskal + totalLainFiskal;
 
   return {
-    entityId,
-    entityName: entity?.name ?? "Entitas",
+    entityId: primaryEntityId,
+    entityName,
     year,
     pendapatan: {
       items: pendapatanRows,

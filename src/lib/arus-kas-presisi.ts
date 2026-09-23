@@ -71,41 +71,46 @@ export function formatRupiahArusKas(val: number): string {
 }
 
 export async function getArusKasPresisiData(
-  entityId: string,
+  entityId: string | string[],
   year: number,
   version: ReportVersion = "INTERNAL"
 ): Promise<ArusKasPresisiData> {
   const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const ids = Array.isArray(entityId) ? entityId : [entityId];
 
-  const entity = await prisma.entity.findUnique({
-    where: { id: entityId },
-    select: { name: true },
-  });
+  let entityName = "Semua Entitas (Grup)";
+  if (ids.length === 1) {
+    const entity = await prisma.entity.findUnique({
+      where: { id: ids[0] },
+      select: { name: true },
+    });
+    if (entity) entityName = entity.name;
+  }
 
   const start = new Date(`${year}-01-01`);
   const end = new Date(`${year}-12-31T23:59:59`);
 
-  const [penyusutanSummary, allAccounts, saldoAwalList, transactions, assetsList] = await Promise.all([
-    getPenyusutanSummary(entityId, year),
+  const [penyusutanSummaries, allAccounts, saldoAwalList, transactions, assetsList] = await Promise.all([
+    Promise.all(ids.map((id) => getPenyusutanSummary(id, year))),
     prisma.coaAccount.findMany({
       orderBy: { code: "asc" },
     }),
     prisma.saldoAwal.findMany({
       where: {
-        entityId,
+        entityId: { in: ids },
         year,
       },
     }),
     prisma.transaction.findMany({
       where: {
-        entityId,
+        entityId: { in: ids },
         tanggal: { gte: start, lte: end },
         coaAccountId: { not: null },
       },
       include: { coaAccount: true },
     }),
     prisma.asetTetap.findMany({
-      where: { entityId },
+      where: { entityId: { in: ids } },
     }),
   ]);
 
@@ -177,7 +182,7 @@ export async function getArusKasPresisiData(
   }
 
   // Sinkronisasi penyusutan aset tetap
-  const penyusutanAsetTetap = penyusutanSummary.totalBebanPenyusutan;
+  const penyusutanAsetTetap = penyusutanSummaries.reduce((sum, s) => sum + s.totalBebanPenyusutan, 0);
   if (penyusutanAsetTetap > 0) {
     const accPenyusutan = allAccounts.find(
       (a) => a.code === "512" || a.code === "540" || /penyusutan/i.test(a.name)
@@ -371,7 +376,7 @@ export async function getArusKasPresisiData(
   ];
 
   return {
-    entityName: entity?.name ?? "Entitas",
+    entityName,
     year,
     version: normVersion,
     labaBersihSetelahPajak,

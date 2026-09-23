@@ -2,7 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
-import { CoaKategori, ReportType } from "@prisma/client";
+import { CoaKategori, ReportType, ReportCategory } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/actions/log";
@@ -13,15 +13,16 @@ export async function createCOA(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
   const reportType = formData.get("reportType") as ReportType;
+  const reportCategory = (formData.get("reportCategory") as ReportCategory) || ReportCategory.SEMUA;
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 
   const last = await prisma.coaAccount.findFirst({ orderBy: { urutan: "desc" }, select: { urutan: true } });
   const urutan = (last?.urutan ?? -1) + 1;
 
-  await prisma.coaAccount.create({ data: { code, name, kategori, reportType, urutan } });
+  await prisma.coaAccount.create({ data: { code, name, kategori, reportType, reportCategory, urutan } });
   if (session?.user.id) {
-    logActivity(session.user.id, `Tambah COA ${code} – ${name}`, "FINANCIAL_CHANGE", { code, name, kategori, reportType });
+    logActivity(session.user.id, `Tambah COA ${code} – ${name}`, "FINANCIAL_CHANGE", { code, name, kategori, reportType, reportCategory });
   }
   revalidatePath("/coa");
 }
@@ -32,12 +33,13 @@ export async function updateCOA(id: string, formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   const kategori = formData.get("kategori") as CoaKategori;
   const reportType = formData.get("reportType") as ReportType;
+  const reportCategory = (formData.get("reportCategory") as ReportCategory) || ReportCategory.SEMUA;
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 
-  await prisma.coaAccount.update({ where: { id }, data: { code, name, kategori, reportType } });
+  await prisma.coaAccount.update({ where: { id }, data: { code, name, kategori, reportType, reportCategory } });
   if (session?.user.id) {
-    logActivity(session.user.id, `Update COA ${code} – ${name}`, "FINANCIAL_CHANGE", { id, code, name, kategori, reportType });
+    logActivity(session.user.id, `Update COA ${code} – ${name}`, "FINANCIAL_CHANGE", { id, code, name, kategori, reportType, reportCategory });
   }
   revalidatePath("/coa");
 }

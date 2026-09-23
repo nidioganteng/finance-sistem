@@ -1,12 +1,13 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
-import { CoaKategori } from "@prisma/client";
+import { CoaKategori, ReportCategory } from "@prisma/client";
 import {
   isDebetNormal,
   isContraAset,
   isAktivaTetap,
   isLabaDitahan,
   hitungSaldoAkhir,
+  getExcludedNoBuktiForVersion,
 } from "./akuntansi";
 import { getPenyusutanSummary } from "./aset-tetap";
 
@@ -18,23 +19,46 @@ export type CoaLine = {
   isContra?: boolean;
 };
 
-export async function getNeracaData(entityId: string, year: number) {
-  const [allCoa, saldoAwalRows, transactions, penyusutanSummary] = await Promise.all([
-    prisma.coaAccount.findMany({ orderBy: { urutan: "asc" } }),
-    prisma.saldoAwal.findMany({ where: { entityId, year } }),
-    prisma.transaction.findMany({
+export type ReportVersion = "INTERNAL" | "UMUM";
+
+export async function getNeracaData(
+  entityId: string,
+  year: number,
+  version: ReportVersion | string = "INTERNAL"
+) {
+  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const allowedCategories: ReportCategory[] =
+    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
+
+  const [allCoa, saldoAwalRows, excludedNoBukti, penyusutanSummary] = await Promise.all([
+    prisma.coaAccount.findMany({
+      where: { reportCategory: { in: allowedCategories } },
+      orderBy: { urutan: "asc" },
+    }),
+    prisma.saldoAwal.findMany({
       where: {
         entityId,
-        coaAccountId: { not: null },
-        tanggal: {
-          gte: new Date(`${year}-01-01`),
-          lte: new Date(`${year}-12-31T23:59:59`),
-        },
+        year,
+        coaAccount: { reportCategory: { in: allowedCategories } },
       },
-      select: { coaAccountId: true, debit: true, kredit: true },
     }),
+    getExcludedNoBuktiForVersion(entityId, year, normVersion),
     getPenyusutanSummary(entityId, year),
   ]);
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      entityId,
+      coaAccountId: { not: null },
+      tanggal: {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31T23:59:59`),
+      },
+      coaAccount: { reportCategory: { in: allowedCategories } },
+      ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
+    },
+    select: { coaAccountId: true, debit: true, kredit: true },
+  });
 
   const totalsByAccount = new Map<string, { debit: number; kredit: number }>();
   for (const t of transactions) {
@@ -244,5 +268,6 @@ export async function getNeracaData(entityId: string, year: number) {
     // Modul Aset Tetap summary
     penyusutanOtomatis: penyusutanSummary.totalBebanPenyusutan,
     akumulasiPenyusutanOtomatis: penyusutanSummary.totalAkumulasiPenyusutan,
+    version: normVersion,
   };
 }

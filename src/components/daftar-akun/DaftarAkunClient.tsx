@@ -73,9 +73,9 @@ export function DaftarAkunClient({
         <div className="mx-5 mt-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead>
-            <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
+            <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint whitespace-nowrap">
               <th className="py-3 px-5">KODE AKUN</th>
               <th className="py-3 px-3">NAMA AKUN</th>
               <th className="py-3 px-3">KATEGORI</th>
@@ -89,21 +89,21 @@ export function DaftarAkunClient({
           <tbody>
             {rows.map((r) => (
               <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40">
-                <td className="py-3 px-5 font-mono font-bold text-navy-text text-[13px]">{r.code}</td>
+                <td className="py-3 px-5 font-mono font-bold text-navy-text text-[13px] whitespace-nowrap">{r.code}</td>
                 <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
                   {r.name}
                   {!r.punyaTransaksi && (
-                    <span className="ml-1.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded">
+                    <span className="ml-1.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded whitespace-nowrap">
                       belum ada transaksi
                     </span>
                   )}
                 </td>
-                <td className="py-3 px-3">
+                <td className="py-3 px-3 whitespace-nowrap">
                   <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[r.kategori] ?? "bg-surface-hover text-muted"}`}>
                     {r.kategori}
                   </span>
                 </td>
-                <td className="py-3 px-3 text-right">
+                <td className="py-3 px-3 text-right whitespace-nowrap">
                   {editingId === r.coaId ? (
                     <form action={(fd) => handleSave(r.coaId, fd)} className="flex items-center justify-end gap-1">
                       <input
@@ -123,7 +123,7 @@ export function DaftarAkunClient({
                     </form>
                   ) : (
                     <div className="flex items-center justify-end gap-1.5">
-                      <span className="tabular-nums text-[13px] text-muted">{r.saldoAwalFmt}</span>
+                      <span className="tabular-nums text-[13px] text-muted whitespace-nowrap">{r.saldoAwalFmt}</span>
                       {canEdit && (
                         <button onClick={() => setEditingId(r.coaId)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit saldo awal">
                           <Pencil size={11} />
@@ -132,9 +132,9 @@ export function DaftarAkunClient({
                     </div>
                   )}
                 </td>
-                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text">{r.totalDebetFmt}</td>
-                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text">{r.totalKreditFmt}</td>
-                <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold">
+                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalDebetFmt}</td>
+                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalKreditFmt}</td>
+                <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold whitespace-nowrap">
                   <span className={r.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}>
                     {r.saldoAkhirNegatif ? "-" : ""}{r.saldoAkhirFmt}
                   </span>

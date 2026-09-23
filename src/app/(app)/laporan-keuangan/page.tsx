@@ -525,7 +525,12 @@ function ArusKasTab({
         {/* Aktivitas Operasi */}
         <SectionHeader color="blue" label="Aktivitas Operasi" />
         <AkRow label="Laba/(Rugi) Bersih" val={data.labaBersih} fmt={data.labaBersihFmt} />
-        <AkRow label="Penyesuaian non-kas (penyusutan, dll.)" val={0} fmt="" italic />
+        <AkRow
+          label="Penyesuaian non-kas (penyusutan aset tetap)"
+          val={data.penyesuaianNonKas ?? 0}
+          fmt={data.penyesuaianNonKasFmt ?? "Rp 0"}
+          italic={!data.penyesuaianNonKas}
+        />
         {data.perubahanAsetNonKas !== 0 && (
           <AkRow label="Penurunan/(Kenaikan) Aset Non-Kas" val={data.perubahanAsetNonKas} fmt={formatRupiah(Math.abs(data.perubahanAsetNonKas))} />
         )}

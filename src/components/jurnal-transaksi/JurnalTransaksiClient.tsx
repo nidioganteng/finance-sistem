@@ -11,13 +11,18 @@ import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
 
 type CoaOption = { id: string; code: string; name: string };
 
-// Satu baris COA: akun + deskripsi + debit atau kredit
-type CoaRow = { uid: string; coaAccountId: string; keterangan: string; debitRaw: string; kreditRaw: string };
+type CoaRow = {
+  uid: string;
+  coaAccountId: string;
+  keterangan: string;
+  arah: "debit" | "kredit";
+  nominalRaw: string;
+};
 
 let _counter = 0;
 function uid() { return `r${++_counter}`; }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
-function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", keterangan: "", debitRaw: "", kreditRaw: "" }; }
+function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", keterangan: "", arah: "debit", nominalRaw: "" }; }
 function parseNum(s: string) { return parseInt(s.replace(/\./g, "").replace(/[^0-9]/g, ""), 10) || 0; }
 function fmtNum(raw: string) {
   const n = parseInt(raw.replace(/\./g, "").replace(/[^0-9]/g, ""), 10);
@@ -48,17 +53,16 @@ export function JurnalTransaksiClient({
   const [filterSampai, setFilterSampai] = useState(sampai);
   const isFiltered = !!dari || !!sampai;
 
-  // Form state: header fields + multiple COA rows
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const totalDebit = coaRows.reduce((s, r) => s + parseNum(r.debitRaw), 0);
-  const totalKredit = coaRows.reduce((s, r) => s + parseNum(r.kreditRaw), 0);
+  const totalDebit = coaRows.reduce((s, r) => s + (r.arah === "debit" ? parseNum(r.nominalRaw) : 0), 0);
+  const totalKredit = coaRows.reduce((s, r) => s + (r.arah === "kredit" ? parseNum(r.nominalRaw) : 0), 0);
   const isBalanced = totalDebit > 0 && totalKredit > 0 && totalDebit === totalKredit;
-  const validRowCount = coaRows.filter((r) => r.coaAccountId && (parseNum(r.debitRaw) > 0 || parseNum(r.kreditRaw) > 0)).length;
+  const validRowCount = coaRows.filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0).length;
   const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && validRowCount >= 1 && !isPending;
 
   function resetForm() {
@@ -76,25 +80,15 @@ export function JurnalTransaksiClient({
       uid: uid(),
       coaAccountId: r.coaAccountId,
       keterangan: r.keterangan,
-      debitRaw: r.debit > 0 ? r.debit.toLocaleString("id-ID") : "",
-      kreditRaw: r.kredit > 0 ? r.kredit.toLocaleString("id-ID") : "",
+      arah: r.debit > 0 ? "debit" : "kredit",
+      nominalRaw: r.debit > 0 ? r.debit.toLocaleString("id-ID") : r.kredit.toLocaleString("id-ID"),
     })));
     setFeedback(null);
     setPanelOpen(true);
   }
 
-  function updateCoaRow(rowUid: string, field: keyof Omit<CoaRow, "uid">, value: string) {
-    setCoaRows((prev) => prev.map((r) => {
-      if (r.uid !== rowUid) return r;
-      const updated = { ...r, [field]: value };
-      if (field === "debitRaw" && value) updated.kreditRaw = "";
-      if (field === "kreditRaw" && value) updated.debitRaw = "";
-      return updated;
-    }));
-  }
-
-  function setRowKeterangan(rowUid: string, value: string) {
-    setCoaRows((prev) => prev.map((r) => r.uid === rowUid ? { ...r, keterangan: value } : r));
+  function updateRow(rowUid: string, patch: Partial<Omit<CoaRow, "uid">>) {
+    setCoaRows((prev) => prev.map((r) => r.uid === rowUid ? { ...r, ...patch } : r));
   }
 
   function applyDateFilter() {
@@ -122,8 +116,13 @@ export function JurnalTransaksiClient({
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
-        .filter((r) => r.coaAccountId)
-        .map((r) => ({ coaAccountId: r.coaAccountId, keterangan: r.keterangan, debit: parseNum(r.debitRaw), kredit: parseNum(r.kreditRaw) }))
+        .filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0)
+        .map((r) => ({
+          coaAccountId: r.coaAccountId,
+          keterangan: r.keterangan,
+          debit: r.arah === "debit" ? parseNum(r.nominalRaw) : 0,
+          kredit: r.arah === "kredit" ? parseNum(r.nominalRaw) : 0,
+        }))
     ));
     startTransition(async () => {
       try {
@@ -219,7 +218,7 @@ export function JurnalTransaksiClient({
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Header: No. Bukti, Tanggal */}
+            {/* Header: No. Bukti + Tanggal */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
@@ -242,8 +241,8 @@ export function JurnalTransaksiClient({
                     <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-7">#</th>
                     <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-[28%]">AKUN COA</th>
                     <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint">KETERANGAN</th>
-                    <th className="text-right px-3 py-2.5 text-[10.5px] font-bold text-blue-500 w-36">DEBIT (Rp)</th>
-                    <th className="text-right px-3 py-2.5 text-[10.5px] font-bold text-status-green w-36">KREDIT (Rp)</th>
+                    <th className="text-center px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-36">DEBIT / KREDIT</th>
+                    <th className="text-right px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-36">NOMINAL (Rp)</th>
                     <th className="px-2 py-2.5 w-8" />
                   </tr>
                 </thead>
@@ -254,28 +253,46 @@ export function JurnalTransaksiClient({
                       <td className="px-3 py-2">
                         <CoaCombobox
                           value={row.coaAccountId}
-                          onChange={(id) => updateCoaRow(row.uid, "coaAccountId", id)}
+                          onChange={(id) => updateRow(row.uid, { coaAccountId: id })}
                           options={coa}
                           className="h-8"
                         />
                       </td>
                       <td className="px-3 py-2">
                         <input type="text" value={row.keterangan}
-                          onChange={(e) => setRowKeterangan(row.uid, e.target.value)}
+                          onChange={(e) => updateRow(row.uid, { keterangan: e.target.value })}
                           placeholder="Deskripsi transaksi…"
                           className="w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand transition-colors" />
                       </td>
                       <td className="px-3 py-2">
-                        <input type="text" inputMode="numeric" value={row.debitRaw}
-                          onChange={(e) => updateCoaRow(row.uid, "debitRaw", fmtNum(e.target.value))}
-                          placeholder="—"
-                          className="w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text text-right placeholder:text-muted-faint focus:outline-none focus:border-blue-400 transition-colors" />
+                        <div className="flex rounded-[8px] border border-border-soft overflow-hidden h-8 w-full">
+                          <button type="button"
+                            onClick={() => updateRow(row.uid, { arah: "debit" })}
+                            className={`flex-1 text-[11.5px] font-bold transition-colors ${
+                              row.arah === "debit"
+                                ? "bg-blue-500 text-white"
+                                : "bg-surface-input text-muted hover:bg-surface-hover"
+                            }`}>
+                            Debit
+                          </button>
+                          <button type="button"
+                            onClick={() => updateRow(row.uid, { arah: "kredit" })}
+                            className={`flex-1 text-[11.5px] font-bold transition-colors border-l border-border-soft ${
+                              row.arah === "kredit"
+                                ? "bg-status-green text-white"
+                                : "bg-surface-input text-muted hover:bg-surface-hover"
+                            }`}>
+                            Kredit
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3 py-2">
-                        <input type="text" inputMode="numeric" value={row.kreditRaw}
-                          onChange={(e) => updateCoaRow(row.uid, "kreditRaw", fmtNum(e.target.value))}
+                        <input type="text" inputMode="numeric" value={row.nominalRaw}
+                          onChange={(e) => updateRow(row.uid, { nominalRaw: fmtNum(e.target.value) })}
                           placeholder="—"
-                          className="w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text text-right placeholder:text-muted-faint focus:outline-none focus:border-green-400 transition-colors" />
+                          className={`w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text text-right placeholder:text-muted-faint focus:outline-none transition-colors ${
+                            row.arah === "debit" ? "focus:border-blue-400" : "focus:border-green-400"
+                          }`} />
                       </td>
                       <td className="px-2 py-2 text-center">
                         {coaRows.length > 1 && (
@@ -290,16 +307,22 @@ export function JurnalTransaksiClient({
                 </tbody>
                 <tfoot>
                   <tr className="bg-surface-subtle border-t border-border-soft">
-                    <td colSpan={3} className="px-3 py-2.5 text-[12px] font-bold text-muted-stronger">Total</td>
+                    <td colSpan={4} className="px-3 py-2.5 text-[12px] font-bold text-muted-stronger">Total</td>
                     <td className="px-3 py-2.5 text-right">
-                      <span className={`text-[13px] font-bold tabular-nums ${totalDebit > 0 ? (isBalanced ? "text-status-green" : "text-blue-500") : "text-muted"}`}>
-                        {totalDebit > 0 ? formatRupiah(totalDebit) : "—"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className={`text-[13px] font-bold tabular-nums ${totalKredit > 0 ? (isBalanced ? "text-status-green" : "text-status-amber") : "text-muted"}`}>
-                        {totalKredit > 0 ? formatRupiah(totalKredit) : "—"}
-                      </span>
+                      {totalDebit > 0 || totalKredit > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          {totalDebit > 0 && (
+                            <span className={`text-[12px] font-bold tabular-nums ${isBalanced ? "text-status-green" : "text-blue-500"}`}>
+                              D {formatRupiah(totalDebit)}
+                            </span>
+                          )}
+                          {totalKredit > 0 && (
+                            <span className={`text-[12px] font-bold tabular-nums ${isBalanced ? "text-status-green" : "text-status-amber"}`}>
+                              K {formatRupiah(totalKredit)}
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-muted text-[13px]">—</span>}
                     </td>
                     <td />
                   </tr>
@@ -338,9 +361,6 @@ export function JurnalTransaksiClient({
           {actionError}
         </div>
       )}
-
-      {/* ── Perbandingan desain (testing) ── */}
-      <DesainAlternatifToggle coa={coa} />
 
       {/* Tabel history */}
       <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
@@ -414,168 +434,6 @@ export function JurnalTransaksiClient({
           return `${pathname}?${params.toString()}`;
         }}
       />
-    </div>
-  );
-}
-
-// ── Komponen perbandingan desain: toggle Debit/Kredit per baris ──
-type AltRow = { uid: string; coaAccountId: string; keterangan: string; arah: "debit" | "kredit"; nominalRaw: string };
-let _altCounter = 0;
-function altUid() { return `a${++_altCounter}`; }
-function makeAltRow(): AltRow { return { uid: altUid(), coaAccountId: "", keterangan: "", arah: "debit", nominalRaw: "" }; }
-
-function DesainAlternatifToggle({ coa }: { coa: CoaOption[] }) {
-  const [rows, setRows] = useState<AltRow[]>([makeAltRow(), makeAltRow()]);
-
-  const totalDebit = rows.reduce((s, r) => s + (r.arah === "debit" ? parseNum(r.nominalRaw) : 0), 0);
-  const totalKredit = rows.reduce((s, r) => s + (r.arah === "kredit" ? parseNum(r.nominalRaw) : 0), 0);
-  const isBalanced = totalDebit > 0 && totalKredit > 0 && totalDebit === totalKredit;
-
-  function update(uid: string, patch: Partial<Omit<AltRow, "uid">>) {
-    setRows((prev) => prev.map((r) => r.uid === uid ? { ...r, ...patch } : r));
-  }
-
-  return (
-    <div className="bg-surface-card border border-border-soft rounded-2xl p-6">
-      {/* Label */}
-      <div className="flex items-center gap-2.5 mb-5">
-        <div className="w-8 h-8 rounded-[10px] bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-none">
-          <ArrowUpDown size={15} className="text-amber-600 dark:text-amber-400" />
-        </div>
-        <div>
-          <h2 className="text-[14.5px] font-bold text-navy-text">Alternatif Desain — Toggle Debit/Kredit</h2>
-          <p className="text-[11.5px] text-muted">Setiap baris pilih arah (Debit / Kredit) lalu isi nominal — untuk perbandingan ke client</p>
-        </div>
-      </div>
-
-      {/* Header: No. Bukti + Tanggal */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
-          <input type="text" placeholder="JU/0922-001"
-            className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text font-mono placeholder:text-muted focus:outline-none focus:border-brand transition-colors" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">Tanggal</label>
-          <input type="date" defaultValue={new Date().toISOString().slice(0, 10)}
-            className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
-        </div>
-      </div>
-
-      {/* Tabel baris */}
-      <div className="rounded-[12px] border border-border-soft overflow-hidden mb-4">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="bg-surface-subtle border-b border-border-soft">
-              <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-7">#</th>
-              <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-[28%]">AKUN COA</th>
-              <th className="text-left px-3 py-2.5 text-[10.5px] font-bold text-muted-faint">KETERANGAN</th>
-              <th className="text-center px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-36">DEBIT / KREDIT</th>
-              <th className="text-right px-3 py-2.5 text-[10.5px] font-bold text-muted-faint w-36">NOMINAL (Rp)</th>
-              <th className="px-2 py-2.5 w-8" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => (
-              <tr key={row.uid} className="border-b border-border-soft last:border-0 hover:bg-surface-hover/40 transition-colors">
-                <td className="px-3 py-2 text-[12px] text-muted">{idx + 1}</td>
-                <td className="px-3 py-2">
-                  <CoaCombobox value={row.coaAccountId} onChange={(id) => update(row.uid, { coaAccountId: id })} options={coa} className="h-8" />
-                </td>
-                <td className="px-3 py-2">
-                  <input type="text" value={row.keterangan} onChange={(e) => update(row.uid, { keterangan: e.target.value })}
-                    placeholder="Deskripsi transaksi…"
-                    className="w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand transition-colors" />
-                </td>
-                <td className="px-3 py-2">
-                  {/* Toggle pill */}
-                  <div className="flex rounded-[8px] border border-border-soft overflow-hidden h-8 w-full">
-                    <button type="button"
-                      onClick={() => update(row.uid, { arah: "debit" })}
-                      className={`flex-1 text-[11.5px] font-bold transition-colors ${
-                        row.arah === "debit"
-                          ? "bg-blue-500 text-white"
-                          : "bg-surface-input text-muted hover:bg-surface-hover"
-                      }`}>
-                      Debit
-                    </button>
-                    <button type="button"
-                      onClick={() => update(row.uid, { arah: "kredit" })}
-                      className={`flex-1 text-[11.5px] font-bold transition-colors border-l border-border-soft ${
-                        row.arah === "kredit"
-                          ? "bg-status-green text-white"
-                          : "bg-surface-input text-muted hover:bg-surface-hover"
-                      }`}>
-                      Kredit
-                    </button>
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  <input type="text" inputMode="numeric" value={row.nominalRaw}
-                    onChange={(e) => update(row.uid, { nominalRaw: fmtNum(e.target.value) })}
-                    placeholder="—"
-                    className={`w-full h-8 px-2 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text text-right placeholder:text-muted-faint focus:outline-none transition-colors ${
-                      row.arah === "debit" ? "focus:border-blue-400" : "focus:border-green-400"
-                    }`} />
-                </td>
-                <td className="px-2 py-2 text-center">
-                  {rows.length > 1 && (
-                    <button type="button" onClick={() => setRows((p) => p.filter((r) => r.uid !== row.uid))}
-                      className="p-1 rounded-[6px] text-muted hover:text-status-red hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="bg-surface-subtle border-t border-border-soft">
-              <td colSpan={4} className="px-3 py-2.5 text-[12px] font-bold text-muted-stronger">Total</td>
-              <td className="px-3 py-2.5 text-right">
-                {totalDebit > 0 || totalKredit > 0 ? (
-                  <div className="flex flex-col items-end gap-0.5">
-                    {totalDebit > 0 && (
-                      <span className={`text-[12px] font-bold tabular-nums ${isBalanced ? "text-status-green" : "text-blue-500"}`}>
-                        D {formatRupiah(totalDebit)}
-                      </span>
-                    )}
-                    {totalKredit > 0 && (
-                      <span className={`text-[12px] font-bold tabular-nums ${isBalanced ? "text-status-green" : "text-status-amber"}`}>
-                        K {formatRupiah(totalKredit)}
-                      </span>
-                    )}
-                  </div>
-                ) : <span className="text-muted text-[13px]">—</span>}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <button type="button" onClick={() => setRows((p) => [...p, makeAltRow()])}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover hover:text-navy-text transition-colors">
-          <Plus size={14} /> Tambah Baris Akun
-        </button>
-        <div className="flex items-center gap-3">
-          {totalDebit > 0 && totalKredit > 0 && !isBalanced && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[11.5px] font-bold">
-              <AlertTriangle size={12} /> Tidak seimbang
-            </span>
-          )}
-          {isBalanced && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-[11.5px] font-bold">
-              <CheckCircle2 size={12} /> Seimbang
-            </span>
-          )}
-          <button type="button" disabled
-            className="px-5 py-2 rounded-[10px] bg-navy text-white text-[13px] font-bold opacity-40 cursor-not-allowed">
-            Simpan Jurnal
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

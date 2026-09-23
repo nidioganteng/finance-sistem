@@ -6,7 +6,34 @@ export function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
 
-export async function getAccessibleEntities(entityKeys: string[], targetYear: number = new Date().getFullYear()) {
+export interface AccessibleEntity {
+  id: string;
+  key: string;
+  name: string;
+  legalName: string;
+  colorHex: string;
+  isUmum: boolean;
+  revenue: number;
+  spend: number;
+  profit: number;
+  projects: {
+    code: string;
+    name: string;
+    contractValue: number;
+    spend: number;
+    profit: number;
+    termin: {
+      name: string;
+      percentage: number;
+      status: string;
+    }[];
+  }[];
+}
+
+export async function getAccessibleEntities(
+  entityKeys: string[],
+  targetYear: number = new Date().getFullYear()
+): Promise<AccessibleEntity[]> {
   const [entities, txRows, assetsRaw] = await Promise.all([
     prisma.entity.findMany({
       where: { key: { in: entityKeys } },
@@ -30,11 +57,9 @@ export async function getAccessibleEntities(entityKeys: string[], targetYear: nu
         coaAccount: { select: { kategori: true } },
       },
     }),
-    Boolean((prisma as any).asetTetap)
-      ? prisma.asetTetap.findMany({
-          where: { entity: { key: { in: entityKeys } } },
-        })
-      : Promise.resolve([]),
+    prisma.asetTetap.findMany({
+      where: { entity: { key: { in: entityKeys } } },
+    }),
   ]);
 
   const revenueMap = new Map<string, number>();

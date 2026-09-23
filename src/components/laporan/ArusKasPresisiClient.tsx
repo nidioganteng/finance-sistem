@@ -27,7 +27,7 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
             <CheckCircle2 size={13} />
-            Metode Tidak Langsung (Standar Excel Acuan)
+            Metode Tidak Langsung
           </span>
           <span className="text-xs text-muted">
             Rincian Modal Kerja & Pihak Berelasi

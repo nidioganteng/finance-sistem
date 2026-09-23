@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { FileSpreadsheet, LayoutDashboard } from "lucide-react";
+import { FileText, LayoutDashboard } from "lucide-react";
 import { ArusKasPresisiClient } from "./ArusKasPresisiClient";
 import type { ArusKasPresisiData } from "@/lib/arus-kas-presisi";
 
@@ -16,7 +16,7 @@ export function ArusKasTabWrapper({
   presisiData,
   entityId,
 }: ArusKasTabWrapperProps) {
-  const [viewMode, setViewMode] = useState<"presisi" | "standar">("presisi");
+  const [viewMode, setViewMode] = useState<"rinci" | "tren">("rinci");
 
   return (
     <div className="flex flex-col gap-5">
@@ -28,39 +28,33 @@ export function ArusKasTabWrapper({
           </span>
           <div className="flex items-center p-1 bg-surface-subtle rounded-xl gap-1">
             <button
-              onClick={() => setViewMode("presisi")}
+              onClick={() => setViewMode("rinci")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-xs font-bold transition-all cursor-pointer ${
-                viewMode === "presisi"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-muted hover:text-emerald-600 hover:bg-surface-hover"
+                viewMode === "rinci"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-muted hover:text-navy-text hover:bg-surface-hover"
               }`}
             >
-              <FileSpreadsheet size={14} />
-              Format Presisi (Template Excel)
+              <FileText size={14} />
+              Laporan Arus Kas
             </button>
             <button
-              onClick={() => setViewMode("standar")}
+              onClick={() => setViewMode("tren")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-xs font-bold transition-all cursor-pointer ${
-                viewMode === "standar"
+                viewMode === "tren"
                   ? "bg-navy text-white shadow-xs"
                   : "text-muted hover:text-navy-text hover:bg-surface-hover"
               }`}
             >
               <LayoutDashboard size={14} />
-              Format Standar SAK
+              Tren Bulanan
             </button>
           </div>
         </div>
-
-        <span className="text-[12px] text-muted italic pr-1">
-          {viewMode === "presisi"
-            ? "Format vertikal tidak langsung dengan rincian modal kerja & pihak berelasi"
-            : "Format ringkas per aktivitas operasi, investasi & pendanaan"}
-        </span>
       </div>
 
       {/* Konten sesuai mode terpilih */}
-      {viewMode === "presisi" ? (
+      {viewMode === "rinci" ? (
         <ArusKasPresisiClient data={presisiData} entityId={entityId} />
       ) : (
         standardView

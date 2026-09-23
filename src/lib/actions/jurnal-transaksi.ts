@@ -88,6 +88,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
     if (dup) return { error: `No. Bukti "${noBukti}" sudah dipakai di entitas ini.` };
   }
 
+  try {
   const coaIds = [...new Set(validRows.map((r) => r.coaAccountId))];
   const coaList = await prisma.coaAccount.findMany({
     where: { id: { in: coaIds } },
@@ -203,6 +204,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
   revalidatePath("/kas-besar");
   revalidatePath("/buku-bank");
   return { success: true };
+  } catch (e) {
+    console.error("[saveJurnalTransaksi]", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    return { error: `Gagal menyimpan jurnal: ${msg}` };
+  }
 }
 
 export async function deleteJurnalTransaksi(txIds: string[]) {

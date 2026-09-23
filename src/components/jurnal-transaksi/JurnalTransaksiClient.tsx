@@ -126,13 +126,17 @@ export function JurnalTransaksiClient({
         .map((r) => ({ coaAccountId: r.coaAccountId, keterangan: r.keterangan, debit: parseNum(r.debitRaw), kredit: parseNum(r.kreditRaw) }))
     ));
     startTransition(async () => {
-      const result = await saveJurnalTransaksi(fd);
-      if (result.error) {
-        setFeedback({ type: "error", msg: result.error });
-      } else {
-        setFeedback({ type: "success", msg: editingGroup ? "Jurnal berhasil diperbarui." : "Jurnal berhasil disimpan." });
-        if (!editingGroup) { resetForm(); setPanelOpen(false); }
-        router.refresh();
+      try {
+        const result = await saveJurnalTransaksi(fd);
+        if (result?.error) {
+          setFeedback({ type: "error", msg: result.error });
+        } else {
+          setFeedback({ type: "success", msg: editingGroup ? "Jurnal berhasil diperbarui." : "Jurnal berhasil disimpan." });
+          if (!editingGroup) { resetForm(); setPanelOpen(false); }
+          router.refresh();
+        }
+      } catch (err) {
+        setFeedback({ type: "error", msg: err instanceof Error ? err.message : "Terjadi kesalahan tak terduga." });
       }
     });
   }

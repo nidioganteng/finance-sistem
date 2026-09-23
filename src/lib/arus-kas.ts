@@ -6,7 +6,7 @@ const MONTHS = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-import { ReportCategory } from "@prisma/client";
+import type { ReportCategory } from "@prisma/client";
 import { getExcludedNoBuktiForVersion } from "./akuntansi";
 
 export type ReportVersion = "INTERNAL" | "UMUM";
@@ -18,7 +18,7 @@ export async function getArusKasData(
 ) {
   const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const allowedCategories: ReportCategory[] =
-    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
+    normVersion === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const excludedNoBukti = await getExcludedNoBuktiForVersion(entityId, year, normVersion);
 

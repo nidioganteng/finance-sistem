@@ -10,7 +10,7 @@ import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lu
 import { formatRupiah } from "@/lib/dashboard-data";
 
 type CoaOption = { id: string; code: string; name: string };
-type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; itemDescription?: string };
+type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string };
 type LedgerRow = {
   tanggal: string;
   tanggalRaw: string;
@@ -374,8 +374,34 @@ export function KasScreenClient({
                         )}
                       </div>
                     </td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-status-green text-right tabular-nums">{r.masukFmt}</td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-status-red text-right tabular-nums">{r.keluarFmt}</td>
+                    {/* MASUK — per baris akun */}
+                    <td className="py-2.5 px-1.5 text-right align-top">
+                      {r.coaRows.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                            <span key={i} className={`text-[13px] font-bold tabular-nums leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
+                              {r.masuk > 0 ? formatRupiah(cr.nominal) : "—"}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[13px] font-bold text-status-green tabular-nums">{r.masukFmt}</span>
+                      )}
+                    </td>
+                    {/* KELUAR — per baris akun */}
+                    <td className="py-2.5 px-1.5 text-right align-top">
+                      {r.coaRows.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                            <span key={i} className={`text-[13px] font-bold tabular-nums leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
+                              {r.keluar > 0 ? formatRupiah(cr.nominal) : "—"}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[13px] font-bold text-status-red tabular-nums">{r.keluarFmt}</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums">{r.saldoFmt}</td>
                     <td className="py-2.5 px-1.5 text-right">
                       {isCrossingFrom ? (

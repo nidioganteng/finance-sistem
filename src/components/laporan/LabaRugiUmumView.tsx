@@ -8,14 +8,15 @@ import { formatAccounting } from "@/lib/pajak";
 interface LabaRugiUmumViewProps {
   data: LaporanPajakData;
   entityKey: string;
+  version?: "INTERNAL" | "UMUM";
 }
 
-export function LabaRugiUmumView({ data, entityKey }: LabaRugiUmumViewProps) {
+export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: LabaRugiUmumViewProps) {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportExcel = () => {
     setIsExporting(true);
-    const url = `/api/pajak/export?entityId=${encodeURIComponent(data.entityId)}&year=${data.year}`;
+    const url = `/api/pajak/export?entityId=${encodeURIComponent(data.entityId)}&year=${data.year}&version=${version}`;
     window.location.href = url;
     setTimeout(() => setIsExporting(false), 2000);
   };
@@ -80,10 +81,12 @@ export function LabaRugiUmumView({ data, entityKey }: LabaRugiUmumViewProps) {
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
             <CheckCircle2 size={13} />
-            Laporan Laba Rugi
+            Laporan Laba Rugi {version === "UMUM" ? "(Versi Umum)" : "(Versi Internal)"}
           </span>
           <span className="text-xs text-muted">
-            Format Berjenjang (Biaya Langsung & Operasional)
+            {version === "UMUM"
+              ? "Format Berjenjang Komersial (Tanpa By Marketing)"
+              : "Format Berjenjang Komersial (Termasuk By Marketing)"}
           </span>
         </div>
 
@@ -125,7 +128,9 @@ export function LabaRugiUmumView({ data, entityKey }: LabaRugiUmumViewProps) {
           <span className="text-lg font-bold tabular-nums text-status-red">
             Rp {data.biayaLangsung.totalKomersial.toLocaleString("id-ID")}
           </span>
-          <span className="text-xs text-muted">Akun Biaya Langsung 6xx</span>
+          <span className="text-xs text-muted">
+            {version === "UMUM" ? "Akun 6xx (Tanpa By Marketing)" : "Akun 6xx (Termasuk By Marketing)"}
+          </span>
         </div>
 
         <div className="bg-surface-card p-4 rounded-2xl border border-border-soft flex flex-col gap-1.5">
@@ -160,7 +165,7 @@ export function LabaRugiUmumView({ data, entityKey }: LabaRugiUmumViewProps) {
             {data.entityName}
           </h2>
           <h1 className="text-lg font-black text-navy-text tracking-wider uppercase mt-0.5">
-            LAPORAN LABA RUGI
+            LAPORAN LABA RUGI {version === "UMUM" ? "(VERSI UMUM)" : "(VERSI INTERNAL)"}
           </h1>
           <p className="text-xs text-muted font-medium mt-1">
             Periode 1 Januari s/d 31 Desember {data.year}
@@ -173,7 +178,7 @@ export function LabaRugiUmumView({ data, entityKey }: LabaRugiUmumViewProps) {
               <tr className="border-t-2 border-b-2 border-slate-900 bg-surface-subtle text-[12.5px] uppercase tracking-wider font-black text-navy-text">
                 <th className="py-3 px-6 text-center w-28">No Akun</th>
                 <th className="py-3 px-6 min-w-[320px]">Keterangan</th>
-                <th className="py-3 px-6 text-right w-60">Jumlah</th>
+                <th className="py-3 px-6 text-right w-60">Komersial</th>
               </tr>
             </thead>
             <tbody>

@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { getPenyusutanSummary } from "./aset-tetap";
 import { getExcludedNoBuktiForVersion } from "./akuntansi";
+import type { ReportVersion } from "./laba-rugi";
 
 export interface TaxReportRow {
   code: string;
@@ -126,7 +127,8 @@ const TEMPLATE_BIAYA_OPERASIONAL = [
 
 export async function getLaporanPajakData(
   entityId: string,
-  year: number
+  year: number,
+  version: ReportVersion = "INTERNAL"
 ): Promise<LaporanPajakData> {
   const entity = await prisma.entity.findUnique({
     where: { id: entityId },
@@ -245,8 +247,13 @@ export async function getLaporanPajakData(
   const totalPendapatanFiskal = pend400Fiskal - ppnFiskal;
 
   // 2. BIAYA LANGSUNG (Akun 6xx proyek/langsung)
-  const biayaLangsungCodes = new Set(TEMPLATE_BIAYA_LANGSUNG.map((t) => t.code));
-  const biayaLangsungRows: TaxReportRow[] = TEMPLATE_BIAYA_LANGSUNG.map((item) => {
+  // Aturan Biaya: Di Versi INTERNAL ada By Marketing (628), di Versi UMUM tidak ada By Marketing (628).
+  const templateBiayaLangsung = version === "UMUM"
+    ? TEMPLATE_BIAYA_LANGSUNG.filter((t) => t.code !== "628")
+    : TEMPLATE_BIAYA_LANGSUNG;
+
+  const biayaLangsungCodes = new Set(templateBiayaLangsung.map((t) => t.code));
+  const biayaLangsungRows: TaxReportRow[] = templateBiayaLangsung.map((item) => {
     const k = komersialMap.get(item.code) ?? 0;
     const f = fiskalMap.get(item.code) ?? 0;
     return {
@@ -265,7 +272,8 @@ export async function getLaporanPajakData(
       !biayaLangsungCodes.has(acc.code) &&
       acc.code !== "611" &&
       acc.code !== "633" &&
-      acc.code !== "616"
+      acc.code !== "616" &&
+      (version !== "UMUM" || acc.code !== "628")
     ) {
       const k = komersialMap.get(acc.code) ?? 0;
       const f = fiskalMap.get(acc.code) ?? 0;

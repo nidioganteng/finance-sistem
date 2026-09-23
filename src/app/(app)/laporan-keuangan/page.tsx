@@ -43,7 +43,7 @@ export default async function LaporanKeuanganPage({
 
   const [data, taxData, arusKasPresisiData] = await Promise.all([
     getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
-    getLaporanPajakData(selectedEntity.id, currentYear),
+    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion),
     tab === "arus-kas"
       ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
       : Promise.resolve(null),
@@ -80,7 +80,7 @@ export default async function LaporanKeuanganPage({
       {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
       {hasData && tab === "laba-rugi" && (
         currentVersion === "UMUM" && taxData ? (
-          <LabaRugiUmumView data={taxData} entityKey={selectedKey} />
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
         ) : (
           <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />
         )

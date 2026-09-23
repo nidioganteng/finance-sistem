@@ -1,7 +1,10 @@
 import ExcelJS from "exceljs";
 import type { LaporanPajakData } from "./pajak";
 
-export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise<Buffer> {
+export async function generateLaporanPajakExcel(
+  data: LaporanPajakData,
+  version: "INTERNAL" | "UMUM" = "INTERNAL"
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Finance Sistem - SDK Gaharu Sempana";
   workbook.created = new Date();
@@ -11,17 +14,18 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   // Page setup
   worksheet.views = [{ showGridLines: true }];
 
-  // Column definitions: 3 columns (Code, Keterangan, Jumlah)
+  // Column definitions: 3 columns (Code, Keterangan, Komersial)
   worksheet.columns = [
     { key: "code", width: 16 },
     { key: "name", width: 55 },
-    { key: "jumlah", width: 28 },
+    { key: "komersial", width: 28 },
   ];
 
   const accountingFormat = '#,##0;(#,##0);"-"';
 
   // 1. Title Rows
-  const titleRow1 = worksheet.addRow(["", "LAPORAN LABA RUGI"]);
+  const versionSuffix = version === "UMUM" ? " (VERSI UMUM)" : " (VERSI INTERNAL)";
+  const titleRow1 = worksheet.addRow(["", `LAPORAN LABA RUGI${versionSuffix}`]);
   titleRow1.font = { bold: true, size: 14, color: { argb: "FF0F172A" } };
 
   const titleRow2 = worksheet.addRow(["", `${data.entityName.toUpperCase()} — TAHUN ${data.year}`]);
@@ -30,7 +34,7 @@ export async function generateLaporanPajakExcel(data: LaporanPajakData): Promise
   worksheet.addRow([]); // Blank spacer
 
   // 2. Table Header
-  const headerRow = worksheet.addRow(["NO AKUN", "KETERANGAN", "JUMLAH"]);
+  const headerRow = worksheet.addRow(["NO AKUN", "KETERANGAN", "KOMERSIAL"]);
   headerRow.height = 26;
   headerRow.eachCell((cell, colNumber) => {
     cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };

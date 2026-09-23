@@ -36,7 +36,7 @@ export default async function LabaRugiPage({
   const [data, taxData] = await Promise.all([
     getLabaRugiData(selectedEntity.id, currentYear, undefined, currentVersion),
     currentVersion === "UMUM"
-      ? getLaporanPajakData(selectedEntity.id, currentYear)
+      ? getLaporanPajakData(selectedEntity.id, currentYear, currentVersion)
       : Promise.resolve(null),
   ]);
 
@@ -58,7 +58,7 @@ export default async function LabaRugiPage({
       />
 
       {currentVersion === "UMUM" && taxData ? (
-        <LabaRugiUmumView data={taxData} entityKey={selectedKey} />
+        <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
       ) : data.pendapatanList.length === 0 && data.bebanList.length === 0 ? (
         <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
           <div className="text-sm font-semibold text-muted-stronger mb-1">Tidak ada data</div>

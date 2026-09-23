@@ -8,6 +8,7 @@ import {
   isLabaDitahan,
   hitungSaldoAkhir,
 } from "./akuntansi";
+import { getPenyusutanSummary } from "./aset-tetap";
 
 export type CoaLine = {
   code: string;
@@ -18,7 +19,7 @@ export type CoaLine = {
 };
 
 export async function getNeracaData(entityId: string, year: number) {
-  const [allCoa, saldoAwalRows, transactions] = await Promise.all([
+  const [allCoa, saldoAwalRows, transactions, penyusutanSummary] = await Promise.all([
     prisma.coaAccount.findMany({ orderBy: { urutan: "asc" } }),
     prisma.saldoAwal.findMany({ where: { entityId, year } }),
     prisma.transaction.findMany({
@@ -32,6 +33,7 @@ export async function getNeracaData(entityId: string, year: number) {
       },
       select: { coaAccountId: true, debit: true, kredit: true },
     }),
+    getPenyusutanSummary(entityId, year),
   ]);
 
   const totalsByAccount = new Map<string, { debit: number; kredit: number }>();
@@ -54,8 +56,20 @@ export async function getNeracaData(entityId: string, year: number) {
     if (coa.kategori === CoaKategori.PENDAPATAN) {
       totalPendapatan += kredit - debit;
     } else if (coa.kategori === CoaKategori.BEBAN) {
-      totalBeban += debit - kredit;
+      // Jika akun beban penyusutan dan ada hitungan otomatis dari Modul Aset Tetap,
+      // kita tangani sinkronisasinya agar tidak dobel hitung.
+      const isDeprCoa = coa.code === "512" || coa.code === "540" || /penyusutan/i.test(coa.name);
+      if (isDeprCoa && penyusutanSummary.totalBebanPenyusutan > 0) {
+        // Akan ditambahkan otomatis di bawah
+      } else {
+        totalBeban += debit - kredit;
+      }
     }
+  }
+
+  // Issue 39: Tarik otomatis beban penyusutan dari Modul Aktiva Tetap
+  if (penyusutanSummary.totalBebanPenyusutan > 0) {
+    totalBeban += penyusutanSummary.totalBebanPenyusutan;
   }
 
   const labaBersih = totalPendapatan - totalBeban;
@@ -116,7 +130,43 @@ export async function getNeracaData(entityId: string, year: number) {
     }
   }
 
-  // 3. Formula Neraca Sesuai Standar & Templat Excel (Issue 38)
+  // Issue 39: Sinkronkan saldo Aktiva Tetap & Akumulasi Penyusutan dari Modul Aset Tetap
+  if (penyusutanSummary.assets.length > 0) {
+    // 1. Akun Akumulasi Penyusutan (kontra aset)
+    let akmLine = aktivaTetap.find((a) => a.isContra || a.code === "1001" || /penyusutan/i.test(a.name));
+    if (akmLine) {
+      akmLine.saldo = penyusutanSummary.totalAkumulasiPenyusutan;
+      akmLine.saldoFmt = formatSaldo(akmLine.saldo, true);
+      akmLine.isContra = true;
+    } else if (penyusutanSummary.totalAkumulasiPenyusutan > 0) {
+      aktivaTetap.push({
+        code: "1001",
+        name: "Akumulasi Penyusutan Aset",
+        saldo: penyusutanSummary.totalAkumulasiPenyusutan,
+        saldoFmt: formatSaldo(penyusutanSummary.totalAkumulasiPenyusutan, true),
+        isContra: true,
+      });
+    }
+
+    // 2. Akun Perolehan Aktiva Tetap
+    let perolehanLine = aktivaTetap.find((a) => !a.isContra && (a.code === "100" || /aktiva tetap|aset tetap/i.test(a.name)));
+    if (perolehanLine) {
+      if (perolehanLine.saldo === 0 || perolehanLine.saldo < penyusutanSummary.totalHargaPerolehan) {
+        perolehanLine.saldo = penyusutanSummary.totalHargaPerolehan;
+        perolehanLine.saldoFmt = formatSaldo(perolehanLine.saldo, false);
+      }
+    } else if (penyusutanSummary.totalHargaPerolehan > 0) {
+      aktivaTetap.unshift({
+        code: "100",
+        name: "Aktiva Tetap (Perolehan)",
+        saldo: penyusutanSummary.totalHargaPerolehan,
+        saldoFmt: formatSaldo(penyusutanSummary.totalHargaPerolehan, false),
+        isContra: false,
+      });
+    }
+  }
+
+  // 3. Formula Neraca Sesuai Standar & Templat Excel (Issue 38 & 39)
   // • Total Aktiva Lancar: akun debet dijumlahkan, akun kontra dikurangkan
   const totalAktivaLancar = aktivaLancar.reduce(
     (sum, item) => sum + (item.isContra ? -item.saldo : item.saldo),
@@ -182,13 +232,17 @@ export async function getNeracaData(entityId: string, year: number) {
     totalLabaDitahan,
     totalLabaDitahanFmt: formatRupiah(Math.abs(totalLabaDitahan)),
     totalEkuitas,
-    totalEkuitasFmt: formatRupiah(Math.abs(totalEkuitas)),
-    totalModalDanLabaFmt: formatRupiah(Math.abs(totalEkuitas)),
+    totalEkuitasFmt: totalEkuitas < 0 ? `-${formatRupiah(Math.abs(totalEkuitas))}` : formatRupiah(totalEkuitas),
+    totalModalDanLabaFmt: totalEkuitas < 0 ? `-${formatRupiah(Math.abs(totalEkuitas))}` : formatRupiah(totalEkuitas),
 
     // Pasiva
     totalPassiva,
     totalPassivaFmt: totalPassiva < 0 ? `-${formatRupiah(Math.abs(totalPassiva))}` : formatRupiah(totalPassiva),
     neracaBalanced: balanced,
     balanced,
+
+    // Modul Aset Tetap summary
+    penyusutanOtomatis: penyusutanSummary.totalBebanPenyusutan,
+    akumulasiPenyusutanOtomatis: penyusutanSummary.totalAkumulasiPenyusutan,
   };
 }

@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { Role } from "@prisma/client";
+import { Role, ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
 
 export function formatRupiah(n: number) {
@@ -14,12 +14,14 @@ export async function getAccessibleEntities(entityKeys: string[], targetYear: nu
       orderBy: { createdAt: "asc" },
     }),
     // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
-    // dan disinkronkan dengan beban penyusutan dari Modul Aktiva Tetap (Issue 39)
-    // supaya Dashboard Manager & Staf konsisten dengan Laporan Keuangan.
+    // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41).
     prisma.transaction.findMany({
       where: {
         entity: { key: { in: entityKeys } },
-        coaAccount: { kategori: { in: ["PENDAPATAN", "BEBAN"] } },
+        coaAccount: {
+          kategori: { in: ["PENDAPATAN", "BEBAN"] },
+          reportCategory: { in: [ReportCategory.INTERNAL, ReportCategory.SEMUA] },
+        },
       },
       select: {
         entityId: true,
@@ -121,7 +123,10 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
     where: {
       entity: { key: { in: entityKeys } },
       tanggal: { gte: start, lt: end },
-      coaAccount: { kategori: "PENDAPATAN" },
+      coaAccount: {
+        kategori: "PENDAPATAN",
+        reportCategory: { in: [ReportCategory.INTERNAL, ReportCategory.SEMUA] },
+      },
     },
     select: {
       tanggal: true,
@@ -153,7 +158,10 @@ export async function getMonthlyByYear(entityIds: string[], years: number[]) {
     where: {
       entityId: { in: entityIds },
       tanggal: { gte: new Date(`${minYear}-01-01`), lt: new Date(`${maxYear + 1}-01-01`) },
-      coaAccount: { kategori: "PENDAPATAN" },
+      coaAccount: {
+        kategori: "PENDAPATAN",
+        reportCategory: { in: [ReportCategory.INTERNAL, ReportCategory.SEMUA] },
+      },
     },
     select: { tanggal: true, kredit: true },
   });

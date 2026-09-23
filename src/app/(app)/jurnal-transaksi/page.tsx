@@ -14,7 +14,7 @@ import { logActivity } from "@/lib/actions/log";
 export default async function JurnalTransaksiPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; page?: string };
+  searchParams: { entity?: string; page?: string; dari?: string; sampai?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -41,7 +41,7 @@ export default async function JurnalTransaksiPage({
       select: { id: true, code: true, name: true },
       orderBy: { urutan: "asc" },
     }),
-    getJurnalTransaksiHistory(selectedEntity.id, page),
+    getJurnalTransaksiHistory(selectedEntity.id, page, searchParams.dari, searchParams.sampai),
   ]);
 
   const coa = coaAccounts.map((c) => ({ id: c.id, code: c.code, name: c.name }));
@@ -70,7 +70,8 @@ export default async function JurnalTransaksiPage({
         history={groups}
         page={page}
         totalPages={totalPages}
-        searchParams={spRecord}
+        dari={searchParams.dari ?? ""}
+        sampai={searchParams.sampai ?? ""}
       />
     </PageTransition>
   );

@@ -95,3 +95,17 @@ export async function saveJurnalTransaksi(formData: FormData) {
   revalidatePath("/jurnal");
   return { success: true };
 }
+
+export async function deleteJurnalTransaksi(txIds: string[]) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { error: "Belum login." };
+  if (!canManageTransaksi(session.user.role)) return { error: "Tidak punya akses." };
+  if (!txIds.length) return { error: "Tidak ada transaksi yang dihapus." };
+
+  await prisma.transaction.deleteMany({ where: { id: { in: txIds } } });
+
+  logActivity(session.user.id, `Hapus Jurnal Transaksi (${txIds.length} baris)`, "FINANCIAL_CHANGE", { txIds });
+  revalidatePath("/jurnal-transaksi");
+  revalidatePath("/jurnal");
+  return { success: true };
+}

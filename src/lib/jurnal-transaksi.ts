@@ -8,12 +8,13 @@ export type JurnalTransaksiGroup = {
   tanggal: string;
   tanggalRaw: string;
   keterangan: string;
-  rows: { coaName: string; coaCode: string; debit: number; kredit: number }[];
+  rows: { coaAccountId: string; coaName: string; coaCode: string; debit: number; kredit: number }[];
   totalDebit: number;
   totalKredit: number;
+  allTxIds: string[];
 };
 
-export async function getJurnalTransaksiHistory(entityId: string, page = 1) {
+export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari?: string, sampai?: string) {
   // Count distinct noBukti for this jenis input
   const jenisInput = await prisma.jenisInputTransaksi.findUnique({
     where: { key: "jurnalTransaksi" },
@@ -24,9 +25,15 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1) {
     return { groups: [] as JurnalTransaksiGroup[], totalPages: 1, page };
   }
 
+  const tanggalFilter = dari || sampai ? {
+    ...(dari ? { gte: new Date(dari) } : {}),
+    ...(sampai ? { lte: new Date(sampai + "T23:59:59") } : {}),
+  } : undefined;
+
   const where = {
     entityId,
     jenisInputId: jenisInput.id,
+    ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
   };
 
   // Get distinct noBukti ordered by tanggal desc — use a subquery approach:
@@ -64,6 +71,7 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1) {
       rows: [],
       totalDebit: 0,
       totalKredit: 0,
+      allTxIds: [],
     });
   }
 
@@ -84,11 +92,13 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1) {
     const debit = Number(row.debit);
     const kredit = Number(row.kredit);
     group.rows.push({
+      coaAccountId: row.coaAccountId ?? "",
       coaCode: row.coaAccount?.code ?? "—",
       coaName: row.coaAccount?.name ?? "—",
       debit,
       kredit,
     });
+    group.allTxIds.push(row.id);
     group.totalDebit += debit;
     group.totalKredit += kredit;
   }

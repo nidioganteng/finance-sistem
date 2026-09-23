@@ -3,7 +3,7 @@ import { formatRupiah } from "./dashboard-data";
 import { getPenyusutanSummary } from "./aset-tetap";
 import { getExcludedNoBuktiForVersion } from "./akuntansi";
 
-import { ReportCategory } from "@prisma/client";
+import type { ReportCategory } from "@prisma/client";
 
 export type ReportVersion = "INTERNAL" | "UMUM";
 
@@ -18,7 +18,7 @@ export async function getLabaRugiData(
 ) {
   const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const allowedCategories: ReportCategory[] =
-    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
+    normVersion === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const { start, end } = month
     ? { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59) }

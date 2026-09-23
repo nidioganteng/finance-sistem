@@ -9,11 +9,12 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
+import type { ReportVersion } from "@/lib/laba-rugi";
 
 export default async function LabaRugiPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string };
+  searchParams: { entity?: string; year?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -24,18 +25,19 @@ export default async function LabaRugiPage({
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getLabaRugiData(selectedEntity.id, currentYear);
+  const data = await getLabaRugiData(selectedEntity.id, currentYear, undefined, currentVersion);
 
   return (
     <PageTransition>
       <PageHeader
         title="Laporan Laba Rugi"
-        subtitle={`Periode Januari – Desember ${currentYear} — ${selectedEntity.name}`}
+        subtitle={`Periode Januari – Desember ${currentYear} — ${selectedEntity.name} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
         rightSlot={
           <>
             <YearSelect currentYear={currentYear} />

@@ -1,19 +1,21 @@
 import { prisma } from "./prisma";
 import { Role } from "@prisma/client";
+import { calculateAsetDepreciation } from "./aset-tetap";
 
 export function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
 
-export async function getAccessibleEntities(entityKeys: string[]) {
-  const [entities, txRows] = await Promise.all([
+export async function getAccessibleEntities(entityKeys: string[], targetYear: number = new Date().getFullYear()) {
+  const [entities, txRows, assetsRaw] = await Promise.all([
     prisma.entity.findMany({
       where: { key: { in: entityKeys } },
       include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
       orderBy: { createdAt: "asc" },
     }),
     // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
-    // supaya Dashboard Manager konsisten dengan Laporan Keuangan Staff.
+    // dan disinkronkan dengan beban penyusutan dari Modul Aktiva Tetap (Issue 39)
+    // supaya Dashboard Manager & Staf konsisten dengan Laporan Keuangan.
     prisma.transaction.findMany({
       where: {
         entity: { key: { in: entityKeys } },
@@ -26,6 +28,9 @@ export async function getAccessibleEntities(entityKeys: string[]) {
         coaAccount: { select: { kategori: true } },
       },
     }),
+    prisma.asetTetap.findMany({
+      where: { entity: { key: { in: entityKeys } } },
+    }),
   ]);
 
   const revenueMap = new Map<string, number>();
@@ -35,6 +40,16 @@ export async function getAccessibleEntities(entityKeys: string[]) {
       revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
     } else if (tx.coaAccount?.kategori === "BEBAN") {
       spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
+    }
+  }
+
+  // Tambahkan beban penyusutan aset tetap per entitas untuk targetYear (Issue 39 & sinkronisasi Laba Rugi)
+  for (const asset of assetsRaw) {
+    const tgl = new Date(asset.tanggalPerolehan);
+    const endDate = new Date(targetYear, 11, 31, 23, 59, 59);
+    if (tgl <= endDate) {
+      const dep = calculateAsetDepreciation(asset, targetYear);
+      spendMap.set(asset.entityId, (spendMap.get(asset.entityId) ?? 0) + dep.bebanPeriodeIni);
     }
   }
 

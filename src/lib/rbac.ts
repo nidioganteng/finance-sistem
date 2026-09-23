@@ -1,9 +1,16 @@
 import { Role } from "@prisma/client";
 
+export type NavSubItem = {
+  label: string;
+  href: string;
+  version?: "internal" | "umum";
+};
+
 export type NavItem = {
   label: string;
   href: string;
   icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList";
+  subItems?: NavSubItem[];
 };
 
 type NavSection = {
@@ -21,7 +28,15 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "grid" },
-        { label: "Laporan Keuangan", href: "/laporan", icon: "fileText" },
+        {
+          label: "Laporan Keuangan",
+          href: "/laporan",
+          icon: "fileText",
+          subItems: [
+            { label: "Laporan Internal", href: "/laporan?version=internal", version: "internal" },
+            { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
+          ],
+        },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
@@ -51,7 +66,15 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
     {
       title: "Laporan",
       items: [
-        { label: "Laporan Keuangan", href: "/laporan", icon: "fileText" },
+        {
+          label: "Laporan Keuangan",
+          href: "/laporan",
+          icon: "fileText",
+          subItems: [
+            { label: "Laporan Internal", href: "/laporan?version=internal", version: "internal" },
+            { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
+          ],
+        },
         { label: "Laporan Pajak", href: "/pajak", icon: "landmark" },
       ],
     },
@@ -82,7 +105,15 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
         { label: "Daftar Akun", href: "/daftar-akun", icon: "table2" },
         { label: "Aktiva Tetap", href: "/aktiva-tetap", icon: "clipboardList" },
-        { label: "Laporan Keuangan", href: "/laporan-keuangan", icon: "fileText" },
+        {
+          label: "Laporan Keuangan",
+          href: "/laporan-keuangan",
+          icon: "fileText",
+          subItems: [
+            { label: "Laporan Internal", href: "/laporan-keuangan?version=internal", version: "internal" },
+            { label: "Laporan Umum", href: "/laporan-keuangan?version=umum", version: "umum" },
+          ],
+        },
         { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "handCoins" },
       ],
     },

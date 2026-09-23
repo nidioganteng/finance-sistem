@@ -127,13 +127,14 @@ enum CoaKategori {
 }
 
 model CoaAccount {
-  id         String      @id @default(cuid())
-  code       String      @unique // 1 kode = 1 akun, dipakai bareng di Kas Kecil/Besar & Bank Buku (issue #28)
-  name       String
-  kategori   CoaKategori
-  reportType ReportType  @default(NERACA) // "Rumah Akun" — laporan tempat akun ini otomatis masuk
-  urutan     Int         @default(0) // urutan tampil di Daftar Akun/Bagan Akun (issue #37) — bukan urut kode, ngikutin urutan referensi Excel user
-  createdAt  DateTime    @default(now())
+  id             String         @id @default(cuid())
+  code           String         @unique // 1 kode = 1 akun, dipakai bareng di Kas Kecil/Besar & Bank Buku (issue #28)
+  name           String
+  kategori       CoaKategori
+  reportType     ReportType     @default(NERACA) // "Rumah Akun" — laporan tempat akun ini otomatis masuk
+  reportCategory ReportCategory @default(SEMUA) @map("report_category") // Flag versi laporan (issue #40): INTERNAL, UMUM, atau SEMUA
+  urutan         Int            @default(0) // urutan tampil di Daftar Akun/Bagan Akun (issue #37) — bukan urut kode, ngikutin urutan referensi Excel user
+  createdAt      DateTime       @default(now())
 
   transactions Transaction[]
   saldoAwal    SaldoAwal[]
@@ -163,6 +164,14 @@ enum ReportType {
   NERACA
   LABA_RUGI
   ARUS_KAS
+}
+
+// Versi / Kategori Laporan (issue #40): membedakan akun khusus Internal (analisis manajemen),
+// Umum (laporan eksternal), atau Semua (tampil di kedua versi laporan).
+enum ReportCategory {
+  INTERNAL
+  UMUM
+  SEMUA
 }
 
 // Jenis input transaksi yang bisa ditambah langsung oleh Staf Keuangan

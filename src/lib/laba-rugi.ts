@@ -1,25 +1,46 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { getPenyusutanSummary } from "./aset-tetap";
+import { getExcludedNoBuktiForVersion } from "./akuntansi";
+
+import { ReportCategory } from "@prisma/client";
+
+export type ReportVersion = "INTERNAL" | "UMUM";
 
 // month opsional (1-12) — kalau diisi, scope laporan ke satu bulan itu saja
 // (dipakai fitur komparasi antar-periode), kalau tidak diisi tetap satu tahun penuh.
-export async function getLabaRugiData(entityId: string, year: number, month?: number) {
+// version (issue #40): "INTERNAL" (default) atau "UMUM"
+export async function getLabaRugiData(
+  entityId: string,
+  year: number,
+  month?: number,
+  version: ReportVersion | string = "INTERNAL"
+) {
+  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const allowedCategories: ReportCategory[] =
+    normVersion === "UMUM" ? [ReportCategory.UMUM, ReportCategory.SEMUA] : [ReportCategory.INTERNAL, ReportCategory.SEMUA];
+
   const { start, end } = month
     ? { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59) }
     : { start: new Date(`${year}-01-01`), end: new Date(`${year}-12-31T23:59:59`) };
 
-  const [transactions, penyusutanSummary] = await Promise.all([
-    prisma.transaction.findMany({
-      where: {
-        entityId,
-        tanggal: { gte: start, lte: end },
-        coaAccountId: { not: null },
-      },
-      include: { coaAccount: true },
-    }),
+  const [excludedNoBukti, penyusutanSummary] = await Promise.all([
+    getExcludedNoBuktiForVersion(entityId, year, normVersion),
     getPenyusutanSummary(entityId, year, month),
   ]);
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      entityId,
+      tanggal: { gte: start, lte: end },
+      coaAccountId: { not: null },
+      coaAccount: {
+        reportCategory: { in: allowedCategories },
+      },
+      ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
+    },
+    include: { coaAccount: true },
+  });
 
   const pendapatan = new Map<string, { code: string; name: string; total: number }>();
   const beban = new Map<string, { code: string; name: string; total: number }>();
@@ -99,5 +120,6 @@ export async function getLabaRugiData(entityId: string, year: number, month?: nu
     labaBersihPositive: labaBersih >= 0,
     penyusutanOtomatis: penyusutanSummary.totalBebanPenyusutan,
     penyusutanOtomatisFmt: formatRupiah(penyusutanSummary.totalBebanPenyusutan),
+    version: normVersion,
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Percent, Award, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Percent, Award, ArrowUpRight, ArrowDownRight, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
 import type { CoaLine } from "@/lib/laporan-keuangan";
 
 interface LabaRugiViewProps {
@@ -46,7 +47,14 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
             Periode Akuntansi 1 Januari s/d 31 Desember {year} · Standar Pelaporan Akuntansi SAK
           </p>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/pajak"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 transition-colors shadow-xs"
+          >
+            <FileSpreadsheet size={15} />
+            Rekonsiliasi Pajak (Komersial vs Fiskal)
+          </Link>
           <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-extrabold shadow-xs ${
             data.labaBersihPositive
               ? "bg-green-500 text-white"

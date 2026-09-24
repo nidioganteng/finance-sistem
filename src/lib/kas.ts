@@ -174,7 +174,7 @@ export async function getKasLedger(
       if (r.coaAccount) {
         const itemDesc = typeof extra?.itemDescription === "string" ? extra.itemDescription : undefined;
         g.akunTags.push(itemDesc ?? r.coaAccount.name);
-        g.coaRows.push({ id: r.id, coaAccountId: r.coaAccount.id, coaName: r.coaAccount.name, nominal: Number(r.debit || r.kredit), isDebit: Number(r.debit) > 0, itemDescription: itemDesc });
+        g.coaRows.push({ id: r.id, coaAccountId: r.coaAccount.id, coaName: r.coaAccount.name, nominal: Number(r.debit) || Number(r.kredit), isDebit: Number(r.debit) > 0, itemDescription: itemDesc });
       }
       if (!extra && !g.hasKasEntry) {
         g.masuk += Number(r.debit);

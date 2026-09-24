@@ -23,6 +23,10 @@ type InitialValues = {
 
 const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
 
+const PIUTANG_COA_MAP: Record<string, string> = {
+  kencana: "111", gaharu: "112", tataring: "113", ciptaAsri: "114", umum: "115",
+};
+
 const LAPORAN_OPTIONS = [
   { value: "JURNAL_UMUM", label: "Jurnal Umum" },
   { value: "BUKU_BESAR", label: "Buku Besar" },
@@ -80,6 +84,24 @@ export function KasTransactionForm({
 
   const [keterangan, setKeterangan] = useState(initialValues?.keterangan ?? "");
   const [arah, setArah] = useState<"masuk" | "keluar">(initialValues?.arah ?? "keluar");
+
+  function handleArahChange(newArah: "masuk" | "keluar") {
+    setArah(newArah);
+    if (newArah === "masuk") {
+      // Feature 2/4: clear crossing when switching to masuk
+      setCrossingEntityKeys([]);
+      // Feature 3: bankBuku masuk → auto-set first row to COA 400
+      if (jenisInputKey === "bankBuku") {
+        const coa400 = coaOptions.find((c) => c.code === "400");
+        if (coa400) {
+          setRows((prev) => {
+            const rest = prev.slice(1);
+            return [{ ...prev[0], coaAccountId: coa400.id }, ...rest];
+          });
+        }
+      }
+    }
+  }
   const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
   const [crossingEntityKeys, setCrossingEntityKeys] = useState<string[]>(initialValues?.crossingEntityKeys ?? []);
   const [projectId, setProjectId] = useState<string>("");
@@ -164,7 +186,7 @@ export function KasTransactionForm({
         <div className="flex items-center bg-surface-hover rounded-[12px] p-1 gap-1">
           <button
             type="button"
-            onClick={() => setArah("masuk")}
+            onClick={() => handleArahChange("masuk")}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] text-[12.5px] font-bold transition-all ${
               arah === "masuk"
                 ? "bg-emerald-500 text-white shadow-sm"
@@ -176,7 +198,7 @@ export function KasTransactionForm({
           </button>
           <button
             type="button"
-            onClick={() => setArah("keluar")}
+            onClick={() => handleArahChange("keluar")}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] text-[12.5px] font-bold transition-all ${
               arah === "keluar"
                 ? "bg-red-500 text-white shadow-sm"
@@ -289,8 +311,8 @@ export function KasTransactionForm({
           </div>
         )}
 
-        {/* Crossing Entitas */}
-        {allEntities.filter((e) => e.key !== entityKey).length > 0 && (
+        {/* Crossing Entitas — hanya tampil saat keluar */}
+        {arah === "keluar" && allEntities.filter((e) => e.key !== entityKey).length > 0 && (
           <div>
             <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-2">
               Juga Catat ke Entitas Lain{" "}
@@ -303,9 +325,29 @@ export function KasTransactionForm({
                   <button
                     key={e.key}
                     type="button"
-                    onClick={() => setCrossingEntityKeys((prev) =>
-                      selected ? prev.filter((k) => k !== e.key) : [...prev, e.key]
-                    )}
+                    onClick={() => {
+                      const isAdding = !selected;
+                      setCrossingEntityKeys((prev) =>
+                        selected ? prev.filter((k) => k !== e.key) : [...prev, e.key]
+                      );
+                      // Auto-add PIUTANG COA row for the added crossing entity
+                      if (isAdding) {
+                        const piutangCode = PIUTANG_COA_MAP[e.key];
+                        if (piutangCode) {
+                          const piutangCoa = coaOptions.find((c) => c.code === piutangCode);
+                          if (piutangCoa) {
+                            setRows((prev) => {
+                              const emptyIdx = prev.findIndex((r) => !r.coaAccountId);
+                              if (emptyIdx !== -1) {
+                                return prev.map((r, i) => i === emptyIdx ? { ...r, coaAccountId: piutangCoa.id } : r);
+                              }
+                              rowIdSeq += 1;
+                              return [...prev, { id: rowIdSeq, coaAccountId: piutangCoa.id, nominal: "", keterangan: "" }];
+                            });
+                          }
+                        }
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-[8px] text-[12px] font-semibold border transition-all ${
                       selected
                         ? "bg-navy text-white border-navy"

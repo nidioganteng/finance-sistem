@@ -81,7 +81,7 @@ export function PiutangClient({
 }) {
   const [tab, setTab] = useState<"termin" | "dock">("termin");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    new Set(projectList.map((p) => p.id))
+    () => new Set()
   );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);

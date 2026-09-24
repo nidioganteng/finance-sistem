@@ -74,10 +74,7 @@ export function Sidebar({
   const currentVersionParam = searchParams.get("version")?.toLowerCase();
   const sections = getNavForRole(role);
 
-  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => ({
-    "/laporan": true,
-    "/laporan-keuangan": true,
-  }));
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
   function toggleDropdown(href: string) {
     setOpenDropdowns((prev) => ({ ...prev, [href]: !prev[href] }));
@@ -120,7 +117,7 @@ export function Sidebar({
                 const isParentActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
                 if (item.subItems && item.subItems.length > 0) {
-                  const isOpen = openDropdowns[item.href] ?? isParentActive;
+                  const isOpen = Boolean(openDropdowns[item.href]);
                   return (
                     <div key={item.href} className="flex flex-col">
                       <button

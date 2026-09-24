@@ -271,7 +271,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   });
 
   // Saat auto-sync aktif, skip akunRows — Buku Bank keluar sudah jadi counterpart-nya
-  const isSyncMode = !!(input.jenisInputKey === "kasKecil" && input.arah === "masuk" && input.syncBukuBankRekeningId);
+  const isSyncMode = !!((input.jenisInputKey === "kasKecil" || input.jenisInputKey === "kasBesar") && input.arah === "masuk" && input.syncBukuBankRekeningId);
   await prisma.$transaction([...(isSyncMode ? [] : akunRows), kasEntry, ...crossingOps, ...terminCreate]);
 
   // Auto-sync Kas Kecil masuk → Buku Bank keluar (jika dipilih)

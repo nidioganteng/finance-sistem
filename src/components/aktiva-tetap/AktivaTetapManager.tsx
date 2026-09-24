@@ -12,7 +12,7 @@ import {
   deleteAsetTetapAction,
   type AsetTetapInput,
 } from "@/lib/actions/aset-tetap";
-import { formatRupiah } from "@/lib/dashboard-data";
+import { formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
 import {
   Plus,
   Edit2,
@@ -192,84 +192,84 @@ export function AktivaTetapManager({
   return (
     <div className="flex flex-col gap-6">
       {/* ── 4 Card Ringkasan Finansial Aset ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Total Harga Perolehan */}
-        <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 shadow-xs flex flex-col justify-between">
+        <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
               Nilai Perolehan
             </span>
-            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-none">
               <Building2 size={16} />
             </div>
           </div>
-          <div>
-            <div className="text-[21px] font-extrabold text-navy-text tabular-nums">
+          <div className="min-w-0">
+            <div className={`${getMetricValueFontSize(summary.totalHargaPerolehanFmt)} text-navy-text truncate`} title={summary.totalHargaPerolehanFmt}>
               {summary.totalHargaPerolehanFmt}
             </div>
-            <div className="text-[11.5px] text-muted-faint mt-1">
+            <div className="text-[11.5px] text-muted-faint mt-1 truncate">
               Total {summary.assets.length} unit aset terdaftar
             </div>
           </div>
         </div>
 
         {/* Beban Penyusutan Berjalan */}
-        <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 shadow-xs flex flex-col justify-between">
+        <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
               Beban Tahun {year}
             </span>
-            <div className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center flex-none">
               <TrendingDown size={16} />
             </div>
           </div>
-          <div>
-            <div className="text-[21px] font-extrabold text-status-red tabular-nums">
+          <div className="min-w-0">
+            <div className={`${getMetricValueFontSize(summary.totalBebanPenyusutanFmt)} text-status-red truncate`} title={summary.totalBebanPenyusutanFmt}>
               {summary.totalBebanPenyusutanFmt}
             </div>
-            <div className="text-[11.5px] text-blue-600 dark:text-blue-400 font-semibold mt-1 flex items-center gap-1">
-              <CheckCircle2 size={12} />
+            <div className="text-[11.5px] text-blue-600 dark:text-blue-400 font-semibold mt-1 flex items-center gap-1 truncate">
+              <CheckCircle2 size={12} className="flex-none" />
               Ditarik ke Laba Rugi
             </div>
           </div>
         </div>
 
         {/* Total Akumulasi Penyusutan */}
-        <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 shadow-xs flex flex-col justify-between">
+        <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
               Akumulasi Penyusutan
             </span>
-            <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-none">
               <Scale size={16} />
             </div>
           </div>
-          <div>
-            <div className="text-[21px] font-extrabold text-status-amber tabular-nums">
+          <div className="min-w-0">
+            <div className={`${getMetricValueFontSize(summary.totalAkumulasiPenyusutanFmt)} text-status-amber truncate`} title={`(${summary.totalAkumulasiPenyusutanFmt})`}>
               ({summary.totalAkumulasiPenyusutanFmt})
             </div>
-            <div className="text-[11.5px] text-amber-700 dark:text-amber-400 font-semibold mt-1 flex items-center gap-1">
-              <CheckCircle2 size={12} />
+            <div className="text-[11.5px] text-amber-700 dark:text-amber-400 font-semibold mt-1 flex items-center gap-1 truncate">
+              <CheckCircle2 size={12} className="flex-none" />
               Kontra Aset di Neraca
             </div>
           </div>
         </div>
 
         {/* Total Nilai Buku Bersih (Net) */}
-        <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 shadow-xs flex flex-col justify-between">
+        <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
               Nilai Buku Bersih
             </span>
-            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-none">
               <Landmark size={16} />
             </div>
           </div>
-          <div>
-            <div className="text-[21px] font-extrabold text-status-green tabular-nums">
+          <div className="min-w-0">
+            <div className={`${getMetricValueFontSize(summary.totalNilaiBukuFmt)} text-status-green truncate`} title={summary.totalNilaiBukuFmt}>
               {summary.totalNilaiBukuFmt}
             </div>
-            <div className="text-[11.5px] text-muted-faint mt-1">
+            <div className="text-[11.5px] text-muted-faint mt-1 truncate">
               Perolehan − Akumulasi (Net)
             </div>
           </div>

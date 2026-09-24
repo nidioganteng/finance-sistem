@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Download, Printer, CheckCircle2, TrendingUp, TrendingDown, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import type { ArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { formatRupiahArusKas } from "@/lib/arus-kas-presisi";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface ArusKasPresisiClientProps {
   data: ArusKasPresisiData;
@@ -71,51 +72,65 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
       </div>
 
       {/* ── Top Metric Cards (Sesuai Desain Standar) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Arus Kas Operasi</div>
-          <div className="text-[22px] font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">
-            {formatRupiahArusKas(data.totalArusKasOperasi)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">Laba operasi & modal kerja</div>
-        </div>
+      {(() => {
+        const operasiFmt = formatRupiahArusKas(data.totalArusKasOperasi);
+        const investasiFmt = formatRupiahArusKas(data.totalArusKasInvestasi);
+        const pendanaanFmt = formatRupiahArusKas(data.totalArusKasPendanaan);
+        const kasAkhirFmt = formatRupiahArusKas(data.kasAkhirPeriode);
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 print:hidden">
+            <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+              <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">
+                Total Arus Kas Operasi
+              </div>
+              <div className={`${getMetricValueFontSize(operasiFmt)} text-blue-600 dark:text-blue-400 truncate`} title={operasiFmt}>
+                {operasiFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">Laba operasi & modal kerja</div>
+            </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Arus Kas Investasi</div>
-          <div className="text-[22px] font-extrabold text-orange-600 dark:text-orange-400 tabular-nums">
-            {formatRupiahArusKas(data.totalArusKasInvestasi)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">Perolehan aset tetap tahun berjalan</div>
-        </div>
+            <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+              <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">
+                Total Arus Kas Investasi
+              </div>
+              <div className={`${getMetricValueFontSize(investasiFmt)} text-orange-600 dark:text-orange-400 truncate`} title={investasiFmt}>
+                {investasiFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">Perolehan aset tetap tahun berjalan</div>
+            </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Arus Kas Pendanaan</div>
-          <div className="text-[22px] font-extrabold text-violet-600 dark:text-violet-400 tabular-nums">
-            {formatRupiahArusKas(data.totalArusKasPendanaan)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">Laba ditahan & ekuitas modal</div>
-        </div>
+            <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+              <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">
+                Total Arus Kas Pendanaan
+              </div>
+              <div className={`${getMetricValueFontSize(pendanaanFmt)} text-violet-600 dark:text-violet-400 truncate`} title={pendanaanFmt}>
+                {pendanaanFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">Laba ditahan & ekuitas modal</div>
+            </div>
 
-        <div
-          className={`rounded-[20px] border p-5 shadow-xs ${
-            isPositive
-              ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
-              : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
-          }`}
-        >
-          <div className="text-[12px] font-bold uppercase tracking-wider mb-2">
-            <span className={isPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
-              Kas & Setara Kas Akhir
-            </span>
+            <div
+              className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
+                isPositive
+                  ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
+                  : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
+              }`}
+            >
+              <div className="text-[12px] font-bold uppercase tracking-wider mb-2 truncate">
+                <span className={isPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                  Kas & Setara Kas Akhir
+                </span>
+              </div>
+              <div className={`${getMetricValueFontSize(kasAkhirFmt)} ${isPositive ? "text-status-green" : "text-status-red"} truncate`} title={kasAkhirFmt}>
+                {kasAkhirFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">
+                Kenaikan bersih: {formatRupiahArusKas(data.kenaikanBersihKas)}
+              </div>
+            </div>
           </div>
-          <div className={`text-[20px] font-extrabold tabular-nums ${isPositive ? "text-status-green" : "text-status-red"}`}>
-            {formatRupiahArusKas(data.kasAkhirPeriode)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">
-            Kenaikan bersih: {formatRupiahArusKas(data.kenaikanBersihKas)}
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Main Table */}
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">

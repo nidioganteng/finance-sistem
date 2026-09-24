@@ -2,6 +2,7 @@
 
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import type { CoaLine } from "@/lib/laporan-keuangan";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface NeracaViewProps {
   data: {
@@ -94,43 +95,47 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
       )}
 
       {/* ── Top Metric Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Aktiva</div>
-          <div className="text-[22px] font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">{data.totalAsetFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Lancar: {totalLancarFmt} · Tetap: {totalTetapFmt}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">Total Aktiva</div>
+          <div className={`${getMetricValueFontSize(data.totalAsetFmt)} text-blue-600 dark:text-blue-400 truncate`} title={data.totalAsetFmt}>
+            {data.totalAsetFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Lancar: {totalLancarFmt} · Tetap: {totalTetapFmt}</div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Kewajiban</div>
-          <div className="text-[22px] font-extrabold text-orange-600 dark:text-orange-400 tabular-nums">{data.totalKewajibanFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Kewajiban jangka pendek & panjang</div>
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">Total Kewajiban</div>
+          <div className={`${getMetricValueFontSize(data.totalKewajibanFmt)} text-orange-600 dark:text-orange-400 truncate`} title={data.totalKewajibanFmt}>
+            {data.totalKewajibanFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Kewajiban jangka pendek & panjang</div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Ekuitas & Laba</div>
-          <div className="text-[22px] font-extrabold text-violet-600 dark:text-violet-400 tabular-nums">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">Total Ekuitas & Laba</div>
+          <div className={`${getMetricValueFontSize(totalEkuitasFmt)} text-violet-600 dark:text-violet-400 truncate`} title={totalEkuitasFmt}>
             {totalEkuitasFmt}
           </div>
-          <div className="text-[11.5px] text-muted mt-2">Modal, laba ditahan & tahun berjalan</div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Modal, laba ditahan & tahun berjalan</div>
         </div>
 
         <div
-          className={`rounded-[20px] border p-5 shadow-xs ${
+          className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
             data.neracaBalanced
               ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
               : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
           }`}
         >
-          <div className="text-[12px] font-bold uppercase tracking-wider mb-2">
+          <div className="text-[12px] font-bold uppercase tracking-wider mb-2 truncate">
             <span className={data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
               Status Keseimbangan
             </span>
           </div>
-          <div className={`text-[20px] font-extrabold ${data.neracaBalanced ? "text-status-green" : "text-status-red"}`}>
+          <div className={`text-[19px] sm:text-[20px] font-extrabold truncate ${data.neracaBalanced ? "text-status-green" : "text-status-red"}`}>
             {data.neracaBalanced ? "100% Balanced" : "Selisih Saldo"}
           </div>
-          <div className="text-[11.5px] text-muted mt-2">
+          <div className="text-[11.5px] text-muted mt-2 truncate">
             {data.neracaBalanced ? "Aktiva = Pasiva Seimbang" : `Perbedaan Rp ${Math.round(selisih).toLocaleString("id-ID")}`}
           </div>
         </div>

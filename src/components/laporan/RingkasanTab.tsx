@@ -16,7 +16,7 @@ import {
   Layers,
 } from "lucide-react";
 import type { LaporanJurnalRow, LaporanBankRow } from "@/lib/laporan-keuangan";
-import { formatRupiah } from "@/lib/dashboard-data";
+import { formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface RingkasanTabProps {
   kpi: {
@@ -101,17 +101,19 @@ export function RingkasanTab({
   return (
     <div className="flex flex-col gap-8">
       {/* ── 1. Top 4 KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Total Pendapatan */}
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">Total Pendapatan</span>
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">Total Pendapatan</span>
             <div className="w-9 h-9 rounded-xl bg-green-500/10 dark:bg-green-500/20 text-status-green flex items-center justify-center shrink-0">
               <TrendingUp size={18} />
             </div>
           </div>
-          <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{kpi.totalPendapatanFmt}</div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-muted-stronger">
+          <div className={`${getMetricValueFontSize(kpi.totalPendapatanFmt)} text-navy-text truncate`} title={kpi.totalPendapatanFmt}>
+            {kpi.totalPendapatanFmt}
+          </div>
+          <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-muted-stronger truncate">
             <span className="inline-flex items-center text-status-green font-semibold">
               <ArrowUpRight size={13} className="mr-0.5" /> Pendapatan Usaha
             </span>
@@ -120,15 +122,17 @@ export function RingkasanTab({
         </div>
 
         {/* Total Beban */}
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">Total Beban</span>
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">Total Beban</span>
             <div className="w-9 h-9 rounded-xl bg-red-500/10 dark:bg-red-500/20 text-status-red flex items-center justify-center shrink-0">
               <TrendingDown size={18} />
             </div>
           </div>
-          <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{kpi.totalBebanFmt}</div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-muted-stronger">
+          <div className={`${getMetricValueFontSize(kpi.totalBebanFmt)} text-navy-text truncate`} title={kpi.totalBebanFmt}>
+            {kpi.totalBebanFmt}
+          </div>
+          <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px] text-muted-stronger truncate">
             <span className="inline-flex items-center text-status-red font-semibold">
               <ArrowDownRight size={13} className="mr-0.5" /> Beban Operasional
             </span>
@@ -137,18 +141,18 @@ export function RingkasanTab({
         </div>
 
         {/* Laba / Rugi Bersih */}
-        <div className={`rounded-[20px] border p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow ${
+        <div className={`rounded-[20px] border p-4 sm:p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow min-w-0 ${
           kpi.labaBersihPositive
             ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
             : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
         }`}>
           <div className="flex items-center justify-between gap-3 mb-3">
-            <span className={`text-[12px] font-bold uppercase tracking-wider ${
+            <span className={`text-[12px] font-bold uppercase tracking-wider truncate ${
               kpi.labaBersihPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
             }`}>
               {kpi.labaBersihPositive ? "Laba Bersih" : "Rugi Bersih"}
             </span>
-            <div className={`px-2.5 py-1 rounded-full text-[10.5px] font-extrabold ${
+            <div className={`px-2.5 py-1 rounded-full text-[10.5px] font-extrabold flex-none ${
               kpi.labaBersihPositive
                 ? "bg-green-500 text-white"
                 : "bg-red-500 text-white"
@@ -156,29 +160,29 @@ export function RingkasanTab({
               {kpi.marginPct.toFixed(1)}% Margin
             </div>
           </div>
-          <div className={`text-[22px] font-extrabold tabular-nums ${
+          <div className={`${getMetricValueFontSize(kpi.labaBersihFmt)} ${
             kpi.labaBersihPositive ? "text-status-green" : "text-status-red"
-          }`}>
+          } truncate`} title={(kpi.labaBersihPositive ? "" : "–") + kpi.labaBersihFmt}>
             {kpi.labaBersihPositive ? "" : "–"}{kpi.labaBersihFmt}
           </div>
-          <div className="mt-2.5 text-[11.5px] text-muted-stronger">
+          <div className="mt-2.5 text-[11.5px] text-muted-stronger truncate">
             Net Result ({entityName})
           </div>
         </div>
 
         {/* Total Transaksi Jurnal */}
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider">Total Transaksi Jurnal</span>
+            <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">Total Transaksi Jurnal</span>
             <div className="w-9 h-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <FileText size={18} />
             </div>
           </div>
-          <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
+          <div className="text-[20px] sm:text-[22px] font-extrabold text-navy-text tabular-nums truncate">
             {jurnal.totalCount.toLocaleString("id-ID")}{" "}
             <span className="text-[13px] font-medium text-muted">transaksi</span>
           </div>
-          <div className="mt-2.5 flex items-center gap-2 text-[11.5px]">
+          <div className="mt-2.5 flex items-center gap-2 text-[11.5px] truncate">
             {jurnal.isBalanced ? (
               <span className="inline-flex items-center text-status-green font-semibold">
                 <CheckCircle2 size={13} className="mr-1" /> Jurnal Seimbang

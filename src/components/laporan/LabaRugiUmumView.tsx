@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Printer, CheckCircle2, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import type { LaporanPajakData, TaxReportRow } from "@/lib/pajak";
 import { formatAccounting } from "@/lib/pajak";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface LabaRugiUmumViewProps {
   data: LaporanPajakData;
@@ -187,53 +188,67 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
       </div>
 
       {/* ── Top Metric Cards (Sesuai Desain Standar) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Pendapatan</div>
-          <div className="text-[22px] font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">
-            {formatAccounting(data.pendapatan.totalKomersial)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">Pendapatan usaha & operasional</div>
-        </div>
+      {(() => {
+        const pendapatanFmt = formatAccounting(data.pendapatan.totalKomersial);
+        const biayaLangsungFmt = formatAccounting(data.biayaLangsung.totalKomersial);
+        const biayaOperasionalFmt = formatAccounting(data.biayaOperasional.totalKomersial);
+        const labaBersihFmt = formatAccounting(data.labaBersih.komersial);
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 print:hidden">
+            <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+              <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">
+                Total Pendapatan
+              </div>
+              <div className={`${getMetricValueFontSize(pendapatanFmt)} text-blue-600 dark:text-blue-400 truncate`} title={pendapatanFmt}>
+                {pendapatanFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">Pendapatan usaha & operasional</div>
+            </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Biaya Langsung</div>
-          <div className="text-[22px] font-extrabold text-orange-600 dark:text-orange-400 tabular-nums">
-            {formatAccounting(data.biayaLangsung.totalKomersial)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">
-            {version === "UMUM" ? "Akun 6xx tanpa By Marketing" : "Akun 6xx termasuk By Marketing"}
-          </div>
-        </div>
+            <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+              <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">
+                Total Biaya Langsung
+              </div>
+              <div className={`${getMetricValueFontSize(biayaLangsungFmt)} text-orange-600 dark:text-orange-400 truncate`} title={biayaLangsungFmt}>
+                {biayaLangsungFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">
+                {version === "UMUM" ? "Akun 6xx tanpa By Marketing" : "Akun 6xx termasuk By Marketing"}
+              </div>
+            </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Beban Operasional</div>
-          <div className="text-[22px] font-extrabold text-violet-600 dark:text-violet-400 tabular-nums">
-            {formatAccounting(data.biayaOperasional.totalKomersial)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">Beban operasional & penyusutan</div>
-        </div>
+            <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+              <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">
+                Total Beban Operasional
+              </div>
+              <div className={`${getMetricValueFontSize(biayaOperasionalFmt)} text-violet-600 dark:text-violet-400 truncate`} title={biayaOperasionalFmt}>
+                {biayaOperasionalFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">Beban operasional & penyusutan</div>
+            </div>
 
-        <div
-          className={`rounded-[20px] border p-5 shadow-xs ${
-            isPositive
-              ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
-              : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
-          }`}
-        >
-          <div className="text-[12px] font-bold uppercase tracking-wider mb-2">
-            <span className={isPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
-              Status Laba / (Rugi) Bersih
-            </span>
+            <div
+              className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
+                isPositive
+                  ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
+                  : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
+              }`}
+            >
+              <div className="text-[12px] font-bold uppercase tracking-wider mb-2 truncate">
+                <span className={isPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                  Status Laba / (Rugi) Bersih
+                </span>
+              </div>
+              <div className={`${getMetricValueFontSize(labaBersihFmt)} ${isPositive ? "text-status-green" : "text-status-red"} truncate`} title={labaBersihFmt}>
+                {labaBersihFmt}
+              </div>
+              <div className="text-[11.5px] text-muted mt-2 truncate">
+                {isPositive ? "Surplus Tahun Berjalan" : "Defisit Tahun Berjalan"}
+              </div>
+            </div>
           </div>
-          <div className={`text-[20px] font-extrabold tabular-nums ${isPositive ? "text-status-green" : "text-status-red"}`}>
-            {formatAccounting(data.labaBersih.komersial)}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2">
-            {isPositive ? "Surplus Tahun Berjalan" : "Defisit Tahun Berjalan"}
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Main Table */}
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">

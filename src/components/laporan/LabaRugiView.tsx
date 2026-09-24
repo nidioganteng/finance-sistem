@@ -142,7 +142,7 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
                           <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
                           <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
                         </div>
-                        <span className="text-[13.5px] font-bold text-status-green tabular-nums shrink-0">
+                        <span className="text-[13.5px] font-bold text-status-green tabular-nums shrink-0 whitespace-nowrap">
                           {item.saldoFmt}
                         </span>
                       </div>
@@ -168,7 +168,7 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
             <span className="text-[13.5px] font-extrabold text-green-900 dark:text-green-300 uppercase">
               Total Pendapatan Usaha
             </span>
-            <span className="text-[16px] font-black text-status-green tabular-nums">
+            <span className="text-[16px] font-black text-status-green tabular-nums whitespace-nowrap">
               {data.totalPendapatanFmt}
             </span>
           </div>
@@ -200,7 +200,7 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
                           <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
                           <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
                         </div>
-                        <span className="text-[13.5px] font-bold text-status-red tabular-nums shrink-0">
+                        <span className="text-[13.5px] font-bold text-status-red tabular-nums shrink-0 whitespace-nowrap">
                           {item.saldoFmt}
                         </span>
                       </div>
@@ -226,7 +226,7 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
             <span className="text-[13.5px] font-extrabold text-red-900 dark:text-red-300 uppercase">
               Total Beban Usaha
             </span>
-            <span className="text-[16px] font-black text-status-red tabular-nums">
+            <span className="text-[16px] font-black text-status-red tabular-nums whitespace-nowrap">
               {data.totalBebanFmt}
             </span>
           </div>

@@ -3,7 +3,7 @@ import { Role, type ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
 
 export function formatRupiah(n: number) {
-  return "Rp " + Math.round(n).toLocaleString("id-ID");
+  return "Rp\u00A0" + Math.round(n).toLocaleString("id-ID");
 }
 
 export interface AccessibleEntity {

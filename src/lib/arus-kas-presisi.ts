@@ -65,9 +65,9 @@ export interface ArusKasPresisiData {
 }
 
 export function formatRupiahArusKas(val: number): string {
-  if (val === 0 || Math.round(val) === 0) return "Rp -";
+  if (val === 0 || Math.round(val) === 0) return "Rp\u00A0-";
   const abs = Math.abs(Math.round(val)).toLocaleString("id-ID");
-  return val < 0 ? `Rp (${abs})` : `Rp ${abs}`;
+  return val < 0 ? `Rp\u00A0(${abs})` : `Rp\u00A0${abs}`;
 }
 
 export async function getArusKasPresisiData(
@@ -268,13 +268,15 @@ export async function getArusKasPresisiData(
   const totalArusKasInvestasi = perolehanAsetTetap + perolehanAsetTidakBerwujud;
 
   // 5. Aktivitas Pendanaan
-  // Laba Ditahan / Prive / Penarikan Modal
+  // Setoran Modal Saham (320), Laba Ditahan (310), Prive (531)
+  const accModal = accountByCode.get("320");
   const accLabaDitahan = accountByCode.get("310");
   const accPrive = accountByCode.get("531");
+  const deltaModal = accModal ? getAccountDelta(accModal) : 0;
   const deltaLabaDitahan = accLabaDitahan ? getAccountDelta(accLabaDitahan) : 0;
   const deltaPrive = accPrive ? -getAccountDelta(accPrive) : 0;
   const labaDitahan = deltaLabaDitahan + deltaPrive;
-  const totalArusKasPendanaan = labaDitahan;
+  const totalArusKasPendanaan = deltaModal + labaDitahan;
 
   // 6. Rekapitulasi Kas & Setara Kas
   const kenaikanBersihKas = totalArusKasOperasi + totalArusKasInvestasi + totalArusKasPendanaan;
@@ -354,7 +356,8 @@ export async function getArusKasPresisiData(
 
     // Pendanaan
     { label: "Arus Kas dan Setara Kas dari Aktivitas Pendanaan", amount: 0, level: 0, isHeader: true },
-    { label: "Laba Ditahan", amount: labaDitahan, level: 1, code: "310" },
+    ...(deltaModal !== 0 ? [{ label: "Setoran Modal Saham", amount: deltaModal, level: 1, code: "320" }] : []),
+    ...(labaDitahan !== 0 || deltaModal === 0 ? [{ label: "Laba Ditahan", amount: labaDitahan, level: 1, code: "310" }] : []),
     {
       label: "Arus Kas dan Setara Kas dari Aktivitas Pendanaan",
       amount: totalArusKasPendanaan,

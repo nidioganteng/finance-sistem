@@ -93,7 +93,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
             {label}
           </td>
           <td
-            className={`py-3.5 px-6 text-right tabular-nums text-[15px] font-black ${
+            className={`py-3.5 px-6 text-right tabular-nums text-[15px] font-black whitespace-nowrap ${
               isSurplus ? "text-status-green" : "text-status-red"
             }`}
           >
@@ -110,7 +110,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
             {label}
           </td>
           <td
-            className={`py-3 px-6 text-right tabular-nums text-[13.5px] font-black ${
+            className={`py-3 px-6 text-right tabular-nums text-[13.5px] font-black whitespace-nowrap ${
               isNegative ? "text-rose-600 dark:text-rose-400" : "text-navy-text"
             }`}
           >
@@ -126,7 +126,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
           {label}
         </td>
         <td
-          className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold ${
+          className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold whitespace-nowrap ${
             isNegative ? "text-rose-600 dark:text-rose-400" : "text-navy-text"
           }`}
         >

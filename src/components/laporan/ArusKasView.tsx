@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Wallet, Activity } from "lucide-react";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface MonthlyRow {
   bulan: string;
@@ -75,53 +76,64 @@ export function ArusKasView({ data, year, entityName }: ArusKasViewProps) {
       </div>
 
       {/* ── Top Metric Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>Total Kas Masuk</span>
-            <ArrowUpRight size={16} className="text-status-green" />
+            <span className="truncate">Total Kas Masuk</span>
+            <ArrowUpRight size={16} className="text-status-green shrink-0" />
           </div>
-          <div className="text-[22px] font-extrabold text-status-green tabular-nums">{data.totalMasukFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Seluruh arus masuk kas & bank</div>
+          <div className={`${getMetricValueFontSize(data.totalMasukFmt)} text-status-green truncate`} title={data.totalMasukFmt}>
+            {data.totalMasukFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Seluruh arus masuk kas & bank</div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>Total Kas Keluar</span>
-            <ArrowDownRight size={16} className="text-status-red" />
+            <span className="truncate">Total Kas Keluar</span>
+            <ArrowDownRight size={16} className="text-status-red shrink-0" />
           </div>
-          <div className="text-[22px] font-extrabold text-status-red tabular-nums">{data.totalKeluarFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Pengeluaran kas & bank tahun {year}</div>
+          <div className={`${getMetricValueFontSize(data.totalKeluarFmt)} text-status-red truncate`} title={data.totalKeluarFmt}>
+            {data.totalKeluarFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Pengeluaran kas & bank tahun {year}</div>
         </div>
 
-        <div className={`rounded-[20px] border p-5 shadow-xs ${
+        <div className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
           data.netTotalPositive
             ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
             : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
         }`}>
           <div className="text-[12px] font-bold uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span className={data.netTotalPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+            <span className={`truncate ${data.netTotalPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
               Net Cash Flow
             </span>
-            <Activity size={16} className={data.netTotalPositive ? "text-status-green" : "text-status-red"} />
+            <Activity size={16} className={`shrink-0 ${data.netTotalPositive ? "text-status-green" : "text-status-red"}`} />
           </div>
-          <div className={`text-[22px] font-extrabold tabular-nums ${
-            data.netTotalPositive ? "text-status-green" : "text-status-red"
-          }`}>
-            {data.netTotalPositive ? "+" : "–"}{data.netTotalFmt}
-          </div>
-          <div className="text-[11.5px] text-muted-stronger mt-2 font-medium">
+          {(() => {
+            const netVal = (data.netTotalPositive ? "+" : "–") + data.netTotalFmt;
+            return (
+              <div className={`${getMetricValueFontSize(netVal)} truncate ${
+                data.netTotalPositive ? "text-status-green" : "text-status-red"
+              }`} title={netVal}>
+                {netVal}
+              </div>
+            );
+          })()}
+          <div className="text-[11.5px] text-muted-stronger mt-2 font-medium truncate">
             Arus kas bersih periode berjalan
           </div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>Saldo Akhir Kas & Bank</span>
-            <Wallet size={16} className="text-brand" />
+            <span className="truncate">Saldo Akhir Kas & Bank</span>
+            <Wallet size={16} className="text-brand shrink-0" />
           </div>
-          <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{data.kasAkhirFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Posisi kas dan setara kas</div>
+          <div className={`${getMetricValueFontSize(data.kasAkhirFmt)} text-navy-text truncate`} title={data.kasAkhirFmt}>
+            {data.kasAkhirFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Posisi kas dan setara kas</div>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, Percent, Award, ArrowUpRight, ArrowDownRight, FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
 import type { CoaLine } from "@/lib/laporan-keuangan";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface LabaRugiViewProps {
   data: {
@@ -60,57 +61,61 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
       </div>
 
       {/* ── Top Metric Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between gap-2 mb-2 text-[12px] font-bold text-muted-faint uppercase tracking-wider">
-            <span>Total Pendapatan</span>
-            <TrendingUp size={16} className="text-status-green" />
+            <span className="truncate">Total Pendapatan</span>
+            <TrendingUp size={16} className="text-status-green flex-none" />
           </div>
-          <div className="text-[22px] font-extrabold text-status-green tabular-nums">{data.totalPendapatanFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">100% dari basis omzet</div>
+          <div className={`${getMetricValueFontSize(data.totalPendapatanFmt)} text-status-green truncate`} title={data.totalPendapatanFmt}>
+            {data.totalPendapatanFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">100% dari basis omzet</div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between gap-2 mb-2 text-[12px] font-bold text-muted-faint uppercase tracking-wider">
-            <span>Total Beban Usaha</span>
-            <TrendingDown size={16} className="text-status-red" />
+            <span className="truncate">Total Beban Usaha</span>
+            <TrendingDown size={16} className="text-status-red flex-none" />
           </div>
-          <div className="text-[22px] font-extrabold text-status-red tabular-nums">{data.totalBebanFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">{costRatio.toFixed(1)}% dari total pendapatan</div>
+          <div className={`${getMetricValueFontSize(data.totalBebanFmt)} text-status-red truncate`} title={data.totalBebanFmt}>
+            {data.totalBebanFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">{costRatio.toFixed(1)}% dari total pendapatan</div>
         </div>
 
-        <div className={`rounded-[20px] border p-5 shadow-xs ${
+        <div className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
           data.labaBersihPositive
             ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
             : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
         }`}>
           <div className="flex items-center justify-between gap-2 mb-2 text-[12px] font-bold uppercase tracking-wider">
-            <span className={data.labaBersihPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+            <span className={`truncate ${data.labaBersihPositive ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
               {data.labaBersihPositive ? "Laba Bersih" : "Rugi Bersih"}
             </span>
-            <Award size={16} className={data.labaBersihPositive ? "text-status-green" : "text-status-red"} />
+            <Award size={16} className={`flex-none ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`} />
           </div>
-          <div className={`text-[22px] font-extrabold tabular-nums ${
+          <div className={`${getMetricValueFontSize(data.labaBersihFmt)} ${
             data.labaBersihPositive ? "text-status-green" : "text-status-red"
-          }`}>
+          } truncate`} title={(data.labaBersihPositive ? "" : "–") + data.labaBersihFmt}>
             {data.labaBersihPositive ? "" : "–"}{data.labaBersihFmt}
           </div>
-          <div className="text-[11.5px] text-muted-stronger mt-2 font-medium">
+          <div className="text-[11.5px] text-muted-stronger mt-2 font-medium truncate">
             Laba/Rugi tahun berjalan {year}
           </div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between gap-2 mb-2 text-[12px] font-bold text-muted-faint uppercase tracking-wider">
-            <span>Net Profit Margin</span>
-            <Percent size={16} className="text-brand" />
+            <span className="truncate">Net Profit Margin</span>
+            <Percent size={16} className="text-brand flex-none" />
           </div>
-          <div className={`text-[22px] font-extrabold tabular-nums ${
+          <div className={`text-[19px] sm:text-[21px] font-extrabold tabular-nums truncate ${
             marginPct >= 0 ? "text-status-green" : "text-status-red"
           }`}>
             {marginPct.toFixed(1)}%
           </div>
-          <div className="text-[11.5px] text-muted mt-2">Efisiensi margin operasional</div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Efisiensi margin operasional</div>
         </div>
       </div>
 

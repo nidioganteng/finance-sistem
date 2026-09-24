@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject } from "@/lib/actions/piutang";
 import { CheckCircle, ChevronDown, ChevronRight, Ban, CheckSquare } from "lucide-react";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 type TerminItem = {
   id: string;
@@ -165,37 +166,37 @@ export function PiutangClient({
       {tab === "termin" && (
         <>
           {/* Kartu ringkasan */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                 Total Nilai Kontrak Aktif
               </div>
-              <div className="text-[20px] font-extrabold text-navy-text tabular-nums">
+              <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
                 {summary.totalKontrakFmt}
               </div>
-              <div className="text-[12px] text-muted mt-0.5">{summary.jumlahProyek} proyek</div>
+              <div className="text-[12px] text-muted mt-0.5 truncate">{summary.jumlahProyek} proyek</div>
             </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                 Total Termin Tertagih
               </div>
-              <div className="text-[20px] font-extrabold text-status-green tabular-nums">
+              <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
                 {summary.totalTerminTagihFmt}
               </div>
-              <div className="text-[12px] text-muted mt-0.5">
+              <div className="text-[12px] text-muted mt-0.5 truncate">
                 {summary.totalKontrak > 0
                   ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
                   : "—"}
               </div>
             </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                 Sisa Piutang Belum Tertagih
               </div>
-              <div className="text-[20px] font-extrabold text-status-red tabular-nums">
+              <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
                 {summary.sisaPiutangFmt}
               </div>
-              <div className="text-[12px] text-muted mt-0.5">belum masuk kas</div>
+              <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
             </div>
           </div>
 

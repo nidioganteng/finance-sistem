@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, createPelunasan, type CreatePelunasanInput } from "@/lib/actions/piutang";
+import { generateNoBukti } from "@/lib/actions/kas";
 import { CheckCircle, ChevronDown, ChevronRight, Ban, CheckSquare, ArrowDownCircle, ArrowUpCircle, X } from "lucide-react";
 
 type TerminItem = {
@@ -121,9 +122,10 @@ export function PiutangClient({
   const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN";
 
   function openPelunasanModal(balance: InterEntityBalance) {
+    const today = new Date().toISOString().slice(0, 10);
     setPelunasanModal({ balance });
     setPelunasanForm({
-      tanggal: new Date().toISOString().slice(0, 10),
+      tanggal: today,
       noBukti: "",
       keterangan: `Pelunasan ${balance.type === "piutang" ? "piutang dari" : "hutang ke"} ${balance.counterpartyEntityName}`,
       nominal: formatInputNominal(balance.netAmount),
@@ -131,6 +133,9 @@ export function PiutangClient({
       jenisKasTujuan: "kasKecil",
     });
     setPelunasanError(null);
+    generateNoBukti(currentEntityKey, today).then((nb) =>
+      setPelunasanForm((f) => ({ ...f, noBukti: f.noBukti || nb }))
+    ).catch(() => {});
   }
 
   function closePelunasanModal() {

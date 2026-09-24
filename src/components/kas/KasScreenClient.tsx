@@ -300,9 +300,9 @@ export function KasScreenClient({
               <td className="py-2 px-1.5">NO. BUKTI</td>
               <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5">AKUN</td>
-              <td className="py-2 px-1.5 text-right">MASUK</td>
-              <td className="py-2 px-1.5 text-right">KELUAR</td>
-              <td className="py-2 px-1.5 text-right">SALDO BERJALAN</td>
+              <td className="py-2 px-1.5 text-right whitespace-nowrap">MASUK</td>
+              <td className="py-2 px-1.5 text-right whitespace-nowrap">KELUAR</td>
+              <td className="py-2 px-1.5 text-right whitespace-nowrap">SALDO BERJALAN</td>
               <td className="py-2 px-1.5 text-right">AKSI</td>
             </tr>
           </thead>
@@ -330,24 +330,24 @@ export function KasScreenClient({
                 return (
                   <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
                     <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
-                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{r.noBukti}</td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                     <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                       {r.keterangan}
                       {r.rekening && (
-                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           {r.rekening}
                         </span>
                       )}
                       {/* Crossing destination badge — transaksi masuk dari entitas lain */}
                       {isCrossingFrom && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           <ArrowRightLeft size={9} />
                           dari {sourceEntityName}
                         </span>
                       )}
                       {/* Crossing source badges — transaksi dikirim ke entitas lain */}
                       {!isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           <ArrowRightLeft size={9} />
                           → {(r.crossingEntityKeys ?? [])
                             .map((k) => allEntities.find((e) => e.key === k)?.name ?? k)
@@ -359,7 +359,7 @@ export function KasScreenClient({
                       <div className="flex flex-col gap-1">
                         {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
                           <div key={i} className="flex flex-col">
-                            <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md">
+                            <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md whitespace-nowrap">
                               {cr.coaName}
                             </span>
                             {cr.itemDescription && (
@@ -368,41 +368,41 @@ export function KasScreenClient({
                           </div>
                         ))}
                         {!expanded && r.coaRows.length > 2 && (
-                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left">
+                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left whitespace-nowrap">
                             +{r.coaRows.length - 2} lagi
                           </button>
                         )}
                       </div>
                     </td>
                     {/* MASUK — per baris akun */}
-                    <td className="py-2.5 px-1.5 text-right align-top">
+                    <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
                       {r.coaRows.length > 0 ? (
                         <div className="flex flex-col gap-1">
                           {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                            <span key={i} className={`text-[13px] font-bold tabular-nums leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
+                            <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
                               {r.masuk > 0 ? formatRupiah(cr.nominal) : "—"}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[13px] font-bold text-status-green tabular-nums">{r.masukFmt}</span>
+                        <span className="text-[13px] font-bold text-status-green tabular-nums whitespace-nowrap">{r.masukFmt}</span>
                       )}
                     </td>
                     {/* KELUAR — per baris akun */}
-                    <td className="py-2.5 px-1.5 text-right align-top">
+                    <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
                       {r.coaRows.length > 0 ? (
                         <div className="flex flex-col gap-1">
                           {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                            <span key={i} className={`text-[13px] font-bold tabular-nums leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
+                            <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
                               {r.keluar > 0 ? formatRupiah(cr.nominal) : "—"}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[13px] font-bold text-status-red tabular-nums">{r.keluarFmt}</span>
+                        <span className="text-[13px] font-bold text-status-red tabular-nums whitespace-nowrap">{r.keluarFmt}</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums">{r.saldoFmt}</td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">{r.saldoFmt}</td>
                     <td className="py-2.5 px-1.5 text-right">
                       {isCrossingFrom ? (
                         <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>

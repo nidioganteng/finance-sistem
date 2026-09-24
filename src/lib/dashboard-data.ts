@@ -3,7 +3,16 @@ import { Role, type ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
 
 export function formatRupiah(n: number) {
-  return "Rp " + Math.round(n).toLocaleString("id-ID");
+  return "Rp\u00A0" + Math.round(n).toLocaleString("id-ID");
+}
+
+export function getMetricValueFontSize(str?: string | number): string {
+  const text = typeof str === "number" ? str.toString() : (str ?? "");
+  const len = text.length;
+  if (len >= 22) return "text-[14.5px] sm:text-[16px] xl:text-[16.5px] 2xl:text-[19px] font-extrabold tabular-nums tracking-tight";
+  if (len >= 18) return "text-[15.5px] sm:text-[17px] xl:text-[17.5px] 2xl:text-[20px] font-extrabold tabular-nums tracking-tight";
+  if (len >= 14) return "text-[17px] sm:text-[18.5px] xl:text-[19px] 2xl:text-[21px] font-extrabold tabular-nums tracking-tight";
+  return "text-[19px] sm:text-[21px] xl:text-[21px] 2xl:text-[22px] font-extrabold tabular-nums";
 }
 
 export interface AccessibleEntity {

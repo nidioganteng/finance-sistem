@@ -77,10 +77,10 @@ export interface LaporanPajakData {
 }
 
 export function formatAccounting(val: number): string {
-  if (!val || Math.round(val) === 0) return "Rp -";
+  if (!val || Math.round(val) === 0) return "Rp\u00A0-";
   const rounded = Math.round(val);
   const formatted = Math.abs(rounded).toLocaleString("id-ID");
-  return rounded < 0 ? `Rp (${formatted})` : `Rp ${formatted}`;
+  return rounded < 0 ? `Rp\u00A0(${formatted})` : `Rp\u00A0${formatted}`;
 }
 
 // Template standar akun sesuai format spreadsheet Excel acuan

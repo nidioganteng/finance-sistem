@@ -106,13 +106,13 @@ async function RekapView({
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
-              <th className="py-3 px-5">KODE AKUN</th>
-              <th className="py-3 px-3">NAMA AKUN</th>
-              <th className="py-3 px-3">KATEGORI</th>
-              <th className="py-3 px-3 text-right">SALDO AWAL</th>
-              <th className="py-3 px-3 text-right">TOTAL DEBET</th>
-              <th className="py-3 px-3 text-right">TOTAL KREDIT</th>
-              <th className="py-3 px-5 text-right">SALDO AKHIR</th>
+              <th className="py-3 px-5 whitespace-nowrap">KODE AKUN</th>
+              <th className="py-3 px-3 whitespace-nowrap">NAMA AKUN</th>
+              <th className="py-3 px-3 whitespace-nowrap">KATEGORI</th>
+              <th className="py-3 px-3 text-right whitespace-nowrap">SALDO AWAL</th>
+              <th className="py-3 px-3 text-right whitespace-nowrap">TOTAL DEBET</th>
+              <th className="py-3 px-3 text-right whitespace-nowrap">TOTAL KREDIT</th>
+              <th className="py-3 px-5 text-right whitespace-nowrap">SALDO AKHIR</th>
             </tr>
           </thead>
           <tbody>
@@ -144,10 +144,10 @@ async function RekapView({
                       {r.kategori}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-muted">{r.saldoAwalFmt}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text">{r.totalDebetFmt}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text">{r.totalKreditFmt}</td>
-                  <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold">
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-muted whitespace-nowrap">{r.saldoAwalFmt}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalDebetFmt}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalKreditFmt}</td>
+                  <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold whitespace-nowrap">
                     <a href={rekapHref(r.coaId)} className={r.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}>
                       {r.saldoAkhirNegatif ? "-" : ""}{r.saldoAkhirFmt}
                     </a>
@@ -165,10 +165,10 @@ async function RekapView({
                     <span className="ml-2 text-[11px] font-bold text-red-500">⚠ tidak seimbang</span>
                   )}
                 </td>
-                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
+                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold whitespace-nowrap ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                   {totalSemuaDebetFmt}
                 </td>
-                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
+                <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold whitespace-nowrap ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                   {totalSemuaKreditFmt}
                 </td>
                 <td className="py-3.5 px-5" />
@@ -243,7 +243,7 @@ async function DrilldownView({
               <td colSpan={5} className="py-2.5 px-5 text-[12px] font-semibold text-muted-faint italic">
                 Saldo Awal {year}
               </td>
-              <td className={`py-2.5 px-5 text-right tabular-nums text-[12px] font-bold ${data.saldoAwalNegatif ? "text-status-red" : "text-muted"}`}>
+              <td className={`py-2.5 px-5 text-right tabular-nums text-[12px] font-bold whitespace-nowrap ${data.saldoAwalNegatif ? "text-status-red" : "text-muted"}`}>
                 {data.saldoAwalNegatif ? "-" : ""}{data.saldoAwalFmt}
               </td>
             </tr>
@@ -260,9 +260,9 @@ async function DrilldownView({
                   <td className="py-2.5 px-5 text-[12.5px] text-muted whitespace-nowrap">{e.tanggal}</td>
                   <td className="py-2.5 px-3 font-mono text-[12px] text-muted whitespace-nowrap">{e.noBukti}</td>
                   <td className="py-2.5 px-3 text-[13px] text-muted-stronger">{e.keterangan}</td>
-                  <td className="py-2.5 px-3 text-right tabular-nums text-[13px] text-navy-text">{e.debitFmt}</td>
-                  <td className="py-2.5 px-3 text-right tabular-nums text-[13px] text-navy-text">{e.kreditFmt}</td>
-                  <td className={`py-2.5 px-5 text-right tabular-nums text-[13px] font-bold ${e.saldoNegatif ? "text-status-red" : "text-navy-text"}`}>
+                  <td className="py-2.5 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{e.debitFmt}</td>
+                  <td className="py-2.5 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{e.kreditFmt}</td>
+                  <td className={`py-2.5 px-5 text-right tabular-nums text-[13px] font-bold whitespace-nowrap ${e.saldoNegatif ? "text-status-red" : "text-navy-text"}`}>
                     {e.saldoNegatif ? "-" : ""}{e.saldoFmt}
                   </td>
                 </tr>
@@ -272,9 +272,9 @@ async function DrilldownView({
           <tfoot>
             <tr className="border-t-2 border-border">
               <td colSpan={3} className="py-3.5 px-5 text-[13px] font-extrabold text-navy-text">Saldo Akhir</td>
-              <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold text-navy-text">{data.totalDebetFmt}</td>
-              <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold text-navy-text">{data.totalKreditFmt}</td>
-              <td className={`py-3.5 px-5 text-right tabular-nums text-[14px] font-extrabold ${data.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}`}>
+              <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold text-navy-text whitespace-nowrap">{data.totalDebetFmt}</td>
+              <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold text-navy-text whitespace-nowrap">{data.totalKreditFmt}</td>
+              <td className={`py-3.5 px-5 text-right tabular-nums text-[14px] font-extrabold whitespace-nowrap ${data.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}`}>
                 {data.saldoAkhirNegatif ? "-" : ""}{data.saldoAkhirFmt}
               </td>
             </tr>

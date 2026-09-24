@@ -171,12 +171,12 @@ export function EntityFinancialSummary({
 
           <MetricRow
             label="Aktivitas Operasi"
-            value={(data.kasOperasi >= 0 ? "+" : "") + data.kasOperasiFmt?.replace("Rp ", "")}
+            value={(data.kasOperasi >= 0 ? "+" : "") + data.kasOperasiFmt?.replace(/^Rp[\s\u00A0]?/, "")}
             color={data.kasOperasi >= 0 ? "text-status-green" : "text-status-red"}
           />
           <MetricRow
             label="Aktivitas Investasi"
-            value={(data.kasInvestasi >= 0 ? "+" : "-") + data.kasInvestasiFmt?.replace("Rp ", "")}
+            value={(data.kasInvestasi >= 0 ? "+" : "-") + data.kasInvestasiFmt?.replace(/^Rp[\s\u00A0]?/, "")}
             color={data.kasInvestasi >= 0 ? "text-status-green" : "text-status-red"}
           />
           <MetricRow

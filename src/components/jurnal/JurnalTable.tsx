@@ -174,10 +174,10 @@ export function JurnalTable({
                     </span>
                   )}
                 </td>
-                <td className="py-2.5 px-1.5 text-[13px] text-navy-text text-right tabular-nums font-medium">
+                <td className="py-2.5 px-1.5 text-[13px] text-navy-text text-right tabular-nums font-medium whitespace-nowrap">
                   {r.debitFmt}
                 </td>
-                <td className="py-2.5 px-1.5 text-[13px] text-navy-text text-right tabular-nums font-medium">
+                <td className="py-2.5 px-1.5 text-[13px] text-navy-text text-right tabular-nums font-medium whitespace-nowrap">
                   {r.kreditFmt}
                 </td>
                 <td className="py-2.5 px-1.5">
@@ -204,14 +204,14 @@ export function JurnalTable({
                 )}
               </td>
               <td
-                className={`py-3.5 px-1.5 text-[13.5px] font-extrabold text-right tabular-nums ${
+                className={`py-3.5 px-1.5 text-[13.5px] font-extrabold text-right tabular-nums whitespace-nowrap ${
                   isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"
                 }`}
               >
                 {totalDebitFmt}
               </td>
               <td
-                className={`py-3.5 px-1.5 text-[13.5px] font-extrabold text-right tabular-nums ${
+                className={`py-3.5 px-1.5 text-[13.5px] font-extrabold text-right tabular-nums whitespace-nowrap ${
                   isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"
                 }`}
               >

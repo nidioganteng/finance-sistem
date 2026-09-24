@@ -2,6 +2,7 @@
 
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import type { CoaLine } from "@/lib/laporan-keuangan";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 interface NeracaViewProps {
   data: {
@@ -94,43 +95,47 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
       )}
 
       {/* ── Top Metric Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Aktiva</div>
-          <div className="text-[22px] font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">{data.totalAsetFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Lancar: {totalLancarFmt} · Tetap: {totalTetapFmt}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">Total Aktiva</div>
+          <div className={`${getMetricValueFontSize(data.totalAsetFmt)} text-blue-600 dark:text-blue-400 truncate`} title={data.totalAsetFmt}>
+            {data.totalAsetFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Lancar: {totalLancarFmt} · Tetap: {totalTetapFmt}</div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Kewajiban</div>
-          <div className="text-[22px] font-extrabold text-orange-600 dark:text-orange-400 tabular-nums">{data.totalKewajibanFmt}</div>
-          <div className="text-[11.5px] text-muted mt-2">Kewajiban jangka pendek & panjang</div>
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">Total Kewajiban</div>
+          <div className={`${getMetricValueFontSize(data.totalKewajibanFmt)} text-orange-600 dark:text-orange-400 truncate`} title={data.totalKewajibanFmt}>
+            {data.totalKewajibanFmt}
+          </div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Kewajiban jangka pendek & panjang</div>
         </div>
 
-        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 shadow-xs">
-          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2">Total Ekuitas & Laba</div>
-          <div className="text-[22px] font-extrabold text-violet-600 dark:text-violet-400 tabular-nums">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
+          <div className="text-[12px] font-bold text-muted-faint uppercase tracking-wider mb-2 truncate">Total Ekuitas & Laba</div>
+          <div className={`${getMetricValueFontSize(totalEkuitasFmt)} text-violet-600 dark:text-violet-400 truncate`} title={totalEkuitasFmt}>
             {totalEkuitasFmt}
           </div>
-          <div className="text-[11.5px] text-muted mt-2">Modal, laba ditahan & tahun berjalan</div>
+          <div className="text-[11.5px] text-muted mt-2 truncate">Modal, laba ditahan & tahun berjalan</div>
         </div>
 
         <div
-          className={`rounded-[20px] border p-5 shadow-xs ${
+          className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
             data.neracaBalanced
               ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
               : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
           }`}
         >
-          <div className="text-[12px] font-bold uppercase tracking-wider mb-2">
+          <div className="text-[12px] font-bold uppercase tracking-wider mb-2 truncate">
             <span className={data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
               Status Keseimbangan
             </span>
           </div>
-          <div className={`text-[20px] font-extrabold ${data.neracaBalanced ? "text-status-green" : "text-status-red"}`}>
+          <div className={`text-[19px] sm:text-[20px] font-extrabold truncate ${data.neracaBalanced ? "text-status-green" : "text-status-red"}`}>
             {data.neracaBalanced ? "100% Balanced" : "Selisih Saldo"}
           </div>
-          <div className="text-[11.5px] text-muted mt-2">
+          <div className="text-[11.5px] text-muted mt-2 truncate">
             {data.neracaBalanced ? "Aktiva = Pasiva Seimbang" : `Perbedaan Rp ${Math.round(selisih).toLocaleString("id-ID")}`}
           </div>
         </div>
@@ -171,7 +176,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                       )}
                     </div>
                     <span
-                      className={`text-[13px] font-bold tabular-nums shrink-0 ${
+                      className={`text-[13px] font-bold tabular-nums shrink-0 whitespace-nowrap ${
                         item.isContra ? "text-status-amber" : "text-navy-text"
                       }`}
                     >
@@ -221,7 +226,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                       )}
                     </div>
                     <span
-                      className={`text-[13px] font-bold tabular-nums shrink-0 ${
+                      className={`text-[13px] font-bold tabular-nums shrink-0 whitespace-nowrap ${
                         item.isContra ? "text-status-amber" : "text-navy-text"
                       }`}
                     >
@@ -234,7 +239,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
 
             <div className="px-6 py-3 bg-cyan-50/40 dark:bg-cyan-500/10 border-t border-cyan-100 dark:border-cyan-500/20 flex items-center justify-between">
               <span className="text-[12.5px] font-bold text-cyan-950 dark:text-cyan-300">Total Aktiva Tetap (Net)</span>
-              <span className="text-[13.5px] font-extrabold text-cyan-700 dark:text-cyan-400 tabular-nums">
+              <span className="text-[13.5px] font-extrabold text-cyan-700 dark:text-cyan-400 tabular-nums whitespace-nowrap">
                 {totalTetapFmt}
               </span>
             </div>
@@ -246,7 +251,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
               <span className="text-[14px] font-extrabold text-navy-text uppercase">Total Aktiva</span>
               <p className="text-[11px] text-muted">Aktiva Lancar + Aktiva Tetap</p>
             </div>
-            <span className="text-[18px] font-black text-blue-700 dark:text-blue-400 tabular-nums">
+            <span className="text-[18px] font-black text-blue-700 dark:text-blue-400 tabular-nums whitespace-nowrap">
               {data.totalAsetFmt}
             </span>
           </div>
@@ -276,7 +281,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                       <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
                       <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
                     </div>
-                    <span className="text-[13px] font-bold text-navy-text tabular-nums shrink-0">
+                    <span className="text-[13px] font-bold text-navy-text tabular-nums shrink-0 whitespace-nowrap">
                       {item.saldoFmt}
                     </span>
                   </div>
@@ -286,7 +291,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
 
             <div className="px-6 py-3 bg-orange-50/40 dark:bg-orange-500/10 border-t border-orange-100 dark:border-orange-500/20 flex items-center justify-between">
               <span className="text-[12.5px] font-bold text-orange-950 dark:text-orange-300">Total Kewajiban</span>
-              <span className="text-[13.5px] font-extrabold text-orange-700 dark:text-orange-400 tabular-nums">
+              <span className="text-[13.5px] font-extrabold text-orange-700 dark:text-orange-400 tabular-nums whitespace-nowrap">
                 {data.totalKewajibanFmt}
               </span>
             </div>
@@ -311,7 +316,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                     <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
                     <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
                   </div>
-                  <span className="text-[13px] font-bold text-navy-text tabular-nums shrink-0">
+                  <span className="text-[13px] font-bold text-navy-text tabular-nums shrink-0 whitespace-nowrap">
                     {item.saldoFmt}
                   </span>
                 </div>
@@ -323,7 +328,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                   <code className="text-[11px] font-mono text-muted-faint shrink-0">[310]</code>
                   <span className="text-[13px] font-semibold text-navy-text">Laba Ditahan</span>
                 </div>
-                <span className="text-[13px] font-bold text-navy-text tabular-nums shrink-0">
+                <span className="text-[13px] font-bold text-navy-text tabular-nums shrink-0 whitespace-nowrap">
                   {data.labaDitahanFmt ?? "Rp 0"}
                 </span>
               </div>
@@ -335,7 +340,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                   <span className="text-[13px] font-bold text-navy-text">Laba Tahun Berjalan {year}</span>
                 </div>
                 <span
-                  className={`text-[13px] font-bold tabular-nums shrink-0 ${
+                  className={`text-[13px] font-bold tabular-nums shrink-0 whitespace-nowrap ${
                     data.labaBersihPositive ? "text-status-green" : "text-status-red"
                   }`}
                 >
@@ -347,7 +352,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
 
             <div className="px-6 py-3 bg-violet-50/40 dark:bg-violet-500/10 border-t border-violet-100 dark:border-violet-500/20 flex items-center justify-between">
               <span className="text-[12.5px] font-bold text-violet-950 dark:text-violet-300">Total Modal & Laba</span>
-              <span className="text-[13.5px] font-extrabold text-violet-700 dark:text-violet-400 tabular-nums">
+              <span className="text-[13.5px] font-extrabold text-violet-700 dark:text-violet-400 tabular-nums whitespace-nowrap">
                 {totalEkuitasFmt}
               </span>
             </div>
@@ -360,7 +365,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
               <p className="text-[11px] text-muted">Kewajiban + Modal + Laba Ditahan</p>
             </div>
             <span
-              className={`text-[18px] font-black tabular-nums ${
+              className={`text-[18px] font-black tabular-nums whitespace-nowrap ${
                 data.neracaBalanced ? "text-navy-text" : "text-status-red"
               }`}
             >

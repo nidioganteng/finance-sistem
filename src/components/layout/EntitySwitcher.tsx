@@ -52,12 +52,13 @@ export function EntitySwitcher({
   }, []);
 
   function select(value: string) {
-    if (value !== "grup") {
-      document.cookie = `lastEntityKey=${value}; path=/; max-age=2592000`;
-    }
+    document.cookie = `lastEntityKey=${value}; path=/; max-age=2592000`;
     const params = new URLSearchParams(searchParams.toString());
-    if (value === "grup") params.delete("entity");
-    else params.set("entity", value);
+    if (value === "grup") {
+      params.set("entity", "grup");
+    } else {
+      params.set("entity", value);
+    }
     router.push(`${pathname}?${params.toString()}`);
     setOpen(false);
   }

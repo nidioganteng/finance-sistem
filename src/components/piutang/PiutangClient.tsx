@@ -5,6 +5,7 @@ import { TerminStatus } from "@prisma/client";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, createPelunasan, type CreatePelunasanInput } from "@/lib/actions/piutang";
 import { generateNoBukti } from "@/lib/actions/kas";
 import { CheckCircle, ChevronDown, ChevronRight, Ban, CheckSquare, ArrowDownCircle, ArrowUpCircle, X } from "lucide-react";
+import { getMetricValueFontSize } from "@/lib/dashboard-data";
 
 type TerminItem = {
   id: string;
@@ -103,7 +104,7 @@ export function PiutangClient({
 }) {
   const [tab, setTab] = useState<"termin" | "dock">("termin");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    new Set(projectList.map((p) => p.id))
+    () => new Set()
   );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -249,37 +250,37 @@ export function PiutangClient({
       {tab === "termin" && (
         <>
           {/* Kartu ringkasan */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                 Total Nilai Kontrak Aktif
               </div>
-              <div className="text-[20px] font-extrabold text-navy-text tabular-nums">
+              <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
                 {summary.totalKontrakFmt}
               </div>
-              <div className="text-[12px] text-muted mt-0.5">{summary.jumlahProyek} proyek</div>
+              <div className="text-[12px] text-muted mt-0.5 truncate">{summary.jumlahProyek} proyek</div>
             </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                 Total Termin Tertagih
               </div>
-              <div className="text-[20px] font-extrabold text-status-green tabular-nums">
+              <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
                 {summary.totalTerminTagihFmt}
               </div>
-              <div className="text-[12px] text-muted mt-0.5">
+              <div className="text-[12px] text-muted mt-0.5 truncate">
                 {summary.totalKontrak > 0
                   ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
                   : "—"}
               </div>
             </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">
+            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                 Sisa Piutang Belum Tertagih
               </div>
-              <div className="text-[20px] font-extrabold text-status-red tabular-nums">
+              <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
                 {summary.sisaPiutangFmt}
               </div>
-              <div className="text-[12px] text-muted mt-0.5">belum masuk kas</div>
+              <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
             </div>
           </div>
 
@@ -339,10 +340,10 @@ export function PiutangClient({
                             </div>
                             <div className="text-[12px] text-muted-stronger">{p.name}</div>
                           </td>
-                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-navy-text">
+                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-navy-text whitespace-nowrap">
                             {p.contractValueFmt}
                           </td>
-                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-status-green">
+                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-status-green whitespace-nowrap">
                             {p.terminTagihFmt}
                           </td>
                           <td className="py-3 px-3">
@@ -376,7 +377,7 @@ export function PiutangClient({
                             )}
                           </td>
                           <td className="py-3 px-5 text-right">
-                            <div className="tabular-nums text-[13px] font-semibold text-status-red">
+                            <div className="tabular-nums text-[13px] font-semibold text-status-red whitespace-nowrap">
                               {p.sisaTagihFmt}
                             </div>
                             {isManajer && p.status === "ACTIVE" && (
@@ -424,7 +425,7 @@ export function PiutangClient({
                                   </div>
                                 )}
                               </td>
-                              <td className="py-2.5 px-3 text-right tabular-nums text-[12px] font-semibold text-status-green">
+                              <td className="py-2.5 px-3 text-right tabular-nums text-[12px] font-semibold text-status-green whitespace-nowrap">
                                 {t.nominalFmt}
                               </td>
                               <td className="py-2.5 px-3" />
@@ -503,7 +504,7 @@ export function PiutangClient({
               {loadingDockList.map((d) => (
                 <tr key={d.id} className="border-b border-surface-subtle hover:bg-surface-hover/30">
                   <td className="py-3 px-6 font-semibold text-navy-text">{d.nama}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px]">{d.totalFmt}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] whitespace-nowrap">{d.totalFmt}</td>
                   <td className="py-3 px-3">
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-surface-hover text-muted-stronger">
                       {DOCK_STATUS_LABEL[d.status] ?? d.status}

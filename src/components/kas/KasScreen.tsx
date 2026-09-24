@@ -48,10 +48,11 @@ export async function KasScreen({
   // Rekening per entitas — hanya relevan untuk Buku Bank
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
+  const isKasBesar = jenisInputKey === "kasBesar";
   const rekeningOptions: RekeningOption[] = isBankBuku
     ? (REKENING_BY_ENTITY[selectedKey] ?? [])
     : [];
-  const bukuBankRekeningOptions: RekeningOption[] = isKasKecil
+  const bukuBankRekeningOptions: RekeningOption[] = (isKasKecil || isKasBesar)
     ? (REKENING_BY_ENTITY[selectedKey] ?? [])
     : [];
   const selectedRekeningId =

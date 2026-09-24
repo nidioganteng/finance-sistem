@@ -1,6 +1,121 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 
+// ── Piutang/Hutang antar entitas ───────────────────────────────────────────
+// COA 111-115 = piutang ke counterparty tertentu; 311-315 = hutang ke counterparty
+const PIUTANG_CODE_TO_ENTITY: Record<string, string> = {
+  "111": "kencana",
+  "112": "gaharu",
+  "113": "tataring",
+  "114": "ciptaAsri",
+  "115": "umum",
+};
+const HUTANG_CODE_TO_ENTITY: Record<string, string> = {
+  "311": "kencana",
+  "312": "gaharu",
+  "313": "tataring",
+  "314": "ciptaAsri",
+  "315": "umum",
+};
+export const PIUTANG_COA: Record<string, string> = {
+  kencana: "111", gaharu: "112", tataring: "113", ciptaAsri: "114", umum: "115",
+};
+export const HUTANG_COA: Record<string, string> = {
+  kencana: "311", gaharu: "312", tataring: "313", ciptaAsri: "314", umum: "315",
+};
+
+export type InterEntityBalance = {
+  type: "piutang" | "hutang";
+  coaCode: string;
+  coaId: string;
+  counterpartyEntityKey: string;
+  counterpartyEntityName: string;
+  netAmount: number;
+  netAmountFmt: string;
+};
+
+export async function getInterEntityBalances(entityId: string): Promise<InterEntityBalance[]> {
+  // Collect all relevant COA codes: piutang (111-115) + hutang (311-315)
+  const piutangCodes = Object.keys(PIUTANG_CODE_TO_ENTITY);
+  const hutangCodes = Object.keys(HUTANG_CODE_TO_ENTITY);
+  const allCodes = [...piutangCodes, ...hutangCodes];
+
+  const coaAccounts = await prisma.coaAccount.findMany({
+    where: { code: { in: allCodes } },
+    select: { id: true, code: true },
+  });
+
+  const coaByCode = new Map(coaAccounts.map((c) => [c.code, c]));
+
+  // Sum debit/kredit per COA for this entity
+  const totals = await prisma.transaction.groupBy({
+    by: ["coaAccountId"],
+    where: {
+      entityId,
+      coaAccountId: { in: coaAccounts.map((c) => c.id) },
+    },
+    _sum: { debit: true, kredit: true },
+  });
+
+  const coaIdToCode = new Map(coaAccounts.map((c) => [c.id, c.code]));
+
+  // Fetch entity names for display
+  const allEntityKeys = [
+    ...Object.values(PIUTANG_CODE_TO_ENTITY),
+    ...Object.values(HUTANG_CODE_TO_ENTITY),
+  ];
+  const uniqueKeys = [...new Set(allEntityKeys)];
+  const entities = await prisma.entity.findMany({
+    where: { key: { in: uniqueKeys } },
+    select: { key: true, name: true },
+  });
+  const entityNameByKey = new Map(entities.map((e) => [e.key, e.name]));
+
+  const balances: InterEntityBalance[] = [];
+
+  for (const row of totals) {
+    if (!row.coaAccountId) continue;
+    const code = coaIdToCode.get(row.coaAccountId);
+    if (!code) continue;
+    const sumDebit = Number(row._sum.debit ?? 0);
+    const sumKredit = Number(row._sum.kredit ?? 0);
+
+    const isPiutang = piutangCodes.includes(code);
+    const isHutang = hutangCodes.includes(code);
+    if (!isPiutang && !isHutang) continue;
+
+    // Piutang: net = debit - kredit (positive = outstanding receivable)
+    // Hutang: net = kredit - debit (positive = outstanding payable)
+    const netAmount = isPiutang ? sumDebit - sumKredit : sumKredit - sumDebit;
+    if (netAmount === 0) continue;
+
+    const counterpartyKey = isPiutang
+      ? PIUTANG_CODE_TO_ENTITY[code]
+      : HUTANG_CODE_TO_ENTITY[code];
+
+    const coa = coaByCode.get(code);
+    if (!coa) continue;
+
+    balances.push({
+      type: isPiutang ? "piutang" : "hutang",
+      coaCode: code,
+      coaId: coa.id,
+      counterpartyEntityKey: counterpartyKey,
+      counterpartyEntityName: entityNameByKey.get(counterpartyKey) ?? counterpartyKey,
+      netAmount,
+      netAmountFmt: formatRupiah(Math.abs(netAmount)),
+    });
+  }
+
+  // Sort: piutang first, then hutang; each group by net amount descending
+  balances.sort((a, b) => {
+    if (a.type !== b.type) return a.type === "piutang" ? -1 : 1;
+    return b.netAmount - a.netAmount;
+  });
+
+  return balances;
+}
+
 // Daftar proyek satu entitas buat dropdown "Proyek Terkait" di form transaksi
 // Kas/Buku Bank — dipakai staf/manajer keuangan pas mencatat uang masuk yang
 // sekalian jadi pembayaran termin proyek tertentu.

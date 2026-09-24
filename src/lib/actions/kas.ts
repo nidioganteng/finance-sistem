@@ -281,6 +281,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId!);
       const bankPrevSaldo = await getRunningSaldo(entity.id, bankJenisInput.id, rekeningNama);
       const bankNewSaldo = bankPrevSaldo - total;
+      const bankCoaId = await resolveKasCoa("bankBuku", input.entityKey, input.syncBukuBankRekeningId);
       await prisma.transaction.create({
         data: {
           entityId: entity.id,
@@ -289,7 +290,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
           noBukti: input.noBukti,
           keterangan: `[Auto] ${input.keterangan}`,
           staffId: session.user.id,
-          coaAccountId: null,
+          coaAccountId: bankCoaId,
           debit: 0,
           kredit: total,
           saldoSetelah: bankNewSaldo,

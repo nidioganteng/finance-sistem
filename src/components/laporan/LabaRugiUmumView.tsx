@@ -22,51 +22,113 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
   };
 
   const renderRow = (item: TaxReportRow, isIndent = true) => {
+    const isZero = !item.komersial || Math.round(item.komersial) === 0;
     return (
-      <tr key={item.code} className="border-b border-surface-subtle hover:bg-surface-hover/50 transition-colors">
-        <td className="py-2.5 px-6 text-center text-[12.5px] font-mono text-muted w-28">{item.code}</td>
-        <td className={`py-2.5 px-6 text-[13px] text-navy-text ${isIndent ? "pl-10" : "font-medium"}`}>
+      <tr
+        key={item.code}
+        className="border-b border-surface-subtle hover:bg-surface-hover/50 transition-colors"
+      >
+        <td className="py-2.5 px-6 text-[12px] font-mono text-muted whitespace-nowrap w-32">
+          {item.code}
+        </td>
+        <td className={`py-2.5 px-6 text-[13px] text-navy-text ${isIndent ? "pl-8" : "font-medium"}`}>
           {item.name}
         </td>
-        <td className="py-2.5 px-6 text-right tabular-nums text-[13px] font-semibold text-navy-text w-60">
+        <td
+          className={`py-2.5 px-6 text-right tabular-nums text-[13px] w-64 whitespace-nowrap ${
+            isZero
+              ? "font-normal text-muted-faint"
+              : "font-semibold text-navy-text"
+          }`}
+        >
           {formatAccounting(item.komersial)}
         </td>
       </tr>
     );
   };
 
-  const renderSectionHeader = (title: string) => (
-    <tr className="bg-surface-subtle/80 border-b border-surface-subtle">
-      <td className="py-2.5 px-6 text-center font-bold text-xs text-muted-stronger">—</td>
-      <td colSpan={2} className="py-2.5 px-6 text-[13px] font-black text-navy-text tracking-wide uppercase">
-        {title}
-      </td>
-    </tr>
-  );
+  const renderSectionHeader = (
+    title: string,
+    color: "green" | "orange" | "violet" | "amber" | "blue" = "blue"
+  ) => {
+    const barColors = {
+      green: "bg-emerald-500",
+      orange: "bg-orange-500",
+      violet: "bg-violet-500",
+      amber: "bg-amber-500",
+      blue: "bg-blue-500",
+    };
+    return (
+      <tr className="bg-surface-subtle/60 border-y border-border-soft">
+        <td colSpan={3} className="py-2.5 px-6">
+          <div className="flex items-center gap-2">
+            <span className={`w-1.5 h-4 rounded-full ${barColors[color]} shrink-0`} />
+            <span className="text-[11.5px] font-extrabold text-navy-text tracking-wider uppercase">
+              {title}
+            </span>
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
   const renderSubtotalRow = (
     label: string,
     amount: number,
-    isMajor = false
+    type: "subtotal" | "major" | "grand" = "subtotal"
   ) => {
     const isNegative = amount < 0;
 
+    if (type === "grand") {
+      const isSurplus = amount >= 0;
+      return (
+        <tr
+          className={`border-t-2 border-border ${
+            isSurplus
+              ? "bg-emerald-50/50 dark:bg-emerald-500/10"
+              : "bg-rose-50/50 dark:bg-rose-500/10"
+          }`}
+        >
+          <td colSpan={2} className="py-3.5 px-6 text-[13.5px] font-black text-navy-text uppercase tracking-wider">
+            {label}
+          </td>
+          <td
+            className={`py-3.5 px-6 text-right tabular-nums text-[15px] font-black ${
+              isSurplus ? "text-status-green" : "text-status-red"
+            }`}
+          >
+            {formatAccounting(amount)}
+          </td>
+        </tr>
+      );
+    }
+
+    if (type === "major") {
+      return (
+        <tr className="bg-surface-subtle/80 border-t border-b border-border-soft">
+          <td colSpan={2} className="py-3 px-6 text-[13px] font-black text-navy-text uppercase tracking-wide">
+            {label}
+          </td>
+          <td
+            className={`py-3 px-6 text-right tabular-nums text-[13.5px] font-black ${
+              isNegative ? "text-rose-600 dark:text-rose-400" : "text-navy-text"
+            }`}
+          >
+            {formatAccounting(amount)}
+          </td>
+        </tr>
+      );
+    }
+
     return (
-      <tr
-        className={`${
-          isMajor
-            ? "bg-navy/5 dark:bg-navy/15 border-t-2 border-b-2 border-border-strong font-black"
-            : "bg-surface-subtle/50 border-t border-b border-border-soft font-bold"
-        }`}
-      >
-        <td className="py-2.5 px-6 text-center text-xs text-muted font-bold">—</td>
-        <td className={`py-2.5 px-6 text-[13px] text-navy-text ${isMajor ? "uppercase tracking-wide font-black" : "font-bold"}`}>
+      <tr className="bg-surface-subtle/40 border-t border-b border-surface-hover">
+        <td colSpan={2} className="py-2.5 px-6 text-[12.5px] font-bold text-muted-strong uppercase tracking-wider">
           {label}
         </td>
         <td
-          className={`py-2.5 px-6 text-right tabular-nums text-[13px] ${
-            isMajor ? "font-extrabold text-[14px]" : "font-bold"
-          } ${isNegative ? "text-rose-600 dark:text-rose-400" : "text-navy-text"}`}
+          className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold ${
+            isNegative ? "text-rose-600 dark:text-rose-400" : "text-navy-text"
+          }`}
         >
           {formatAccounting(amount)}
         </td>
@@ -174,8 +236,9 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
       </div>
 
       {/* Main Table */}
-      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-sm">
-        <div className="text-center py-6 px-4 border-b border-border-soft bg-surface-card">
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
+        {/* Print-only Document Title */}
+        <div className="hidden print:block text-center py-6 px-4 border-b border-border-soft bg-surface-card">
           <h2 className="text-base font-extrabold text-navy-text tracking-wide uppercase">
             {data.entityName}
           </h2>
@@ -190,84 +253,84 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-t-2 border-b-2 border-slate-900 bg-surface-subtle text-[12.5px] uppercase tracking-wider font-black text-navy-text">
-                <th className="py-3 px-6 text-center w-28">No Akun</th>
-                <th className="py-3 px-6 min-w-[320px]">Keterangan</th>
-                <th className="py-3 px-6 text-right w-60">Komersial</th>
+              <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint uppercase tracking-wider bg-surface-subtle/50">
+                <th className="py-3 px-6 w-32 whitespace-nowrap">NO. AKUN</th>
+                <th className="py-3 px-6 min-w-[320px]">KETERANGAN</th>
+                <th className="py-3 px-6 text-right w-64 whitespace-nowrap">KOMERSIAL</th>
               </tr>
             </thead>
             <tbody>
               {/* 1. PENDAPATAN */}
-              {renderSectionHeader("PENDAPATAN :")}
+              {renderSectionHeader("PENDAPATAN", "green")}
               {data.pendapatan.items.map((row) => renderRow(row))}
               {renderSubtotalRow(
                 "TOTAL PENDAPATAN USAHA BERSIH",
                 data.pendapatan.totalKomersial,
-                true
+                "major"
               )}
 
               {/* 2. BIAYA LANGSUNG */}
-              {renderSectionHeader("BIAYA LANGSUNG :")}
+              {renderSectionHeader("BIAYA LANGSUNG", "orange")}
               {data.biayaLangsung.items.map((row) => renderRow(row))}
               {renderSubtotalRow(
                 "TOTAL BIAYA LANGSUNG",
                 data.biayaLangsung.totalKomersial,
-                true
+                "major"
               )}
 
               {/* 3. LABA KOTOR */}
               {renderSubtotalRow(
                 "LABA KOTOR",
                 data.labaKotor.komersial,
-                true
+                "major"
               )}
 
               {/* 4. BIAYA OPERASIONAL */}
-              {renderSectionHeader("BIAYA OPERASIONAL :")}
+              {renderSectionHeader("BIAYA OPERASIONAL", "violet")}
               {data.biayaOperasional.items.map((row) => renderRow(row))}
               {renderSubtotalRow(
                 "TOTAL BIAYA OPERASIONAL",
                 data.biayaOperasional.totalKomersial,
-                true
+                "major"
               )}
 
               {/* 5. LABA OPERASIONAL */}
               {renderSubtotalRow(
                 "LABA OPERASIONAL",
                 data.labaOperasional.komersial,
-                true
+                "major"
               )}
 
               {/* 6. PPH FINAL */}
-              {renderSectionHeader("PPH FINAL PASAL 4 AYAT 2 :")}
+              {renderSectionHeader("PPH FINAL PASAL 4 AYAT 2", "amber")}
               {data.pphFinal.items.map((row) => renderRow(row))}
               {renderSubtotalRow(
                 "TOTAL PPH FINAL",
                 data.pphFinal.totalKomersial,
-                false
+                "subtotal"
               )}
 
               {/* 7. LABA SETELAH PAJAK */}
               {renderSubtotalRow(
                 "LABA SETELAH PAJAK",
                 data.labaSetelahPajak.komersial,
-                true
+                "major"
               )}
 
               {/* 8. PENDAPATAN DAN BIAYA LAIN-LAIN */}
-              {renderSectionHeader("PENDAPATAN DAN BIAYA LAIN-LAIN :")}
+              {renderSectionHeader("PENDAPATAN DAN BIAYA LAIN-LAIN", "blue")}
               {data.pendapatanBiayaLain.items.map((row) => renderRow(row))}
               {renderSubtotalRow(
                 "TOTAL PENDAPATAN DAN BIAYA LAIN-LAIN",
                 data.pendapatanBiayaLain.totalKomersial,
-                false
+                "subtotal"
               )}
 
               {/* 9. RUGI / LABA BERSIH */}
               {renderSubtotalRow(
                 data.labaBersih.komersial >= 0 ? "LABA BERSIH" : "RUGI BERSIH",
                 data.labaBersih.komersial,
-                true
+                "grand"
               )}
             </tbody>
           </table>

@@ -117,10 +117,10 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
         </div>
       </div>
 
-      {/* Main Table: Templat Excel Acuan */}
-      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-sm">
-        {/* Header Document */}
-        <div className="text-center py-6 px-4 border-b border-border-soft bg-surface-card">
+      {/* Main Table */}
+      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
+        {/* Print-only Document Title */}
+        <div className="hidden print:block text-center py-6 px-4 border-b border-border-soft bg-surface-card">
           <h2 className="text-base font-extrabold text-navy-text tracking-wide uppercase">
             {data.entityName}
           </h2>
@@ -135,9 +135,9 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-t-2 border-b-2 border-slate-900 bg-surface-subtle/80 text-[12.5px] font-black text-navy-text uppercase tracking-wider">
-                <th className="py-3 px-6 min-w-[340px]">URAIAN</th>
-                <th className="py-3 px-6 text-right w-56">{data.year}</th>
+              <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint uppercase tracking-wider bg-surface-subtle/50">
+                <th className="py-3.5 px-6 min-w-[360px]">URAIAN ARUS KAS</th>
+                <th className="py-3.5 px-6 text-right w-64 whitespace-nowrap">PERIODE {data.year}</th>
               </tr>
             </thead>
             <tbody>
@@ -145,50 +145,152 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
                 const isHeader = row.isHeader;
                 const isSubtotal = row.isSubtotal;
                 const isTotal = row.isTotal;
+                const isZero = row.amount === 0;
 
-                // Indentation styling
-                let indentClass = "pl-6";
-                if (row.level === 1) indentClass = "pl-10";
-                if (row.level === 2) indentClass = "pl-14";
-                if (row.level === 3) indentClass = "pl-20";
+                // 1. Level 0 Section Header (Aktivitas Operasi / Investasi / Pendanaan)
+                if (isHeader && row.level === 0) {
+                  let accentBar = "bg-blue-500";
+                  if (row.label.toLowerCase().includes("investasi")) accentBar = "bg-orange-500";
+                  else if (row.label.toLowerCase().includes("pendanaan")) accentBar = "bg-violet-500";
+                  else if (row.label.toLowerCase().includes("kas") || row.label.toLowerCase().includes("setara")) accentBar = "bg-emerald-500";
 
-                // Row background and border styling
-                let rowBg = "hover:bg-surface-hover/30 transition-colors";
-                let borderClass = "border-b border-surface-subtle";
+                  return (
+                    <tr key={`${row.label}-${idx}`} className="bg-surface-subtle/60 border-y border-border-soft">
+                      <td colSpan={2} className="py-2.5 px-6">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-1.5 h-4 rounded-full ${accentBar} shrink-0`} />
+                          <span className="text-[11.5px] font-extrabold text-navy-text tracking-wider uppercase">
+                            {row.label}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
 
+                // 2. Sub-section Header (e.g. "Perubahan Modal Kerja :", "Piutang Pihak Berelasi :")
                 if (isHeader) {
-                  borderClass = "border-b border-surface-subtle";
+                  let indentClass = "pl-6";
+                  if (row.level === 1) indentClass = "pl-8";
+                  if (row.level === 2) indentClass = "pl-12";
+                  if (row.level === 3) indentClass = "pl-16";
+
+                  return (
+                    <tr key={`${row.label}-${idx}`} className="border-b border-surface-subtle bg-surface-subtle/25">
+                      <td colSpan={2} className={`py-2 px-6 ${indentClass} text-[12px] font-bold text-muted-stronger`}>
+                        {row.label}
+                      </td>
+                    </tr>
+                  );
                 }
+
+                // 3. Grand Total at Bottom: Kas & Setara Kas pada Akhir Periode
+                if (isTotal && row.label.toLowerCase().includes("akhir")) {
+                  const isSurplus = row.amount >= 0;
+                  return (
+                    <tr
+                      key={`${row.label}-${idx}`}
+                      className={`border-t-2 border-border ${
+                        isSurplus
+                          ? "bg-emerald-50/50 dark:bg-emerald-500/10"
+                          : "bg-rose-50/50 dark:bg-rose-500/10"
+                      }`}
+                    >
+                      <td className="py-3.5 px-6 text-[13.5px] font-black text-navy-text uppercase tracking-wider">
+                        {row.label}
+                      </td>
+                      <td
+                        className={`py-3.5 px-6 text-right tabular-nums text-[15px] font-black ${
+                          isSurplus ? "text-status-green" : "text-status-red"
+                        }`}
+                      >
+                        {formatRupiahArusKas(row.amount)}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                // 4. Major Activity Total / Kenaikan Bersih
+                if (isTotal || (isSubtotal && row.level === 0)) {
+                  return (
+                    <tr
+                      key={`${row.label}-${idx}`}
+                      className="border-t border-b border-border-soft bg-surface-subtle/80"
+                    >
+                      <td className="py-3 px-6 text-[13px] font-black text-navy-text uppercase tracking-wide">
+                        {row.label}
+                      </td>
+                      <td
+                        className={`py-3 px-6 text-right tabular-nums text-[13.5px] font-black ${
+                          row.amount < 0
+                            ? "text-rose-600 dark:text-rose-400"
+                            : row.amount > 0
+                            ? "text-navy-text"
+                            : "text-muted-faint font-normal"
+                        }`}
+                      >
+                        {formatRupiahArusKas(row.amount)}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                // 5. Section Subtotal (e.g. Laba Operasi setelah penyesuaian)
                 if (isSubtotal) {
-                  borderClass = isTotal
-                    ? "border-t border-b-2 border-border-strong font-black bg-surface-subtle/40"
-                    : "border-t border-b border-border-soft font-bold bg-surface-subtle/20";
+                  return (
+                    <tr
+                      key={`${row.label}-${idx}`}
+                      className="border-t border-b border-surface-hover bg-surface-subtle/40"
+                    >
+                      <td className="py-2.5 px-6 text-[12.5px] font-bold text-muted-strong pl-8 uppercase tracking-wider">
+                        {row.label}
+                      </td>
+                      <td
+                        className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold ${
+                          row.amount < 0
+                            ? "text-rose-600 dark:text-rose-400"
+                            : row.amount > 0
+                            ? "text-navy-text"
+                            : "text-muted-faint font-normal"
+                        }`}
+                      >
+                        {formatRupiahArusKas(row.amount)}
+                      </td>
+                    </tr>
+                  );
                 }
+
+                // 6. Regular Data Row
+                let indentClass = "pl-6";
+                if (row.level === 1) indentClass = "pl-8";
+                if (row.level === 2) indentClass = "pl-12";
+                if (row.level === 3) indentClass = "pl-16";
 
                 return (
-                  <tr key={`${row.label}-${idx}`} className={`${rowBg} ${borderClass}`}>
-                    <td
-                      className={`py-2 px-6 text-[13px] ${indentClass} ${
-                        isHeader || isSubtotal || isTotal
-                          ? "font-bold text-navy-text"
-                          : "text-muted-stronger font-normal"
-                      }`}
-                    >
-                      {row.label}
+                  <tr
+                    key={`${row.label}-${idx}`}
+                    className="border-b border-surface-subtle hover:bg-surface-hover/50 transition-colors"
+                  >
+                    <td className={`py-2.5 px-6 text-[13px] text-navy-text ${indentClass}`}>
+                      <div className="flex items-center gap-2">
+                        {row.code && (
+                          <span className="text-[12px] font-mono text-muted shrink-0">
+                            {row.code}
+                          </span>
+                        )}
+                        <span>{row.label}</span>
+                      </div>
                     </td>
-
                     <td
-                      className={`py-2 px-6 text-right tabular-nums text-[13px] ${
-                        isSubtotal || isTotal ? "font-extrabold text-navy-text" : "font-medium"
-                      } ${
-                        row.amount < 0
-                          ? "text-rose-600 dark:text-rose-400"
-                          : row.amount > 0
-                          ? "text-navy-text"
-                          : "text-muted"
+                      className={`py-2.5 px-6 text-right tabular-nums text-[13px] ${
+                        isZero
+                          ? "font-normal text-muted-faint"
+                          : row.amount < 0
+                          ? "font-semibold text-rose-600 dark:text-rose-400"
+                          : "font-semibold text-navy-text"
                       }`}
                     >
-                      {isHeader ? "" : formatRupiahArusKas(row.amount)}
+                      {formatRupiahArusKas(row.amount)}
                     </td>
                   </tr>
                 );

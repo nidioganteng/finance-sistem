@@ -117,6 +117,7 @@ export function KasTransactionForm({
 
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
+  const isKasBesar = jenisInputKey === "kasBesar";
   const rowsTotal = rows.reduce((sum, r) => sum + (Number(r.nominal.replace(/[^0-9]/g, "")) || 0), 0);
   const selectedRekeningNama = rekeningOptions.find((r) => r.id === rekeningId)?.nama;
 
@@ -158,7 +159,7 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(arah === "masuk" && projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
-      ...(isKasKecil && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
+      ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
       const result = isEdit
@@ -267,7 +268,7 @@ export function KasTransactionForm({
         )}
 
         {/* Auto-sync ke Buku Bank */}
-        {isKasKecil && arah === "masuk" && bukuBankRekeningOptions.length > 0 && !isEdit && (
+        {(isKasKecil || isKasBesar) && arah === "masuk" && bukuBankRekeningOptions.length > 0 && !isEdit && (
           <div className={`rounded-[12px] border p-3.5 transition-colors ${syncBukuBank ? "border-brand/40 bg-blue-50/50 dark:bg-blue-500/10" : "border-border-soft bg-surface-subtle/40"}`}>
             <label className="flex items-center gap-2.5 cursor-pointer">
               <input

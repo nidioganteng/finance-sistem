@@ -200,7 +200,7 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
                         {row.label}
                       </td>
                       <td
-                        className={`py-3.5 px-6 text-right tabular-nums text-[15px] font-black ${
+                        className={`py-3.5 px-6 text-right tabular-nums text-[15px] font-black whitespace-nowrap ${
                           isSurplus ? "text-status-green" : "text-status-red"
                         }`}
                       >
@@ -221,7 +221,7 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
                         {row.label}
                       </td>
                       <td
-                        className={`py-3 px-6 text-right tabular-nums text-[13.5px] font-black ${
+                        className={`py-3 px-6 text-right tabular-nums text-[13.5px] font-black whitespace-nowrap ${
                           row.amount < 0
                             ? "text-rose-600 dark:text-rose-400"
                             : row.amount > 0
@@ -246,7 +246,7 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
                         {row.label}
                       </td>
                       <td
-                        className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold ${
+                        className={`py-2.5 px-6 text-right tabular-nums text-[13px] font-bold whitespace-nowrap ${
                           row.amount < 0
                             ? "text-rose-600 dark:text-rose-400"
                             : row.amount > 0
@@ -282,7 +282,7 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
                       </div>
                     </td>
                     <td
-                      className={`py-2.5 px-6 text-right tabular-nums text-[13px] ${
+                      className={`py-2.5 px-6 text-right tabular-nums text-[13px] whitespace-nowrap ${
                         isZero
                           ? "font-normal text-muted-faint"
                           : row.amount < 0

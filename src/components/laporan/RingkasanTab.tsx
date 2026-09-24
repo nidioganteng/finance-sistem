@@ -16,6 +16,7 @@ import {
   Layers,
 } from "lucide-react";
 import type { LaporanJurnalRow, LaporanBankRow } from "@/lib/laporan-keuangan";
+import { formatRupiah } from "@/lib/dashboard-data";
 
 interface RingkasanTabProps {
   kpi: {
@@ -326,10 +327,10 @@ export function RingkasanTab({
                       {row.kodeAkun}
                     </td>
                     <td className={`py-3 px-4 text-[12.5px] text-muted-stronger font-medium ${row.isKredit ? "pl-7 italic" : ""}`}>{row.namaAkun}</td>
-                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-navy-text">
+                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-navy-text whitespace-nowrap">
                       {row.debitFmt}
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-navy-text">
+                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-navy-text whitespace-nowrap">
                       {row.kreditFmt}
                     </td>
                     <td className="py-3 px-5 text-right text-[12px] text-muted whitespace-nowrap">
@@ -345,11 +346,11 @@ export function RingkasanTab({
                   <td colSpan={isGrup ? 7 : 6} className="py-3 px-5 text-right text-[12.5px] uppercase">
                     Total Halaman Ini ({filteredJurnalRows.length} entri):
                   </td>
-                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-navy-text">
-                    Rp {filteredJurnalRows.reduce((s, r) => s + r.debit, 0).toLocaleString("id-ID")}
+                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-navy-text whitespace-nowrap">
+                    {formatRupiah(filteredJurnalRows.reduce((s, r) => s + r.debit, 0))}
                   </td>
-                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-navy-text">
-                    Rp {filteredJurnalRows.reduce((s, r) => s + r.kredit, 0).toLocaleString("id-ID")}
+                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-navy-text whitespace-nowrap">
+                    {formatRupiah(filteredJurnalRows.reduce((s, r) => s + r.kredit, 0))}
                   </td>
                   <td></td>
                 </tr>
@@ -467,13 +468,13 @@ export function RingkasanTab({
                       {row.kodeAkun !== "—" && <span className="font-mono text-muted-faint mr-1">[{row.kodeAkun}]</span>}
                       {row.namaAkun}
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-status-green">
+                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-status-green whitespace-nowrap">
                       {row.penerimaanFmt}
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-status-red">
+                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-semibold text-status-red whitespace-nowrap">
                       {row.pengeluaranFmt}
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-bold text-navy-text">
+                    <td className="py-3 px-4 text-right text-[12.5px] tabular-nums font-bold text-navy-text whitespace-nowrap">
                       {row.saldoSetelahFmt}
                     </td>
                     <td className="py-3 px-5 text-right text-[12px] text-muted whitespace-nowrap">
@@ -489,11 +490,11 @@ export function RingkasanTab({
                   <td colSpan={isGrup ? 6 : 5} className="py-3 px-5 text-right text-[12.5px] uppercase">
                     Total Halaman Ini ({filteredBankRows.length} entri):
                   </td>
-                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-status-green">
-                    Rp {filteredBankRows.reduce((s, r) => s + r.penerimaan, 0).toLocaleString("id-ID")}
+                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-status-green whitespace-nowrap">
+                    {formatRupiah(filteredBankRows.reduce((s, r) => s + r.penerimaan, 0))}
                   </td>
-                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-status-red">
-                    Rp {filteredBankRows.reduce((s, r) => s + r.pengeluaran, 0).toLocaleString("id-ID")}
+                  <td className="py-3 px-4 text-right text-[13px] tabular-nums font-extrabold text-status-red whitespace-nowrap">
+                    {formatRupiah(filteredBankRows.reduce((s, r) => s + r.pengeluaran, 0))}
                   </td>
                   <td colSpan={2}></td>
                 </tr>

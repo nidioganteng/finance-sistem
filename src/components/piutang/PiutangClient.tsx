@@ -255,10 +255,10 @@ export function PiutangClient({
                             </div>
                             <div className="text-[12px] text-muted-stronger">{p.name}</div>
                           </td>
-                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-navy-text">
+                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-navy-text whitespace-nowrap">
                             {p.contractValueFmt}
                           </td>
-                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-status-green">
+                          <td className="py-3 px-3 text-right tabular-nums text-[13px] font-semibold text-status-green whitespace-nowrap">
                             {p.terminTagihFmt}
                           </td>
                           <td className="py-3 px-3">
@@ -292,7 +292,7 @@ export function PiutangClient({
                             )}
                           </td>
                           <td className="py-3 px-5 text-right">
-                            <div className="tabular-nums text-[13px] font-semibold text-status-red">
+                            <div className="tabular-nums text-[13px] font-semibold text-status-red whitespace-nowrap">
                               {p.sisaTagihFmt}
                             </div>
                             {isManajer && p.status === "ACTIVE" && (
@@ -340,7 +340,7 @@ export function PiutangClient({
                                   </div>
                                 )}
                               </td>
-                              <td className="py-2.5 px-3 text-right tabular-nums text-[12px] font-semibold text-status-green">
+                              <td className="py-2.5 px-3 text-right tabular-nums text-[12px] font-semibold text-status-green whitespace-nowrap">
                                 {t.nominalFmt}
                               </td>
                               <td className="py-2.5 px-3" />
@@ -419,7 +419,7 @@ export function PiutangClient({
               {loadingDockList.map((d) => (
                 <tr key={d.id} className="border-b border-surface-subtle hover:bg-surface-hover/30">
                   <td className="py-3 px-6 font-semibold text-navy-text">{d.nama}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px]">{d.totalFmt}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] whitespace-nowrap">{d.totalFmt}</td>
                   <td className="py-3 px-3">
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-surface-hover text-muted-stronger">
                       {DOCK_STATUS_LABEL[d.status] ?? d.status}

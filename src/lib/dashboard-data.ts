@@ -1,23 +1,63 @@
 import { prisma } from "./prisma";
-import { Role } from "@prisma/client";
+import { Role, type ReportCategory } from "@prisma/client";
+import { calculateAsetDepreciation } from "./aset-tetap";
 
 export function formatRupiah(n: number) {
-  return "Rp " + Math.round(n).toLocaleString("id-ID");
+  return "Rp\u00A0" + Math.round(n).toLocaleString("id-ID");
 }
 
-export async function getAccessibleEntities(entityKeys: string[]) {
-  const [entities, txRows] = await Promise.all([
+export function getMetricValueFontSize(str?: string | number): string {
+  const text = typeof str === "number" ? str.toString() : (str ?? "");
+  const len = text.length;
+  if (len >= 22) return "text-[14.5px] sm:text-[16px] xl:text-[16.5px] 2xl:text-[19px] font-extrabold tabular-nums tracking-tight";
+  if (len >= 18) return "text-[15.5px] sm:text-[17px] xl:text-[17.5px] 2xl:text-[20px] font-extrabold tabular-nums tracking-tight";
+  if (len >= 14) return "text-[17px] sm:text-[18.5px] xl:text-[19px] 2xl:text-[21px] font-extrabold tabular-nums tracking-tight";
+  return "text-[19px] sm:text-[21px] xl:text-[21px] 2xl:text-[22px] font-extrabold tabular-nums";
+}
+
+export interface AccessibleEntity {
+  id: string;
+  key: string;
+  name: string;
+  legalName: string;
+  colorHex: string;
+  isUmum: boolean;
+  revenue: number;
+  spend: number;
+  profit: number;
+  projects: {
+    code: string;
+    name: string;
+    contractValue: number;
+    spend: number;
+    profit: number;
+    termin: {
+      name: string;
+      percentage: number;
+      status: string;
+    }[];
+  }[];
+}
+
+export async function getAccessibleEntities(
+  entityKeys: string[],
+  targetYear: number = new Date().getFullYear()
+): Promise<AccessibleEntity[]> {
+  const [entities, txRows, assetsRaw] = await Promise.all([
     prisma.entity.findMany({
       where: { key: { in: entityKeys } },
       include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
       orderBy: { createdAt: "asc" },
     }),
     // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
-    // supaya Dashboard Manager konsisten dengan Laporan Keuangan Staff.
+    // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41).
     prisma.transaction.findMany({
       where: {
         entity: { key: { in: entityKeys } },
-        coaAccount: { kategori: { in: ["PENDAPATAN", "BEBAN"] } },
+        coaAccount: {
+          kategori: { in: ["PENDAPATAN", "BEBAN"] },
+          reportCategory: { in: ["INTERNAL", "SEMUA"] },
+        },
       },
       select: {
         entityId: true,
@@ -25,6 +65,9 @@ export async function getAccessibleEntities(entityKeys: string[]) {
         debit: true,
         coaAccount: { select: { kategori: true } },
       },
+    }),
+    prisma.asetTetap.findMany({
+      where: { entity: { key: { in: entityKeys } } },
     }),
   ]);
 
@@ -35,6 +78,16 @@ export async function getAccessibleEntities(entityKeys: string[]) {
       revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
     } else if (tx.coaAccount?.kategori === "BEBAN") {
       spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
+    }
+  }
+
+  // Tambahkan beban penyusutan aset tetap per entitas untuk targetYear (Issue 39 & sinkronisasi Laba Rugi)
+  for (const asset of assetsRaw) {
+    const tgl = new Date(asset.tanggalPerolehan);
+    const endDate = new Date(targetYear, 11, 31, 23, 59, 59);
+    if (tgl <= endDate) {
+      const dep = calculateAsetDepreciation(asset, targetYear);
+      spendMap.set(asset.entityId, (spendMap.get(asset.entityId) ?? 0) + dep.bebanPeriodeIni);
     }
   }
 
@@ -106,7 +159,10 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
     where: {
       entity: { key: { in: entityKeys } },
       tanggal: { gte: start, lt: end },
-      coaAccount: { kategori: "PENDAPATAN" },
+      coaAccount: {
+        kategori: "PENDAPATAN",
+        reportCategory: { in: ["INTERNAL", "SEMUA"] },
+      },
     },
     select: {
       tanggal: true,
@@ -138,7 +194,10 @@ export async function getMonthlyByYear(entityIds: string[], years: number[]) {
     where: {
       entityId: { in: entityIds },
       tanggal: { gte: new Date(`${minYear}-01-01`), lt: new Date(`${maxYear + 1}-01-01`) },
-      coaAccount: { kategori: "PENDAPATAN" },
+      coaAccount: {
+        kategori: "PENDAPATAN",
+        reportCategory: { in: ["INTERNAL", "SEMUA"] },
+      },
     },
     select: { tanggal: true, kredit: true },
   });

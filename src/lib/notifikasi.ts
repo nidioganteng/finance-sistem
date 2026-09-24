@@ -25,12 +25,28 @@ export function getNotifFilterOptions(role: Role) {
   return [{ key: "semua", label: "Semua" }, ...Object.entries(labels).map(([key, label]) => ({ key, label: label! }))];
 }
 
-export async function getNotifikasiList(role: Role, filterType?: string) {
-  return prisma.notifikasi.findMany({
-    where: {
-      targetRole: role,
-      ...(filterType && filterType !== "semua" ? { type: filterType as NotifikasiType } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
+const NOTIF_PAGE_SIZE = 25;
+
+export async function getNotifikasiList(role: Role, filterType?: string, page = 1) {
+  const where = {
+    targetRole: role,
+    ...(filterType && filterType !== "semua" ? { type: filterType as NotifikasiType } : {}),
+  };
+
+  const [totalCount, list] = await Promise.all([
+    prisma.notifikasi.count({ where }),
+    prisma.notifikasi.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * NOTIF_PAGE_SIZE,
+      take: NOTIF_PAGE_SIZE,
+    }),
+  ]);
+
+  return {
+    list,
+    totalCount,
+    totalPages: Math.max(1, Math.ceil(totalCount / NOTIF_PAGE_SIZE)),
+    page,
+  };
 }

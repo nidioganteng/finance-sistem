@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
+    "exceljs": "^4.4.0",
     "framer-motion": "^13.4.0",
     "lucide-react": "^0.441.0",
     "next": "14.2.35",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/exceljs": "^0.5.3",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

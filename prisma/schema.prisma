@@ -60,6 +60,8 @@ model Entity {
   projects     Project[]
   transactions Transaction[]
   loadingDock  LoadingDockTransaksi[]
+  saldoAwal    SaldoAwal[]
+  asetTetap    AsetTetap[]
 }
 
 model UserEntityAccess {
@@ -125,16 +127,51 @@ enum CoaKategori {
 }
 
 model CoaAccount {
-  id        String      @id @default(cuid())
-  code      String
-  name      String
-  kategori  CoaKategori
-  scope     String      @default("KAS") // "KAS" = kas kecil+besar, "BANK" = bank buku
-  createdAt DateTime    @default(now())
+  id             String         @id @default(cuid())
+  code           String         @unique // 1 kode = 1 akun, dipakai bareng di Kas Kecil/Besar & Bank Buku (issue #28)
+  name           String
+  kategori       CoaKategori
+  reportType     ReportType     @default(NERACA) // "Rumah Akun" — laporan tempat akun ini otomatis masuk
+  reportCategory ReportCategory @default(SEMUA) @map("report_category") // Flag versi laporan (issue #40): INTERNAL, UMUM, atau SEMUA
+  urutan         Int            @default(0) // urutan tampil di Daftar Akun/Bagan Akun (issue #37) — bukan urut kode, ngikutin urutan referensi Excel user
+  createdAt      DateTime       @default(now())
 
   transactions Transaction[]
+  saldoAwal    SaldoAwal[]
+}
 
-  @@unique([code, scope])
+// Saldo awal per akun, per entitas, per tahun buku (issue #37) — dasar
+// perhitungan Saldo Akhir di Daftar Akun & Buku Besar (Saldo Akhir = Saldo
+// Awal + Debit - Kredit, dibalik untuk akun kredit-normal).
+model SaldoAwal {
+  id           String   @id @default(cuid())
+  entityId     String
+  coaAccountId String
+  year         Int
+  nominal      Decimal  @db.Decimal(18, 2) @default(0)
+  updatedAt    DateTime @updatedAt
+
+  entity     Entity     @relation(fields: [entityId], references: [id])
+  coaAccount CoaAccount @relation(fields: [coaAccountId], references: [id])
+
+  @@unique([entityId, coaAccountId, year])
+}
+
+// "Rumah Akun" — dipilih manual saat daftar akun (issue #28), lebih presisi dari
+// `kategori` untuk ASET: sebagian ASET adalah kas/bank (masuk Arus Kas), sebagian
+// lagi piutang/aktiva tetap/dst (cuma masuk Neraca).
+enum ReportType {
+  NERACA
+  LABA_RUGI
+  ARUS_KAS
+}
+
+// Versi / Kategori Laporan (issue #40): membedakan akun khusus Internal (analisis manajemen),
+// Umum (laporan eksternal), atau Semua (tampil di kedua versi laporan).
+enum ReportCategory {
+  INTERNAL
+  UMUM
+  SEMUA
 }
 
 // Jenis input transaksi yang bisa ditambah langsung oleh Staf Keuangan
@@ -173,6 +210,10 @@ model Transaction {
   project    Project?             @relation(fields: [projectId], references: [id])
   coaAccount CoaAccount?          @relation(fields: [coaAccountId], references: [id])
   staff      User                 @relation("TransactionStaff", fields: [staffId], references: [id])
+
+  @@index([entityId, jenisInputId, tanggal])
+  @@index([entityId, coaAccountId])
+  @@index([entityId, tanggal])
 }
 
 enum LoadingDockStatus {
@@ -247,3 +288,27 @@ model ActivityLog {
 
   actor User @relation("ActivityActor", fields: [actorId], references: [id])
 }
+
+// Modul Aktiva Tetap (Issue 39 & SRS v2.0 Bagian 3.4)
+// Menyimpan inventaris aset fisik dan jadwal penyusutan otomatis garis lurus.
+// Saldo akumulasi penyusutan dan biaya penyusutan otomatis ditarik (linked) ke Laba Rugi dan Neraca.
+model AsetTetap {
+  id               String   @id @default(cuid())
+  entityId         String
+  kode             String   // Kode registrasi / nomor stiker / tagging fisik aset
+  nama             String   // Nama barang / aset tetap
+  kategori         String   @default("KENDARAAN") // KENDARAAN, PERALATAN, MESIN, GEDUNG, INVENTARIS, LAINNYA
+  tanggalPerolehan DateTime
+  hargaPerolehan   Decimal  @db.Decimal(18, 2)
+  nilaiResidu      Decimal  @default(0.00) @db.Decimal(18, 2)
+  umurBulan        Int      @default(48) // Umur ekonomis dalam bulan (contoh: 48 bulan = 4 tahun)
+  metode           String   @default("GARIS_LURUS")
+  keterangan       String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id])
+
+  @@index([entityId])
+}
+

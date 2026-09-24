@@ -6,10 +6,11 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lucide-react";
+import { formatRupiah } from "@/lib/dashboard-data";
 
 type CoaOption = { id: string; code: string; name: string };
-type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number };
+type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string };
 type LedgerRow = {
   tanggal: string;
   tanggalRaw: string;
@@ -43,6 +44,12 @@ export function KasScreenClient({
   allEntities = [],
   projectOptions = [],
   defaultArahLaporan = [],
+  bukuBankRekeningOptions = [],
+  dari = "",
+  sampai = "",
+  saldoAwal = 0,
+  totalMasuk = 0,
+  totalKeluar = 0,
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -56,6 +63,12 @@ export function KasScreenClient({
   allEntities?: { key: string; name: string }[];
   projectOptions?: ProjectOption[];
   defaultArahLaporan?: string[];
+  bukuBankRekeningOptions?: RekeningOption[];
+  dari?: string;
+  sampai?: string;
+  saldoAwal?: number;
+  totalMasuk?: number;
+  totalKeluar?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -66,6 +79,27 @@ export function KasScreenClient({
   const [deletingRow, setDeletingRow] = useState<LedgerRow | null>(null);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(false);
+  const [filterDari, setFilterDari] = useState(dari);
+  const [filterSampai, setFilterSampai] = useState(sampai);
+
+  function applyDateFilter() {
+    const params = new URLSearchParams(searchParams.toString());
+    if (filterDari) params.set("dari", filterDari); else params.delete("dari");
+    if (filterSampai) params.set("sampai", filterSampai); else params.delete("sampai");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function resetDateFilter() {
+    setFilterDari("");
+    setFilterSampai("");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("dari");
+    params.delete("sampai");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  const isFiltered = !!dari || !!sampai;
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -147,13 +181,60 @@ export function KasScreenClient({
         />
       )}
 
+      {/* Ringkasan saldo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Saldo Awal", value: saldoAwal, color: "text-muted-stronger" },
+          { label: "Mutasi Masuk", value: totalMasuk, color: "text-status-green" },
+          { label: "Mutasi Keluar", value: totalKeluar, color: "text-status-red" },
+          { label: "Saldo Akhir", value: saldoAwal + totalMasuk - totalKeluar, color: "text-navy-text" },
+        ].map((s) => (
+          <div key={s.label} className="bg-surface-card border border-border-soft rounded-[14px] px-4 py-3">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wide mb-1">{s.label}</p>
+            <p className={`text-[15px] font-extrabold tabular-nums ${s.color}`}>{formatRupiah(s.value)}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter tanggal */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <CalendarDays size={14} className="text-muted-faint flex-none" />
+        <input
+          type="date"
+          value={filterDari}
+          onChange={(e) => setFilterDari(e.target.value)}
+          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
+        />
+        <span className="text-[12px] text-muted-faint">—</span>
+        <input
+          type="date"
+          value={filterSampai}
+          onChange={(e) => setFilterSampai(e.target.value)}
+          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
+        />
+        <button
+          onClick={applyDateFilter}
+          className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold"
+        >
+          Terapkan
+        </button>
+        {isFiltered && (
+          <button
+            onClick={resetDateFilter}
+            className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
+          >
+            <X size={11} /> Reset
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center justify-between flex-wrap gap-3.5">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-surface-card">
             {saldoLabel}: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
           </div>
 
-          {/* Rekening switcher — hanya tampil di Bank Buku */}
+          {/* Rekening switcher — hanya tampil di Buku Bank */}
           {rekeningOptions.length > 1 && (
             <div className="flex items-center gap-1 bg-surface-hover rounded-pill p-1">
               {rekeningOptions.map((r) => (
@@ -175,7 +256,7 @@ export function KasScreenClient({
 
         <button
           onClick={() => setPanelOpen((v) => !v)}
-          className="px-4.5 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold"
+          className="px-7 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold"
         >
           {panelOpen ? "Tutup Form" : "+ Transaksi Baru"}
         </button>
@@ -192,6 +273,7 @@ export function KasScreenClient({
           allEntities={allEntities}
           projectOptions={projectOptions}
           defaultArahLaporan={defaultArahLaporan}
+          bukuBankRekeningOptions={bukuBankRekeningOptions}
           onClose={() => setPanelOpen(false)}
         />
       )}
@@ -206,13 +288,21 @@ export function KasScreenClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">
-              <td className="py-2 px-1.5">TANGGAL</td>
+              <td className="py-2 px-1.5">
+                <button
+                  onClick={() => setSortAsc((v) => !v)}
+                  className="flex items-center gap-1 hover:text-navy-text transition-colors"
+                  title={sortAsc ? "Urutkan terbaru dulu" : "Urutkan terlama dulu"}
+                >
+                  TANGGAL <ArrowUpDown size={10} />
+                </button>
+              </td>
               <td className="py-2 px-1.5">NO. BUKTI</td>
               <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5">AKUN</td>
-              <td className="py-2 px-1.5 text-right">MASUK</td>
-              <td className="py-2 px-1.5 text-right">KELUAR</td>
-              <td className="py-2 px-1.5 text-right">SALDO BERJALAN</td>
+              <td className="py-2 px-1.5 text-right whitespace-nowrap">MASUK</td>
+              <td className="py-2 px-1.5 text-right whitespace-nowrap">KELUAR</td>
+              <td className="py-2 px-1.5 text-right whitespace-nowrap">SALDO BERJALAN</td>
               <td className="py-2 px-1.5 text-right">AKSI</td>
             </tr>
           </thead>
@@ -224,7 +314,10 @@ export function KasScreenClient({
                 </td>
               </tr>
             ) : (
-              ledger.map((r, idx) => {
+              [...ledger].sort((a, b) => {
+                const diff = new Date(a.tanggalRaw).getTime() - new Date(b.tanggalRaw).getTime();
+                return sortAsc ? diff : -diff;
+              }).map((r, idx) => {
                 const shown = r.akunTags.slice(0, 2);
                 const rest = r.akunTags.length - shown.length;
                 const expanded = expandedIdx === idx;
@@ -237,24 +330,24 @@ export function KasScreenClient({
                 return (
                   <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
                     <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
-                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{r.noBukti}</td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                     <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                       {r.keterangan}
                       {r.rekening && (
-                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           {r.rekening}
                         </span>
                       )}
                       {/* Crossing destination badge — transaksi masuk dari entitas lain */}
                       {isCrossingFrom && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           <ArrowRightLeft size={9} />
                           dari {sourceEntityName}
                         </span>
                       )}
                       {/* Crossing source badges — transaksi dikirim ke entitas lain */}
                       {!isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           <ArrowRightLeft size={9} />
                           → {(r.crossingEntityKeys ?? [])
                             .map((k) => allEntities.find((e) => e.key === k)?.name ?? k)
@@ -263,22 +356,53 @@ export function KasScreenClient({
                       )}
                     </td>
                     <td className="py-2.5 px-1.5">
-                      <div className="flex gap-1 flex-wrap">
-                        {(expanded ? r.akunTags : shown).map((tag, i) => (
-                          <span key={i} className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md">
-                            {tag}
-                          </span>
+                      <div className="flex flex-col gap-1">
+                        {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                          <div key={i} className="flex flex-col">
+                            <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md whitespace-nowrap">
+                              {cr.coaName}
+                            </span>
+                            {cr.itemDescription && (
+                              <span className="text-[10px] text-muted px-1 mt-0.5 italic">{cr.itemDescription}</span>
+                            )}
+                          </div>
                         ))}
-                        {!expanded && rest > 0 && (
-                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1">
-                            +{rest} lagi
+                        {!expanded && r.coaRows.length > 2 && (
+                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left whitespace-nowrap">
+                            +{r.coaRows.length - 2} lagi
                           </button>
                         )}
                       </div>
                     </td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-status-green text-right tabular-nums">{r.masukFmt}</td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-status-red text-right tabular-nums">{r.keluarFmt}</td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums">{r.saldoFmt}</td>
+                    {/* MASUK — per baris akun */}
+                    <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
+                      {r.coaRows.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                            <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
+                              {r.masuk > 0 ? formatRupiah(cr.nominal) : "—"}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[13px] font-bold text-status-green tabular-nums whitespace-nowrap">{r.masukFmt}</span>
+                      )}
+                    </td>
+                    {/* KELUAR — per baris akun */}
+                    <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
+                      {r.coaRows.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                            <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
+                              {r.keluar > 0 ? formatRupiah(cr.nominal) : "—"}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[13px] font-bold text-status-red tabular-nums whitespace-nowrap">{r.keluarFmt}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">{r.saldoFmt}</td>
                     <td className="py-2.5 px-1.5 text-right">
                       {isCrossingFrom ? (
                         <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>

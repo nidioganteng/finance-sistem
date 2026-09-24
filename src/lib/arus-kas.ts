@@ -6,9 +6,16 @@ const MONTHS = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-export async function getArusKasData(entityId: string, year: number) {
-  // Filter ke akun ASET (kas & bank) saja — debit = kas masuk, kredit = kas keluar.
-  // Kalau kita ambil semua transaksi, debit total == kredit total (balanced) → net selalu 0.
+export type ReportVersion = "INTERNAL" | "UMUM";
+
+export async function getArusKasData(
+  entityId: string,
+  year: number,
+  version: ReportVersion | string = "INTERNAL"
+) {
+  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+
+  // Filter ke semua akun ber-reportType ARUS_KAS (kas & bank) — sama untuk internal dan umum
   const transactions = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -16,7 +23,9 @@ export async function getArusKasData(entityId: string, year: number) {
         gte: new Date(`${year}-01-01`),
         lte: new Date(`${year}-12-31T23:59:59`),
       },
-      coaAccount: { kategori: "ASET" },
+      coaAccount: {
+        reportType: "ARUS_KAS",
+      },
     },
     orderBy: { tanggal: "asc" },
   });
@@ -49,5 +58,6 @@ export async function getArusKasData(entityId: string, year: number) {
     totalKeluarFmt: formatRupiah(totalKeluar),
     netTotalFmt: formatRupiah(Math.abs(netTotal)),
     netTotalPositive: netTotal >= 0,
+    version: normVersion,
   };
 }

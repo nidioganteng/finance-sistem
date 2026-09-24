@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
-import { getPiutangData } from "@/lib/piutang";
+import { getPiutangData, getInterEntityBalances } from "@/lib/piutang";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PiutangClient } from "@/components/piutang/PiutangClient";
@@ -30,7 +30,10 @@ export default async function PiutangPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getPiutangData(selectedEntity.id);
+  const [data, interEntityBalances] = await Promise.all([
+    getPiutangData(selectedEntity.id),
+    getInterEntityBalances(selectedEntity.id),
+  ]);
 
   return (
     <PageTransition>
@@ -51,6 +54,8 @@ export default async function PiutangPage({
         loadingDockList={data.loadingDockList}
         userRole={role}
         isUmumEntity={selectedEntity.isUmum}
+        interEntityBalances={interEntityBalances}
+        currentEntityKey={selectedKey}
       />
     </PageTransition>
   );

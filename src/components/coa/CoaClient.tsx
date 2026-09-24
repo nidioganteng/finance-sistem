@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CoaKategori } from "@prisma/client";
+import { CoaKategori, ReportType, ReportCategory } from "@prisma/client";
 import { createCOA, updateCOA, deleteCOA } from "@/lib/actions/coa";
 import { Pencil, Trash2, Plus, X, Check } from "lucide-react";
 
@@ -10,6 +10,8 @@ type COAItem = {
   code: string;
   name: string;
   kategori: CoaKategori;
+  reportType: ReportType;
+  reportCategory: ReportCategory;
   createdAt: Date;
 };
 
@@ -23,7 +25,29 @@ const KATEGORI_BADGE: Record<CoaKategori, string> = {
   MODAL: "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
 };
 
-export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
+const REPORT_TYPE_OPTS: ReportType[] = ["NERACA", "LABA_RUGI", "ARUS_KAS"];
+
+const REPORT_TYPE_LABEL: Record<ReportType, string> = {
+  NERACA: "Neraca",
+  LABA_RUGI: "Laba Rugi",
+  ARUS_KAS: "Arus Kas",
+};
+
+const REPORT_CATEGORY_OPTS: ReportCategory[] = ["SEMUA", "INTERNAL", "UMUM"];
+
+const REPORT_CATEGORY_LABEL: Record<ReportCategory, string> = {
+  SEMUA: "Semua (Internal & Umum)",
+  INTERNAL: "Internal Saja",
+  UMUM: "Umum Saja",
+};
+
+const REPORT_CATEGORY_BADGE: Record<ReportCategory, string> = {
+  SEMUA: "bg-surface-hover text-muted border border-border-soft",
+  INTERNAL: "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
+  UMUM: "bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400",
+};
+
+export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; canDelete: boolean }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +114,13 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
               <option value="">Pilih Kategori</option>
               {KATEGORI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
+            <select name="reportType" required defaultValue="" className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
+              <option value="" disabled>Rumah Akun</option>
+              {REPORT_TYPE_OPTS.map((r) => <option key={r} value={r}>{REPORT_TYPE_LABEL[r]}</option>)}
+            </select>
+            <select name="reportCategory" defaultValue="SEMUA" className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
+              {REPORT_CATEGORY_OPTS.map((c) => <option key={c} value={c}>{REPORT_CATEGORY_LABEL[c]}</option>)}
+            </select>
             <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
               <Check size={14} /> Simpan
             </button>
@@ -106,6 +137,8 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
             <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Kode</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Nama Akun</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Kategori</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Rumah Akun</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Versi Laporan</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Dibuat</th>
             <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Aksi</th>
           </tr>
@@ -113,7 +146,7 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
         <tbody>
           {initialCoa.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-10 text-center text-sm text-muted">
+              <td colSpan={7} className="py-10 text-center text-sm text-muted">
                 Belum ada akun COA. Klik &quot;Tambah Akun&quot; untuk memulai.
               </td>
             </tr>
@@ -121,12 +154,18 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
           {initialCoa.map((item) =>
             editingId === item.id ? (
               <tr key={item.id} className="border-b border-surface-subtle bg-surface-subtle">
-                <td colSpan={5} className="px-6 py-3">
+                <td colSpan={7} className="px-6 py-3">
                   <form action={(fd) => handleUpdate(item.id, fd)} className="flex items-center gap-3 flex-wrap">
                     <input name="code" required defaultValue={item.code} className="px-3 py-2 rounded-xl border border-border text-sm w-36 bg-surface-card" />
                     <input name="name" required defaultValue={item.name} className="px-3 py-2 rounded-xl border border-border text-sm flex-1 min-w-40 bg-surface-card" />
                     <select name="kategori" required defaultValue={item.kategori} className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
                       {KATEGORI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                    <select name="reportType" required defaultValue={item.reportType} className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
+                      {REPORT_TYPE_OPTS.map((r) => <option key={r} value={r}>{REPORT_TYPE_LABEL[r]}</option>)}
+                    </select>
+                    <select name="reportCategory" defaultValue={item.reportCategory} className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card">
+                      {REPORT_CATEGORY_OPTS.map((c) => <option key={c} value={c}>{REPORT_CATEGORY_LABEL[c]}</option>)}
                     </select>
                     <button type="submit" disabled={isPending} className="px-3.5 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1">
                       <Check size={14} /> Simpan
@@ -146,6 +185,14 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
                     {item.kategori}
                   </span>
                 </td>
+                <td className="py-3 px-3 text-[12.5px] text-muted-stronger">
+                  {REPORT_TYPE_LABEL[item.reportType]}
+                </td>
+                <td className="py-3 px-3 text-[12.5px]">
+                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${REPORT_CATEGORY_BADGE[item.reportCategory] ?? "bg-surface-hover text-muted"}`}>
+                    {REPORT_CATEGORY_LABEL[item.reportCategory] ?? item.reportCategory}
+                  </span>
+                </td>
                 <td className="py-3 px-3 text-[12.5px] text-muted">
                   {new Date(item.createdAt).toLocaleDateString("id-ID")}
                 </td>
@@ -154,9 +201,11 @@ export function CoaClient({ initialCoa }: { initialCoa: COAItem[] }) {
                     <button onClick={() => { setEditingId(item.id); setShowAdd(false); }} className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger" title="Edit">
                       <Pencil size={14} />
                     </button>
-                    <button onClick={() => handleDelete(item.id)} disabled={isPending} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red" title="Hapus">
-                      <Trash2 size={14} />
-                    </button>
+                    {canDelete && (
+                      <button onClick={() => handleDelete(item.id)} disabled={isPending} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red" title="Hapus">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

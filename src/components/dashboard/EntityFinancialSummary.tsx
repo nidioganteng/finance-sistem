@@ -63,13 +63,18 @@ export function EntityFinancialSummary({
 
   const bebanRatio = pct(data.totalBeban, data.totalPendapatan);
 
-  const laporanHref = `/laporan?entity=${entityKey}&year=${year}`;
+  const laporanHref = `/laporan?entity=${entityKey}&year=${year}&version=internal`;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Section title */}
       <div className="flex items-center justify-between">
-        <div className="text-sm font-bold text-navy-text">Ringkasan Laporan Keuangan {year}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-navy-text">Ringkasan Laporan Keuangan {year}</span>
+          <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-navy/10 text-navy-text border border-navy/15 dark:bg-white/10 dark:text-white/90 dark:border-white/15">
+            Versi Internal
+          </span>
+        </div>
         <Link
           href={`${laporanHref}&tab=ringkasan`}
           className="flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
@@ -166,12 +171,12 @@ export function EntityFinancialSummary({
 
           <MetricRow
             label="Aktivitas Operasi"
-            value={(data.kasOperasi >= 0 ? "+" : "") + data.kasOperasiFmt?.replace("Rp ", "")}
+            value={(data.kasOperasi >= 0 ? "+" : "") + data.kasOperasiFmt?.replace(/^Rp[\s\u00A0]?/, "")}
             color={data.kasOperasi >= 0 ? "text-status-green" : "text-status-red"}
           />
           <MetricRow
             label="Aktivitas Investasi"
-            value={(data.kasInvestasi >= 0 ? "+" : "-") + data.kasInvestasiFmt?.replace("Rp ", "")}
+            value={(data.kasInvestasi >= 0 ? "+" : "-") + data.kasInvestasiFmt?.replace(/^Rp[\s\u00A0]?/, "")}
             color={data.kasInvestasi >= 0 ? "text-status-green" : "text-status-red"}
           />
           <MetricRow

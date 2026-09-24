@@ -2,20 +2,21 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-const TABS = [
-  { key: "ringkasan", label: "Ringkasan" },
-  { key: "laba-rugi", label: "Laba Rugi" },
-  { key: "neraca", label: "Neraca" },
-  { key: "arus-kas", label: "Arus Kas" },
-  { key: "piutang", label: "Piutang" },
-  { key: "utang-aset", label: "Utang & Aset" },
-  { key: "komparasi", label: "Komparasi" },
-];
-
 export function LaporanTabs({ currentTab }: { currentTab: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const isUmum = searchParams.get("version")?.toLowerCase() === "umum";
+
+  const tabs = [
+    { key: "ringkasan", label: "Ringkasan" },
+    { key: "laba-rugi", label: "Laba Rugi" },
+    { key: "neraca", label: "Neraca" },
+    { key: "arus-kas", label: "Arus Kas" },
+    { key: "piutang", label: "Piutang" },
+    { key: "utang-aset", label: "Utang & Aset" },
+    { key: "komparasi", label: "Komparasi" },
+  ];
 
   function go(key: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -26,7 +27,7 @@ export function LaporanTabs({ currentTab }: { currentTab: string }) {
   return (
     <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
       <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-max sm:w-fit min-w-full sm:min-w-0">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => go(t.key)}

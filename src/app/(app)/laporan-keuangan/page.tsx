@@ -13,34 +13,48 @@ import { LaporanKeuanganTabs } from "@/components/laporan-keuangan/LaporanKeuang
 import { AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
+import type { ReportVersion } from "@/lib/laba-rugi";
+import { getLaporanPajakData } from "@/lib/pajak";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
+import { ArusKasPresisiClient } from "@/components/laporan/ArusKasPresisiClient";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
+import { NeracaView } from "@/components/laporan/NeracaView";
+
 export default async function LaporanKeuanganPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string; tab?: string };
+  searchParams: { entity?: string; year?: string; tab?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
+  const { entityKeys } = session!.user;
   logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan-keuangan" });
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const tab = searchParams.tab ?? "neraca";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getLaporanKeuanganData(selectedEntity.id, currentYear);
+  const [data, taxData, arusKasPresisiData] = await Promise.all([
+    getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
+    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion),
+    tab === "arus-kas"
+      ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
+      : Promise.resolve(null),
+  ]);
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   return (
     <PageTransition>
       <PageHeader
-        title={`Laporan Keuangan – ${selectedEntity.name}`}
-        subtitle={`Ringkasan laporan keuangan — Periode ${currentYear}`}
+        title={`Laporan Keuangan ${currentVersion === "UMUM" ? "Umum" : "Internal"} – ${selectedEntity.name}`}
+        subtitle={`Posisi dan ringkasan keuangan — Periode ${currentYear}`}
         rightSlot={
           <>
             <PrintButton />
@@ -63,9 +77,23 @@ export default async function LaporanKeuanganPage({
         </div>
       )}
 
-      {hasData && tab === "neraca" && <NeracaTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-      {hasData && tab === "laba-rugi" && <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />}
-      {hasData && tab === "arus-kas" && <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />}
+      {hasData && tab === "neraca" && <NeracaView data={data} year={currentYear} entityName={selectedEntity.name} />}
+      {hasData && tab === "laba-rugi" && (
+        taxData ? (
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
+        ) : (
+          <LabaRugiTab data={data} year={currentYear} entityName={selectedEntity.name} />
+        )
+      )}
+      {hasData && tab === "arus-kas" && arusKasPresisiData && (
+        <ArusKasTabWrapper
+          presisiData={arusKasPresisiData}
+          entityId={selectedEntity.id}
+          standardView={
+            <ArusKasTab data={data} year={currentYear} entityName={selectedEntity.name} />
+          }
+        />
+      )}
     </PageTransition>
   );
 }
@@ -195,19 +223,62 @@ function NeracaTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ── Aktiva ── */}
-        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-          <SectionHeader color="blue" label="Aktiva" />
-          <div className="divide-y divide-surface-subtle">
-            {data.aset.length === 0 ? (
-              <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aset.</p>
-            ) : (
-              data.aset.map((item) => (
-                <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
-              ))
-            )}
+        <div className="flex flex-col gap-4">
+          {/* I. Aktiva Lancar */}
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+            <SectionHeader color="blue" label="I. Aktiva Lancar" />
+            <div className="divide-y divide-surface-subtle">
+              {data.aktivaLancar.length === 0 ? (
+                <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva lancar.</p>
+              ) : (
+                data.aktivaLancar.map((item) => (
+                  <ItemRow
+                    key={item.code}
+                    code={item.code}
+                    name={item.name + (item.isContra ? " (Kontra)" : "")}
+                    amount={item.saldoFmt}
+                    amountClass={item.isContra ? "text-status-amber" : "text-navy-text"}
+                  />
+                ))
+              )}
+            </div>
+            <SubtotalRow
+              label="Total Aktiva Lancar"
+              amount={data.totalAktivaLancarFmt}
+              bgClass="bg-blue-50/50 dark:bg-blue-500/10"
+              borderClass="border-blue-100 dark:border-blue-500/20"
+            />
           </div>
+
+          {/* II. Aktiva Tetap */}
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+            <SectionHeader color="blue" label="II. Aktiva Tetap" />
+            <div className="divide-y divide-surface-subtle">
+              {data.aktivaTetap.length === 0 ? (
+                <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva tetap.</p>
+              ) : (
+                data.aktivaTetap.map((item) => (
+                  <ItemRow
+                    key={item.code}
+                    code={item.code}
+                    name={item.name + (item.isContra ? " (Pengurang)" : "")}
+                    amount={item.saldoFmt}
+                    amountClass={item.isContra ? "text-status-amber" : "text-navy-text"}
+                  />
+                ))
+              )}
+            </div>
+            <SubtotalRow
+              label="Total Aktiva Tetap (Net)"
+              amount={data.totalAktivaTetapFmt}
+              bgClass="bg-cyan-50/50 dark:bg-cyan-500/10"
+              borderClass="border-cyan-100 dark:border-cyan-500/20"
+            />
+          </div>
+
+          {/* Total Aktiva */}
           <TotalRow
-            label="Total Aktiva"
+            label="Total Aktiva (Lancar + Tetap)"
             amount={data.totalAsetFmt}
             amountClass={data.neracaBalanced ? "text-blue-700 dark:text-blue-400" : "text-status-red"}
             bgClass="bg-blue-50 dark:bg-blue-500/15"
@@ -219,7 +290,7 @@ function NeracaTab({
         <div className="flex flex-col gap-4">
           {/* Kewajiban */}
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="orange" label="Kewajiban" />
+            <SectionHeader color="orange" label="I. Kewajiban" />
             <div className="divide-y divide-surface-subtle">
               {data.kewajiban.length === 0 ? (
                 <p className="py-4 px-5 text-[13px] text-muted-faint italic">Tidak ada kewajiban.</p>
@@ -237,13 +308,24 @@ function NeracaTab({
             />
           </div>
 
-          {/* Modal */}
+          {/* Modal & Ekuitas */}
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="violet" label="Modal" />
+            <SectionHeader color="violet" label="II. Modal & Ekuitas" />
             <div className="divide-y divide-surface-subtle">
               {data.modal.map((item) => (
                 <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
               ))}
+              {/* Laba Ditahan (Akun 310) */}
+              <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-violet-50/30 dark:bg-violet-500/5">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <code className="text-[10.5px] text-muted-faintest font-mono shrink-0">310</code>
+                  <span className="text-[13px] text-muted-stronger">Laba Ditahan</span>
+                </div>
+                <span className="tabular-nums text-[13px] font-semibold shrink-0 text-navy-text">
+                  {data.labaDitahanFmt}
+                </span>
+              </div>
+              {/* Laba Tahun Berjalan */}
               <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-green-50/40 dark:bg-green-500/10">
                 <span className="text-[13px] font-semibold text-muted-stronger">Laba Tahun Berjalan {year}</span>
                 <span className={`tabular-nums text-[13px] font-bold shrink-0 ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
@@ -252,8 +334,8 @@ function NeracaTab({
               </div>
             </div>
             <SubtotalRow
-              label="Total Modal"
-              amount={formatRupiah(Math.abs(data.totalModal + data.labaBersih))}
+              label="Total Modal & Laba"
+              amount={data.totalModalDanLabaFmt}
               bgClass="bg-violet-50/50 dark:bg-violet-500/10"
               borderClass="border-violet-100 dark:border-violet-500/20"
             />
@@ -266,7 +348,7 @@ function NeracaTab({
               : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"
           }`}>
             <div>
-              <p className="font-extrabold text-[13px] text-navy-text">Total Kewajiban + Modal</p>
+              <p className="font-extrabold text-[13px] text-navy-text">Total Pasiva (Kewajiban + Modal + Laba)</p>
               <p className={`text-[11.5px] font-semibold mt-0.5 ${
                 data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
               }`}>
@@ -471,7 +553,12 @@ function ArusKasTab({
         {/* Aktivitas Operasi */}
         <SectionHeader color="blue" label="Aktivitas Operasi" />
         <AkRow label="Laba/(Rugi) Bersih" val={data.labaBersih} fmt={data.labaBersihFmt} />
-        <AkRow label="Penyesuaian non-kas (penyusutan, dll.)" val={0} fmt="" italic />
+        <AkRow
+          label="Penyesuaian non-kas (penyusutan aset tetap)"
+          val={data.penyesuaianNonKas ?? 0}
+          fmt={data.penyesuaianNonKasFmt ?? "Rp 0"}
+          italic={!data.penyesuaianNonKas}
+        />
         {data.perubahanAsetNonKas !== 0 && (
           <AkRow label="Penurunan/(Kenaikan) Aset Non-Kas" val={data.perubahanAsetNonKas} fmt={formatRupiah(Math.abs(data.perubahanAsetNonKas))} />
         )}

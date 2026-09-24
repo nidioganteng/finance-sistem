@@ -3,40 +3,46 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getArusKasData } from "@/lib/arus-kas";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
+import type { ReportVersion } from "@/lib/laba-rugi";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
 
 export default async function ArusKasPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; year?: string };
+  searchParams: { entity?: string; year?: string; version?: string };
 }) {
   const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
+  const { entityKeys } = session!.user;
   logActivity(session!.user.id, "Buka halaman Arus Kas", "USER_ACTIVITY", { path: "/arus-kas" });
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getArusKasData(selectedEntity.id, currentYear);
+  const [data, presisiData] = await Promise.all([
+    getArusKasData(selectedEntity.id, currentYear, currentVersion),
+    getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion),
+  ]);
   const hasData = data.monthly.some((m) => m.hasData);
 
   return (
     <PageTransition>
       <PageHeader
         title="Arus Kas"
-        subtitle={`Ringkasan arus kas masuk dan keluar — ${selectedEntity.name} ${currentYear}`}
+        subtitle={`Laporan Arus Kas — ${selectedEntity.name} ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`}
         rightSlot={
           <>
             <YearSelect currentYear={currentYear} />
@@ -49,13 +55,18 @@ export default async function ArusKasPage({
         }
       />
 
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total Kas Masuk", value: data.totalMasukFmt, color: "text-status-green" },
-          { label: "Total Kas Keluar", value: data.totalKeluarFmt, color: "text-status-red" },
-          {
-            label: "Net Arus Kas",
-            value: (data.netTotalPositive ? "" : "-") + data.netTotalFmt,
+      <ArusKasTabWrapper
+        presisiData={presisiData}
+        entityId={selectedEntity.id}
+        standardView={
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Total Kas Masuk", value: data.totalMasukFmt, color: "text-status-green" },
+                { label: "Total Kas Keluar", value: data.totalKeluarFmt, color: "text-status-red" },
+                {
+                  label: "Net Arus Kas",
+                  value: (data.netTotalPositive ? "" : "-") + data.netTotalFmt,
             color: data.netTotalPositive ? "text-status-green" : "text-status-red",
           },
         ].map((card) => (
@@ -110,6 +121,9 @@ export default async function ArusKasPage({
         </table>
         </div>
       </div>
-    </PageTransition>
-  );
+    </div>
+  }
+/>
+</PageTransition>
+);
 }

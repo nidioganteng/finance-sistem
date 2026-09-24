@@ -11,14 +11,14 @@ export default async function CoaPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
   logActivity(session!.user.id, "Buka halaman Bagan Akun", "USER_ACTIVITY", { path: "/coa" });
-  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN") redirect("/dashboard");
+  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const coa = await getCOAList();
 
   return (
     <PageTransition>
       <PageHeader title="Bagan Akun" subtitle="Kelola daftar akun keuangan (Chart of Accounts)" />
-      <CoaClient initialCoa={coa} />
+      <CoaClient initialCoa={coa} canDelete={role !== "STAF_KEUANGAN"} />
     </PageTransition>
   );
 }

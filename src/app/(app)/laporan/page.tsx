@@ -6,7 +6,7 @@ import { getLabaRugiData } from "@/lib/laba-rugi";
 import { getNeracaData } from "@/lib/neraca";
 import { getArusKasData } from "@/lib/arus-kas";
 import { canViewGrupAggregate } from "@/lib/rbac";
-import { resolveEntityKey } from "@/lib/entity-prefs";
+import { resolveReportEntityKey } from "@/lib/entity-prefs";
 import { logActivity } from "@/lib/actions/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -18,8 +18,12 @@ import { KomparasiLineChart } from "@/components/laporan/KomparasiLineChart";
 import { KomparasiEntityPills } from "@/components/laporan/KomparasiEntityPills";
 import { RingkasanTab } from "@/components/laporan/RingkasanTab";
 import { LabaRugiView } from "@/components/laporan/LabaRugiView";
+import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
+import { getLaporanPajakData } from "@/lib/pajak";
 import { NeracaView } from "@/components/laporan/NeracaView";
 import { ArusKasView } from "@/components/laporan/ArusKasView";
+import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
+import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import {
   getLaporanKeuanganData,
   getLaporanJurnalData,
@@ -32,6 +36,7 @@ import { UtangAsetView } from "@/components/laporan/UtangAsetView";
 import { prisma } from "@/lib/prisma";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
+import type { ReportVersion } from "@/lib/laba-rugi";
 
 const BULAN_LABEL = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -72,6 +77,7 @@ export default async function LaporanPage({
     periodA?: string;
     periodB?: string;
     chartYears?: string;
+    version?: string;
   };
 }) {
   const session = await getServerSession(authOptions);
@@ -81,14 +87,10 @@ export default async function LaporanPage({
 
   const entities = await getAccessibleEntities(entityKeys);
   const canGrup = canViewGrupAggregate(role);
-  // Grup view hanya muncul kalau canGrup dan tidak ada entity di URL (user sengaja pilih grup).
-  // Kalau tidak ada entity di URL tapi juga tidak canGrup → baca cookie via resolveEntityKey.
-  const selectedKey =
-    canGrup && !searchParams.entity
-      ? undefined
-      : resolveEntityKey(searchParams.entity, entityKeys);
+  const selectedKey = resolveReportEntityKey(searchParams.entity, entityKeys, canGrup);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const tab = searchParams.tab ?? "ringkasan";
 
   // For group view, aggregate all entity data
@@ -101,12 +103,14 @@ export default async function LaporanPage({
   let jurnalData: Awaited<ReturnType<typeof getLaporanJurnalData>> | null = null;
   let bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null = null;
   let arusKasCombined: any = null;
+  let arusKasPresisiData: Awaited<ReturnType<typeof getArusKasPresisiData>> | null = null;
   let piutangData: Awaited<ReturnType<typeof getLaporanPiutangData>> | null = null;
   let utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null = null;
+  let taxData: Awaited<ReturnType<typeof getLaporanPajakData>> | null = null;
 
   if (tab === "ringkasan") {
     const [laporan, jData, bData] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear),
+      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
       getLaporanJurnalData(entityIds, currentYear, 80),
       getLaporanBankData(entityIds, currentYear, 80),
     ]);
@@ -114,13 +118,22 @@ export default async function LaporanPage({
     jurnalData = jData;
     bankData = bData;
   } else if (tab === "laba-rugi" || tab === "neraca") {
-    laporanKeuanganData = await getLaporanKeuanganData(entityIds, currentYear);
-  } else if (tab === "arus-kas") {
-    const [laporan, allArusKas] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear),
-      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear))),
+    const [laporan, tax] = await Promise.all([
+      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+      tab === "laba-rugi"
+        ? getLaporanPajakData(entityIds, currentYear, currentVersion)
+        : Promise.resolve(null),
     ]);
     laporanKeuanganData = laporan;
+    taxData = tax;
+  } else if (tab === "arus-kas") {
+    const [laporan, allArusKas, presisi] = await Promise.all([
+      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
+      getArusKasPresisiData(entityIds, currentYear, currentVersion),
+    ]);
+    laporanKeuanganData = laporan;
+    arusKasPresisiData = presisi;
 
     const MONTHS_LABEL = [
       "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -208,8 +221,8 @@ export default async function LaporanPage({
         : { gte: new Date(`${p.year}-01-01`), lte: new Date(`${p.year}-12-31T23:59:59`) };
 
     const [labaRugiA, labaRugiB, txCountA, txCountB] = await Promise.all([
-      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month))),
-      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month))),
+      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month, currentVersion))),
+      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month, currentVersion))),
       prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodA) } }),
       prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodB) } }),
     ]);
@@ -304,11 +317,11 @@ export default async function LaporanPage({
   return (
     <PageTransition>
       <PageHeader
-        title="Laporan Keuangan"
+        title={`Laporan Keuangan ${currentVersion === "UMUM" ? "Umum" : "Internal"}`}
         subtitle={
           tab === "komparasi" && komparasiData
-            ? `Komparasi laporan keuangan — ${entityLabel} · ${komparasiData.labelA} vs ${komparasiData.labelB}`
-            : `Ringkasan laporan keuangan — ${entityLabel} ${currentYear}`
+            ? `Komparasi laporan keuangan — ${entityLabel} · ${komparasiData.labelA} vs ${komparasiData.labelB} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`
+            : `Ringkasan laporan keuangan — ${entityLabel} ${currentYear} (${currentVersion === "UMUM" ? "Versi Umum" : "Versi Internal"})`
         }
         rightSlot={
           <>
@@ -439,11 +452,15 @@ export default async function LaporanPage({
       )}
 
       {tab === "laba-rugi" && laporanKeuanganData && (
-        <LabaRugiView
-          data={laporanKeuanganData}
-          year={currentYear}
-          entityName={entityLabel}
-        />
+        taxData ? (
+          <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
+        ) : (
+          <LabaRugiView
+            data={laporanKeuanganData}
+            year={currentYear}
+            entityName={entityLabel}
+          />
+        )
       )}
 
       {tab === "neraca" && laporanKeuanganData && (
@@ -455,11 +472,25 @@ export default async function LaporanPage({
       )}
 
       {tab === "arus-kas" && arusKasCombined && (
-        <ArusKasView
-          data={arusKasCombined}
-          year={currentYear}
-          entityName={entityLabel}
-        />
+        arusKasPresisiData ? (
+          <ArusKasTabWrapper
+            standardView={
+              <ArusKasView
+                data={arusKasCombined}
+                year={currentYear}
+                entityName={entityLabel}
+              />
+            }
+            presisiData={arusKasPresisiData}
+            entityId={selectedEntity?.id ?? entityIds[0]}
+          />
+        ) : (
+          <ArusKasView
+            data={arusKasCombined}
+            year={currentYear}
+            entityName={entityLabel}
+          />
+        )
       )}
 
       {tab === "piutang" && piutangData && (

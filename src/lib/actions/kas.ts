@@ -5,14 +5,49 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getRunningSaldo } from "@/lib/kas";
+import { getRunningSaldo, ENTITY_PREFIX } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
 import { computeNewTerminPercentage } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 
-type KasRowInput = { coaAccountId: string; nominal: number };
+// Format: {PREFIX}/{MMDD}{SEQ} — SEQ mulai dari 1, naik per hari per entitas
+export async function generateNoBukti(entityKey: string, tanggal: string): Promise<string> {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Belum login.");
+
+  const prefix = ENTITY_PREFIX[entityKey] ?? entityKey.toUpperCase().slice(0, 3);
+  const d = new Date(tanggal);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const dayPart = `${mm}${dd}`;
+  const pattern = `${prefix}/${dayPart}`;
+
+  const entity = await prisma.entity.findUnique({ where: { key: entityKey } });
+  if (!entity) throw new Error("Entity tidak ditemukan.");
+
+  // Ambil semua noBukti hari itu lalu cari sequence tertinggi
+  const existing = await prisma.transaction.findMany({
+    where: {
+      entityId: entity.id,
+      noBukti: { startsWith: pattern },
+    },
+    select: { noBukti: true },
+    distinct: ["noBukti"],
+  });
+
+  let maxSeq = 0;
+  for (const row of existing) {
+    const seqStr = row.noBukti.slice(pattern.length);
+    const seq = parseInt(seqStr, 10);
+    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  }
+
+  return `${pattern}${maxSeq + 1}`;
+}
+
+type KasRowInput = { coaAccountId: string; nominal: number; keterangan?: string };
 
 export type CreateKasTransactionInput = {
   entityKey: string;
@@ -23,10 +58,11 @@ export type CreateKasTransactionInput = {
   arah: "masuk" | "keluar";
   rows: KasRowInput[];
   pagePath: string; // path buat revalidate, mis. "/kas-kecil"
-  rekeningId?: string; // khusus Bank Buku
+  rekeningId?: string; // khusus Buku Bank
   crossingEntityKeys?: string[]; // crossing antar entitas (opsional, bisa lebih dari satu)
   projectId?: string; // uang masuk buat proyek ini → otomatis jadi progres termin
   arahLaporan?: string[]; // override output keuangan per transaksi (custom jenis input)
+  syncBukuBankRekeningId?: string; // Kas Kecil masuk dari Buku Bank → auto-catat di Buku Bank
 };
 
 const KAS_KECIL_COA: Record<string, string> = {
@@ -35,21 +71,27 @@ const KAS_KECIL_COA: Record<string, string> = {
 const KAS_BESAR_COA: Record<string, string> = {
   kencana: "110", gaharu: "120", tataring: "130", ciptaAsri: "140",
 };
+const PIUTANG_COA_CODE: Record<string, string> = {
+  kencana: "111", gaharu: "112", tataring: "113", ciptaAsri: "114", umum: "115",
+};
+const HUTANG_COA_CODE: Record<string, string> = {
+  kencana: "311", gaharu: "312", tataring: "313", ciptaAsri: "314", umum: "315",
+};
 
 async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningId?: string): Promise<string | null> {
   if (jenisInputKey === "kasKecil") {
     const code = KAS_KECIL_COA[entityKey];
     if (!code) return null;
-    return (await prisma.coaAccount.findUnique({ where: { code_scope: { code, scope: "KAS" } } }))?.id ?? null;
+    return (await prisma.coaAccount.findUnique({ where: { code } }))?.id ?? null;
   }
   if (jenisInputKey === "kasBesar") {
     const code = KAS_BESAR_COA[entityKey];
     if (!code) return null;
-    return (await prisma.coaAccount.findUnique({ where: { code_scope: { code, scope: "KAS" } } }))?.id ?? null;
+    return (await prisma.coaAccount.findUnique({ where: { code } }))?.id ?? null;
   }
   if (jenisInputKey === "bankBuku" && rekeningId) {
     const coaCode = REKENING_COA_CODE[rekeningId];
-    if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code_scope: { code: coaCode, scope: "BANK" } } }))?.id ?? null;
+    if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code: coaCode } }))?.id ?? null;
   }
   return null;
 }
@@ -65,7 +107,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   if (!input.noBukti || !input.keterangan) return { error: "No. bukti dan keterangan wajib diisi." };
 
   if (input.jenisInputKey === "bankBuku") {
-    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Bank Buku." };
+    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Buku Bank." };
     if (!isValidRekening(input.entityKey, input.rekeningId)) {
       return { error: "Rekening yang dipilih tidak sesuai dengan entitas ini." };
     }
@@ -74,6 +116,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   const entity = await prisma.entity.findUnique({ where: { key: input.entityKey } });
   const jenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: input.jenisInputKey } });
   if (!entity || !jenisInput) return { error: "Entity atau jenis input tidak ditemukan." };
+
+  // Cek duplikat noBukti per entitas
+  const dupCheck = await prisma.transaction.findFirst({
+    where: { entityId: entity.id, noBukti: input.noBukti },
+    select: { id: true },
+  });
+  if (dupCheck) return { error: `No. bukti "${input.noBukti}" sudah dipakai di entitas ini.` };
 
   const rekeningNama = input.rekeningId ? getRekeningNama(input.entityKey, input.rekeningId) : undefined;
   const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.entityKey, input.rekeningId);
@@ -84,18 +133,24 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   const isKeluar = input.arah === "keluar";
 
   const crossingEntityKeys = (input.crossingEntityKeys ?? []).filter(Boolean);
+
+  if (input.arah === "masuk" && crossingEntityKeys.length > 0) {
+    return { error: "Pemasukan hanya boleh dari entitas yang sama, tidak bisa lintas entitas." };
+  }
+
   const crossingGroupId = crossingEntityKeys.length > 0 ? randomUUID() : undefined;
   const arahLaporan = Array.isArray(input.arahLaporan) && input.arahLaporan.length > 0 ? input.arahLaporan : undefined;
 
   // Pre-calculate crossing entity saldos (read-only, safe to do before transaction)
-  type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number };
+  type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number; kasCoaId: string | null };
   const crossingEntries: CrossingEntry[] = [];
   for (const crossKey of crossingEntityKeys) {
     const crossEntity = await prisma.entity.findUnique({ where: { key: crossKey } });
     if (!crossEntity) continue;
     const crossPrev = await getRunningSaldo(crossEntity.id, jenisInput.id);
-    const crossNewSaldo = crossPrev + (isKeluar ? -total : total);
-    crossingEntries.push({ entity: crossEntity, newSaldo: crossNewSaldo });
+    const crossNewSaldo = crossPrev + total; // crossing entity receives money (masuk)
+    const crossKasCoaId = await resolveKasCoa(input.jenisInputKey, crossKey);
+    crossingEntries.push({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId });
   }
 
   const commonData = {
@@ -115,7 +170,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...(arahLaporan ? { extraFieldsJson: { arahLaporan } } : {}),
+        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
       },
     })
   );
@@ -173,8 +228,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     }
   }
 
+  // Pre-resolve hutang COA for the source entity (used as liability in crossing entries)
+  const hutangCode = HUTANG_COA_CODE[input.entityKey];
+  const hutangCoa = hutangCode ? await prisma.coaAccount.findUnique({ where: { code: hutangCode } }) : null;
+
   // Build crossing entity ops — tagged with crossingGroupId so they can be deleted/found together
-  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo }) => {
+  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Kas B / Cr. HUTANG_A
+  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId }) => {
     const crossCommon = {
       entityId: crossEntity.id,
       jenisInputId: jenisInput.id,
@@ -184,30 +244,66 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       saldoSetelah: crossNewSaldo,
       staffId: session.user.id,
     };
-    const crossAkun = validRows.map((r) =>
-      prisma.transaction.create({
-        data: {
-          ...crossCommon,
-          coaAccountId: r.coaAccountId,
-          debit: isKeluar ? r.nominal : 0,
-          kredit: isKeluar ? 0 : r.nominal,
-          extraFieldsJson: { crossingGroupId, crossingFromEntityKey: input.entityKey },
-        },
-      })
-    );
+    // Crossing entity receives money (masuk): Dr. Kas B
     const crossKas = prisma.transaction.create({
       data: {
         ...crossCommon,
-        coaAccountId: kasCoaId,
-        debit: isKeluar ? 0 : total,
-        kredit: isKeluar ? total : 0,
+        coaAccountId: crossKasCoaId,
+        debit: total,
+        kredit: 0,
         extraFieldsJson: { isKasEntry: true, crossingGroupId, crossingFromEntityKey: input.entityKey },
       },
     });
-    return [...crossAkun, crossKas];
+    // Crossing entity records liability: Cr. HUTANG_A
+    const ops: ReturnType<typeof prisma.transaction.create>[] = [crossKas];
+    if (hutangCoa) {
+      ops.push(prisma.transaction.create({
+        data: {
+          ...crossCommon,
+          coaAccountId: hutangCoa.id,
+          debit: 0,
+          kredit: total,
+          extraFieldsJson: { crossingGroupId, crossingFromEntityKey: input.entityKey },
+        },
+      }));
+    }
+    return ops;
   });
 
-  await prisma.$transaction([...akunRows, kasEntry, ...crossingOps, ...terminCreate]);
+  // Saat auto-sync aktif, skip akunRows — Buku Bank keluar sudah jadi counterpart-nya
+  const isSyncMode = !!((input.jenisInputKey === "kasKecil" || input.jenisInputKey === "kasBesar") && input.arah === "masuk" && input.syncBukuBankRekeningId);
+  await prisma.$transaction([...(isSyncMode ? [] : akunRows), kasEntry, ...crossingOps, ...terminCreate]);
+
+  // Auto-sync Kas Kecil masuk → Buku Bank keluar (jika dipilih)
+  if (isSyncMode) {
+    const bankJenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "bankBuku" } });
+    if (bankJenisInput) {
+      const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId!);
+      const bankPrevSaldo = await getRunningSaldo(entity.id, bankJenisInput.id, rekeningNama);
+      const bankNewSaldo = bankPrevSaldo - total;
+      const bankCoaId = await resolveKasCoa("bankBuku", input.entityKey, input.syncBukuBankRekeningId);
+      await prisma.transaction.create({
+        data: {
+          entityId: entity.id,
+          jenisInputId: bankJenisInput.id,
+          tanggal: new Date(input.tanggal),
+          noBukti: input.noBukti,
+          keterangan: `[Auto] ${input.keterangan}`,
+          staffId: session.user.id,
+          coaAccountId: bankCoaId,
+          debit: 0,
+          kredit: total,
+          saldoSetelah: bankNewSaldo,
+          extraFieldsJson: {
+            isKasEntry: true,
+            rekeningNama,
+            syncFromKasKecil: true,
+          },
+        },
+      });
+      revalidatePath("/bank-buku");
+    }
+  }
 
   logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
 
@@ -262,7 +358,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   if (!input.noBukti || !input.keterangan) return { error: "No. bukti dan keterangan wajib diisi." };
 
   if (input.jenisInputKey === "bankBuku") {
-    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Bank Buku." };
+    if (!input.rekeningId) return { error: "Rekening/Bank wajib dipilih untuk transaksi Buku Bank." };
     if (!isValidRekening(input.entityKey, input.rekeningId)) return { error: "Rekening yang dipilih tidak sesuai dengan entitas ini." };
   }
 
@@ -299,17 +395,23 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   const isKeluar = input.arah === "keluar";
 
   const crossingEntityKeys = (input.crossingEntityKeys ?? []).filter(Boolean);
+
+  if (input.arah === "masuk" && crossingEntityKeys.length > 0) {
+    return { error: "Pemasukan hanya boleh dari entitas yang sama, tidak bisa lintas entitas." };
+  }
+
   const crossingGroupId = crossingEntityKeys.length > 0 ? randomUUID() : undefined;
   const arahLaporan = Array.isArray(input.arahLaporan) && input.arahLaporan.length > 0 ? input.arahLaporan : undefined;
 
-  type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number };
+  type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number; kasCoaId: string | null };
   const crossingEntries: CrossingEntry[] = [];
   for (const crossKey of crossingEntityKeys) {
     const crossEntity = await prisma.entity.findUnique({ where: { key: crossKey } });
     if (!crossEntity) continue;
     const crossPrev = await getRunningSaldo(crossEntity.id, jenisInput.id);
-    const crossNewSaldo = crossPrev + (isKeluar ? -total : total);
-    crossingEntries.push({ entity: crossEntity, newSaldo: crossNewSaldo });
+    const crossNewSaldo = crossPrev + total; // crossing entity receives money (masuk)
+    const crossKasCoaId = await resolveKasCoa(input.jenisInputKey, crossKey);
+    crossingEntries.push({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId });
   }
 
   const commonData = {
@@ -329,7 +431,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...(arahLaporan ? { extraFieldsJson: { arahLaporan } } : {}),
+        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
       },
     })
   );
@@ -349,7 +451,12 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
     },
   });
 
-  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo }) => {
+  // Pre-resolve hutang COA for the source entity (used as liability in crossing entries)
+  const hutangCodeReplace = HUTANG_COA_CODE[input.entityKey];
+  const hutangCoaReplace = hutangCodeReplace ? await prisma.coaAccount.findUnique({ where: { code: hutangCodeReplace } }) : null;
+
+  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Kas B / Cr. HUTANG_A
+  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId }) => {
     const crossCommon = {
       entityId: crossEntity.id,
       jenisInputId: jenisInput.id,
@@ -359,27 +466,30 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
       saldoSetelah: crossNewSaldo,
       staffId: session.user.id,
     };
-    const crossAkun = validRows.map((r) =>
-      prisma.transaction.create({
-        data: {
-          ...crossCommon,
-          coaAccountId: r.coaAccountId,
-          debit: isKeluar ? r.nominal : 0,
-          kredit: isKeluar ? 0 : r.nominal,
-          extraFieldsJson: { crossingGroupId, crossingFromEntityKey: input.entityKey },
-        },
-      })
-    );
+    // Crossing entity receives money (masuk): Dr. Kas B
     const crossKas = prisma.transaction.create({
       data: {
         ...crossCommon,
-        coaAccountId: kasCoaId,
-        debit: isKeluar ? 0 : total,
-        kredit: isKeluar ? total : 0,
+        coaAccountId: crossKasCoaId,
+        debit: total,
+        kredit: 0,
         extraFieldsJson: { isKasEntry: true, crossingGroupId, crossingFromEntityKey: input.entityKey },
       },
     });
-    return [...crossAkun, crossKas];
+    // Crossing entity records liability: Cr. HUTANG_A
+    const ops: ReturnType<typeof prisma.transaction.create>[] = [crossKas];
+    if (hutangCoaReplace) {
+      ops.push(prisma.transaction.create({
+        data: {
+          ...crossCommon,
+          coaAccountId: hutangCoaReplace.id,
+          debit: 0,
+          kredit: total,
+          extraFieldsJson: { crossingGroupId, crossingFromEntityKey: input.entityKey },
+        },
+      }));
+    }
+    return ops;
   });
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);

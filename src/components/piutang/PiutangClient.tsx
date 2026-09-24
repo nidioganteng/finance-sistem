@@ -118,7 +118,7 @@ export function PiutangClient({
   const [pelunasanError, setPelunasanError] = useState<string | null>(null);
   const [pelunasanPending, startPelunasanTransition] = useTransition();
 
-  const isManajer = userRole === "MANAJER_KEUANGAN";
+  const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN";
 
   function openPelunasanModal(balance: InterEntityBalance) {
     setPelunasanModal({ balance });

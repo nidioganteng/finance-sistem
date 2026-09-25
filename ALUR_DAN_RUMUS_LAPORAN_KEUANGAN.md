@@ -83,17 +83,24 @@ Selain isi angkanya, laporan juga perlu dibedakan berdasarkan **status waktu**:
 
 ---
 
-### 4.1 Neraca: Versi Internal vs Versi Umum (Penyajian Bruto / Gross Sesuai Templat Resmi NRC 2026)
+### 4.1 Neraca: Netting Piutang & Hutang Antar Entitas (Hanya yang Lebih Besar Dimasukkan)
 
-Berdasarkan templat spreadsheet resmi perusahaan (**`NRC 2026`** pada buku kerja laporan keuangan) serta Standar Akuntansi Keuangan (PSAK/SAK) mengenai larangan saling hapus (*no-offsetting rule*):
+Sesuai ketentuan pembukuan grup perusahaan, akun piutang dan hutang antar entitas (pihak terkait/afiliasi) di Neraca disajikan secara **saling hapus (netted)** per pasangan rekanan entitas:
 
-- **Penyajian Bruto Penuh (Gross Presentation)**:
-  Seluruh akun piutang antar entitas (`111`–`115`) di Aktiva Lancar dan hutang antar entitas (`311`–`315`) di Kewajiban disajikan **secara utuh (bruto/gross)** baik di Versi Internal maupun Versi Umum.
-  * *Contoh*: Cipta Asri Disain (CAD) mencatat `Piutang GS: Rp 1.170.271.323` di Aktiva Lancar sekaligus `Hutang GS: Rp 46.295.500` di Kewajiban Lancar. Keduanya tetap dicantumkan secara lengkap tanpa di-netting.
-  * *Alasan Standar*: Piutang adalah hak tagih atas pekerjaan/proyek, sedangkan hutang adalah kewajiban operasional/pinjaman. Menyajikan keduanya secara terbuka menjaga jejak audit (*audit trail*) yang transparan dan dapat dipertanggungjawabkan kepada auditor maupun kantor pajak.
+- **Prinsip Netting ("Yang Paling Besar yang Dimasukkan")**:
+  1. **Jika Piutang > Hutang**:
+     - Akun **Piutang** masuk di sisi **Aktiva Lancar** sebesar selisihnya (`Piutang - Hutang`).
+     - Akun **Hutang** menjadi Rp 0 (dihilangkan dari sisi Kewajiban).
+     - *Contoh*: Gaharu memiliki Piutang KAK Rp 50.010.000.000 dan Hutang KAK Rp 100.000.000 $\rightarrow$ Yang muncul di Neraca hanyalah **PIUTANG KAK: Rp 49.910.000.000** di Aktiva Lancar, sedangkan Hutang KAK tidak muncul.
+  2. **Jika Hutang > Piutang**:
+     - Akun **Hutang** masuk di sisi **Kewajiban** sebesar selisihnya (`Hutang - Piutang`).
+     - Akun **Piutang** menjadi Rp 0 (dihilangkan dari sisi Aktiva Lancar).
+     - *Contoh*: Kencana memiliki Hutang GS Rp 50.010.000.000 dan Piutang GS Rp 100.000.000 $\rightarrow$ Yang muncul di Neraca hanyalah **Hutang GS: Rp 49.910.000.000** di Kewajiban, sedangkan Piutang GS tidak muncul.
+  3. **Jika Piutang = Hutang**:
+     - Keduanya saling mengeliminasi menjadi Rp 0 dan tidak ditampilkan di Neraca.
 
 - **Keseimbangan Otomatis (100% Balanced)**:
-  Karena seluruh pencatatan transaksi berpegang pada prinsip *double-entry* (Debit = Kredit), penyajian bruto seluruh akun aktiva dan pasiva menjamin $\mathbf{Total\ Aktiva = Total\ Pasiva}$ secara alami tanpa risiko selisih.
+  Karena pengurangan nominal dilakukan dalam jumlah yang persis sama di kedua sisi Neraca ($\min(\text{Piutang}, \text{Hutang})$ pada Aktiva Lancar dan Kewajiban), persamaan akuntansi $\mathbf{Total\ Aktiva = Total\ Pasiva}$ tetap **seimbang sempurna (Diff = Rp 0)**.
 
 ---
 

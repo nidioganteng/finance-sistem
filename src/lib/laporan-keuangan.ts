@@ -128,9 +128,12 @@ export async function getLaporanKeuanganData(
       } else {
         const saldo = debit - kredit;
         if (saldo !== 0 || debit !== 0 || kredit !== 0) {
+          const isMkt = coa.code === "628";
+          const code = normVersion === "UMUM" && isMkt ? "150" : coa.code;
+          const name = normVersion === "UMUM" && isMkt ? "Kas Titipan" : coa.name;
           beban.push({
-            code: coa.code,
-            name: coa.name,
+            code,
+            name,
             saldo,
             saldoFmt: formatRupiah(Math.abs(saldo)),
           });

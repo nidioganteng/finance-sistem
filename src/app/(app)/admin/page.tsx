@@ -92,8 +92,16 @@ export default function AdminPage() {
       <div className="max-w-lg flex flex-col gap-4">
         <AdminCard
           icon={<Wrench size={20} />}
+          title="Sync Daftar Akun (COA) dari Master"
+          description="Hapus semua COA lama dan insert ulang dari master list yang benar. <strong>Jalankan ini setelah reset data keuangan.</strong>"
+          buttonLabel="Sync COA dari Master"
+          endpoint="/api/admin/sync-coa"
+        />
+
+        <AdminCard
+          icon={<Wrench size={20} />}
           title="Fix Duplikat Daftar Akun (COA)"
-          description="Menghapus entri COA yang duplikat (kode sama). Entri pertama dipertahankan, transaksi yang mereferensi duplikat dipindahkan ke entri yang dipertahankan."
+          description="Menghapus entri COA yang duplikat (kode sama). Entri pertama dipertahankan."
           buttonLabel="Hapus Duplikat COA"
           endpoint="/api/admin/fix-duplicate-coa"
         />

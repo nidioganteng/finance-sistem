@@ -213,7 +213,7 @@ export function LabaRugiUmumView({ data, entityKey, version = "INTERNAL" }: Laba
                 {biayaLangsungFmt}
               </div>
               <div className="text-[11.5px] text-muted mt-2 truncate">
-                {version === "UMUM" ? "Akun 6xx tanpa By Marketing" : "Akun 6xx termasuk By Marketing"}
+                {version === "UMUM" ? "Akun 6xx (termasuk Kas Titipan)" : "Akun 6xx (termasuk By Marketing)"}
               </div>
             </div>
 

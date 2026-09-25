@@ -18,9 +18,14 @@ export function KomparasiEntityPills({
   const searchParams = useSearchParams();
 
   function select(key: string | undefined) {
+    const target = key || "grup";
+    document.cookie = `lastEntityKey=${target}; path=/; max-age=2592000`;
     const params = new URLSearchParams(searchParams.toString());
-    if (key) params.set("entity", key);
-    else params.delete("entity");
+    if (key) {
+      params.set("entity", key);
+    } else {
+      params.set("entity", "grup");
+    }
     router.push(`${pathname}?${params.toString()}`);
   }
 

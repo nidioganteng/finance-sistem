@@ -86,11 +86,12 @@ export default async function LaporanPage({
   if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
+  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const canGrup = canViewGrupAggregate(role);
-  const selectedKey = resolveReportEntityKey(searchParams.entity, entityKeys, canGrup);
+  const effectiveCanGrup = currentVersion === "UMUM" ? false : canGrup;
+  const selectedKey = resolveReportEntityKey(searchParams.entity, entityKeys, effectiveCanGrup);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
   const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
   const tab = searchParams.tab ?? "ringkasan";
 
   // For group view, aggregate all entity data
@@ -328,7 +329,7 @@ export default async function LaporanPage({
             {tab !== "komparasi" && <YearSelect currentYear={currentYear} />}
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
-              showGrupOption={canGrup}
+              showGrupOption={effectiveCanGrup}
               currentEntityKey={selectedKey ?? "grup"}
             />
           </>
@@ -348,7 +349,7 @@ export default async function LaporanPage({
             <KomparasiEntityPills
               entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))}
               currentEntityKey={selectedKey}
-              canGrup={canGrup}
+              canGrup={effectiveCanGrup}
             />
           </div>
 

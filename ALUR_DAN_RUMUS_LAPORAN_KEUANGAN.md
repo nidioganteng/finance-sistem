@@ -83,6 +83,56 @@ Selain isi angkanya, laporan juga perlu dibedakan berdasarkan **status waktu**:
 
 ---
 
+### 4.1 Neraca: Netting Piutang & Hutang Antar Entitas (Hanya yang Lebih Besar Dimasukkan)
+
+Sesuai ketentuan pembukuan grup perusahaan, akun piutang dan hutang antar entitas (pihak terkait/afiliasi) di Neraca disajikan secara **saling hapus (netted)** per pasangan rekanan entitas:
+
+- **Prinsip Netting ("Yang Paling Besar yang Dimasukkan")**:
+  1. **Jika Piutang > Hutang**:
+     - Akun **Piutang** masuk di sisi **Aktiva Lancar** sebesar selisihnya (`Piutang - Hutang`).
+     - Akun **Hutang** menjadi Rp 0 (dihilangkan dari sisi Kewajiban).
+     - *Contoh*: Gaharu memiliki Piutang KAK Rp 50.010.000.000 dan Hutang KAK Rp 100.000.000 $\rightarrow$ Yang muncul di Neraca hanyalah **PIUTANG KAK: Rp 49.910.000.000** di Aktiva Lancar, sedangkan Hutang KAK tidak muncul.
+  2. **Jika Hutang > Piutang**:
+     - Akun **Hutang** masuk di sisi **Kewajiban** sebesar selisihnya (`Hutang - Piutang`).
+     - Akun **Piutang** menjadi Rp 0 (dihilangkan dari sisi Aktiva Lancar).
+     - *Contoh*: Kencana memiliki Hutang GS Rp 50.010.000.000 dan Piutang GS Rp 100.000.000 $\rightarrow$ Yang muncul di Neraca hanyalah **Hutang GS: Rp 49.910.000.000** di Kewajiban, sedangkan Piutang GS tidak muncul.
+  3. **Jika Piutang = Hutang**:
+     - Keduanya saling mengeliminasi menjadi Rp 0 dan tidak ditampilkan di Neraca.
+
+- **Keseimbangan Otomatis (100% Balanced)**:
+  Karena pengurangan nominal dilakukan dalam jumlah yang persis sama di kedua sisi Neraca ($\min(\text{Piutang}, \text{Hutang})$ pada Aktiva Lancar dan Kewajiban), persamaan akuntansi $\mathbf{Total\ Aktiva = Total\ Pasiva}$ tetap **seimbang sempurna (Diff = Rp 0)**.
+
+---
+
+### 4.2 Rekonsiliasi By Marketing (Laba Rugi) vs Kas Titipan (Neraca Umum)
+
+Dalam pelaporan keuangan grup, terdapat perbedaan perlakuan biaya promosi/marketing antara versi manajemen internal dan versi pelaporan umum/pajak:
+
+1. **Laba Rugi Versi Internal**:
+   - Akun `By Marketing` (kode `628`) diakui penuh sebagai beban operasional (pengurang laba).
+   - Pengeluaran kas/bank dicatat riil, sehingga laba bersih mencerminkan profitabilitas operasional sebenarnya.
+
+2. **Laba Rugi Versi Umum**:
+   - Akun `By Marketing` **tidak dimasukkan / ditiadakan** (koreksi fiskal positif), karena menurut ketentuan perpajakan, biaya marketing tanpa daftar nominatif resmi tidak boleh mengurangi Penghasilan Kena Pajak.
+   - Akibatnya, Laba Bersih Versi Umum menjadi **lebih besar** sebesar nominal `By Marketing`.
+
+3. **Neraca Versi Umum (Akun Kas Titipan)**:
+   - Karena Laba Tahun Berjalan di sisi Modal (Pasiva) bertambah sebesar `By Marketing`, maka sisi Aktiva juga harus bertambah dengan nilai yang sama agar Neraca tetap seimbang ($\text{Aktiva} = \text{Pasiva}$).
+   - Nilai tersebut dicatat di Aktiva Lancar sebagai akun **`Kas Titipan`** (kode `150`) atau pada baris `Kas`. Secara hukum/fiskal, uang tersebut tidak diakui sebagai biaya yang hangus, melainkan dianggap masih berupa dana/kas yang dititipkan di perusahaan.
+
+#### Tabel Simulasi Dummy (Berdasarkan Templat CAD 2026):
+*Nominal By Marketing: Rp 105.264.739*
+
+| Komponen Laporan | Versi INTERNAL | Versi UMUM | Selisih / Perlakuan |
+| :--- | :---: | :---: | :--- |
+| **Laba Rugi: By Marketing (628)** | Rp 105.264.739 | Rp 0 | Diakui di Internal, dihapus di Umum |
+| **Laba Rugi: Laba Bersih** | Rp 552.894.735.261 | Rp 557.000.000.000 | Laba Umum lebih tinggi +Rp 105.264.739 |
+| **Neraca: Kas Titipan (150)** | **Rp 0 (Tidak ada)** | **Rp 105.264.739** | Ditampilkan di Aktiva Lancar Umum |
+| **Neraca: Laba Tahun Berjalan** | Rp 552.894.735.261 | Rp 557.000.000.000 | Modal Umum lebih tinggi +Rp 105.264.739 |
+| **Status Neraca** | **100% Balanced (Diff = 0)** | **100% Balanced (Diff = 0)** | Keduanya seimbang sempurna |
+
+---
+
 ## 5. Arus Kas — Presentasi Netted per Pihak Terkait
 
 Kalau ada piutang DAN hutang ke pihak yang sama, sebaiknya digabung jadi satu baris bersih di Arus Kas, bukan ditampilkan dua baris terpisah.

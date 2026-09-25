@@ -81,7 +81,7 @@ async function main() {
   // ── COA ──────────────────────────────────────────────────────────
   await prisma.coaAccount.deleteMany({});
 
-  type CoaMasterDef = { code: string; name: string; kategori: CoaKategori };
+  type CoaMasterDef = { code: string; name: string; kategori: CoaKategori; reportCategory?: "INTERNAL" | "UMUM" | "SEMUA" };
   const A = CoaKategori.ASET;
   const P = CoaKategori.PENDAPATAN;
   const B = CoaKategori.BEBAN;
@@ -98,6 +98,7 @@ async function main() {
     { code: "120",  name: "Kas GS",                      kategori: A },
     { code: "130",  name: "Kas TB",                      kategori: A },
     { code: "140",  name: "Kas CAD",                     kategori: A },
+    { code: "150",  name: "Kas Titipan",                 kategori: A, reportCategory: "UMUM" },
     { code: "1100", name: "Kas Kecil KAK",               kategori: A },
     { code: "1200", name: "Kas Kecil GS",                kategori: A },
     { code: "1300", name: "Kas Kecil TB",                kategori: A },
@@ -170,7 +171,7 @@ async function main() {
     { code: "625",  name: "By Taktis",                   kategori: B },
     { code: "626",  name: "By SKA",                      kategori: B },
     { code: "627",  name: "By Kontrak",                  kategori: B },
-    { code: "628",  name: "By Marketing",                kategori: B },
+    { code: "628",  name: "By Marketing",                kategori: B, reportCategory: "INTERNAL" },
     { code: "630",  name: "Biaya Lainnya",               kategori: B },
     { code: "632",  name: "By Akomodasi",                kategori: B },
     { code: "633",  name: "By Ijin Usaha",               kategori: B },
@@ -191,8 +192,8 @@ async function main() {
     const reportType = deriveReportType(c.kategori, c.name);
     await prisma.coaAccount.upsert({
       where: { code: c.code },
-      update: { name: c.name, kategori: c.kategori, reportType, urutan: i },
-      create: { code: c.code, name: c.name, kategori: c.kategori, reportType, urutan: i },
+      update: { name: c.name, kategori: c.kategori, reportType, urutan: i, reportCategory: c.reportCategory ?? "SEMUA" },
+      create: { code: c.code, name: c.name, kategori: c.kategori, reportType, urutan: i, reportCategory: c.reportCategory ?? "SEMUA" },
     });
   }
 

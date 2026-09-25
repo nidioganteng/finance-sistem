@@ -246,45 +246,6 @@ export async function getLaporanKeuanganData(
     }
   }
 
-  // Khusus Versi UMUM: Presentasi Netted Saldo Antar Entitas (yang lebih besar yang dimasukin)
-  // Sesuai prinsip pelaporan eksternal: saldo piutang & hutang ke entitas yang sama diselisihkan (netting).
-  // Sisi yang lebih besar yang masuk dengan nilai selisihnya, sedangkan sisi yang lebih kecil menjadi nol.
-  if (normVersion === "UMUM") {
-    const INTER_ENTITY_PAIRS: [string, string][] = [
-      ["111", "311"], // KAK (Kencana)
-      ["112", "312"], // GS (Gaharu)
-      ["113", "313"], // TB (Tataring)
-      ["114", "314"], // CAD (Cipta Asri)
-      ["115", "315"], // KP (Umum)
-    ];
-
-    for (const [piutangCode, hutangCode] of INTER_ENTITY_PAIRS) {
-      const pIdx = aktivaLancar.findIndex((a) => a.code === piutangCode);
-      const hIdx = kewajiban.findIndex((k) => k.code === hutangCode);
-
-      if (pIdx !== -1 && hIdx !== -1) {
-        const pLine = aktivaLancar[pIdx];
-        const hLine = kewajiban[hIdx];
-
-        if (pLine.saldo >= hLine.saldo) {
-          pLine.saldo = pLine.saldo - hLine.saldo;
-          pLine.saldoFmt = formatSaldo(pLine.saldo, false);
-          kewajiban.splice(hIdx, 1);
-          if (pLine.saldo === 0) {
-            aktivaLancar.splice(pIdx, 1);
-          }
-        } else {
-          hLine.saldo = hLine.saldo - pLine.saldo;
-          hLine.saldoFmt = formatSaldo(hLine.saldo, false);
-          aktivaLancar.splice(pIdx, 1);
-          if (hLine.saldo === 0) {
-            kewajiban.splice(hIdx, 1);
-          }
-        }
-      }
-    }
-  }
-
   // Formula Neraca (Issue 38 & 39):
   // • Total Aktiva Lancar: akun debet ditambah, akun kontra dikurangkan
   const totalAktivaLancar = aktivaLancar.reduce(

@@ -83,6 +83,24 @@ Selain isi angkanya, laporan juga perlu dibedakan berdasarkan **status waktu**:
 
 ---
 
+### 4.1 Neraca: Versi Internal (Gross) vs Versi Umum (Netted Antar Entitas)
+
+Selain pembedaan waktu, Neraca juga memiliki perbedaan penyajian untuk **Internal** vs **Umum (Eksternal)**:
+
+- **Versi Internal (Gross)**:
+  Seluruh akun piutang dan hutang antar entitas (inter-entity) ditampilkan secara utuh (*gross*). Contoh: Kencana mencatat `[112] PIUTANG GS: Rp 100.000.000` di Aktiva Lancar dan `[312] Hutang GS: Rp 50.010.000.000` di Kewajiban. Keduanya muncul bersamaan agar tim internal memiliki jejak audit lengkap antara pinjaman modal kerja vs talangan operasional.
+
+- **Versi Umum (Netted — "Yang Paling Besar yang Dimasukkan")**:
+  Untuk kebutuhan pelaporan eksternal (bank, auditor, pajak), transaksi bolak-balik antar entitas berelasi disajikan secara bersih (*netted*) per pasangan entitas rekanan:
+  1. **Jika Hutang > Piutang**: Akun Hutang dimasukkan di sisi Kewajiban sebesar nilai selisihnya (`Hutang - Piutang`), sedangkan akun Piutang menjadi Rp 0 (tidak ditampilkan).
+     *Contoh*: Kencana memiliki Hutang GS Rp 50,01 Miliar dan Piutang GS Rp 100 Juta $\rightarrow$ Yang muncul di Neraca Umum hanyalah **Hutang GS: Rp 49.910.000.000** di Kewajiban.
+  2. **Jika Piutang > Hutang**: Akun Piutang dimasukkan di sisi Aktiva Lancar sebesar nilai selisihnya (`Piutang - Hutang`), sedangkan akun Hutang menjadi Rp 0 (tidak ditampilkan).
+     *Contoh*: Gaharu memiliki Piutang KAK Rp 50,01 Miliar dan Hutang KAK Rp 100 Juta $\rightarrow$ Yang muncul di Neraca Umum hanyalah **PIUTANG KAK: Rp 49.910.000.000** di Aktiva Lancar.
+  3. **Keseimbangan Neraca**: Karena kedua sisi (Aktiva & Pasiva) berkurang dengan angka yang sama persis (`min(Piutang, Hutang)`), formula Neraca tetap **100% seimbang (Total Aktiva = Total Pasiva)**.
+
+
+---
+
 ## 5. Arus Kas — Presentasi Netted per Pihak Terkait
 
 Kalau ada piutang DAN hutang ke pihak yang sama, sebaiknya digabung jadi satu baris bersih di Arus Kas, bukan ditampilkan dua baris terpisah.

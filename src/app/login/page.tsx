@@ -1,208 +1,277 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
-import Link from "next/link";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { registerUser } from "@/lib/actions/auth";
 
-const SLIDESHOW_IMAGES = ["/img/login/gambar2.webp", "/img/login/gambar3.webp", "/img/login/gambar6.webp"];
-const SLIDE_DELAY = 8000;
+const BG_IMAGE = "/img/login/gambar2.webp";
 
 const ENTITY_LOGOS = [
-  { key: "gaharu", src: "/logo-entitas/gaharu.webp", name: "Gaharu" },
-  { key: "kencana", src: "/logo-entitas/kencana.webp", name: "Kencana" },
-  { key: "tataring", src: "/logo-entitas/tataring.webp", name: "Tataring" },
-  { key: "ciptaAsri", src: "/logo-entitas/cipta-asri.webp", name: "Cipta Asri" },
+  { key: "gaharu",    src: "/logo-entitas/gaharu.webp",    name: "Gaharu" },
+  { key: "kencana",   src: "/logo-entitas/kencana.webp",   name: "Kencana" },
+  { key: "tataring",  src: "/logo-entitas/tataring.webp",  name: "Tataring" },
+  { key: "ciptaAsri", src: "/logo-entitas/cipta-asri.webp",name: "Cipta Asri" },
 ];
 
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
-      <LoginForm />
+      <AuthForm />
     </Suspense>
   );
 }
 
-function LoginForm() {
+function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("registered") === "1";
+
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [slideIdx, setSlideIdx] = useState(0);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(
+    justRegistered ? "Pendaftaran berhasil! Akun Anda menunggu persetujuan Manajer Keuangan." : null
+  );
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSlideIdx((i) => (i + 1) % SLIDESHOW_IMAGES.length);
-    }, SLIDE_DELAY);
-    return () => clearInterval(timer);
-  }, []);
+  function switchMode(toLogin: boolean) {
+    setIsLogin(toLogin);
+    setError(null);
+    setSuccessMsg(null);
+    setPassword("");
+    setConfirmPassword("");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     setLoading(true);
-    const result = await signIn("credentials", { email, password, redirect: false });
-    setLoading(false);
-    if (result?.error) { setError("Email atau password salah, atau akun belum aktif."); return; }
-    router.push("/dashboard");
-    router.refresh();
+    try {
+      if (isLogin) {
+        const result = await signIn("credentials", { email, password, redirect: false });
+        if (result?.error) {
+          setError("Email atau password salah, atau akun belum aktif.");
+        } else {
+          router.push("/dashboard");
+          router.refresh();
+        }
+      } else {
+        if (!name.trim()) throw new Error("Nama lengkap harus diisi.");
+        if (password !== confirmPassword) throw new Error("Password dan konfirmasi tidak cocok.");
+        const fd = new FormData();
+        fd.set("name", name);
+        fd.set("email", email);
+        fd.set("password", password);
+        fd.set("confirm", confirmPassword);
+        const result = await registerUser(fd);
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          setSuccessMsg("Pendaftaran berhasil! Akun Anda menunggu persetujuan Manajer Keuangan.");
+          switchMode(true);
+        }
+      }
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }
 
+  const inputBase = "w-full bg-slate-900/50 border border-slate-700/50 rounded-2xl py-3.5 text-sm text-slate-100 focus:outline-none focus:border-[#158ed4] focus:ring-1 focus:ring-[#158ed4] transition-all shadow-inner placeholder:text-slate-600";
+
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* ── Background slideshow full layar ── */}
-      <div className="absolute inset-0 bg-slate-900">
-        {SLIDESHOW_IMAGES.map((src, i) => (
-          <Image
-            key={src}
-            src={src}
-            alt="background"
-            fill
-            className={`object-cover transition-opacity duration-1000 ${i === slideIdx ? "opacity-100" : "opacity-0"}`}
-            priority={i === 0}
-          />
-        ))}
-        {/* Overlay gelap tipis agar teks terbaca */}
-        <div className="absolute inset-0 bg-black/30" />
-      </div>
+    <div className="min-h-screen bg-slate-900 flex flex-col md:flex-row font-sans text-slate-100 overflow-hidden relative">
+      {/* Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[#158ed4]/20 blur-[120px] pointer-events-none animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-blue-600/20 blur-[150px] pointer-events-none animate-pulse" style={{ animationDelay: "2s" }} />
 
-      {/* Theme toggle */}
-      <div className="absolute top-6 right-6 z-20">
-        <ThemeToggle />
-      </div>
-
-      {/* Copyright */}
-      <div className="absolute bottom-5 right-6 z-20">
-        <p className="text-[11px] text-white/30">© 2026 Gaharu Sempana Group</p>
-      </div>
-
-      {/* Label kiri atas */}
-      <div className="absolute top-7 left-8 z-20 hidden lg:block drop-shadow-lg">
-        <div className="text-white text-[15px] font-extrabold tracking-widest uppercase" style={{textShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>Gaharu Sempana Group</div>
-        <div className="text-white/80 text-[12.5px] mt-0.5 font-semibold" style={{textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>Sistem Data Keuangan</div>
-      </div>
-
-      {/* Logo entitas + dots — kiri bawah */}
-      <div className="absolute bottom-8 left-8 z-20 hidden lg:block">
-        <div className="text-white text-[11px] font-bold uppercase tracking-widest mb-3" style={{textShadow:"0 1px 4px rgba(0,0,0,0.6)"}}>Entitas Grup</div>
-        <div className="flex items-center gap-4 mb-4">
-          {ENTITY_LOGOS.map((e) => (
-            <div key={e.key} className="flex flex-col items-center gap-2">
-              <div className="w-14 h-14 rounded-[16px] bg-white flex items-center justify-center overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.35)]">
-                <Image src={e.src} alt={e.name} width={52} height={52} className="object-contain p-1" />
-              </div>
-              <span className="text-white text-[11px] font-bold" style={{textShadow:"0 1px 4px rgba(0,0,0,0.6)"}}>{e.name}</span>
-            </div>
-          ))}
+      {/* ── Left: Branding ── */}
+      <div className="hidden md:flex md:w-1/2 lg:w-[55%] relative flex-col justify-between p-12 lg:p-20 border-r border-white/10 z-10">
+        <div className="absolute inset-0 z-0">
+          <Image src={BG_IMAGE} alt="Background" fill className="object-cover opacity-30 mix-blend-overlay" priority />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-[#158ed4]/40" />
         </div>
-        <div className="flex gap-1.5">
-          {SLIDESHOW_IMAGES.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setSlideIdx(i)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${i === slideIdx ? "w-6 bg-white" : "w-1.5 bg-white/50"}`}
-            />
-          ))}
-        </div>
-      </div>
 
-      {/* ── Panel form — tengah, frosted glass ── */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-[420px] flex flex-col justify-center
-          bg-white/15 dark:bg-black/40 backdrop-blur-2xl
-          rounded-[20px] sm:rounded-[28px] border border-white/25 dark:border-white/10
-          px-6 py-8 sm:px-10 sm:py-12 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
-
-          {/* Logo mobile */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-none">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M4 20V10l8-6 8 6v10" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" />
-                <rect x="10" y="14" width="4" height="6" fill="#fff" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center flex-none">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path d="M4 20V10l8-6 8 6v10" stroke="#158ed4" strokeWidth="1.8" strokeLinejoin="round" />
+                <rect x="10" y="14" width="4" height="6" fill="#158ed4" />
               </svg>
             </div>
-            <div>
-              <div className="font-extrabold text-[15px] text-white">Sistem Data Keuangan</div>
-              <div className="text-[10.5px] text-white/70 font-semibold tracking-wide">GAHARU SEMPANA GROUP</div>
-            </div>
+            <h1 className="text-3xl font-black tracking-tight text-white">
+              Data Keuangan<span className="text-[#158ed4]">.</span>
+            </h1>
           </div>
 
-          {/* Heading */}
-          <div className="mb-8">
-            <h1 className="text-[30px] font-extrabold text-white leading-tight">Selamat Datang</h1>
-            <p className="text-[13.5px] text-white/70 mt-1">Masuk ke akun Anda untuk melanjutkan.</p>
-          </div>
+          <h2 className="text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-white mb-6">
+            Sistem Keuangan <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#158ed4] to-cyan-400">
+              Grup Terpadu
+            </span>
+          </h2>
+          <p className="text-lg text-slate-300 max-w-md leading-relaxed border-l-4 border-[#158ed4] pl-4">
+            Platform pengelolaan keuangan internal Gaharu Sempana Group — real-time, akurat, dan aman.
+          </p>
+        </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label className="text-[11px] font-bold text-white/70 uppercase tracking-widest block mb-1.5">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@gaharusempana.com"
-                className="w-full px-4 py-3 rounded-[12px] border border-white/20 bg-white/10 text-[13.5px] text-white placeholder:text-white/40 focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-bold text-white/70 uppercase tracking-widest block mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3 pr-11 rounded-[12px] border border-white/20 bg-white/10 text-[13.5px] text-white placeholder:text-white/40 focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+        <div className="relative z-10">
+          <div className="text-white/60 text-[11px] font-bold uppercase tracking-widest mb-4">Entitas Grup</div>
+          <div className="flex items-center gap-5">
+            {ENTITY_LOGOS.map((e) => (
+              <div key={e.key} className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-[16px] bg-white/10 backdrop-blur flex items-center justify-center overflow-hidden border border-white/20">
+                  <Image src={e.src} alt={e.name} width={44} height={44} className="object-contain p-1" />
+                </div>
+                <span className="text-white/70 text-[11px] font-semibold">{e.name}</span>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right: Form ── */}
+      <div className="w-full md:w-1/2 lg:w-[45%] flex items-center justify-center p-6 sm:p-12 relative z-10 min-h-screen md:min-h-0">
+        <div className="w-full max-w-md">
+          {/* Mobile branding */}
+          <div className="md:hidden text-center mb-10">
+            <div className="w-16 h-16 rounded-2xl bg-[#158ed4]/20 flex items-center justify-center mx-auto mb-4">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path d="M4 20V10l8-6 8 6v10" stroke="#158ed4" strokeWidth="1.8" strokeLinejoin="round" />
+                <rect x="10" y="14" width="4" height="6" fill="#158ed4" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-black text-white tracking-tight mb-1">
+              Data Keuangan<span className="text-[#158ed4]">.</span>
+            </h1>
+            <p className="text-sm text-slate-400">Gaharu Sempana Group</p>
+          </div>
+
+          {/* Card */}
+          <div className="bg-slate-800/40 backdrop-blur-2xl border border-white/10 p-8 sm:p-10 rounded-[2rem] shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#158ed4] via-cyan-500 to-blue-500" />
+
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                {isLogin ? "Selamat Datang" : "Buat Akun Baru"}
+              </h2>
+              <p className="text-sm text-slate-400">
+                {isLogin
+                  ? "Silahkan masukkan akun anda yang terdaftar untuk melanjutkan"
+                  : "Daftarkan diri Anda untuk mengakses sistem."}
+              </p>
             </div>
 
             {error && (
-              <div className="px-4 py-3 rounded-[10px] bg-red-500/20 border border-red-400/40 text-red-200 text-[13px]">
-                {error}
+              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
+                <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                <span className="text-red-300 text-sm font-medium">{error}</span>
               </div>
             )}
 
-            {justRegistered && (
-              <div className="px-4 py-3 rounded-[10px] bg-green-500/20 border border-green-400/40 text-green-200 text-[12.5px]">
-                Pendaftaran berhasil! Akun Anda menunggu persetujuan Manajer Keuangan.
+            {successMsg && (
+              <div className="mb-6 p-4 rounded-xl bg-[#158ed4]/10 border border-[#158ed4]/20 flex items-start gap-3">
+                <CheckCircle2 size={18} className="text-[#158ed4] shrink-0 mt-0.5" />
+                <span className="text-[#158ed4] text-sm font-medium">{successMsg}</span>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 rounded-[12px] bg-white text-navy font-bold text-[14px] mt-1 disabled:opacity-60 hover:bg-white/90 transition-colors"
-            >
-              {loading ? "Memproses..." : "Masuk"}
-            </button>
-          </form>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {!isLogin && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Nama Lengkap</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-[#158ed4] transition-colors">
+                      <User size={18} />
+                    </div>
+                    <input type="text" className={`${inputBase} pl-11`} placeholder="Nama lengkap Anda"
+                      value={name} onChange={(e) => setName(e.target.value)} required={!isLogin} />
+                  </div>
+                </div>
+              )}
 
-          <p className="text-center text-[12.5px] text-white/60 mt-6">
-            Belum punya akun?{" "}
-            <Link href="/register" className="text-white font-semibold hover:underline">
-              Daftar di sini
-            </Link>
-          </p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Email</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-[#158ed4] transition-colors">
+                    <Mail size={18} />
+                  </div>
+                  <input type="email" className={`${inputBase} pl-11`} placeholder="nama@gaharusempana.com"
+                    value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
+              </div>
 
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Password</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-[#158ed4] transition-colors">
+                    <Lock size={18} />
+                  </div>
+                  <input type={showPassword ? "text" : "password"} className={`${inputBase} pl-11 pr-12`}
+                    placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
+                    required minLength={isLogin ? undefined : 8} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-slate-300 transition-colors focus:outline-none">
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {!isLogin && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Konfirmasi Password</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-[#158ed4] transition-colors">
+                      <Lock size={18} />
+                    </div>
+                    <input type={showConfirmPassword ? "text" : "password"} className={`${inputBase} pl-11 pr-12`}
+                      placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                      required={!isLogin} />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-slate-300 transition-colors focus:outline-none">
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" disabled={loading}
+                className="w-full group relative overflow-hidden bg-[#158ed4] text-white font-bold text-sm py-4 px-4 rounded-2xl transition-all shadow-lg shadow-[#158ed4]/40 disabled:opacity-70 disabled:cursor-not-allowed mt-4">
+                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {loading
+                    ? <><Loader2 size={18} className="animate-spin" /> Memproses...</>
+                    : isLogin ? "Masuk ke Sistem" : "Daftar Sekarang"
+                  }
+                </span>
+              </button>
+            </form>
+
+            <div className="mt-8 text-center border-t border-slate-700/50 pt-6">
+              <button type="button" onClick={() => switchMode(!isLogin)}
+                className="text-sm text-slate-400 hover:text-white transition-colors font-medium flex items-center justify-center gap-1.5 mx-auto">
+                {isLogin
+                  ? <>Belum punya akun? <span className="text-[#158ed4] font-bold">Daftar sekarang</span></>
+                  : <>Sudah punya akun? <span className="text-[#158ed4] font-bold">Masuk di sini</span></>
+                }
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center md:hidden">
+            <p className="text-xs text-slate-500">&copy; 2026 Gaharu Sempana Group. All rights reserved.</p>
+          </div>
         </div>
       </div>
     </div>

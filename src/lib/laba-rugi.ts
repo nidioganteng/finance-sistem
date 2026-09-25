@@ -57,14 +57,18 @@ export async function getLabaRugiData(
       }
       pendapatan.get(t.coaAccountId!)!.total += Number(t.kredit);
     } else if (t.coaAccount.kategori === "BEBAN") {
-      if (!beban.has(t.coaAccountId!)) {
-        beban.set(t.coaAccountId!, {
-          code: t.coaAccount.code,
-          name: t.coaAccount.name,
+      const isMkt = t.coaAccount.code === "628";
+      const code = normVersion === "UMUM" && isMkt ? "150" : t.coaAccount.code;
+      const name = normVersion === "UMUM" && isMkt ? "Kas Titipan" : t.coaAccount.name;
+      const accountKey = normVersion === "UMUM" && isMkt ? "kas_titipan_150" : t.coaAccountId!;
+      if (!beban.has(accountKey)) {
+        beban.set(accountKey, {
+          code,
+          name,
           total: 0,
         });
       }
-      beban.get(t.coaAccountId!)!.total += Number(t.debit);
+      beban.get(accountKey)!.total += Number(t.debit);
     }
   }
 

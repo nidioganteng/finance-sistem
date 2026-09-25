@@ -4,8 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
   XAxis,
@@ -16,7 +14,7 @@ import {
   Legend,
   LabelList,
 } from "recharts";
-import { BarChart2, TrendingUp, GitCompare, X } from "lucide-react";
+import { GitCompare, X } from "lucide-react";
 
 type EntityMeta = { key: string; name: string; colorHex: string };
 type MonthRow = Record<string, string | number>;
@@ -52,7 +50,6 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear, 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [chartType, setChartType] = useState<"bar" | "line">("bar");
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set(["all"]));
 
   const year = years[0];
@@ -160,51 +157,29 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear, 
     fontSize: 12,
   };
 
-  const chartContent = series.map((s) =>
-    chartType === "bar" ? (
-      <Bar key={s.dataKey} dataKey={s.dataKey} name={s.name} fill={s.color} radius={[5, 5, 0, 0]} maxBarSize={28}>
-        {/* Label angka pendapatan per bulan — cuma dinyalain saat bandingkan
-            tahun, biar admin bisa monitor angkanya langsung tanpa hover. */}
-        {isComparing && (
-          <LabelList
-            dataKey={s.dataKey}
-            position="top"
-            formatter={(v: number) => (v > 0 ? formatY(v) : "")}
-            style={{ fontSize: 9, fontWeight: 700, fill: "rgb(var(--color-muted-stronger))" }}
-          />
-        )}
-      </Bar>
-    ) : (
-      <Line
-        key={s.dataKey}
-        type="monotone"
-        dataKey={s.dataKey}
-        name={s.name}
-        stroke={s.color}
-        strokeWidth={2.5}
-        dot={{ r: 3, fill: s.color }}
-        activeDot={{ r: 5 }}
-      />
-    )
-  );
+  const chartContent = series.map((s) => (
+    <Line
+      key={s.dataKey}
+      type="monotone"
+      dataKey={s.dataKey}
+      name={s.name}
+      stroke={s.color}
+      strokeWidth={2.5}
+      dot={{ r: 3, fill: s.color }}
+      activeDot={{ r: 5 }}
+    >
+      {isComparing && (
+        <LabelList
+          dataKey={s.dataKey}
+          position="top"
+          formatter={(v: number) => (v > 0 ? formatY(v) : "")}
+          style={{ fontSize: 9, fontWeight: 700, fill: "rgb(var(--color-muted-stronger))" }}
+        />
+      )}
+    </Line>
+  ));
 
-  const commonChart = chartType === "bar" ? (
-    <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-      <CartesianGrid vertical={false} stroke="rgb(var(--color-border))" />
-      <XAxis dataKey="month" {...sharedAxisProps} />
-      <YAxis {...sharedAxisProps} tickFormatter={formatY} width={56} />
-      <Tooltip
-        formatter={(v: number, name: string) => [formatTooltip(v), name]}
-        contentStyle={tooltipContentStyle}
-      />
-      <Legend
-        iconType="circle"
-        iconSize={8}
-        wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-      />
-      {chartContent}
-    </BarChart>
-  ) : (
+  const commonChart = (
     <LineChart data={chartData}>
       <CartesianGrid vertical={false} stroke="rgb(var(--color-border))" />
       <XAxis dataKey="month" {...sharedAxisProps} />
@@ -271,32 +246,6 @@ export function RevenueChart({ monthlyDataByYear, entities, years, currentYear, 
               ))}
             </select>
           )}
-
-          {/* Chart type toggle */}
-          <div className="flex items-center gap-1 border border-border-soft rounded-[9px] p-0.5 bg-surface-subtle">
-            <button
-              onClick={() => setChartType("bar")}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
-                chartType === "bar"
-                  ? "bg-surface-card text-navy-text shadow-sm"
-                  : "text-muted hover:text-muted-stronger"
-              }`}
-            >
-              <BarChart2 size={13} />
-              Bar
-            </button>
-            <button
-              onClick={() => setChartType("line")}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] text-[12px] font-semibold transition-colors ${
-                chartType === "line"
-                  ? "bg-surface-card text-navy-text shadow-sm"
-                  : "text-muted hover:text-muted-stronger"
-              }`}
-            >
-              <TrendingUp size={13} />
-              Line
-            </button>
-          </div>
 
           {/* Buka tab Komparasi di /laporan (tabel Pendapatan/Beban/Laba lengkap) —
               bawa tahun yang sedang aktif di chart. Klik pada chart/tombol tahun

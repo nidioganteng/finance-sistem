@@ -103,16 +103,8 @@ function AuthForm() {
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center flex-none">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                <path d="M4 20V10l8-6 8 6v10" stroke="#158ed4" strokeWidth="1.8" strokeLinejoin="round" />
-                <rect x="10" y="14" width="4" height="6" fill="#158ed4" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-black tracking-tight text-white">
-              Data Keuangan<span className="text-[#158ed4]">.</span>
-            </h1>
+          <div className="flex items-center gap-4 mb-12">
+            <Image src="/logo-sidamon.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
           </div>
 
           <h2 className="text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-white mb-6">
@@ -131,7 +123,7 @@ function AuthForm() {
           <div className="flex items-center gap-5">
             {ENTITY_LOGOS.map((e) => (
               <div key={e.key} className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-[16px] bg-white/10 backdrop-blur flex items-center justify-center overflow-hidden border border-white/20">
+                <div className="w-14 h-14 rounded-[16px] bg-white flex items-center justify-center overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
                   <Image src={e.src} alt={e.name} width={44} height={44} className="object-contain p-1" />
                 </div>
                 <span className="text-white/70 text-[11px] font-semibold">{e.name}</span>
@@ -146,15 +138,7 @@ function AuthForm() {
         <div className="w-full max-w-md">
           {/* Mobile branding */}
           <div className="md:hidden text-center mb-10">
-            <div className="w-16 h-16 rounded-2xl bg-[#158ed4]/20 flex items-center justify-center mx-auto mb-4">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path d="M4 20V10l8-6 8 6v10" stroke="#158ed4" strokeWidth="1.8" strokeLinejoin="round" />
-                <rect x="10" y="14" width="4" height="6" fill="#158ed4" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-black text-white tracking-tight mb-1">
-              Data Keuangan<span className="text-[#158ed4]">.</span>
-            </h1>
+            <Image src="/logo-sidamon.png" alt="Logo" width={72} height={72} className="object-contain mx-auto mb-4 drop-shadow-lg" />
             <p className="text-sm text-slate-400">Gaharu Sempana Group</p>
           </div>
 

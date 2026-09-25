@@ -128,9 +128,12 @@ export async function getLaporanKeuanganData(
       } else {
         const saldo = debit - kredit;
         if (saldo !== 0 || debit !== 0 || kredit !== 0) {
+          const isMkt = coa.code === "628";
+          const code = normVersion === "UMUM" && isMkt ? "150" : coa.code;
+          const name = normVersion === "UMUM" && isMkt ? "Kas Titipan" : coa.name;
           beban.push({
-            code: coa.code,
-            name: coa.name,
+            code,
+            name,
             saldo,
             saldoFmt: formatRupiah(Math.abs(saldo)),
           });
@@ -243,6 +246,43 @@ export async function getLaporanKeuanganData(
         saldoFmt: formatSaldo(totalHargaPerolehanAset, false),
         isContra: false,
       });
+    }
+  }
+
+  // Presentasi Netted Saldo Antar Entitas (yang lebih besar yang dimasukin)
+  // Sesuai aturan akuntansi neraca: saldo piutang & hutang ke entitas yang sama diselisihkan (netting).
+  // Sisi yang lebih besar yang masuk dengan nilai selisihnya, sedangkan sisi yang lebih kecil menjadi nol / dihilangkan.
+  const INTER_ENTITY_PAIRS: [string, string][] = [
+    ["111", "311"], // KAK (Kencana)
+    ["112", "312"], // GS (Gaharu)
+    ["113", "313"], // TB (Tataring)
+    ["114", "314"], // CAD (Cipta Asri)
+    ["115", "315"], // KP (Umum)
+  ];
+
+  for (const [piutangCode, hutangCode] of INTER_ENTITY_PAIRS) {
+    const pIdx = aktivaLancar.findIndex((a) => a.code === piutangCode);
+    const hIdx = kewajiban.findIndex((k) => k.code === hutangCode);
+
+    if (pIdx !== -1 && hIdx !== -1) {
+      const pLine = aktivaLancar[pIdx];
+      const hLine = kewajiban[hIdx];
+
+      if (pLine.saldo >= hLine.saldo) {
+        pLine.saldo = pLine.saldo - hLine.saldo;
+        pLine.saldoFmt = formatSaldo(pLine.saldo, false);
+        kewajiban.splice(hIdx, 1);
+        if (pLine.saldo === 0) {
+          aktivaLancar.splice(pIdx, 1);
+        }
+      } else {
+        hLine.saldo = hLine.saldo - pLine.saldo;
+        hLine.saldoFmt = formatSaldo(hLine.saldo, false);
+        aktivaLancar.splice(pIdx, 1);
+        if (hLine.saldo === 0) {
+          kewajiban.splice(hIdx, 1);
+        }
+      }
     }
   }
 

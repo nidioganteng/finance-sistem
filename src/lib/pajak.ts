@@ -262,18 +262,23 @@ export async function getLaporanPajakData(
   const totalPendapatanFiskal = pend400Fiskal - ppnFiskal;
 
   // 2. BIAYA LANGSUNG (Akun 6xx proyek/langsung)
-  // Aturan Biaya: Di Versi INTERNAL ada By Marketing (628), di Versi UMUM tidak ada By Marketing (628).
-  const templateBiayaLangsung = version === "UMUM"
-    ? TEMPLATE_BIAYA_LANGSUNG.filter((t) => t.code !== "628")
-    : TEMPLATE_BIAYA_LANGSUNG;
+  // Untuk Internal: akun 628 disajikan sebagai By Marketing.
+  // Untuk Umum: akun 628 dimasukkan juga ke Laba Rugi dengan nama Kas Titipan (kode 150).
+  const templateBiayaLangsung = TEMPLATE_BIAYA_LANGSUNG.map((t) => {
+    if (t.code === "628" && version === "UMUM") {
+      return { code: "150", name: "Kas Titipan" };
+    }
+    return t;
+  });
 
   const biayaLangsungCodes = new Set(templateBiayaLangsung.map((t) => t.code));
   const biayaLangsungRows: TaxReportRow[] = templateBiayaLangsung.map((item) => {
-    const k = activeAmountMap.get(item.code) ?? 0;
-    const f = fiskalMap.get(item.code) ?? 0;
+    const codeToLookup = item.code === "150" ? "628" : item.code;
+    const k = activeAmountMap.get(codeToLookup) ?? activeAmountMap.get(item.code) ?? 0;
+    const f = fiskalMap.get(codeToLookup) ?? fiskalMap.get(item.code) ?? 0;
     return {
       code: item.code,
-      name: accountNameMap.get(item.code) ?? item.name,
+      name: item.code === "150" ? "Kas Titipan" : (accountNameMap.get(item.code) ?? item.name),
       komersial: k,
       fiskal: f,
       koreksi: f - k,
@@ -288,7 +293,8 @@ export async function getLaporanPajakData(
       acc.code !== "611" &&
       acc.code !== "633" &&
       acc.code !== "616" &&
-      (version !== "UMUM" || acc.code !== "628")
+      acc.code !== "628" &&
+      acc.code !== "150"
     ) {
       const k = activeAmountMap.get(acc.code) ?? 0;
       const f = fiskalMap.get(acc.code) ?? 0;

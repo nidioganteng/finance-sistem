@@ -76,8 +76,61 @@ export function Sidebar({
 
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
-  function toggleDropdown(href: string) {
-    setOpenDropdowns((prev) => ({ ...prev, [href]: !prev[href] }));
+  function toggleDropdown(href: string, defaultOpen: boolean) {
+    setOpenDropdowns((prev) => {
+      const current = prev[href] !== undefined ? prev[href] : defaultOpen;
+      return { ...prev, [href]: !current };
+    });
+  }
+
+  function getSubHref(sub: { href: string; version?: "internal" | "umum" }) {
+    const [basePath] = sub.href.split("?");
+    const params = new URLSearchParams();
+
+    if (sub.version) {
+      params.set("version", sub.version);
+    }
+
+    let entity = searchParams.get("entity");
+    if (!entity && typeof document !== "undefined") {
+      const match = document.cookie.match(/(?:^|;\s*)lastEntityKey=([^;]+)/);
+      if (match && match[1]) {
+        entity = decodeURIComponent(match[1]);
+      }
+    }
+    if (entity) {
+      params.set("entity", entity);
+    }
+
+    const currentTab = searchParams.get("tab");
+    if (currentTab) {
+      params.set("tab", currentTab);
+    }
+
+    const currentYear = searchParams.get("year");
+    if (currentYear) {
+      params.set("year", currentYear);
+    }
+
+    const qs = params.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  }
+
+  function getItemHref(href: string) {
+    let entity = searchParams.get("entity");
+    if (!entity && typeof document !== "undefined") {
+      const match = document.cookie.match(/(?:^|;\s*)lastEntityKey=([^;]+)/);
+      if (match && match[1]) {
+        entity = decodeURIComponent(match[1]);
+      }
+    }
+    if (entity && entity !== "grup" && !href.includes("?")) {
+      const noEntityPages = ["/log", "/notifikasi", "/dokumen", "/pengguna", "/jenis-input", "/coa"];
+      if (!noEntityPages.some((p) => href.startsWith(p))) {
+        return `${href}?entity=${encodeURIComponent(entity)}`;
+      }
+    }
+    return href;
   }
 
   return (
@@ -117,12 +170,13 @@ export function Sidebar({
                 const isParentActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
                 if (item.subItems && item.subItems.length > 0) {
-                  const isOpen = Boolean(openDropdowns[item.href]);
+                  const isDefaultOpen = isParentActive;
+                  const isOpen = openDropdowns[item.href] !== undefined ? openDropdowns[item.href] : isDefaultOpen;
                   return (
                     <div key={item.href} className="flex flex-col">
                       <button
                         type="button"
-                        onClick={() => toggleDropdown(item.href)}
+                        onClick={() => toggleDropdown(item.href, isDefaultOpen)}
                         className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 cursor-pointer ${
                           isParentActive
                             ? "bg-surface-hover/80 text-navy-text font-bold"
@@ -150,7 +204,7 @@ export function Sidebar({
                             return (
                               <Link
                                 key={sub.href}
-                                href={sub.href}
+                                href={getSubHref(sub)}
                                 onClick={onClose}
                                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-150 ${
                                   isSubActive
@@ -176,7 +230,7 @@ export function Sidebar({
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={getItemHref(item.href)}
                     onClick={onClose}
                     className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 ${
                       isParentActive
@@ -205,7 +259,7 @@ export function Sidebar({
                 return (
                   <Link
                     key={item.key}
-                    href={href}
+                    href={getItemHref(href)}
                     onClick={onClose}
                     className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 ${
                       active

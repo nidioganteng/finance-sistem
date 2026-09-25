@@ -95,6 +95,34 @@ Berdasarkan templat spreadsheet resmi perusahaan (**`NRC 2026`** pada buku kerja
 - **Keseimbangan Otomatis (100% Balanced)**:
   Karena seluruh pencatatan transaksi berpegang pada prinsip *double-entry* (Debit = Kredit), penyajian bruto seluruh akun aktiva dan pasiva menjamin $\mathbf{Total\ Aktiva = Total\ Pasiva}$ secara alami tanpa risiko selisih.
 
+---
+
+### 4.2 Rekonsiliasi By Marketing (Laba Rugi) vs Kas Titipan (Neraca Umum)
+
+Dalam pelaporan keuangan grup, terdapat perbedaan perlakuan biaya promosi/marketing antara versi manajemen internal dan versi pelaporan umum/pajak:
+
+1. **Laba Rugi Versi Internal**:
+   - Akun `By Marketing` (kode `628`) diakui penuh sebagai beban operasional (pengurang laba).
+   - Pengeluaran kas/bank dicatat riil, sehingga laba bersih mencerminkan profitabilitas operasional sebenarnya.
+
+2. **Laba Rugi Versi Umum**:
+   - Akun `By Marketing` **tidak dimasukkan / ditiadakan** (koreksi fiskal positif), karena menurut ketentuan perpajakan, biaya marketing tanpa daftar nominatif resmi tidak boleh mengurangi Penghasilan Kena Pajak.
+   - Akibatnya, Laba Bersih Versi Umum menjadi **lebih besar** sebesar nominal `By Marketing`.
+
+3. **Neraca Versi Umum (Akun Kas Titipan)**:
+   - Karena Laba Tahun Berjalan di sisi Modal (Pasiva) bertambah sebesar `By Marketing`, maka sisi Aktiva juga harus bertambah dengan nilai yang sama agar Neraca tetap seimbang ($\text{Aktiva} = \text{Pasiva}$).
+   - Nilai tersebut dicatat di Aktiva Lancar sebagai akun **`Kas Titipan`** (kode `150`) atau pada baris `Kas`. Secara hukum/fiskal, uang tersebut tidak diakui sebagai biaya yang hangus, melainkan dianggap masih berupa dana/kas yang dititipkan di perusahaan.
+
+#### Tabel Simulasi Dummy (Berdasarkan Templat CAD 2026):
+*Nominal By Marketing: Rp 105.264.739*
+
+| Komponen Laporan | Versi INTERNAL | Versi UMUM | Selisih / Perlakuan |
+| :--- | :---: | :---: | :--- |
+| **Laba Rugi: By Marketing (628)** | Rp 105.264.739 | Rp 0 | Diakui di Internal, dihapus di Umum |
+| **Laba Rugi: Laba Bersih** | Rp 552.894.735.261 | Rp 557.000.000.000 | Laba Umum lebih tinggi +Rp 105.264.739 |
+| **Neraca: Kas Titipan (150)** | **Rp 0 (Tidak ada)** | **Rp 105.264.739** | Ditampilkan di Aktiva Lancar Umum |
+| **Neraca: Laba Tahun Berjalan** | Rp 552.894.735.261 | Rp 557.000.000.000 | Modal Umum lebih tinggi +Rp 105.264.739 |
+| **Status Neraca** | **100% Balanced (Diff = 0)** | **100% Balanced (Diff = 0)** | Keduanya seimbang sempurna |
 
 ---
 

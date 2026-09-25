@@ -9,7 +9,7 @@ export type NavSubItem = {
 export type NavItem = {
   label: string;
   href: string;
-  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList" | "penLine";
+  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList" | "penLine" | "trash2";
   subItems?: NavSubItem[];
 };
 
@@ -39,6 +39,12 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
+      ],
+    },
+    {
+      title: "Admin",
+      items: [
+        { label: "Reset Data", href: "/admin", icon: "trash2" },
       ],
     },
   ],

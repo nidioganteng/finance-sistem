@@ -40,7 +40,11 @@ export default async function AktivaTetapPage({
         subtitle={`Inventaris aset tetap & otomatisasi jadwal penyusutan terhubung ke Laporan Keuangan (Tahun ${year})`}
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Aktiva Tetap"
+              entityName={selectedEntity.name}
+              year={year}
+            />
             <YearSelect currentYear={year} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

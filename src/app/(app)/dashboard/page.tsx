@@ -167,7 +167,10 @@ export default async function DashboardPage({
         <>
           {/* 5 KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border p-4" title={`Total Pendapatan Grup: ${formatRupiah(totalRevenue)}`}>
+            <div
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
+              title={`Total Pendapatan Grup: ${formatRupiah(totalRevenue)}`}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
                   <TrendingUp size={16} className="text-blue-500 dark:text-blue-400" />
@@ -175,9 +178,20 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pendapatan Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalRevenue)}</div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {formatRupiah(totalRevenue)}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
+              </div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4" title={`Total Pengeluaran Grup: ${formatRupiah(totalSpend)}`}>
+            <div
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
+              title={`Total Pengeluaran Grup: ${formatRupiah(totalSpend)}`}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-500/15 flex items-center justify-center">
                   <TrendingDown size={16} className="text-slate-400 dark:text-slate-500" />
@@ -185,10 +199,18 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pengeluaran Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {formatRupiah(totalSpend)}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
+              </div>
             </div>
 
             <div
-              className="bg-surface-card rounded-[16px] border border-border p-4"
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
               title={`${totalProfit >= 0 ? "Total Laba Bersih Grup" : "Total Rugi Bersih Grup"}: ${(totalProfit < 0 ? "-" : "") + formatRupiah(Math.abs(totalProfit))}`}
             >
               <div className="flex items-center gap-2 mb-2">
@@ -199,6 +221,14 @@ export default async function DashboardPage({
               </div>
               <div className={`text-[22px] font-extrabold tabular-nums ${totalProfit >= 0 ? "text-status-green" : "text-status-red"}`}>
                 {totalProfit < 0 ? "-" : ""}{formatMiliar(Math.abs(totalProfit))}
+              </div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className={`text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight ${totalProfit >= 0 ? "bg-status-green" : "bg-status-red"}`}>
+                  {(totalProfit < 0 ? "-" : "") + formatRupiah(Math.abs(totalProfit))}
+                </div>
+                <div className={`w-0 h-0 border-x-4 border-x-transparent border-t-4 ml-4 ${totalProfit >= 0 ? "border-t-status-green" : "border-t-status-red"}`} />
               </div>
             </div>
 
@@ -216,7 +246,7 @@ export default async function DashboardPage({
             </div>
 
             <div
-              className="bg-surface-card rounded-[16px] border border-border p-4"
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
               title={`Total Piutang Belum Tertagih: ${formatRupiah(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}`}
             >
               <div className="flex items-center gap-2 mb-2">
@@ -227,6 +257,14 @@ export default async function DashboardPage({
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
                 {formatMiliar(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
+              </div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {formatRupiah(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
               </div>
             </div>
           </div>

@@ -9,13 +9,19 @@ export function LogTabs({ currentTab }: { currentTab: string }) {
 
   function go(tab: string) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tab);
-    router.push(`${pathname}?${params.toString()}`);
+    if (tab === "all") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
   }
 
   const tabs = [
-    { key: "user", label: "Aktivitas Pengguna" },
+    { key: "all", label: "Semua" },
     { key: "financial", label: "Perubahan Finansial" },
+    { key: "user", label: "Aktivitas Pengguna" },
   ];
 
   return (
@@ -26,7 +32,7 @@ export function LogTabs({ currentTab }: { currentTab: string }) {
           onClick={() => go(t.key)}
           className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
             currentTab === t.key
-              ? "bg-navy text-white"
+              ? "bg-navy text-white shadow-sm"
               : "text-muted-stronger hover:bg-surface-hover"
           }`}
         >

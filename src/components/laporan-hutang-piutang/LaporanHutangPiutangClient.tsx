@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   ArrowDownCircle,
@@ -13,6 +14,9 @@ import {
   ChevronUp,
   Receipt,
   Minus,
+  ArrowRight,
+  ExternalLink,
+  Info,
 } from "lucide-react";
 import type {
   LaporanHutangPiutangEntityData,
@@ -120,37 +124,37 @@ export function LaporanHutangPiutangClient({
           </div>
         </div>
 
-        {/* ── Side-by-Side Tables (Format Excel Cipta Asri) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ── Side-by-Side Tables (Format Presisi Sesuai Excel Tim Finance) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* ── Table Kiri: REKAP HUTANG ── */}
-          <div className="lg:col-span-7 bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
             <div className="px-6 py-4 border-b border-surface-hover bg-surface-subtle/50 flex items-center justify-between">
               <div>
                 <h3 className="text-[13px] font-extrabold text-navy-text uppercase tracking-wider">
                   Rekap Hutang {entity.name}
                 </h3>
                 <p className="text-[11.5px] text-muted mt-0.5">
-                  Kewajiban hutang berjalan & akumulasi tahun sebelumnya
+                  Kewajiban hutang berjalan &amp; akumulasi tahun sebelumnya
                 </p>
               </div>
-              <span className="p-1 rounded-md bg-status-red/10 text-status-red">
-                <ArrowUpCircle size={15} />
+              <span className="p-1.5 rounded-lg bg-status-red/10 text-status-red">
+                <ArrowUpCircle size={16} />
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-surface-hover text-left bg-surface-card">
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
                       Rekanan / Akun
                     </th>
-                    <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                    <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
                       Hutang per {year - 1}
                     </th>
-                    <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                    <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
                       Hutang {year}
                     </th>
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
                       Total Hutang per {year}
                     </th>
                   </tr>
@@ -158,7 +162,7 @@ export function LaporanHutangPiutangClient({
                 <tbody className="divide-y divide-surface-subtle">
                   {rekapHutang.rows.map((row) => (
                     <tr key={row.code} className="hover:bg-surface-hover/30 transition-colors">
-                      <td className="py-3.5 px-5">
+                      <td className="py-3.5 px-4">
                         <div className="font-semibold text-navy-text text-[13px]">
                           Kas dan Bank {row.shortName}
                         </div>
@@ -166,23 +170,29 @@ export function LaporanHutangPiutangClient({
                           Akun {row.code} · {row.fullName}
                         </div>
                       </td>
-                      <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px]">
+                      <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
                         {row.hutangLaluFmt}
                       </td>
-                      <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px]">
+                      <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
                         {row.hutangTahunIniFmt}
                       </td>
-                      <td className="py-3.5 px-5 text-right tabular-nums font-bold text-navy-text text-[13px]">
+                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-navy-text text-[13px] font-mono">
                         {row.totalHutangFmt}
                       </td>
                     </tr>
                   ))}
                   {/* Total Hutang Row */}
                   <tr className="bg-surface-subtle font-extrabold text-navy-text border-t-2 border-border-soft">
-                    <td colSpan={3} className="py-3.5 px-5 text-right uppercase text-[11.5px] tracking-wider">
+                    <td className="py-3.5 px-4 uppercase text-[11px] tracking-wider">
                       Total Hutang per {year}
                     </td>
-                    <td className="py-3.5 px-5 text-right tabular-nums text-[13.5px] text-status-red underline decoration-double">
+                    <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                      {rekapHutang.totalHutangLaluFmt}
+                    </td>
+                    <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                      {rekapHutang.totalHutangTahunIniFmt}
+                    </td>
+                    <td className="py-3.5 px-4 text-right tabular-nums text-[13.5px] font-mono text-status-red underline decoration-double">
                       {rekapHutang.totalHutangFmt}
                     </td>
                   </tr>
@@ -192,34 +202,42 @@ export function LaporanHutangPiutangClient({
           </div>
 
           {/* ── Table Kanan: PIUTANG ── */}
-          <div className="lg:col-span-5 bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
             <div className="px-6 py-4 border-b border-surface-hover bg-surface-subtle/50 flex items-center justify-between">
               <div>
                 <h3 className="text-[13px] font-extrabold text-navy-text uppercase tracking-wider">
                   Piutang {entity.name} {year}
                 </h3>
-                <p className="text-[11.5px] text-muted mt-0.5">Saldo piutang aktif per {year}</p>
+                <p className="text-[11.5px] text-muted mt-0.5">
+                  Hak tagih piutang aktif ke entitas afiliasi
+                </p>
               </div>
-              <span className="p-1 rounded-md bg-status-green/10 text-status-green">
-                <ArrowDownCircle size={15} />
+              <span className="p-1.5 rounded-lg bg-status-green/10 text-status-green">
+                <ArrowDownCircle size={16} />
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-surface-hover text-left bg-surface-card">
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
                       Akun Piutang
                     </th>
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
-                      Saldo Piutang
+                    <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
+                      Piutang {year - 1}
+                    </th>
+                    <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
+                      Piutang {year}
+                    </th>
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
+                      Perubahan
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-subtle">
                   {rekapPiutang.rows.map((row) => (
                     <tr key={row.code} className="hover:bg-surface-hover/30 transition-colors">
-                      <td className="py-3.5 px-5">
+                      <td className="py-3.5 px-4">
                         <div className="font-semibold text-navy-text text-[13px]">
                           PIUTANG {row.shortName}
                         </div>
@@ -227,18 +245,30 @@ export function LaporanHutangPiutangClient({
                           Akun {row.code} · {row.fullName}
                         </div>
                       </td>
-                      <td className="py-3.5 px-5 text-right tabular-nums font-bold text-navy-text text-[13px]">
-                        {row.piutangFmt}
+                      <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                        {row.piutangLaluFmt}
+                      </td>
+                      <td className="py-3.5 px-3 text-right tabular-nums font-bold text-navy-text text-[13px] font-mono">
+                        {row.piutangBerjalanFmt}
+                      </td>
+                      <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                        {row.perubahanFmt}
                       </td>
                     </tr>
                   ))}
                   {/* Total Piutang Row */}
                   <tr className="bg-surface-subtle font-extrabold text-navy-text border-t-2 border-border-soft">
-                    <td className="py-3.5 px-5 text-right uppercase text-[11.5px] tracking-wider">
+                    <td className="py-3.5 px-4 uppercase text-[11px] tracking-wider">
                       Total Piutang
                     </td>
-                    <td className="py-3.5 px-5 text-right tabular-nums text-[13.5px] text-status-green underline decoration-double">
+                    <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                      {rekapPiutang.totalPiutangLaluFmt}
+                    </td>
+                    <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-mono text-status-green underline decoration-double">
                       {rekapPiutang.totalPiutangFmt}
+                    </td>
+                    <td className="py-3.5 px-4 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                      {rekapPiutang.totalPerubahanFmt}
                     </td>
                   </tr>
                 </tbody>
@@ -247,129 +277,212 @@ export function LaporanHutangPiutangClient({
           </div>
         </div>
 
-        {/* ── Table Bawah: HASIL NETTING (POSISI BERSIH ANTAR-ENTITAS) ── */}
+        {/* ── Section Bawah: HASIL NETTING (POSISI YANG MASUK KE NERACA) ── */}
         <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
-          <div className="px-6 py-4 border-b border-surface-hover flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="px-6 py-5 border-b border-surface-hover flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <Scale size={16} className="text-brand" />
-                <h3 className="text-[14px] font-extrabold text-navy-text">
-                  Hasil Netting Posisi Bersih Antar-Entitas
+                <span className="p-1.5 rounded-lg bg-brand/10 text-brand">
+                  <Scale size={18} />
+                </span>
+                <h3 className="text-[15px] font-extrabold text-navy-text">
+                  Hasil Netting Posisi Bersih Antar-Entitas (Masuk ke Neraca)
                 </h3>
               </div>
-              <p className="text-[12px] text-muted mt-0.5">
-                Perhitungan selisih antara Piutang dan Hutang per rekanan afiliasi (Piutang - Hutang)
+              <p className="text-[12px] text-muted mt-1">
+                Format perhitungan selisih antara Piutang dan Hutang per rekanan afiliasi (Piutang − Hutang)
               </p>
             </div>
-            <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-stronger">
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-status-red" /> Utang (Negatif)
-              </span>
-              <span className="flex items-center gap-1 ml-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-status-green" /> Piutang (Positif)
-              </span>
-            </div>
+            <Link
+              href={`/neraca?entity=${entity.key}&year=${year}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-subtle hover:bg-surface-hover text-navy-text text-[12px] font-bold border border-border-soft transition-colors w-fit"
+            >
+              <span>Buka Laporan Neraca</span>
+              <ExternalLink size={13} className="text-muted-stronger" />
+            </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-hover text-left bg-surface-subtle/40">
-                  <th className="py-3 px-6 text-[11px] font-extrabold text-muted-faint uppercase">
-                    Status
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
-                    Rekanan Afiliasi
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right">
-                    Piutang
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right">
-                    Total Hutang
-                  </th>
-                  <th className="py-3 px-6 text-[11px] font-extrabold text-muted-faint uppercase text-right">
-                    Posisi Bersih (Netting)
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-subtle">
-                {netting.rows.map((row) => (
-                  <tr
-                    key={row.counterpartyKey}
-                    className="hover:bg-surface-hover/30 transition-colors"
-                  >
-                    <td className="py-3.5 px-6">
+          <div className="p-6 flex flex-col gap-6">
+            {/* ── Explanation Banner: Alur Pinjam-Meminjam & Eliminasi Neraca ── */}
+            <div className="p-4 rounded-2xl bg-brand/5 border border-brand/15 text-[12.5px] leading-relaxed text-navy-text">
+              <div className="font-bold flex items-center gap-1.5 text-brand mb-1.5">
+                <Info size={16} /> Aturan Transaksi Pinjam-Meminjam Antar-Entitas &amp; Eliminasi Neraca:
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-muted-stronger text-[12px]">
+                <li>
+                  <strong>Pencatatan Lengkap (Gross)</strong>: Pinjaman antar-entitas (misal Gaharu meminjamkan ke Kencana, lalu Kencana juga meminjamkan ke Gaharu) tetap dicatat penuh pada Laporan Hutang &amp; Piutang di atas sebagai hak tagih dan kewajiban masing-masing entitas.
+                </li>
+                <li>
+                  <strong>Eliminasi di Neraca (Netting = Piutang − Hutang)</strong>: Di Laporan Neraca, saldo Piutang dan Hutang untuk entitas rekanan yang sama diselisihkan. Sisi yang lebih besar yang masuk ke Neraca:
+                  <span className="inline-block mx-1 font-semibold text-status-green">Piutang &gt; Hutang → Aktiva Lancar</span>, atau 
+                  <span className="inline-block mx-1 font-semibold text-status-red">Hutang &gt; Piutang → Kewajiban</span>. Sisi yang lebih kecil dieliminasi menjadi Rp 0.
+                </li>
+              </ul>
+            </div>
+
+            {/* ── Tabel Utama Netting (Format Lembar Kerja Excel Tim Finance) ── */}
+            <div className="overflow-x-auto rounded-xl border border-border-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-hover text-left bg-surface-subtle/50">
+                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                      Posisi Neraca
+                    </th>
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
+                      Entitas Rekanan
+                    </th>
+                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                      Saldo Netto (Masuk Neraca)
+                    </th>
+                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                      Kalkulasi (Piutang − Hutang)
+                    </th>
+                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                      Penempatan di Neraca
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-subtle">
+                  {netting.rows.map((row) => (
+                    <tr
+                      key={row.counterpartyKey}
+                      className="hover:bg-surface-hover/30 transition-colors"
+                    >
+                      <td className="py-3.5 px-5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-extrabold uppercase tracking-wide ${
+                            row.status === "UTANG"
+                              ? "bg-status-red/15 text-status-red"
+                              : row.status === "PIUTANG"
+                              ? "bg-status-green/15 text-status-green"
+                              : "bg-surface-hover text-muted-stronger"
+                          }`}
+                        >
+                          {row.status === "UTANG" ? (
+                            <ArrowUpCircle size={13} />
+                          ) : row.status === "PIUTANG" ? (
+                            <ArrowDownCircle size={13} />
+                          ) : (
+                            <Minus size={13} />
+                          )}
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-navy-text text-[13px] uppercase">
+                        {row.fullName}{" "}
+                        <span className="text-muted-faint font-normal text-[11.5px]">({row.shortName})</span>
+                      </td>
+                      <td className="py-3.5 px-5 text-right tabular-nums">
+                        <span
+                          className={`font-extrabold text-[13.5px] px-2.5 py-1 rounded-md font-mono ${
+                            row.status === "UTANG"
+                              ? "text-status-red bg-red-500/5"
+                              : row.status === "PIUTANG"
+                              ? "text-status-green bg-green-500/5"
+                              : "text-muted-stronger"
+                          }`}
+                        >
+                          {row.netFmt}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-5 text-right tabular-nums text-muted-stronger text-[12px] font-mono">
+                        {row.piutangFmt} − {row.hutangFmt}
+                      </td>
+                      <td className="py-3.5 px-5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-semibold ${
+                            row.status === "UTANG"
+                              ? "bg-status-red/10 text-status-red"
+                              : row.status === "PIUTANG"
+                              ? "bg-status-green/10 text-status-green"
+                              : "bg-surface-subtle text-muted"
+                          }`}
+                        >
+                          {row.neracaPosition}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Total Netting Row */}
+                  <tr className="bg-surface-subtle/80 font-extrabold text-navy-text border-t-2 border-border-soft">
+                    <td colSpan={2} className="py-3.5 px-5 text-left uppercase text-[11.5px] tracking-wider">
+                      Total Posisi Bersih Antar-Grup
+                    </td>
+                    <td className="py-3.5 px-5 text-right tabular-nums">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-extrabold uppercase ${
+                        className={`text-[14px] font-extrabold underline decoration-double font-mono ${
+                          isNetKreditur
+                            ? "text-status-green"
+                            : isNetDebitur
+                            ? "text-status-red"
+                            : "text-navy-text"
+                        }`}
+                      >
+                        {netting.posisiBersihGlobalFmt}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right tabular-nums text-[12px] text-muted-stronger font-mono">
+                      {rekapPiutang.totalPiutangFmt} − {rekapHutang.totalHutangFmt}
+                    </td>
+                    <td className="py-3.5 px-5 text-[11.5px] text-muted">
+                      {isNetKreditur ? "Net Hak Tagih (Kreditur)" : isNetDebitur ? "Net Kewajiban (Debitur)" : "Seimbang"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Ringkasan Cepat Posisi Neraca (Sesuai Format 3 Kolom Excel) ── */}
+            <div>
+              <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wider mb-2.5">
+                Ringkasan Cepat Posisi Neraca (Format Templat Excel)
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {netting.rows.map((row) => (
+                  <div
+                    key={row.counterpartyKey}
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      row.status === "UTANG"
+                        ? "bg-status-red/5 border-status-red/20"
+                        : row.status === "PIUTANG"
+                        ? "bg-status-green/5 border-status-green/20"
+                        : "bg-surface-subtle/30 border-border-soft"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span
+                        className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
                           row.status === "UTANG"
                             ? "bg-status-red/15 text-status-red"
                             : row.status === "PIUTANG"
                             ? "bg-status-green/15 text-status-green"
-                            : "bg-surface-hover text-muted-stronger"
+                            : "bg-surface-hover text-muted"
                         }`}
                       >
-                        {row.status === "UTANG" ? (
-                          <ArrowUpCircle size={13} />
-                        ) : row.status === "PIUTANG" ? (
-                          <ArrowDownCircle size={13} />
-                        ) : (
-                          <Minus size={13} />
-                        )}
                         {row.status}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-navy-text text-[13px]">
-                      {row.fullName}{" "}
-                      <span className="text-muted-faint font-normal text-[12px]">({row.shortName})</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px]">
-                      {row.piutangFmt}
-                    </td>
-                    <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px]">
-                      {row.hutangFmt}
-                    </td>
-                    <td className="py-3.5 px-6 text-right tabular-nums">
-                      <span
-                        className={`font-extrabold text-[13px] px-2.5 py-1 rounded-md ${
-                          row.status === "UTANG"
-                            ? "text-status-red bg-red-500/5 font-mono"
-                            : row.status === "PIUTANG"
-                            ? "text-status-green bg-green-500/5"
-                            : "text-muted-stronger"
-                        }`}
-                      >
-                        {row.netFmt}
+                      <span className="text-[11.5px] font-bold text-navy-text uppercase tracking-tight">
+                        {row.fullName}
                       </span>
-                    </td>
-                  </tr>
-                ))}
-                {/* Total Netting Row */}
-                <tr className="bg-surface-subtle/80 font-extrabold text-navy-text border-t-2 border-border-soft">
-                  <td colSpan={2} className="py-3.5 px-6 text-left uppercase text-[12px] tracking-wider">
-                    Total Posisi Bersih Antar-Grup
-                  </td>
-                  <td className="py-3.5 px-4 text-right tabular-nums text-[12.5px] text-status-green">
-                    {rekapPiutang.totalPiutangFmt}
-                  </td>
-                  <td className="py-3.5 px-4 text-right tabular-nums text-[12.5px] text-status-red">
-                    {rekapHutang.totalHutangFmt}
-                  </td>
-                  <td className="py-3.5 px-6 text-right tabular-nums">
-                    <span
-                      className={`text-[14px] font-extrabold underline decoration-double ${
-                        isNetKreditur
+                    </div>
+                    <div
+                      className={`text-[15px] font-extrabold tabular-nums font-mono ${
+                        row.status === "UTANG"
+                          ? "text-status-red"
+                          : row.status === "PIUTANG"
                           ? "text-status-green"
-                          : isNetDebitur
-                          ? "text-status-red font-mono"
-                          : "text-navy-text"
+                          : "text-muted"
                       }`}
                     >
-                      {netting.posisiBersihGlobalFmt}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                      {row.netFmt}
+                    </div>
+                    <div className="text-[10.5px] text-muted mt-1 truncate">
+                      {row.neracaPosition}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

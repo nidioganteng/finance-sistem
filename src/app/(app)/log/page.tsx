@@ -8,6 +8,9 @@ import { roleLabel } from "@/lib/rbac";
 import { formatLogDetail } from "@/lib/format-log-detail";
 import { PageTransition } from "@/components/layout/PageTransition";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function LogPage({
   searchParams,
 }: {

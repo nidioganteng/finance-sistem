@@ -47,6 +47,12 @@ export interface RekapPiutangRow {
   fullName: string;
   code: string;
   accountName: string;
+  piutangLalu: number;
+  piutangLaluFmt: string;
+  piutangBerjalan: number;
+  piutangBerjalanFmt: string;
+  perubahan: number;
+  perubahanFmt: string;
   piutang: number;
   piutangFmt: string;
 }
@@ -62,7 +68,11 @@ export interface NettingRow {
   hutangFmt: string;
   net: number;
   netFmt: string;
+  absNet: number;
+  absNetFmt: string;
   isUtang: boolean;
+  neracaPosition: string;
+  neracaAccountCode: string;
 }
 
 export interface MutasiAfiliasiTx {
@@ -94,6 +104,10 @@ export interface LaporanHutangPiutangEntityData {
   };
   rekapPiutang: {
     rows: RekapPiutangRow[];
+    totalPiutangLalu: number;
+    totalPiutangLaluFmt: string;
+    totalPerubahan: number;
+    totalPerubahanFmt: string;
     totalPiutang: number;
     totalPiutangFmt: string;
   };
@@ -259,6 +273,8 @@ export async function getLaporanHutangPiutangEntityData(
 
   // Build Rekap Piutang Rows
   const piutangRows: RekapPiutangRow[] = [];
+  let sumPiutangLalu = 0;
+  let sumPerubahan = 0;
   let sumTotalPiutang = 0;
 
   for (const cp of counterparties) {
@@ -281,6 +297,8 @@ export async function getLaporanHutangPiutangEntityData(
     }
 
     const totalPiutang = piutangAwal + piutangTahunIni;
+    sumPiutangLalu += piutangAwal;
+    sumPerubahan += piutangTahunIni;
     sumTotalPiutang += totalPiutang;
 
     piutangRows.push({
@@ -289,6 +307,12 @@ export async function getLaporanHutangPiutangEntityData(
       fullName: cp.fullName,
       code: cp.piutangCode,
       accountName: coa?.name ?? `PIUTANG ${cp.shortName}`,
+      piutangLalu: piutangAwal,
+      piutangLaluFmt: formatAccountingRupiah(piutangAwal),
+      piutangBerjalan: totalPiutang,
+      piutangBerjalanFmt: formatAccountingRupiah(totalPiutang),
+      perubahan: piutangTahunIni,
+      perubahanFmt: formatAccountingRupiah(piutangTahunIni),
       piutang: totalPiutang,
       piutangFmt: formatAccountingRupiah(totalPiutang),
     });
@@ -309,11 +333,18 @@ export async function getLaporanHutangPiutangEntityData(
     const net = piutang - hutang;
 
     let status: "UTANG" | "PIUTANG" | "NIHIL" = "NIHIL";
+    let neracaPosition = "Tidak Masuk Neraca (Saling Hapus)";
+    let neracaAccountCode = "-";
+
     if (net > 0) {
       status = "PIUTANG";
+      neracaPosition = `Aktiva Lancar (Akun ${cp.piutangCode})`;
+      neracaAccountCode = cp.piutangCode;
       totalNetPiutang += net;
     } else if (net < 0) {
       status = "UTANG";
+      neracaPosition = `Kewajiban (Akun ${cp.hutangCode})`;
+      neracaAccountCode = cp.hutangCode;
       totalNetUtang += Math.abs(net);
     }
 
@@ -328,7 +359,11 @@ export async function getLaporanHutangPiutangEntityData(
       hutangFmt: formatAccountingRupiah(hutang),
       net,
       netFmt: formatAccountingRupiah(net),
+      absNet: Math.abs(net),
+      absNetFmt: formatAccountingRupiah(Math.abs(net)),
       isUtang: net < 0,
+      neracaPosition,
+      neracaAccountCode,
     });
   }
 
@@ -386,6 +421,10 @@ export async function getLaporanHutangPiutangEntityData(
     },
     rekapPiutang: {
       rows: piutangRows,
+      totalPiutangLalu: sumPiutangLalu,
+      totalPiutangLaluFmt: formatAccountingRupiah(sumPiutangLalu),
+      totalPerubahan: sumPerubahan,
+      totalPerubahanFmt: formatAccountingRupiah(sumPerubahan),
       totalPiutang: sumTotalPiutang,
       totalPiutangFmt: formatAccountingRupiah(sumTotalPiutang),
     },

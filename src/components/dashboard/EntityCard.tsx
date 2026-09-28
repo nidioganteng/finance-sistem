@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { formatMiliar } from "@/lib/dashboard-data";
+import { formatMiliar, formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -125,6 +125,10 @@ export function EntityCard({
   const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0.0";
   const spendPct = revenue > 0 ? Math.min(Math.round((spend / revenue) * 100), 100) : 0;
 
+  const formattedRevenue = formatRupiah(revenue);
+  const formattedSpend = formatRupiah(spend);
+  const formattedProfit = `${isProfit ? "" : "-"}${formatRupiah(Math.abs(profit))}`;
+
   const content = (
     <motion.div
       whileHover={interactive ? { y: -2, transition: { duration: 0.15 } } : undefined}
@@ -171,17 +175,21 @@ export function EntityCard({
       </div>
 
       {/* Metrics row */}
-      <div className="grid grid-cols-3 divide-x divide-border bg-surface-card border-x border-b border-border rounded-b-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border bg-surface-card border-x border-b border-border rounded-b-2xl">
         {/* Pendapatan */}
-        <div className="px-6 py-4">
+        <div className="px-5 sm:px-6 py-4 min-w-0">
           <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">Pendapatan</div>
-          <div className="text-[20px] font-extrabold text-navy-text tabular-nums">{formatMiliar(revenue)}</div>
+          <div className={`${getMetricValueFontSize(formattedRevenue)} text-navy-text truncate`} title={formattedRevenue}>
+            {formattedRevenue}
+          </div>
         </div>
 
         {/* Pengeluaran */}
-        <div className="px-6 py-4">
+        <div className="px-5 sm:px-6 py-4 min-w-0">
           <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">Pengeluaran</div>
-          <div className="text-[20px] font-extrabold text-navy-text tabular-nums">{formatMiliar(spend)}</div>
+          <div className={`${getMetricValueFontSize(formattedSpend)} text-navy-text truncate`} title={formattedSpend}>
+            {formattedSpend}
+          </div>
           <div className="mt-2 h-1 rounded-full bg-surface-hover overflow-hidden">
             <div
               className={`h-full rounded-full ${spendPct > 90 ? "bg-status-red" : spendPct > 70 ? "bg-status-amber" : "bg-brand"}`}
@@ -192,12 +200,12 @@ export function EntityCard({
         </div>
 
         {/* Laba */}
-        <div className="px-6 py-4">
+        <div className="px-5 sm:px-6 py-4 min-w-0">
           <div className="text-[11px] font-bold text-muted-faint uppercase tracking-wide mb-1">
             {isProfit ? "Laba Bersih" : "Rugi Bersih"}
           </div>
-          <div className={`text-[20px] font-extrabold tabular-nums ${isProfit ? "text-status-green" : "text-status-red"}`}>
-            {isProfit ? "" : "-"}{formatMiliar(Math.abs(profit))}
+          <div className={`${getMetricValueFontSize(formattedProfit)} ${isProfit ? "text-status-green" : "text-status-red"} truncate`} title={formattedProfit}>
+            {formattedProfit}
           </div>
         </div>
       </div>

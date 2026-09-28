@@ -53,7 +53,10 @@ export default async function JurnalPage({
         subtitle="Seluruh transaksi kas dan bank, tercatat otomatis dari setiap input"
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Jurnal Umum"
+              entityName={selectedEntity.name}
+            />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
               showGrupOption={false}

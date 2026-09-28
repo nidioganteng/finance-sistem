@@ -307,7 +307,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     }
   }
 
-  logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
+  logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
@@ -496,7 +496,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);
 
-  logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
+  logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");

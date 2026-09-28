@@ -86,6 +86,7 @@ export function formatLogDetail(detail: unknown, action: string = ""): string {
     if (d.format) parts.push(`Format: ${d.format}`);
     if (d.year) parts.push(`Tahun: ${d.year}`);
     if (d.version) parts.push(`Versi: ${d.version === "UMUM" ? "Umum" : "Internal"}`);
+    if (d.halaman) parts.push(`Halaman: ${d.halaman}`);
     return parts.length > 0 ? parts.join(" • ") : "Ekspor data laporan";
   }
 

@@ -5,24 +5,26 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getRunningSaldo, ENTITY_PREFIX } from "@/lib/kas";
+import { getRunningSaldo, ENTITY_PREFIX, ENTITY_PREFIX_UMUM } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
 import { computeNewTerminPercentage } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 
-// Format: {PREFIX}/{MMDD}{SEQ} — SEQ mulai dari 1, naik per hari per entitas
+// Format Pengeluaran Umum: {PREFIX}{MMDD}{SEQ}
+// Contoh: UK09281 (Kencana), UG09281 (Gaharu), UT09281 (Tataring), UC09281 (Cipta Asri)
+// SEQ mulai dari 1, naik berurutan per hari per entitas
 export async function generateNoBukti(entityKey: string, tanggal: string): Promise<string> {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
 
-  const prefix = ENTITY_PREFIX[entityKey] ?? entityKey.toUpperCase().slice(0, 3);
+  const prefix = ENTITY_PREFIX_UMUM[entityKey] ?? ENTITY_PREFIX[entityKey] ?? entityKey.toUpperCase().slice(0, 2);
   const d = new Date(tanggal);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const dayPart = `${mm}${dd}`;
-  const pattern = `${prefix}/${dayPart}`;
+  const pattern = `${prefix}${dayPart}`;
 
   const entity = await prisma.entity.findUnique({ where: { key: entityKey } });
   if (!entity) throw new Error("Entity tidak ditemukan.");

@@ -16,8 +16,8 @@ export default async function LogPage({
   const { role } = session!.user;
   if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
-  const tab = searchParams.tab === "financial" ? "financial" : "user";
-  const category = tab === "financial" ? "FINANCIAL_CHANGE" : "USER_ACTIVITY";
+  const tab = searchParams.tab === "financial" ? "financial" : searchParams.tab === "user" ? "user" : "all";
+  const category = tab === "financial" ? "FINANCIAL_CHANGE" : tab === "user" ? "USER_ACTIVITY" : undefined;
   const logs = await getActivityLogs(category);
 
   return (
@@ -39,6 +39,7 @@ export default async function LogPage({
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Waktu</th>
               <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Aktor</th>
               <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Role</th>
+              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Kategori</th>
               <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Aksi</th>
               <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Detail</th>
             </tr>
@@ -46,7 +47,7 @@ export default async function LogPage({
           <tbody>
             {logs.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-sm text-muted">
+                <td colSpan={6} className="py-10 text-center text-sm text-muted">
                   Belum ada log untuk kategori ini.
                 </td>
               </tr>
@@ -59,6 +60,17 @@ export default async function LogPage({
                 <td className="py-3 px-3 font-semibold text-navy-text text-[13px]">{log.actor.name}</td>
                 <td className="py-3 px-3 text-[12px] text-muted">
                   {log.actor.role ? roleLabel(log.actor.role) : "-"}
+                </td>
+                <td className="py-3 px-3">
+                  {log.category === "FINANCIAL_CHANGE" ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                      Finansial
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200/60">
+                      Pengguna
+                    </span>
+                  )}
                 </td>
                 <td className="py-3 px-3 text-[13px] text-muted-stronger">{log.action}</td>
                 <td className="py-3 px-6">

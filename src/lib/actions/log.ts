@@ -2,6 +2,29 @@
 
 import { prisma } from "@/lib/prisma";
 import { LogCategory } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
+export async function logExportActivity(action: string, detail?: Record<string, unknown>) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.activityLog.create({
+      data: {
+        actorId: session.user.id,
+        action,
+        category: "USER_ACTIVITY",
+        detail: (detail ?? {}) as any,
+      },
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("Gagal mencatat log ekspor:", err);
+    return { success: false };
+  }
+}
 
 export async function logActivity(
   actorId: string,

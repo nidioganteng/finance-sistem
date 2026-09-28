@@ -6,7 +6,6 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
 import { NeracaView } from "@/components/laporan/NeracaView";
@@ -18,7 +17,6 @@ export default async function NeracaPage({
 }) {
   const session = await getServerSession(authOptions);
   const { entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Neraca", "USER_ACTIVITY", { path: "/neraca" });
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);

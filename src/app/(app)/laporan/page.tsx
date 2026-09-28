@@ -251,53 +251,65 @@ export default async function LaporanPage({
       txCountB,
     };
 
-    // Chart bulanan cuma masuk akal buat mode Tahunan (dua/lebih tahun penuh
-    // dibandingkan bulan per bulan). Grup ("Semua Entitas") dibatasi ke 2 tahun
-    // (Periode A/B) dan warna = entitas; 1 entitas dibatasi 2-5 tahun sekaligus
-    // dan warna = tahun.
-    if (mode === "tahunan") {
-      if (!selectedEntity) {
-        const entityKeysAll = entities.map((e) => e.key);
+    // Chart tren pendapatan bulanan antar-tahun (berlaku untuk mode Tahunan maupun Bulanan).
+    // Grup ("Semua Entitas") menampilkan tren per tahun komparasi;
+    // 1 entitas spesifik menampilkan pilihan multi-tahun (2-5 tahun) dengan warna per tahun.
+    if (!selectedEntity) {
+      const entityKeysAll = entities.map((e) => e.key);
+      let allYears: number[];
+      if (periodA.year === periodB.year) {
+        allYears = [periodA.year - 1, periodA.year];
+      } else {
         const minYear = Math.min(periodA.year, periodB.year);
         const maxYear = Math.max(periodA.year, periodB.year);
-        const allYears = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+        allYears = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+      }
 
-        const allCharts = await Promise.all(allYears.map((y) => getMonthlyChartData(entityKeysAll, y)));
-        const chartByYear: Record<number, MonthRow[]> = {};
-        allYears.forEach((y, i) => { chartByYear[y] = allCharts[i]; });
+      const allCharts = await Promise.all(allYears.map((y) => getMonthlyChartData(entityKeysAll, y, currentVersion)));
+      const chartByYear: Record<number, MonthRow[]> = {};
+      allYears.forEach((y, i) => { chartByYear[y] = allCharts[i]; });
 
-        const chartA = chartByYear[periodA.year];
-        const chartB = chartByYear[periodB.year];
+      const chartA = chartByYear[periodA.year];
+      const chartB = chartByYear[periodB.year];
+      const baseChart = chartA || chartByYear[allYears[0]] || [];
 
-        // Line chart: per bulan, total semua entitas, satu garis per tahun
-        const lineData: MonthRow[] = chartA.map((rowA, mi) => {
-          const entry: MonthRow = { month: rowA.month };
-          for (const y of allYears) {
-            const row = chartByYear[y][mi];
+      // Line chart: per bulan, total semua entitas, satu garis per tahun
+      const lineData: MonthRow[] = baseChart.map((rowA, mi) => {
+        const entry: MonthRow = { month: rowA.month };
+        for (const y of allYears) {
+          const row = chartByYear[y]?.[mi];
+          if (row) {
             entry[String(y)] = entityKeysAll.reduce((s, k) => s + (Number(row[k]) || 0), 0);
           }
-          return entry;
-        });
+        }
+        return entry;
+      });
 
-        komparasiChart = {
-          type: "grup",
-          chartA,
-          chartB,
-          entities: entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex })),
-          lineData,
-          lineYears: allYears,
-        };
+      komparasiChart = {
+        type: "grup",
+        chartA: chartA || baseChart,
+        chartB: chartB || baseChart,
+        entities: entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex })),
+        lineData,
+        lineYears: allYears,
+      };
+    } else {
+      const parsedYears = (searchParams.chartYears ?? "")
+        .split(",")
+        .map((y) => parseInt(y))
+        .filter((y) => !isNaN(y));
+      let chartYears: number[];
+      if (parsedYears.length >= 2) {
+        chartYears = Array.from(new Set(parsedYears)).sort((a, b) => a - b).slice(0, 5);
       } else {
-        const parsedYears = (searchParams.chartYears ?? "")
-          .split(",")
-          .map((y) => parseInt(y))
-          .filter((y) => !isNaN(y));
-        const chartYears = parsedYears.length >= 2
-          ? Array.from(new Set(parsedYears)).sort((a, b) => a - b).slice(0, 5)
-          : Array.from(new Set([periodB.year, periodA.year])).sort((a, b) => a - b);
-        const data = await getMonthlyByYear([selectedEntity.id], chartYears);
-        komparasiChart = { type: "single", data, years: chartYears };
+        const yearsSet = new Set([periodB.year, periodA.year]);
+        if (yearsSet.size < 2) {
+          yearsSet.add(periodA.year - 1);
+        }
+        chartYears = Array.from(yearsSet).sort((a, b) => a - b);
       }
+      const data = await getMonthlyByYear([selectedEntity.id], chartYears, currentVersion);
+      komparasiChart = { type: "single", data, years: chartYears };
     }
   }
 

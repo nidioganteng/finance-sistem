@@ -56,6 +56,27 @@ export async function GET(req: NextRequest) {
     const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
     const filename = `Laporan_Laba_Rugi_${safeName}_${year}_${version.toLowerCase()}.xlsx`;
 
+    const versionLabel = version === "UMUM" ? "Umum" : "Internal";
+    try {
+      await prisma.activityLog.create({
+        data: {
+          actorId: session.user.id,
+          action: `Export Excel Laporan Laba Rugi (${versionLabel}) – ${entity.name} (${year})`,
+          category: "USER_ACTIVITY",
+          detail: {
+            format: "Excel",
+            jenis: "Laba Rugi",
+            version: versionLabel,
+            entitas: entity.name,
+            entityKey: entity.key,
+            year,
+          },
+        },
+      });
+    } catch (logErr) {
+      console.error("Gagal mencatat log aktivitas ekspor:", logErr);
+    }
+
     return new NextResponse(new Uint8Array(excelBuffer), {
       status: 200,
       headers: {

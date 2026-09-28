@@ -9,7 +9,6 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { AktivaTetapManager } from "@/components/aktiva-tetap/AktivaTetapManager";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function AktivaTetapPage({
@@ -21,7 +20,6 @@ export default async function AktivaTetapPage({
   if (!session?.user) redirect("/login");
 
   const { role, entityKeys } = session.user;
-  logActivity(session.user.id, "Buka modul Aktiva Tetap", "USER_ACTIVITY", { path: "/aktiva-tetap" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -42,7 +40,11 @@ export default async function AktivaTetapPage({
         subtitle={`Inventaris aset tetap & otomatisasi jadwal penyusutan terhubung ke Laporan Keuangan (Tahun ${year})`}
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Aktiva Tetap"
+              entityName={selectedEntity.name}
+              year={year}
+            />
             <YearSelect currentYear={year} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

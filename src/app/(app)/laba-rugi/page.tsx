@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { logActivity } from "@/lib/actions/log";
 import type { ReportVersion } from "@/lib/laba-rugi";
 import { getLaporanPajakData } from "@/lib/pajak";
 import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
@@ -19,7 +18,6 @@ export default async function LabaRugiPage({
 }) {
   const session = await getServerSession(authOptions);
   const { entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Laba Rugi", "USER_ACTIVITY", { path: "/laba-rugi" });
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);

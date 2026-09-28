@@ -11,7 +11,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PaginationNav } from "@/components/shared/PaginationNav";
 import { KasScreenClient } from "./KasScreenClient";
-import { logActivity } from "@/lib/actions/log";
 
 export async function KasScreen({
   jenisInputKey,
@@ -30,7 +29,6 @@ export async function KasScreen({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, `Buka halaman ${title}`, "USER_ACTIVITY", { path: pagePath });
 
   if (!canManageTransaksi(role)) redirect("/dashboard");
 

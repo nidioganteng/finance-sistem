@@ -10,7 +10,6 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { DaftarAkunClient } from "@/components/daftar-akun/DaftarAkunClient";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function DaftarAkunPage({
@@ -20,7 +19,6 @@ export default async function DaftarAkunPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Daftar Akun", "USER_ACTIVITY", { path: "/daftar-akun" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -41,7 +39,11 @@ export default async function DaftarAkunPage({
         subtitle="Seluruh akun COA beserta saldo awal, mutasi, dan saldo akhir"
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Daftar Akun"
+              entityName={selectedEntity.name}
+              year={year}
+            />
             <YearSelect currentYear={year} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

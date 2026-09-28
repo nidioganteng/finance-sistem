@@ -7,7 +7,6 @@ import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -28,7 +27,6 @@ export default async function ProfitabilitasPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Profitabilitas Proyek", "USER_ACTIVITY", { path: "/profitabilitas" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

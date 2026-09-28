@@ -13,7 +13,6 @@ import { JurnalFilterChips } from "@/components/jurnal/JurnalFilterChips";
 import { JurnalExtraFilters } from "@/components/jurnal/JurnalExtraFilters";
 import { JurnalTable } from "@/components/jurnal/JurnalTable";
 import { AlertTriangle } from "lucide-react";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function JurnalPage({
@@ -23,7 +22,6 @@ export default async function JurnalPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Jurnal Umum", "USER_ACTIVITY", { path: "/jurnal" });
 
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
@@ -55,7 +53,10 @@ export default async function JurnalPage({
         subtitle="Seluruh transaksi kas dan bank, tercatat otomatis dari setiap input"
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Jurnal Umum"
+              entityName={selectedEntity.name}
+            />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
               showGrupOption={false}

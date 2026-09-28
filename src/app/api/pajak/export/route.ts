@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getLaporanPajakData } from "@/lib/pajak";
 import { generateLaporanPajakExcel } from "@/lib/pajak-excel";
+import { logActivity } from "@/lib/actions/log";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -55,6 +56,13 @@ export async function GET(req: NextRequest) {
 
     const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
     const filename = `Laporan_Laba_Rugi_${safeName}_${year}_${version.toLowerCase()}.xlsx`;
+
+    logActivity(
+      session.user.id,
+      `Export Excel Laporan Laba Rugi – ${entity.name} (${year})`,
+      "USER_ACTIVITY",
+      { entityKey: entity.key, year, version, format: "Excel" }
+    );
 
     return new NextResponse(new Uint8Array(excelBuffer), {
       status: 200,

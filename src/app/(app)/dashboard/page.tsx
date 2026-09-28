@@ -30,12 +30,13 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; chartYear?: string; compareYears?: string };
+  searchParams: { entity?: string; chartYear?: string; compareYears?: string; year?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
 
-  const entities = await getAccessibleEntities(entityKeys);
+  const currentYear = searchParams.year ? parseInt(searchParams.year) : new Date().getFullYear();
+  const entities = await getAccessibleEntities(entityKeys, currentYear);
   const canGrup = canViewGrupAggregate(role);
 
   const selectedKey = canGrup
@@ -47,8 +48,6 @@ export default async function DashboardPage({
     : resolveEntityKey(searchParams.entity, entityKeys);
   const showingGrup = canGrup && !selectedKey;
   const selectedEntity = entities.find((e) => e.key === selectedKey);
-
-  const currentYear = new Date().getFullYear();
   const chartYear = searchParams.chartYear ? parseInt(searchParams.chartYear) : currentYear;
   // Tahun pembanding tambahan (di luar chartYear) — maksimal 4 (jadi 5 tahun
   // sekaligus), pembatasan lebih ketat (grup cuma 1) ditegakkan di RevenueChart

@@ -9,7 +9,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { JurnalTransaksiClient } from "@/components/jurnal-transaksi/JurnalTransaksiClient";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { logActivity } from "@/lib/actions/log";
 
 export default async function JurnalTransaksiPage({
   searchParams,
@@ -21,10 +20,6 @@ export default async function JurnalTransaksiPage({
 
   // SUPER_ADMIN hanya monitoring — tidak perlu input jurnal manual
   if (role === "SUPER_ADMIN") redirect("/dashboard");
-
-  logActivity(session!.user.id, "Buka halaman Entry Jurnal Transaksi", "USER_ACTIVITY", {
-    path: "/jurnal-transaksi",
-  });
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);

@@ -5,7 +5,6 @@ import { getNotifFilterOptions, getNotifikasiList, getNotifTypeLabels } from "@/
 import { markAllNotifikasiRead } from "@/lib/actions/notifikasi";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PaginationNav } from "@/components/shared/PaginationNav";
-import { logActivity } from "@/lib/actions/log";
 import { NotifFilterSelect } from "@/components/notifikasi/NotifFilterSelect";
 import { NotifikasiListClient } from "@/components/notifikasi/NotifikasiListClient";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -13,7 +12,6 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function NotifikasiPage({ searchParams }: { searchParams: { filter?: string; page?: string } }) {
   const session = await getServerSession(authOptions);
   const role = session!.user.role;
-  logActivity(session!.user.id, "Buka halaman Notifikasi", "USER_ACTIVITY", { path: "/notifikasi" });
   if (role === "STAF_KEUANGAN") redirect("/dashboard");
   const filter = searchParams.filter ?? "semua";
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);

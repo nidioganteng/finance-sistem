@@ -5,6 +5,7 @@ import { getActivityLogs } from "@/lib/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LogTabs } from "@/components/log/LogTabs";
 import { roleLabel } from "@/lib/rbac";
+import { formatLogDetail } from "@/lib/format-log-detail";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function LogPage({
@@ -73,12 +74,8 @@ export default async function LogPage({
                   )}
                 </td>
                 <td className="py-3 px-3 text-[13px] text-muted-stronger">{log.action}</td>
-                <td className="py-3 px-6">
-                  {log.detail && (
-                    <code className="text-[11.5px] text-muted bg-surface-subtle px-2 py-1 rounded">
-                      {JSON.stringify(log.detail).slice(0, 120)}
-                    </code>
-                  )}
+                <td className="py-3 px-6 text-[12.5px] text-muted-stronger">
+                  {formatLogDetail(log.detail, log.action)}
                 </td>
               </tr>
             ))}

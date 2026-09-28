@@ -9,6 +9,14 @@ export const ENTITY_PREFIX: Record<string, string> = {
   umum: "UM",
 };
 
+export const ENTITY_PREFIX_UMUM: Record<string, string> = {
+  kencana: "UK",
+  gaharu: "UG",
+  tataring: "UT",
+  ciptaAsri: "UC",
+  umum: "UU",
+};
+
 export async function getJenisInput(key: string) {
   return prisma.jenisInputTransaksi.findUnique({ where: { key } });
 }

@@ -73,19 +73,22 @@ export function EntityCardCompact({
 
           {/* Metrics */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-muted-faint">Pendapatan</span>
-              <span className="text-[13px] font-bold text-navy-text tabular-nums">{formatMiliar(revenue)}</span>
+            <div className="flex items-center justify-between gap-1.5" title={`Pendapatan ${name}: ${formatRupiah(revenue)}`}>
+              <span className="text-[11px] font-semibold text-muted-faint flex-none whitespace-nowrap">Pendapatan</span>
+              <span className="text-[13px] font-bold text-navy-text tabular-nums whitespace-nowrap">{formatMiliar(revenue)}</span>
             </div>
             <div className="h-px bg-surface-subtle" />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
+            <div
+              className="flex items-center justify-between gap-1.5"
+              title={`${isProfit ? "Laba Bersih" : "Rugi Bersih"} ${name}: ${(isProfit ? "" : "-") + formatRupiah(Math.abs(profit))}`}
+            >
+              <div className="flex items-center gap-1 flex-none whitespace-nowrap">
                 {isProfit
-                  ? <TrendingUp size={11} className="text-status-green" />
-                  : <TrendingDown size={11} className="text-status-red" />}
+                  ? <TrendingUp size={11} className="text-status-green flex-none" />
+                  : <TrendingDown size={11} className="text-status-red flex-none" />}
                 <span className="text-[11px] font-semibold text-muted-faint">Laba Bersih</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-none whitespace-nowrap">
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isProfit ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"}`}>
                   {margin}%
                 </span>

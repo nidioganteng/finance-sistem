@@ -2,7 +2,7 @@ import { formatRupiah } from "./dashboard-data";
 import { roleLabel } from "./rbac";
 import { Role } from "@prisma/client";
 
-export function formatLogDetail(detail: unknown, _action: string = ""): string {
+export function formatLogDetail(detail: unknown, action: string = ""): string {
   if (!detail) return "-";
   if (typeof detail === "string") return detail;
   if (typeof detail !== "object") return String(detail);
@@ -78,6 +78,15 @@ export function formatLogDetail(detail: unknown, _action: string = ""): string {
   // Termin & Proyek
   if ("status" in d) {
     return `Status: ${d.status}`;
+  }
+
+  // Ekspor Data Laporan
+  if (d.format || action.startsWith("Export") || action.startsWith("Unduh") || action.startsWith("Ekspor")) {
+    const parts: string[] = [];
+    if (d.format) parts.push(`Format: ${d.format}`);
+    if (d.year) parts.push(`Tahun: ${d.year}`);
+    if (d.version) parts.push(`Versi: ${d.version === "UMUM" ? "Umum" : "Internal"}`);
+    return parts.length > 0 ? parts.join(" • ") : "Ekspor data laporan";
   }
 
   // Generic fallback: format readable key-value without raw JSON / braces

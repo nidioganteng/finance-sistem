@@ -13,7 +13,8 @@ export function MultiYearChips({ selectedYears }: { selectedYears: number[] }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - i);
+  const baseYears = Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - i);
+  const years = Array.from(new Set([...baseYears, ...selectedYears])).sort((a, b) => b - a);
 
   function toggle(y: number) {
     let next: number[];

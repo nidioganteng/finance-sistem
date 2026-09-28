@@ -203,6 +203,9 @@ export async function saveJurnalTransaksi(formData: FormData) {
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
   revalidatePath("/buku-bank");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
   } catch (e) {
     console.error("[saveJurnalTransaksi]", e);
@@ -239,5 +242,8 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
   revalidatePath("/buku-bank");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }

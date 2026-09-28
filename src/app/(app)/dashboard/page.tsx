@@ -167,7 +167,7 @@ export default async function DashboardPage({
         <>
           {/* 5 KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div className="bg-surface-card rounded-[16px] border border-border p-4" title={`Total Pendapatan Grup: ${formatRupiah(totalRevenue)}`}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
                   <TrendingUp size={16} className="text-blue-500 dark:text-blue-400" />
@@ -177,7 +177,7 @@ export default async function DashboardPage({
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalRevenue)}</div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div className="bg-surface-card rounded-[16px] border border-border p-4" title={`Total Pengeluaran Grup: ${formatRupiah(totalSpend)}`}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-500/15 flex items-center justify-center">
                   <TrendingDown size={16} className="text-slate-400 dark:text-slate-500" />
@@ -187,7 +187,10 @@ export default async function DashboardPage({
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div
+              className="bg-surface-card rounded-[16px] border border-border p-4"
+              title={`${totalProfit >= 0 ? "Total Laba Bersih Grup" : "Total Rugi Bersih Grup"}: ${(totalProfit < 0 ? "-" : "") + formatRupiah(Math.abs(totalProfit))}`}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center">
                   <BarChart3 size={16} className="text-status-green" />
@@ -212,7 +215,10 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div
+              className="bg-surface-card rounded-[16px] border border-border p-4"
+              title={`Total Piutang Belum Tertagih: ${formatRupiah(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}`}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
                   <CalendarClock size={16} className="text-purple-500 dark:text-purple-400" />

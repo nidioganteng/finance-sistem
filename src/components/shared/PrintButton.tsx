@@ -6,7 +6,10 @@ import { logExportActivity } from "@/lib/actions/log";
 
 interface PrintButtonProps {
   title?: string;
+  subType?: string;
+  version?: string;
   entityName?: string;
+  year?: number | string;
 }
 
 const PATH_TITLE_MAP: Record<string, string> = {
@@ -23,7 +26,7 @@ const PATH_TITLE_MAP: Record<string, string> = {
   "/piutang": "Kontrol Piutang",
 };
 
-export function PrintButton({ title, entityName }: PrintButtonProps) {
+export function PrintButton({ title, subType, version, entityName, year }: PrintButtonProps) {
   const pathname = usePathname();
 
   const handleClick = () => {
@@ -33,12 +36,25 @@ export function PrintButton({ title, entityName }: PrintButtonProps) {
       (typeof document !== "undefined"
         ? document.title.split("|")[0].trim()
         : "Dokumen Laporan");
+    const subDesc = subType ? ` ${subType}` : "";
+    const versionLabel = version
+      ? version.toUpperCase() === "UMUM"
+        ? "Umum"
+        : "Internal"
+      : undefined;
+    const versionDesc = versionLabel ? ` (${versionLabel})` : "";
     const entityDesc = entityName ? ` – ${entityName}` : "";
+    const yearDesc = year ? ` (${year})` : "";
 
-    logExportActivity(`Export PDF ${docTitle}${entityDesc}`, {
+    const actionText = `Export PDF ${docTitle}${subDesc}${versionDesc}${entityDesc}${yearDesc}`;
+
+    logExportActivity(actionText, {
       format: "PDF",
+      jenis: subType || docTitle,
+      version: versionLabel,
+      entitas: entityName || undefined,
+      tahun: year || undefined,
       halaman: pathname,
-      ...(entityName ? { entityName } : {}),
     });
 
     window.print();

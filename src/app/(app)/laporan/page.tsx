@@ -7,7 +7,6 @@ import { getNeracaData } from "@/lib/neraca";
 import { getArusKasData } from "@/lib/arus-kas";
 import { canViewGrupAggregate } from "@/lib/rbac";
 import { resolveReportEntityKey } from "@/lib/entity-prefs";
-import { logActivity } from "@/lib/actions/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
@@ -82,7 +81,6 @@ export default async function LaporanPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Laporan Keuangan", "USER_ACTIVITY", { path: "/laporan" });
   if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);

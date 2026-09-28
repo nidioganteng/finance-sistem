@@ -57,13 +57,21 @@ export async function GET(req: NextRequest) {
     const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
     const filename = `Laporan_Arus_Kas_${safeName}_${year}.xlsx`;
 
+    const versionLabel = version === "UMUM" ? "Umum" : "Internal";
     try {
       await prisma.activityLog.create({
         data: {
           actorId: session.user.id,
-          action: `Export Excel Laporan Arus Kas – ${entity.name} (${year})`,
+          action: `Export Excel Laporan Arus Kas (${versionLabel}) – ${entity.name} (${year})`,
           category: "USER_ACTIVITY",
-          detail: { entityKey: entity.key, year, version, format: "Excel" },
+          detail: {
+            format: "Excel",
+            jenis: "Arus Kas",
+            version: versionLabel,
+            entitas: entity.name,
+            entityKey: entity.key,
+            year,
+          },
         },
       });
     } catch (logErr) {

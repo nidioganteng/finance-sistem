@@ -48,6 +48,16 @@ export default async function LaporanKeuanganPage({
   ]);
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
+  const TAB_NAMES: Record<string, string> = {
+    neraca: "Neraca",
+    "laba-rugi": "Laba Rugi",
+    "arus-kas": "Arus Kas",
+    ringkasan: "Ringkasan Eksekutif",
+    jurnal: "Jurnal",
+    bank: "Buku Bank",
+  };
+  const activeTabName = TAB_NAMES[tab] ?? tab;
+
   return (
     <PageTransition>
       <PageHeader
@@ -55,7 +65,13 @@ export default async function LaporanKeuanganPage({
         subtitle={`Posisi dan ringkasan keuangan — Periode ${currentYear}`}
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Laporan Keuangan"
+              subType={activeTabName}
+              version={currentVersion}
+              entityName={selectedEntity.name}
+              year={currentYear}
+            />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

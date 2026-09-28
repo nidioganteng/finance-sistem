@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
 import { generateArusKasExcel } from "@/lib/arus-kas-excel";
+import { logActivity } from "@/lib/actions/log";
 import type { ReportVersion } from "@/lib/laba-rugi";
 
 export async function GET(req: NextRequest) {
@@ -56,6 +57,13 @@ export async function GET(req: NextRequest) {
 
     const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
     const filename = `Laporan_Arus_Kas_${safeName}_${year}.xlsx`;
+
+    logActivity(
+      session.user.id,
+      `Export Excel Laporan Arus Kas – ${entity.name} (${year})`,
+      "USER_ACTIVITY",
+      { entityKey: entity.key, year, version, format: "Excel" }
+    );
 
     return new NextResponse(new Uint8Array(excelBuffer), {
       status: 200,

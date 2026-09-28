@@ -75,12 +75,12 @@ export function KasTransactionForm({
   const [isPending, startTransition] = useTransition();
   const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? new Date().toISOString().slice(0, 10));
   const [noBukti, setNoBukti] = useState(initialValues?.noBukti ?? "");
-  const noBuktiManualRef = useRef(false);
+  const [isNoBuktiManual, setIsNoBuktiManual] = useState(isEdit);
 
   useEffect(() => {
-    if (isEdit || noBuktiManualRef.current) return;
+    if (isEdit || isNoBuktiManual) return;
     generateNoBukti(entityKey, tanggal).then(setNoBukti).catch(() => {});
-  }, [entityKey, tanggal, isEdit]);
+  }, [entityKey, tanggal, isEdit, isNoBuktiManual]);
 
   const [keterangan, setKeterangan] = useState(initialValues?.keterangan ?? "");
   const [arah, setArah] = useState<"masuk" | "keluar">(initialValues?.arah ?? "keluar");
@@ -225,22 +225,48 @@ export function KasTransactionForm({
             />
           </div>
           <div>
-            <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">
-              No. Bukti
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide">
+                No. Bukti
+              </label>
+              {isNoBuktiManual && !isEdit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNoBuktiManual(false);
+                    generateNoBukti(entityKey, tanggal).then(setNoBukti).catch(() => {});
+                  }}
+                  className="text-[10px] text-brand hover:underline font-medium"
+                >
+                  Reset ke Format Umum
+                </button>
+              )}
+            </div>
             <div className="relative">
               <input
                 value={noBukti}
-                onChange={(e) => { noBuktiManualRef.current = true; setNoBukti(e.target.value); }}
-                placeholder="Generating..."
-                className={`${inputClass} font-mono pr-16`}
+                onChange={(e) => {
+                  setIsNoBuktiManual(true);
+                  setNoBukti(e.target.value);
+                }}
+                placeholder="mis. UK09281 atau KC/0002"
+                className={`${inputClass} font-mono pr-24`}
               />
-              {!noBuktiManualRef.current && noBukti && (
+              {!isNoBuktiManual && noBukti ? (
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-md">
-                  auto
+                  auto umum
+                </span>
+              ) : isNoBuktiManual && (
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted bg-surface-subtle px-1.5 py-0.5 rounded-md border border-border-subtle">
+                  mandiri
                 </span>
               )}
             </div>
+            <p className="text-[10px] text-muted-faint mt-1">
+              {isNoBuktiManual
+                ? "No. bukti mandiri/proyek aktif (mis. KC/0002). Klik 'Reset ke Format Umum' untuk auto-generate."
+                : "Format pengeluaran umum otomatis. Dapat diketik manual untuk pengeluaran proyek (mis. KC/0002)."}
+            </p>
           </div>
         </div>
 

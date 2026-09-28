@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { useState, useTransition, useMemo } from "react";
+import { Pencil, Check, X, Search } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";
 
 type Row = {
@@ -37,6 +37,27 @@ const ALOKASI_BADGE: Record<Row["alokasi"], string> = {
   LABA_RUGI: "bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400",
 };
 
+function highlightMatch(text: string, query: string) {
+  const q = query.trim();
+  if (!q) return text;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "i"));
+  if (parts.length === 1) return text;
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === q.toLowerCase() ? (
+          <mark key={i} className="bg-yellow-200/90 dark:bg-yellow-500/30 text-navy-text rounded-xs px-0.5">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
 export function DaftarAkunClient({
   rows,
   entityId,
@@ -48,9 +69,20 @@ export function DaftarAkunClient({
   year: number;
   canEdit: boolean;
 }) {
+  const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const matchCode = r.code.toLowerCase().includes(q);
+      const matchName = r.name.toLowerCase().includes(q);
+      return matchCode || matchName;
+    });
+  }, [rows, search]);
 
   function handleSave(coaId: string, formData: FormData) {
     const raw = (formData.get("saldoAwal") as string)?.trim().replace(/[^0-9-]/g, "");
@@ -69,9 +101,48 @@ export function DaftarAkunClient({
 
   return (
     <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
+      {/* ── Toolbar: Search & Info ── */}
+      <div className="px-5 py-3.5 border-b border-surface-subtle flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 print:hidden">
+        <div className="relative w-full sm:w-80 md:w-96">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-faint pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setSearch("");
+            }}
+            placeholder="Cari kode akun (522) atau nama akun..."
+            className="w-full pl-9 pr-8 py-2 bg-surface-base border border-border-soft rounded-pill text-[13px] text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand transition-colors"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-faint hover:text-navy-text hover:bg-surface-hover transition-colors"
+              title="Hapus pencarian (Esc)"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        <div className="text-[12px] font-semibold text-muted-faint self-start sm:self-center">
+          {search.trim() ? (
+            <span>
+              Menampilkan <strong className="text-navy-text font-bold">{filteredRows.length}</strong> dari {rows.length} akun
+            </span>
+          ) : (
+            <span>
+              Total <strong className="text-navy-text font-bold">{rows.length}</strong> akun
+            </span>
+          )}
+        </div>
+      </div>
+
       {error && (
         <div className="mx-5 mt-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[900px]">
           <thead>
@@ -87,65 +158,92 @@ export function DaftarAkunClient({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40">
-                <td className="py-3 px-5 font-mono font-bold text-navy-text text-[13px] whitespace-nowrap">{r.code}</td>
-                <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
-                  {r.name}
-                  {!r.punyaTransaksi && (
-                    <span className="ml-1.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded whitespace-nowrap">
-                      belum ada transaksi
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-3 whitespace-nowrap">
-                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[r.kategori] ?? "bg-surface-hover text-muted"}`}>
-                    {r.kategori}
-                  </span>
-                </td>
-                <td className="py-3 px-3 text-right whitespace-nowrap">
-                  {editingId === r.coaId ? (
-                    <form action={(fd) => handleSave(r.coaId, fd)} className="flex items-center justify-end gap-1">
-                      <input
-                        name="saldoAwal"
-                        required
-                        autoFocus
-                        inputMode="numeric"
-                        defaultValue={r.saldoAwal}
-                        className="w-28 px-2 py-1 rounded-md border border-border text-[12.5px] text-right bg-surface-card"
-                      />
-                      <button type="submit" disabled={isPending} className="p-1 rounded hover:bg-surface-hover text-status-green" title="Simpan">
-                        <Check size={13} />
-                      </button>
-                      <button type="button" onClick={() => setEditingId(null)} className="p-1 rounded hover:bg-surface-hover text-muted-stronger" title="Batal">
-                        <X size={13} />
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span className="tabular-nums text-[13px] text-muted whitespace-nowrap">{r.saldoAwalFmt}</span>
-                      {canEdit && (
-                        <button onClick={() => setEditingId(r.coaId)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit saldo awal">
-                          <Pencil size={11} />
-                        </button>
-                      )}
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-14 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-surface-hover flex items-center justify-center text-muted-faint mb-1">
+                      <Search size={20} />
                     </div>
-                  )}
-                </td>
-                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalDebetFmt}</td>
-                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalKreditFmt}</td>
-                <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold whitespace-nowrap">
-                  <span className={r.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}>
-                    {r.saldoAkhirNegatif ? "-" : ""}{r.saldoAkhirFmt}
-                  </span>
-                </td>
-                <td className="py-3 px-5">
-                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${ALOKASI_BADGE[r.alokasi]}`}>
-                    {ALOKASI_LABEL[r.alokasi]}
-                  </span>
+                    <p className="text-[13.5px] font-semibold text-navy-text">
+                      Tidak ada akun yang cocok
+                    </p>
+                    <p className="text-[12px] text-muted-faint max-w-sm">
+                      Tidak ditemukan akun dengan kode atau nama yang mengandung &ldquo;<span className="font-semibold text-navy-text">{search}</span>&rdquo;.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-surface-hover hover:bg-surface-subtle text-[12px] font-semibold text-brand transition-colors"
+                    >
+                      Reset Pencarian
+                    </button>
+                  </div>
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredRows.map((r) => (
+                <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40">
+                  <td className="py-3 px-5 font-mono font-bold text-navy-text text-[13px] whitespace-nowrap">
+                    {highlightMatch(r.code, search)}
+                  </td>
+                  <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
+                    {highlightMatch(r.name, search)}
+                    {!r.punyaTransaksi && (
+                      <span className="ml-1.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded whitespace-nowrap">
+                        belum ada transaksi
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[r.kategori] ?? "bg-surface-hover text-muted"}`}>
+                      {r.kategori}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right whitespace-nowrap">
+                    {editingId === r.coaId ? (
+                      <form action={(fd) => handleSave(r.coaId, fd)} className="flex items-center justify-end gap-1">
+                        <input
+                          name="saldoAwal"
+                          required
+                          autoFocus
+                          inputMode="numeric"
+                          defaultValue={r.saldoAwal}
+                          className="w-28 px-2 py-1 rounded-md border border-border text-[12.5px] text-right bg-surface-card"
+                        />
+                        <button type="submit" disabled={isPending} className="p-1 rounded hover:bg-surface-hover text-status-green" title="Simpan">
+                          <Check size={13} />
+                        </button>
+                        <button type="button" onClick={() => setEditingId(null)} className="p-1 rounded hover:bg-surface-hover text-muted-stronger" title="Batal">
+                          <X size={13} />
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="tabular-nums text-[13px] text-muted whitespace-nowrap">{r.saldoAwalFmt}</span>
+                        {canEdit && (
+                          <button onClick={() => setEditingId(r.coaId)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit saldo awal">
+                            <Pencil size={11} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalDebetFmt}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{r.totalKreditFmt}</td>
+                  <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold whitespace-nowrap">
+                    <span className={r.saldoAkhirNegatif ? "text-status-red" : "text-navy-text"}>
+                      {r.saldoAkhirNegatif ? "-" : ""}{r.saldoAkhirFmt}
+                    </span>
+                  </td>
+                  <td className="py-3 px-5">
+                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${ALOKASI_BADGE[r.alokasi]}`}>
+                      {ALOKASI_LABEL[r.alokasi]}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

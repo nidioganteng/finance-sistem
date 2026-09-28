@@ -15,9 +15,7 @@ export async function logActivity(
   if (
     trimmed.startsWith("Buka ") ||
     trimmed.startsWith("Lihat ") ||
-    trimmed.startsWith("Navigasi ") ||
-    trimmed.startsWith("Download ") ||
-    trimmed.startsWith("Export ")
+    trimmed.startsWith("Navigasi ")
   ) {
     return;
   }

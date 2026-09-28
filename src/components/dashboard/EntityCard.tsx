@@ -61,20 +61,30 @@ export function EntityCardCompact({
     >
       <motion.div
         whileHover={{ y: -2, transition: { duration: 0.15 } }}
-        className="bg-surface-card rounded-2xl border border-border hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200"
+        className="bg-surface-card rounded-2xl border border-border hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200 overflow-hidden"
       >
         {/* Color bar top */}
         <div className="h-1 rounded-t-2xl" style={{ background: colorHex }} />
 
-        <div className="p-4">
+        <div className="p-3.5 sm:p-4">
           {/* Header */}
-          <div className="flex items-center gap-2.5 mb-3">
-            <EntityAvatar entityKey={entityKey} name={name} colorHex={colorHex} size="sm" />
-            <div className="min-w-0">
-              <div className="text-[13.5px] font-extrabold text-navy-text truncate">{name}</div>
-              {!isUmum && <div className="text-[10.5px] text-muted truncate">{legalName}</div>}
-              {isUmum && <div className="text-[10.5px] text-muted truncate">{legalName}</div>}
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <EntityAvatar entityKey={entityKey} name={name} colorHex={colorHex} size="sm" />
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-extrabold text-navy-text truncate">{name}</div>
+                <div className="text-[10.5px] text-muted truncate">{legalName}</div>
+              </div>
             </div>
+            <span
+              className={`flex-none text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                isProfit
+                  ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
+                  : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"
+              }`}
+            >
+              {margin}%
+            </span>
           </div>
 
           {/* Metrics */}
@@ -85,7 +95,7 @@ export function EntityCardCompact({
               title={`Pendapatan ${name}: ${revenueFull}`}
             >
               <span className="text-[11px] font-semibold text-muted-faint flex-none whitespace-nowrap">Pendapatan</span>
-              <span className="text-[13px] font-bold text-navy-text tabular-nums whitespace-nowrap">{formatMiliar(revenue)}</span>
+              <span className="text-[12.5px] sm:text-[13px] font-bold text-navy-text tabular-nums whitespace-nowrap">{formatMiliar(revenue)}</span>
 
               {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/pendapatan:flex flex-col items-end">
@@ -107,16 +117,13 @@ export function EntityCardCompact({
                 {isProfit
                   ? <TrendingUp size={11} className="text-status-green flex-none" />
                   : <TrendingDown size={11} className="text-status-red flex-none" />}
-                <span className="text-[11px] font-semibold text-muted-faint">Laba Bersih</span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-none whitespace-nowrap">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isProfit ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400"}`}>
-                  {margin}%
-                </span>
-                <span className={`text-[13px] font-bold tabular-nums ${isProfit ? "text-status-green" : "text-status-red"}`}>
-                  {formatMiliar(profit)}
+                <span className="text-[11px] font-semibold text-muted-faint">
+                  {isProfit ? "Laba Bersih" : "Rugi Bersih"}
                 </span>
               </div>
+              <span className={`text-[12.5px] sm:text-[13px] font-bold tabular-nums whitespace-nowrap ${isProfit ? "text-status-green" : "text-status-red"}`}>
+                {formatMiliar(profit)}
+              </span>
 
               {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/laba:flex flex-col items-end">

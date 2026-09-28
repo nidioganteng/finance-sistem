@@ -312,6 +312,9 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
   revalidatePath("/piutang");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }
 
@@ -345,6 +348,9 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
 
   revalidatePath(pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }
 
@@ -500,6 +506,9 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }
 
@@ -529,5 +538,8 @@ export async function updateKasTransactionGroup(input: {
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }

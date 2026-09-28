@@ -39,7 +39,11 @@ export default async function DaftarAkunPage({
         subtitle="Seluruh akun COA beserta saldo awal, mutasi, dan saldo akhir"
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Daftar Akun"
+              entityName={selectedEntity.name}
+              year={year}
+            />
             <YearSelect currentYear={year} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

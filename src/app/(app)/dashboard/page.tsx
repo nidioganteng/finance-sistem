@@ -39,8 +39,10 @@ export default async function DashboardPage({
   const canGrup = canViewGrupAggregate(role);
 
   const selectedKey = canGrup
-    // Semua role yang boleh lihat grup: kalau URL tidak ada entity → tampilkan grup (undefined)
-    ? (searchParams.entity && entityKeys.includes(searchParams.entity) ? searchParams.entity : searchParams.entity)
+    // Semua role yang boleh lihat grup: kalau URL tidak ada entity atau entity=grup → tampilkan grup (undefined)
+    ? (searchParams.entity && searchParams.entity !== "grup" && entityKeys.includes(searchParams.entity)
+        ? searchParams.entity
+        : undefined)
     // Role tanpa akses grup: selalu resolve ke entity pertama
     : resolveEntityKey(searchParams.entity, entityKeys);
   const showingGrup = canGrup && !selectedKey;

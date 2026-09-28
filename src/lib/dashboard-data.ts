@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { Role, type ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
+import { getExcludedNoBuktiForVersion } from "./akuntansi";
 
 export function formatRupiah(n: number) {
   return "Rp\u00A0" + Math.round(n).toLocaleString("id-ID");
@@ -43,31 +44,40 @@ export async function getAccessibleEntities(
   entityKeys: string[],
   targetYear: number = new Date().getFullYear()
 ): Promise<AccessibleEntity[]> {
-  const [entities, txRows, assetsRaw] = await Promise.all([
-    prisma.entity.findMany({
-      where: { key: { in: entityKeys } },
-      include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
-      orderBy: { createdAt: "asc" },
-    }),
-    // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
-    // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41).
+  const entities = await prisma.entity.findMany({
+    where: { key: { in: entityKeys } },
+    include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const entityIds = entities.map((e) => e.id);
+  const excludedNoBukti = await getExcludedNoBuktiForVersion(entityIds, targetYear, "INTERNAL");
+
+  // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
+  // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41) pada targetYear.
+  const [txRows, assetsRaw] = await Promise.all([
     prisma.transaction.findMany({
       where: {
-        entity: { key: { in: entityKeys } },
+        entityId: { in: entityIds },
+        tanggal: {
+          gte: new Date(`${targetYear}-01-01`),
+          lte: new Date(`${targetYear}-12-31T23:59:59`),
+        },
         coaAccount: {
           kategori: { in: ["PENDAPATAN", "BEBAN"] },
           reportCategory: { in: ["INTERNAL", "SEMUA"] },
         },
+        ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
       },
       select: {
         entityId: true,
         kredit: true,
         debit: true,
-        coaAccount: { select: { kategori: true } },
+        coaAccount: { select: { kategori: true, code: true, name: true } },
       },
     }),
     prisma.asetTetap.findMany({
-      where: { entity: { key: { in: entityKeys } } },
+      where: { entityId: { in: entityIds } },
     }),
   ]);
 
@@ -75,9 +85,21 @@ export async function getAccessibleEntities(
   const spendMap = new Map<string, number>();
   for (const tx of txRows) {
     if (tx.coaAccount?.kategori === "PENDAPATAN") {
-      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
+      revenueMap.set(
+        tx.entityId,
+        (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit) - Number(tx.debit)
+      );
     } else if (tx.coaAccount?.kategori === "BEBAN") {
-      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
+      const isDeprCoa =
+        tx.coaAccount.code === "512" ||
+        tx.coaAccount.code === "540" ||
+        /penyusutan/i.test(tx.coaAccount.name);
+      if (!isDeprCoa) {
+        spendMap.set(
+          tx.entityId,
+          (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit) - Number(tx.kredit)
+        );
+      }
     }
   }
 

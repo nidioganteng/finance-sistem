@@ -50,15 +50,21 @@ export function EntityCardCompact({
 }) {
   const isProfit = profit >= 0;
   const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0.0";
+  const revenueFull = formatRupiah(revenue);
+  const profitFull = `${isProfit ? "" : "-"}${formatRupiah(Math.abs(profit))}`;
 
   return (
-    <Link href={`/dashboard?entity=${entityKey}`} className="block group">
+    <Link
+      href={`/dashboard?entity=${entityKey}`}
+      className="block group hover:z-30 relative"
+      title={`${name}: Pendapatan ${revenueFull} | ${isProfit ? "Laba" : "Rugi"} ${profitFull}`}
+    >
       <motion.div
         whileHover={{ y: -2, transition: { duration: 0.15 } }}
-        className="bg-surface-card rounded-2xl border border-border overflow-hidden hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200"
+        className="bg-surface-card rounded-2xl border border-border hover:shadow-[0_6px_24px_rgba(15,23,42,.08)] transition-shadow duration-200"
       >
         {/* Color bar top */}
-        <div className="h-1" style={{ background: colorHex }} />
+        <div className="h-1 rounded-t-2xl" style={{ background: colorHex }} />
 
         <div className="p-4">
           {/* Header */}
@@ -73,14 +79,29 @@ export function EntityCardCompact({
 
           {/* Metrics */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-1.5" title={`Pendapatan ${name}: ${formatRupiah(revenue)}`}>
+            {/* Pendapatan Row */}
+            <div
+              className="group/pendapatan relative flex items-center justify-between gap-1.5 py-0.5 rounded px-1 -mx-1 hover:bg-surface-hover/60 transition-colors"
+              title={`Pendapatan ${name}: ${revenueFull}`}
+            >
               <span className="text-[11px] font-semibold text-muted-faint flex-none whitespace-nowrap">Pendapatan</span>
               <span className="text-[13px] font-bold text-navy-text tabular-nums whitespace-nowrap">{formatMiliar(revenue)}</span>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/pendapatan:flex flex-col items-end">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {revenueFull}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 mr-3" />
+              </div>
             </div>
+
             <div className="h-px bg-surface-subtle" />
+
+            {/* Laba Bersih Row */}
             <div
-              className="flex items-center justify-between gap-1.5"
-              title={`${isProfit ? "Laba Bersih" : "Rugi Bersih"} ${name}: ${(isProfit ? "" : "-") + formatRupiah(Math.abs(profit))}`}
+              className="group/laba relative flex items-center justify-between gap-1.5 py-0.5 rounded px-1 -mx-1 hover:bg-surface-hover/60 transition-colors"
+              title={`${isProfit ? "Laba Bersih" : "Rugi Bersih"} ${name}: ${profitFull}`}
             >
               <div className="flex items-center gap-1 flex-none whitespace-nowrap">
                 {isProfit
@@ -95,6 +116,14 @@ export function EntityCardCompact({
                 <span className={`text-[13px] font-bold tabular-nums ${isProfit ? "text-status-green" : "text-status-red"}`}>
                   {formatMiliar(profit)}
                 </span>
+              </div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/laba:flex flex-col items-end">
+                <div className={`text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight ${isProfit ? "bg-status-green" : "bg-status-red"}`}>
+                  {profitFull}
+                </div>
+                <div className={`w-0 h-0 border-x-4 border-x-transparent border-t-4 mr-3 ${isProfit ? "border-t-status-green" : "border-t-status-red"}`} />
               </div>
             </div>
           </div>

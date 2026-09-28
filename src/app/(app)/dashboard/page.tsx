@@ -6,6 +6,7 @@ import {
   getGrupPiutangMetrics,
   getMonthlyChartData,
   formatMiliar,
+  formatRupiah,
 } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate, roleLabel } from "@/lib/rbac";
@@ -287,7 +288,7 @@ export default async function DashboardPage({
           <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-left text-[11.5px] font-bold text-muted-faint">
                   <td className="pb-2">Kode</td>
@@ -309,14 +310,14 @@ export default async function DashboardPage({
                     <tr key={p.code} className="border-t border-border">
                       <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
                       <td className="py-3">{p.name}</td>
-                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
-                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatRupiah(p.contractValue)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatRupiah(p.spend)}</td>
                       <td
                         className={`py-3 text-right tabular-nums font-semibold ${
                           p.profit >= 0 ? "text-status-green" : "text-status-red"
                         }`}
                       >
-                        {formatMiliar(p.profit)}
+                        {p.profit < 0 ? "-" : ""}{formatRupiah(Math.abs(p.profit))}
                       </td>
                     </tr>
                   ))

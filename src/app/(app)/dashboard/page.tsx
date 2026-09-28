@@ -24,7 +24,6 @@ import {
   CalendarClock,
   Sparkles,
 } from "lucide-react";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function DashboardPage({
@@ -34,7 +33,6 @@ export default async function DashboardPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Dashboard", "USER_ACTIVITY", { path: "/dashboard" });
 
   const entities = await getAccessibleEntities(entityKeys);
   const canGrup = canViewGrupAggregate(role);

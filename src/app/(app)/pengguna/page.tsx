@@ -4,13 +4,11 @@ import { authOptions } from "@/lib/auth";
 import { getUserList, getAllEntities } from "@/lib/pengguna";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PenggunaClient } from "@/components/pengguna/PenggunaClient";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function PenggunaPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Manajemen Pengguna", "USER_ACTIVITY", { path: "/pengguna" });
   if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN") redirect("/dashboard");
 
   const [users, allEntities] = await Promise.all([getUserList(), getAllEntities()]);

@@ -7,7 +7,6 @@ import { getPiutangData, getInterEntityBalances } from "@/lib/piutang";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PiutangClient } from "@/components/piutang/PiutangClient";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function PiutangPage({
@@ -17,7 +16,6 @@ export default async function PiutangPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Kontrol Piutang", "USER_ACTIVITY", { path: "/piutang" });
   if (role === "SUPER_ADMIN" || role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") {
     redirect("/dashboard");
   }

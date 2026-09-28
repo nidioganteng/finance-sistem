@@ -18,7 +18,8 @@ export function KomparasiControls({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - i);
+  const baseYears = Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - i);
+  const years = Array.from(new Set([...baseYears, periodA.year, periodB.year])).sort((a, b) => b - a);
 
   function update(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());

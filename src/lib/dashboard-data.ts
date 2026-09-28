@@ -173,9 +173,11 @@ export async function getGrupPiutangMetrics() {
 
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
-export async function getMonthlyChartData(entityKeys: string[], year: number) {
+export async function getMonthlyChartData(entityKeys: string[], year: number, version: string = "INTERNAL") {
   const start = new Date(`${year}-01-01`);
   const end = new Date(`${year + 1}-01-01`);
+  const allowedCategories: ReportCategory[] =
+    version.toUpperCase() === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const rows = await prisma.transaction.findMany({
     where: {
@@ -183,7 +185,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
       tanggal: { gte: start, lt: end },
       coaAccount: {
         kategori: "PENDAPATAN",
-        reportCategory: { in: ["INTERNAL", "SEMUA"] },
+        reportCategory: { in: allowedCategories },
       },
     },
     select: {
@@ -207,10 +209,12 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
 // Pendapatan bulanan satu (atau beberapa) entitas, dipecah per TAHUN alih-alih
 // per entitas — dipakai chart komparasi antar-tahun saat cuma 1 entitas yang
 // dipilih (warna chart jadi merepresentasikan tahun, bukan entitas).
-export async function getMonthlyByYear(entityIds: string[], years: number[]) {
+export async function getMonthlyByYear(entityIds: string[], years: number[], version: string = "INTERNAL") {
   if (years.length === 0) return [];
   const minYear = Math.min(...years);
   const maxYear = Math.max(...years);
+  const allowedCategories: ReportCategory[] =
+    version.toUpperCase() === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const rows = await prisma.transaction.findMany({
     where: {
@@ -218,7 +222,7 @@ export async function getMonthlyByYear(entityIds: string[], years: number[]) {
       tanggal: { gte: new Date(`${minYear}-01-01`), lt: new Date(`${maxYear + 1}-01-01`) },
       coaAccount: {
         kategori: "PENDAPATAN",
-        reportCategory: { in: ["INTERNAL", "SEMUA"] },
+        reportCategory: { in: allowedCategories },
       },
     },
     select: { tanggal: true, kredit: true },

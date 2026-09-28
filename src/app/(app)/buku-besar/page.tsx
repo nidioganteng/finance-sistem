@@ -51,7 +51,11 @@ export default async function BukuBesarPage({
         subtitle={`Ledger per akun COA — ${currentYear}`}
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Buku Besar"
+              entityName={selectedEntity.name}
+              year={currentYear}
+            />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

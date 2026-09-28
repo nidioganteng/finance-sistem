@@ -14,6 +14,8 @@ import {
 } from "@/lib/laporan-hutang-piutang";
 import { LaporanHutangPiutangClient } from "@/components/laporan-hutang-piutang/LaporanHutangPiutangClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function LaporanHutangPiutangPage({
   searchParams,
 }: {

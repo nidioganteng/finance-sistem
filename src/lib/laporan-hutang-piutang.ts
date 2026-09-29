@@ -62,6 +62,12 @@ export interface NettingRow {
   shortName: string;
   fullName: string;
   status: "UTANG" | "PIUTANG" | "NIHIL";
+  saldoAwalNet: number;
+  saldoAwalNetFmt: string;
+  penambahanPiutang: number;
+  penambahanPiutangFmt: string;
+  penambahanHutang: number;
+  penambahanHutangFmt: string;
   piutang: number;
   piutangFmt: string;
   hutang: number;
@@ -78,16 +84,26 @@ export interface NettingRow {
 export interface MutasiAfiliasiTx {
   id: string;
   tanggal: string;
+  tanggalRaw?: string;
   noBukti: string;
   keterangan: string;
+  counterpartyKey: string;
   counterpartyName: string;
+  counterpartyShortName?: string;
   accountType: "PIUTANG" | "HUTANG";
+  efekSaldo: "TAMBAH" | "KURANG";
   coaCode: string;
   coaName: string;
   debit: number;
   kredit: number;
   debitFmt: string;
   kreditFmt: string;
+  nominalMutasi: number;
+  nominalMutasiFmt: string;
+  saldoAkhir: number;
+  saldoAkhirFmt: string;
+  saldoAkhirGlobal?: number;
+  saldoAkhirGlobalFmt?: string;
 }
 
 export interface LaporanHutangPiutangEntityData {
@@ -387,11 +403,21 @@ export async function getLaporanHutangPiutangEntityData(
       totalNetUtang += Math.abs(net);
     }
 
+    const saldoAwalNet = pRow.piutangLalu - hRow.hutangLalu;
+    const penambahanPiutang = pRow.perubahan;
+    const penambahanHutang = hRow.hutangTahunIni;
+
     nettingRows.push({
       counterpartyKey: cp.key,
       shortName: cp.shortName,
       fullName: cp.fullName,
       status,
+      saldoAwalNet,
+      saldoAwalNetFmt: formatAccountingRupiah(saldoAwalNet),
+      penambahanPiutang,
+      penambahanPiutangFmt: formatAccountingRupiah(penambahanPiutang),
+      penambahanHutang,
+      penambahanHutangFmt: formatAccountingRupiah(penambahanHutang),
       piutang,
       piutangFmt: formatAccountingRupiah(piutang),
       hutang,
@@ -410,7 +436,7 @@ export async function getLaporanHutangPiutangEntityData(
   const statusGlobal: "PIUTANG" | "UTANG" | "NIHIL" =
     posisiBersihGlobal > 0 ? "PIUTANG" : posisiBersihGlobal < 0 ? "UTANG" : "NIHIL";
 
-  // Detailed recent transactions for inter-entity accounts
+  // Detailed recent transactions for inter-entity accounts (diurutkan kronologis untuk running balance)
   const rawTx = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -426,76 +452,100 @@ export async function getLaporanHutangPiutangEntityData(
       ],
     },
     include: { coaAccount: true },
-    orderBy: { tanggal: "desc" },
-    take: 100,
+    orderBy: [{ tanggal: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+    take: 200,
   });
 
-  const transactions: MutasiAfiliasiTx[] = [];
+  const cpRunningBalances = new Map<string, number>();
+  for (const nr of nettingRows) {
+    cpRunningBalances.set(nr.counterpartyKey, nr.saldoAwalNet);
+  }
+  let globalRunningBalance = sumPiutangLalu - sumHutangLalu;
+
+  const chronologicalTransactions: MutasiAfiliasiTx[] = [];
+
   for (const t of rawTx) {
     const coaCode = t.coaAccount?.code ?? "";
     const isStandardHutang = hutangCodes.includes(coaCode);
     const isStandardPiutang = piutangCodes.includes(coaCode);
     const extra = t.extraFieldsJson as Record<string, unknown> | null;
 
+    let cp: CounterpartyConfig | undefined;
+    let accountType: "PIUTANG" | "HUTANG" = "PIUTANG";
+    let coaName = t.coaAccount?.name ?? "";
+    let displayCoaCode = coaCode;
+
     if (extra?.crossingFromEntityKey) {
       const fromKey = String(extra.crossingFromEntityKey);
-      const cp = counterparties.find((c) => c.key === fromKey);
+      cp = counterparties.find((c) => c.key === fromKey);
+      accountType = "HUTANG";
 
       // Lewati baris BEBAN jika bukan akun hutang/piutang standar (hanya baris kewajiban/hutang yang ditampilkan)
       if (extra.crossingRole === "BEBAN" && !isStandardHutang && !isStandardPiutang) {
         continue;
       }
 
-      transactions.push({
-        id: t.id,
-        tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-        noBukti: t.noBukti,
-        keterangan: t.keterangan,
-        counterpartyName: cp?.fullName ?? fromKey,
-        accountType: "HUTANG",
-        coaCode: coaCode || (typeof extra.originalHutangCoaCode === "string" ? extra.originalHutangCoaCode : "-"),
-        coaName:
-          t.coaAccount?.name && !isStandardHutang
-            ? `${t.coaAccount.name} (Hutang Crossing)`
-            : t.coaAccount?.name ?? `Hutang Afiliasi (${cp?.shortName ?? fromKey})`,
-        debit: Number(t.debit),
-        kredit: Number(t.kredit),
-        debitFmt: formatStandardRupiah(Number(t.debit)),
-        kreditFmt: formatStandardRupiah(Number(t.kredit)),
-      });
+      displayCoaCode = coaCode || (typeof extra.originalHutangCoaCode === "string" ? extra.originalHutangCoaCode : "-");
+      coaName =
+        t.coaAccount?.name && !isStandardHutang
+          ? `${t.coaAccount.name} (Hutang Crossing)`
+          : t.coaAccount?.name ?? `Hutang Afiliasi (${cp?.shortName ?? fromKey})`;
+    } else if (isStandardHutang || isStandardPiutang) {
+      accountType = isStandardHutang ? "HUTANG" : "PIUTANG";
+      cp = counterparties.find((c) => (accountType === "HUTANG" ? c.hutangCode === coaCode : c.piutangCode === coaCode));
+    } else {
       continue;
     }
 
-    if (isStandardHutang || isStandardPiutang) {
-      const isHutang = isStandardHutang;
-      const cp = counterparties.find((c) => (isHutang ? c.hutangCode === coaCode : c.piutangCode === coaCode));
-      transactions.push({
-        id: t.id,
-        tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-        noBukti: t.noBukti,
-        keterangan: t.keterangan,
-        counterpartyName: cp?.fullName ?? "-",
-        accountType: isHutang ? "HUTANG" : "PIUTANG",
-        coaCode,
-        coaName: t.coaAccount?.name ?? "",
-        debit: Number(t.debit),
-        kredit: Number(t.kredit),
-        debitFmt: formatStandardRupiah(Number(t.debit)),
-        kreditFmt: formatStandardRupiah(Number(t.kredit)),
-      });
-    }
+    if (!cp) continue;
+
+    const debit = Number(t.debit);
+    const kredit = Number(t.kredit);
+
+    // Rumus running balance sesuai instruksi finance:
+    // Setiap transaksi piutang menambah saldo (+)
+    // Setiap transaksi hutang mengurangi saldo (-)
+    const nominalMutasi = debit - kredit;
+    const efekSaldo: "TAMBAH" | "KURANG" = nominalMutasi >= 0 ? "TAMBAH" : "KURANG";
+
+    const prevCpBalance = cpRunningBalances.get(cp.key) ?? 0;
+    const newCpBalance = prevCpBalance + nominalMutasi;
+    cpRunningBalances.set(cp.key, newCpBalance);
+
+    globalRunningBalance += nominalMutasi;
+
+    chronologicalTransactions.push({
+      id: t.id,
+      tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      tanggalRaw: new Date(t.tanggal).toISOString(),
+      noBukti: t.noBukti,
+      keterangan: t.keterangan,
+      counterpartyKey: cp.key,
+      counterpartyName: cp.fullName,
+      counterpartyShortName: cp.shortName,
+      accountType,
+      efekSaldo,
+      coaCode: displayCoaCode,
+      coaName,
+      debit,
+      kredit,
+      debitFmt: formatStandardRupiah(debit),
+      kreditFmt: formatStandardRupiah(kredit),
+      nominalMutasi,
+      nominalMutasiFmt: formatStandardRupiah(Math.abs(nominalMutasi)),
+      saldoAkhir: newCpBalance,
+      saldoAkhirFmt: formatAccountingRupiah(newCpBalance),
+      saldoAkhirGlobal: globalRunningBalance,
+      saldoAkhirGlobalFmt: formatAccountingRupiah(globalRunningBalance),
+    });
   }
 
-  // Batasi maksimal 50 transaksi teratas
-  const pagedTransactions = transactions.slice(0, 50);
+  // Tampilkan riwayat dengan transaksi terbaru di atas
+  const pagedTransactions = [...chronologicalTransactions].reverse().slice(0, 100);
 
   return {
     entity,

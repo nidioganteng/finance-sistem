@@ -90,6 +90,7 @@ export default async function DashboardPage({
   const totalRevenue = entities.reduce((s, e) => s + e.revenue, 0);
   const totalSpend = entities.reduce((s, e) => s + e.spend, 0);
   const totalProfit = totalRevenue - totalSpend;
+  const totalTalanganGrup = entities.reduce((s, e) => s + (e.talanganKeluar ?? 0), 0);
 
   // Pisahkan entitas utama dan Umum
   const mainEntities = entities.filter((e) => !e.isUmum);
@@ -196,11 +197,21 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pengeluaran Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
+              {totalTalanganGrup > 0 && (
+                <div className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  +{formatMiliar(totalTalanganGrup)} talangan grup
+                </div>
+              )}
 
               {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
                 <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
-                  {formatRupiah(totalSpend)}
+                  <div>Beban Operasional: {formatRupiah(totalSpend)}</div>
+                  {totalTalanganGrup > 0 && (
+                    <div className="text-blue-300 font-medium mt-0.5">
+                      + Talangan Antar-Grup: {formatRupiah(totalTalanganGrup)}
+                    </div>
+                  )}
                 </div>
                 <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
               </div>
@@ -275,6 +286,8 @@ export default async function DashboardPage({
                 colorHex={e.colorHex}
                 revenue={e.revenue}
                 profit={e.profit}
+                talanganKeluar={e.talanganKeluar}
+                talanganMasuk={e.talanganMasuk}
               />
             ))}
             {umumEntity && (
@@ -285,6 +298,8 @@ export default async function DashboardPage({
                 colorHex={umumEntity.colorHex}
                 revenue={umumEntity.revenue}
                 profit={umumEntity.profit}
+                talanganKeluar={umumEntity.talanganKeluar}
+                talanganMasuk={umumEntity.talanganMasuk}
                 isUmum
               />
             )}
@@ -307,6 +322,8 @@ export default async function DashboardPage({
             revenue={selectedEntity.revenue}
             spend={selectedEntity.spend}
             profit={selectedEntity.profit}
+            talanganKeluar={selectedEntity.talanganKeluar}
+            talanganMasuk={selectedEntity.talanganMasuk}
             interactive={true}
           />
 

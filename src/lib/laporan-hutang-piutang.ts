@@ -81,6 +81,18 @@ export interface NettingRow {
   neracaAccountCode: string;
 }
 
+export interface AlokasiPenggunaanDana {
+  entityKey: string;
+  entityName: string;
+  entityShortName?: string;
+  coaCode: string;
+  coaName: string;
+  nominal: number;
+  nominalFmt: string;
+  keterangan: string;
+  role: "BEBAN" | "KAS" | "HUTANG" | "PIUTANG" | "LAINNYA";
+}
+
 export interface MutasiAfiliasiTx {
   id: string;
   tanggal: string;
@@ -104,6 +116,7 @@ export interface MutasiAfiliasiTx {
   saldoAkhirFmt: string;
   saldoAkhirGlobal?: number;
   saldoAkhirGlobalFmt?: string;
+  alokasiPenggunaan?: AlokasiPenggunaanDana[];
 }
 
 export interface LaporanHutangPiutangEntityData {
@@ -456,6 +469,43 @@ export async function getLaporanHutangPiutangEntityData(
     take: 200,
   });
 
+  const crossingGroupIds = rawTx
+    .map((t) => (t.extraFieldsJson as Record<string, unknown> | null)?.crossingGroupId)
+    .filter((v): v is string => typeof v === "string");
+  const noBuktis = rawTx.map((t) => t.noBukti);
+
+  const relatedTxs = await prisma.transaction.findMany({
+    where: {
+      OR: [
+        {
+          noBukti: { in: noBuktis },
+        },
+        {
+          extraFieldsJson: {
+            path: "$.isCrossingEntry",
+            equals: true,
+          },
+        },
+      ],
+    },
+    include: { coaAccount: true, entity: true },
+  });
+
+  const relatedByGid = new Map<string, typeof relatedTxs>();
+  const relatedByBukti = new Map<string, typeof relatedTxs>();
+  for (const r of relatedTxs) {
+    const rExtra = r.extraFieldsJson as Record<string, unknown> | null;
+    const gid = rExtra?.crossingGroupId;
+    if (typeof gid === "string") {
+      if (!relatedByGid.has(gid)) relatedByGid.set(gid, []);
+      relatedByGid.get(gid)!.push(r);
+    }
+    if (r.noBukti) {
+      if (!relatedByBukti.has(r.noBukti)) relatedByBukti.set(r.noBukti, []);
+      relatedByBukti.get(r.noBukti)!.push(r);
+    }
+  }
+
   const cpRunningBalances = new Map<string, number>();
   for (const nr of nettingRows) {
     cpRunningBalances.set(nr.counterpartyKey, nr.saldoAwalNet);
@@ -514,6 +564,84 @@ export async function getLaporanHutangPiutangEntityData(
 
     globalRunningBalance += nominalMutasi;
 
+    // Resolusi Detail Alokasi & Penggunaan Dana (Uang digunakan untuk apa oleh rekanan / entitas)
+    const gid = typeof extra?.crossingGroupId === "string" ? extra.crossingGroupId : null;
+    const matchedRows = (gid ? relatedByGid.get(gid) : null) ?? relatedByBukti.get(t.noBukti) ?? [];
+    const alokasiPenggunaan: AlokasiPenggunaanDana[] = [];
+
+    if (accountType === "PIUTANG") {
+      // Uang keluar dari entitas kita (Gaharu) untuk rekanan (Kencana)
+      // Cari apa yang dicatat di rekanan (Kencana) untuk mengetahui uang digunakan untuk pos apa
+      const cpRows = matchedRows.filter((r) => r.entity.key === cp!.key);
+      const expenseRows = cpRows.filter((r) => {
+        const rx = r.extraFieldsJson as Record<string, unknown> | null;
+        if (rx?.crossingRole === "BEBAN") return true;
+        return Number(r.debit) > 0 && r.coaAccount?.code !== cp!.hutangCode;
+      });
+
+      for (const er of expenseRows) {
+        const erExtra = er.extraFieldsJson as Record<string, unknown> | null;
+        const nom = Number(er.debit) > 0 ? Number(er.debit) : Number(er.kredit);
+        alokasiPenggunaan.push({
+          entityKey: er.entity.key,
+          entityName: er.entity.name,
+          entityShortName: cp!.shortName,
+          coaCode: er.coaAccount?.code ?? "-",
+          coaName: er.coaAccount?.name ?? "Beban Operasional / Proyek",
+          nominal: nom,
+          nominalFmt: formatStandardRupiah(nom),
+          keterangan: er.keterangan || t.keterangan,
+          role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
+        });
+      }
+
+      if (alokasiPenggunaan.length === 0) {
+        const kasRows = cpRows.filter((r) => {
+          const rx = r.extraFieldsJson as Record<string, unknown> | null;
+          return rx?.isKasEntry || Number(r.debit) > 0;
+        });
+        for (const kr of kasRows) {
+          const nom = Number(kr.debit) > 0 ? Number(kr.debit) : Number(kr.kredit);
+          alokasiPenggunaan.push({
+            entityKey: kr.entity.key,
+            entityName: kr.entity.name,
+            entityShortName: cp!.shortName,
+            coaCode: kr.coaAccount?.code ?? "-",
+            coaName: kr.coaAccount?.name ?? "Kas / Bank Rekanan",
+            nominal: nom,
+            nominalFmt: formatStandardRupiah(nom),
+            keterangan: kr.keterangan || t.keterangan,
+            role: "KAS",
+          });
+        }
+      }
+    } else {
+      // accountType === "HUTANG": Entitas kita (Kencana) menerima hutang / talangan dari rekanan (Gaharu)
+      // Cari alokasi biaya di entitas kita sendiri
+      const selfRows = matchedRows.filter((r) => r.entity.key === entity.key && r.id !== t.id);
+      const expenseRows = selfRows.filter((r) => {
+        const rx = r.extraFieldsJson as Record<string, unknown> | null;
+        if (rx?.crossingRole === "BEBAN") return true;
+        return Number(r.debit) > 0 && r.coaAccount?.code !== cp!.hutangCode;
+      });
+
+      for (const er of expenseRows) {
+        const erExtra = er.extraFieldsJson as Record<string, unknown> | null;
+        const nom = Number(er.debit) > 0 ? Number(er.debit) : Number(er.kredit);
+        alokasiPenggunaan.push({
+          entityKey: er.entity.key,
+          entityName: er.entity.name,
+          entityShortName: entity.name,
+          coaCode: er.coaAccount?.code ?? "-",
+          coaName: er.coaAccount?.name ?? "Beban Operasional / Proyek",
+          nominal: nom,
+          nominalFmt: formatStandardRupiah(nom),
+          keterangan: er.keterangan || t.keterangan,
+          role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
+        });
+      }
+    }
+
     chronologicalTransactions.push({
       id: t.id,
       tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
@@ -541,6 +669,7 @@ export async function getLaporanHutangPiutangEntityData(
       saldoAkhirFmt: formatAccountingRupiah(newCpBalance),
       saldoAkhirGlobal: globalRunningBalance,
       saldoAkhirGlobalFmt: formatAccountingRupiah(globalRunningBalance),
+      alokasiPenggunaan: alokasiPenggunaan.length > 0 ? alokasiPenggunaan : undefined,
     });
   }
 

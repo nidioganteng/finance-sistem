@@ -250,6 +250,45 @@ export async function getLaporanHutangPiutangEntityData(
       hutangTahunIni = cur.kredit - cur.debit;
     }
 
+    // Periksa transaksi crossing dari entitas rekanan ini (jika kode akun sempat diubah tim finance di Jurnal)
+    const extraCrossing = await prisma.transaction.findMany({
+      where: {
+        entityId,
+        tanggal: { gte: startYear, lt: endYear },
+        extraFieldsJson: { path: "$.crossingFromEntityKey", equals: cp.key },
+      },
+      select: { id: true, coaAccountId: true, debit: true, kredit: true, extraFieldsJson: true },
+    });
+
+    for (const ec of extraCrossing) {
+      // Jika akunnya bukan akun hutang standar (misal sudah diganti oleh tim finance ke akun lain),
+      // tetap hitung kewajiban kreditnya agar tidak hilang dari Laporan Hutang & Piutang!
+      if (ec.coaAccountId !== coaId) {
+        const extra = ec.extraFieldsJson as Record<string, unknown> | null;
+        if (extra?.crossingRole === "HUTANG" || (!extra?.crossingRole && Number(ec.kredit) > 0)) {
+          hutangTahunIni += Number(ec.kredit) - Number(ec.debit);
+        }
+      }
+    }
+
+    const extraCrossingBefore = await prisma.transaction.findMany({
+      where: {
+        entityId,
+        tanggal: { lt: startYear },
+        extraFieldsJson: { path: "$.crossingFromEntityKey", equals: cp.key },
+      },
+      select: { id: true, coaAccountId: true, debit: true, kredit: true, extraFieldsJson: true },
+    });
+
+    for (const ec of extraCrossingBefore) {
+      if (ec.coaAccountId !== coaId) {
+        const extra = ec.extraFieldsJson as Record<string, unknown> | null;
+        if (extra?.crossingRole === "HUTANG" || (!extra?.crossingRole && Number(ec.kredit) > 0)) {
+          hutangLalu += Number(ec.kredit) - Number(ec.debit);
+        }
+      }
+    }
+
     const totalHutang = hutangLalu + hutangTahunIni;
 
     sumHutangLalu += hutangLalu;
@@ -375,37 +414,88 @@ export async function getLaporanHutangPiutangEntityData(
   const rawTx = await prisma.transaction.findMany({
     where: {
       entityId,
-      coaAccountId: { in: coaAccounts.map((c) => c.id) },
       tanggal: { gte: startYear, lt: endYear },
+      OR: [
+        { coaAccountId: { in: coaAccounts.map((c) => c.id) } },
+        {
+          extraFieldsJson: {
+            path: "$.isCrossingEntry",
+            equals: true,
+          },
+        },
+      ],
     },
     include: { coaAccount: true },
     orderBy: { tanggal: "desc" },
-    take: 50,
+    take: 100,
   });
 
-  const transactions: MutasiAfiliasiTx[] = rawTx.map((t) => {
+  const transactions: MutasiAfiliasiTx[] = [];
+  for (const t of rawTx) {
     const coaCode = t.coaAccount?.code ?? "";
-    const isHutang = hutangCodes.includes(coaCode);
-    const cp = counterparties.find((c) => (isHutang ? c.hutangCode === coaCode : c.piutangCode === coaCode));
-    return {
-      id: t.id,
-      tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      noBukti: t.noBukti,
-      keterangan: t.keterangan,
-      counterpartyName: cp?.fullName ?? "-",
-      accountType: isHutang ? "HUTANG" : "PIUTANG",
-      coaCode,
-      coaName: t.coaAccount?.name ?? "",
-      debit: Number(t.debit),
-      kredit: Number(t.kredit),
-      debitFmt: formatStandardRupiah(Number(t.debit)),
-      kreditFmt: formatStandardRupiah(Number(t.kredit)),
-    };
-  });
+    const isStandardHutang = hutangCodes.includes(coaCode);
+    const isStandardPiutang = piutangCodes.includes(coaCode);
+    const extra = t.extraFieldsJson as Record<string, unknown> | null;
+
+    if (extra?.crossingFromEntityKey) {
+      const fromKey = String(extra.crossingFromEntityKey);
+      const cp = counterparties.find((c) => c.key === fromKey);
+
+      // Lewati baris BEBAN jika bukan akun hutang/piutang standar (hanya baris kewajiban/hutang yang ditampilkan)
+      if (extra.crossingRole === "BEBAN" && !isStandardHutang && !isStandardPiutang) {
+        continue;
+      }
+
+      transactions.push({
+        id: t.id,
+        tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        noBukti: t.noBukti,
+        keterangan: t.keterangan,
+        counterpartyName: cp?.fullName ?? fromKey,
+        accountType: "HUTANG",
+        coaCode: coaCode || (typeof extra.originalHutangCoaCode === "string" ? extra.originalHutangCoaCode : "-"),
+        coaName:
+          t.coaAccount?.name && !isStandardHutang
+            ? `${t.coaAccount.name} (Hutang Crossing)`
+            : t.coaAccount?.name ?? `Hutang Afiliasi (${cp?.shortName ?? fromKey})`,
+        debit: Number(t.debit),
+        kredit: Number(t.kredit),
+        debitFmt: formatStandardRupiah(Number(t.debit)),
+        kreditFmt: formatStandardRupiah(Number(t.kredit)),
+      });
+      continue;
+    }
+
+    if (isStandardHutang || isStandardPiutang) {
+      const isHutang = isStandardHutang;
+      const cp = counterparties.find((c) => (isHutang ? c.hutangCode === coaCode : c.piutangCode === coaCode));
+      transactions.push({
+        id: t.id,
+        tanggal: new Date(t.tanggal).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        noBukti: t.noBukti,
+        keterangan: t.keterangan,
+        counterpartyName: cp?.fullName ?? "-",
+        accountType: isHutang ? "HUTANG" : "PIUTANG",
+        coaCode,
+        coaName: t.coaAccount?.name ?? "",
+        debit: Number(t.debit),
+        kredit: Number(t.kredit),
+        debitFmt: formatStandardRupiah(Number(t.debit)),
+        kreditFmt: formatStandardRupiah(Number(t.kredit)),
+      });
+    }
+  }
+
+  // Batasi maksimal 50 transaksi teratas
+  const pagedTransactions = transactions.slice(0, 50);
 
   return {
     entity,
@@ -436,7 +526,7 @@ export async function getLaporanHutangPiutangEntityData(
       posisiBersihGlobalFmt: formatAccountingRupiah(posisiBersihGlobal),
       statusGlobal,
     },
-    transactions,
+    transactions: pagedTransactions,
   };
 }
 

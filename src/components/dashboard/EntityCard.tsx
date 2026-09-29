@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { formatMiliar, formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { motion } from "framer-motion";
 
 const ENTITY_LOGO: Record<string, string> = {
@@ -38,6 +38,8 @@ export function EntityCardCompact({
   colorHex,
   revenue,
   profit,
+  talanganKeluar = 0,
+  talanganMasuk = 0,
   isUmum = false,
 }: {
   entityKey: string;
@@ -46,6 +48,8 @@ export function EntityCardCompact({
   colorHex: string;
   revenue: number;
   profit: number;
+  talanganKeluar?: number;
+  talanganMasuk?: number;
   isUmum?: boolean;
 }) {
   const isProfit = profit >= 0;
@@ -133,6 +137,60 @@ export function EntityCardCompact({
                 <div className={`w-0 h-0 border-x-4 border-x-transparent border-t-4 mr-3 ${isProfit ? "border-t-status-green" : "border-t-status-red"}`} />
               </div>
             </div>
+
+            {/* Talangan Keluar (Kas Keluar untuk Rekanan / Piutang) */}
+            {talanganKeluar > 0 && (
+              <>
+                <div className="h-px bg-surface-subtle" />
+                <div
+                  className="group/talangan relative flex items-center justify-between gap-1 py-0.5 px-1.5 -mx-1 rounded bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200/60 dark:border-blue-500/20 text-blue-600 dark:text-blue-400"
+                  title={`Kas keluar untuk talangan / pinjaman ke entitas rekanan: ${formatRupiah(talanganKeluar)}`}
+                >
+                  <div className="flex items-center gap-1 flex-none whitespace-nowrap">
+                    <ArrowUpRight size={11} className="text-blue-600 dark:text-blue-400 flex-none" />
+                    <span className="text-[10px] font-bold uppercase tracking-tight">Talangan Afiliasi</span>
+                  </div>
+                  <span className="text-[11.5px] font-bold font-mono tabular-nums whitespace-nowrap">
+                    +{formatMiliar(talanganKeluar)}
+                  </span>
+
+                  {/* Instant Floating Tooltip */}
+                  <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/talangan:flex flex-col items-end">
+                    <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                      Kas Keluar Talangan (Piutang): {formatRupiah(talanganKeluar)}
+                    </div>
+                    <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 mr-3" />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Talangan Masuk (Didanai Pinjaman/Hutang Rekanan) */}
+            {talanganMasuk > 0 && (
+              <>
+                <div className="h-px bg-surface-subtle" />
+                <div
+                  className="group/talanganMasuk relative flex items-center justify-between gap-1 py-0.5 px-1.5 -mx-1 rounded bg-amber-50/70 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20 text-amber-700 dark:text-amber-400"
+                  title={`Didanai oleh pinjaman/talangan entitas rekanan: ${formatRupiah(talanganMasuk)}`}
+                >
+                  <div className="flex items-center gap-1 flex-none whitespace-nowrap">
+                    <ArrowDownLeft size={11} className="text-amber-600 dark:text-amber-400 flex-none" />
+                    <span className="text-[10px] font-bold uppercase tracking-tight">Didanai Rekanan</span>
+                  </div>
+                  <span className="text-[11.5px] font-bold font-mono tabular-nums whitespace-nowrap">
+                    {formatMiliar(talanganMasuk)}
+                  </span>
+
+                  {/* Instant Floating Tooltip */}
+                  <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/talanganMasuk:flex flex-col items-end">
+                    <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                      Didanai Talangan (Hutang): {formatRupiah(talanganMasuk)}
+                    </div>
+                    <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 mr-3" />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </motion.div>
@@ -149,6 +207,8 @@ export function EntityCard({
   revenue,
   spend,
   profit,
+  talanganKeluar = 0,
+  talanganMasuk = 0,
   interactive = true,
 }: {
   entityKey: string;
@@ -158,6 +218,8 @@ export function EntityCard({
   revenue: number;
   spend: number;
   profit: number;
+  talanganKeluar?: number;
+  talanganMasuk?: number;
   interactive?: boolean;
 }) {
   const isProfit = profit >= 0;
@@ -229,6 +291,24 @@ export function EntityCard({
           <div className={`${getMetricValueFontSize(formattedSpend)} text-navy-text truncate`} title={formattedSpend}>
             {formattedSpend}
           </div>
+          {talanganKeluar > 0 && (
+            <div
+              className="mt-1 flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400"
+              title={`Talangan/Pinjaman kas keluar untuk entitas rekanan: ${formatRupiah(talanganKeluar)}`}
+            >
+              <ArrowUpRight size={13} className="flex-none" />
+              <span>+{formatRupiah(talanganKeluar)} talangan keluar</span>
+            </div>
+          )}
+          {talanganMasuk > 0 && (
+            <div
+              className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+              title={`Belanja didanai talangan entitas rekanan: ${formatRupiah(talanganMasuk)}`}
+            >
+              <ArrowDownLeft size={13} className="flex-none" />
+              <span>{formatRupiah(talanganMasuk)} didanai rekanan</span>
+            </div>
+          )}
           <div className="mt-2 h-1 rounded-full bg-surface-hover overflow-hidden">
             <div
               className={`h-full rounded-full ${spendPct > 90 ? "bg-status-red" : spendPct > 70 ? "bg-status-amber" : "bg-brand"}`}

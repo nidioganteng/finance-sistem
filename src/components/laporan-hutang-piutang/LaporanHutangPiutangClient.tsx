@@ -284,28 +284,28 @@ export function LaporanHutangPiutangClient({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-surface-hover text-left bg-surface-subtle/50">
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase whitespace-nowrap">
                         Posisi Neraca
                       </th>
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase whitespace-nowrap">
                         Entitas Rekanan
                       </th>
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
                         Saldo Awal Lalu
                       </th>
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-emerald-600 dark:text-emerald-400">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                         Penambahan (+)
                       </th>
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-rose-600 dark:text-rose-400">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-rose-600 dark:text-rose-400 whitespace-nowrap">
                         Pengurangan (−)
                       </th>
-                      <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                      <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
                         Saldo Akhir Netto
                       </th>
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase whitespace-nowrap">
                         Penempatan di Neraca
                       </th>
-                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-center">
+                      <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-center whitespace-nowrap">
                         Buku Pembantu
                       </th>
                     </tr>
@@ -313,9 +313,9 @@ export function LaporanHutangPiutangClient({
                   <tbody className="divide-y divide-surface-subtle">
                     {netting.rows.map((row) => (
                       <tr key={row.counterpartyKey} className="hover:bg-surface-hover/30 transition-colors">
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-extrabold uppercase tracking-wide ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-extrabold uppercase tracking-wide whitespace-nowrap ${
                               row.status === "UTANG"
                                 ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
                                 : row.status === "PIUTANG"
@@ -333,24 +333,24 @@ export function LaporanHutangPiutangClient({
                             {row.status}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-navy-text text-[13px]">
+                        <td className="py-3.5 px-4 font-bold text-navy-text text-[13px] whitespace-nowrap">
                           {row.fullName}{" "}
                           <span className="text-muted-faint font-normal text-[11.5px]">
                             ({row.shortName})
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                        <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono whitespace-nowrap">
                           {row.saldoAwalNetFmt}
                         </td>
-                        <td className="py-3.5 px-4 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400 text-[12.5px] font-mono">
-                          {row.penambahanPiutang > 0 ? `+${row.penambahanPiutangFmt}` : "Rp -"}
+                        <td className="py-3.5 px-4 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400 text-[12.5px] font-mono whitespace-nowrap">
+                          {row.penambahanPiutang > 0 ? `+${row.penambahanPiutangFmt}` : "Rp\u00A0-"}
                         </td>
-                        <td className="py-3.5 px-4 text-right tabular-nums font-bold text-rose-600 dark:text-rose-400 text-[12.5px] font-mono">
-                          {row.penambahanHutang > 0 ? `−${row.penambahanHutangFmt}` : "Rp -"}
+                        <td className="py-3.5 px-4 text-right tabular-nums font-bold text-rose-600 dark:text-rose-400 text-[12.5px] font-mono whitespace-nowrap">
+                          {row.penambahanHutang > 0 ? `−${row.penambahanHutangFmt}` : "Rp\u00A0-"}
                         </td>
-                        <td className="py-3.5 px-5 text-right tabular-nums">
+                        <td className="py-3.5 px-5 text-right tabular-nums whitespace-nowrap">
                           <span
-                            className={`font-extrabold text-[13.5px] px-2.5 py-1 rounded-md font-mono ${
+                            className={`font-extrabold text-[13.5px] px-2.5 py-1 rounded-md font-mono whitespace-nowrap inline-block ${
                               row.status === "UTANG"
                                 ? "text-rose-600 dark:text-rose-400 bg-rose-500/10"
                                 : row.status === "PIUTANG"
@@ -361,9 +361,9 @@ export function LaporanHutangPiutangClient({
                             {row.netFmt}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-semibold ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-semibold whitespace-nowrap ${
                               row.status === "UTANG"
                                 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                                 : row.status === "PIUTANG"
@@ -374,11 +374,11 @@ export function LaporanHutangPiutangClient({
                             {row.neracaPosition}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => handleViewCounterpartyLedger(row.counterpartyKey)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-subtle hover:bg-navy hover:text-white text-navy-text text-[11.5px] font-bold border border-border-soft transition-all cursor-pointer group"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-subtle hover:bg-navy hover:text-white text-navy-text text-[11.5px] font-bold border border-border-soft transition-all cursor-pointer group whitespace-nowrap"
                             title={`Buka Buku Pembantu Mutasi ${row.fullName}`}
                           >
                             <span>Mutasi</span>
@@ -392,27 +392,27 @@ export function LaporanHutangPiutangClient({
                     ))}
                     {/* Total Netting Row */}
                     <tr className="bg-surface-subtle/80 font-extrabold text-navy-text border-t-2 border-border-soft">
-                      <td colSpan={2} className="py-4 px-4 text-left uppercase text-[11.5px] tracking-wider">
+                      <td colSpan={2} className="py-4 px-4 text-left uppercase text-[11.5px] tracking-wider whitespace-nowrap">
                         Total Posisi Bersih Antar-Grup
                       </td>
-                      <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-muted-stronger font-mono">
+                      <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-muted-stronger font-mono whitespace-nowrap">
                         {formatAccountingRupiah(
                           rekapPiutang.totalPiutangLalu - rekapHutang.totalHutangLalu
                         )}
                       </td>
-                      <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-emerald-600 dark:text-emerald-400 font-mono">
+                      <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
                         {rekapPiutang.totalPerubahan > 0
                           ? `+${rekapPiutang.totalPerubahanFmt}`
-                          : "Rp -"}
+                          : "Rp\u00A0-"}
                       </td>
-                      <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-rose-600 dark:text-rose-400 font-mono">
+                      <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-rose-600 dark:text-rose-400 font-mono whitespace-nowrap">
                         {rekapHutang.totalHutangTahunIni > 0
                           ? `−${rekapHutang.totalHutangTahunIniFmt}`
-                          : "Rp -"}
+                          : "Rp\u00A0-"}
                       </td>
-                      <td className="py-4 px-5 text-right tabular-nums">
+                      <td className="py-4 px-5 text-right tabular-nums whitespace-nowrap">
                         <span
-                          className={`text-[14.5px] font-extrabold underline decoration-double font-mono ${
+                          className={`text-[14.5px] font-extrabold underline decoration-double font-mono whitespace-nowrap inline-block ${
                             isNetKreditur
                               ? "text-emerald-600 dark:text-emerald-400"
                               : isNetDebitur
@@ -423,7 +423,7 @@ export function LaporanHutangPiutangClient({
                           {netting.posisiBersihGlobalFmt}
                         </span>
                       </td>
-                      <td colSpan={2} className="py-4 px-4 text-[11.5px] text-muted font-normal">
+                      <td colSpan={2} className="py-4 px-4 text-[11.5px] text-muted font-normal whitespace-nowrap">
                         {isNetKreditur
                           ? "Net Hak Tagih (Kreditur)"
                           : isNetDebitur
@@ -647,10 +647,10 @@ export function LaporanHutangPiutangClient({
                     <span className="text-[10.5px] font-bold text-emerald-700 dark:text-emerald-400 uppercase block mb-1">
                       + Penambahan Piutang
                     </span>
-                    <div className="text-[17px] font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+                    <div className="text-[17px] font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums whitespace-nowrap">
                       {selectedCpRow.penambahanPiutang > 0
                         ? `+${selectedCpRow.penambahanPiutangFmt}`
-                        : "Rp -"}
+                        : "Rp\u00A0-"}
                     </div>
                     <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-1">
                       Pengeluaran untuk rekanan
@@ -662,10 +662,10 @@ export function LaporanHutangPiutangClient({
                     <span className="text-[10.5px] font-bold text-rose-700 dark:text-rose-400 uppercase block mb-1">
                       − Pengurangan / Hutang
                     </span>
-                    <div className="text-[17px] font-extrabold text-rose-600 dark:text-rose-400 font-mono tabular-nums">
+                    <div className="text-[17px] font-extrabold text-rose-600 dark:text-rose-400 font-mono tabular-nums whitespace-nowrap">
                       {selectedCpRow.penambahanHutang > 0
                         ? `−${selectedCpRow.penambahanHutangFmt}`
-                        : "Rp -"}
+                        : "Rp\u00A0-"}
                     </div>
                     <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-1">
                       Dana masuk / talangan rekanan
@@ -685,7 +685,7 @@ export function LaporanHutangPiutangClient({
                     <span className="text-[10.5px] font-extrabold uppercase tracking-wider block mb-1">
                       = Saldo Akhir Berjalan ({year})
                     </span>
-                    <div className="text-[18px] font-extrabold font-mono tabular-nums">
+                    <div className="text-[18px] font-extrabold font-mono tabular-nums whitespace-nowrap">
                       {selectedCpRow.netFmt}
                     </div>
                     <p className="text-[11px] font-semibold mt-1 truncate">
@@ -711,17 +711,17 @@ export function LaporanHutangPiutangClient({
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-sm font-mono shrink-0">
-                  <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3.5 py-2 rounded-xl font-bold">
+                  <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3.5 py-2 rounded-xl font-bold whitespace-nowrap">
                     <span className="text-[10px] font-sans uppercase block text-emerald-700/80 dark:text-emerald-400/80">
                       Total Penambahan (+)
                     </span>
-                    {totalPenambahanTx > 0 ? `+${formatStandardRupiah(totalPenambahanTx)}` : "Rp -"}
+                    {totalPenambahanTx > 0 ? `+${formatStandardRupiah(totalPenambahanTx)}` : "Rp\u00A0-"}
                   </div>
-                  <div className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3.5 py-2 rounded-xl font-bold">
+                  <div className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3.5 py-2 rounded-xl font-bold whitespace-nowrap">
                     <span className="text-[10px] font-sans uppercase block text-rose-700/80 dark:text-rose-400/80">
                       Total Pengurangan (−)
                     </span>
-                    {totalPenguranganTx > 0 ? `−${formatStandardRupiah(totalPenguranganTx)}` : "Rp -"}
+                    {totalPenguranganTx > 0 ? `−${formatStandardRupiah(totalPenguranganTx)}` : "Rp\u00A0-"}
                   </div>
                 </div>
               </div>
@@ -787,19 +787,19 @@ export function LaporanHutangPiutangClient({
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-surface-subtle border-b border-border-soft z-10">
                       <tr className="text-left text-[11px] font-extrabold text-muted-faint uppercase">
-                        <th className="py-3 px-4">Tanggal</th>
-                        <th className="py-3 px-3">No. Bukti</th>
-                        <th className="py-3 px-3">Pihak Rekanan</th>
+                        <th className="py-3 px-4 whitespace-nowrap">Tanggal</th>
+                        <th className="py-3 px-3 whitespace-nowrap">No. Bukti</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Pihak Rekanan</th>
                         <th className="py-3 px-4 min-w-[280px]">Keterangan &amp; Alokasi Penggunaan Dana</th>
-                        <th className="py-3 px-3 text-center">Arus Mutasi</th>
-                        <th className="py-3 px-3 text-right text-emerald-600 dark:text-emerald-400">
+                        <th className="py-3 px-3 text-center whitespace-nowrap">Arus Mutasi</th>
+                        <th className="py-3 px-3 text-right text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                           Penambahan (+)
                         </th>
-                        <th className="py-3 px-3 text-right text-rose-600 dark:text-rose-400">
+                        <th className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 whitespace-nowrap">
                           Pengurangan (−)
                         </th>
-                        <th className="py-3 px-5 text-right">Saldo Akhir Berjalan</th>
-                        <th className="py-3 px-3 text-center">Detail</th>
+                        <th className="py-3 px-5 text-right whitespace-nowrap">Saldo Akhir Berjalan</th>
+                        <th className="py-3 px-3 text-center whitespace-nowrap">Detail</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-subtle text-[12.5px]">
@@ -837,7 +837,7 @@ export function LaporanHutangPiutangClient({
                               </div>
                               {tx.alokasiPenggunaan && tx.alokasiPenggunaan.length > 0 && (
                                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-brand flex items-center gap-1 bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-brand flex items-center gap-1 bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded whitespace-nowrap">
                                     <Layers size={10} />
                                     <span>
                                       {tx.accountType === "PIUTANG"
@@ -850,7 +850,7 @@ export function LaporanHutangPiutangClient({
                                       key={idx}
                                       type="button"
                                       onClick={() => setSelectedTxDetail(tx)}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-surface-subtle hover:bg-surface-hover border border-border-soft text-navy-text font-mono transition-colors cursor-pointer"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-surface-subtle hover:bg-surface-hover border border-border-soft text-navy-text font-mono transition-colors cursor-pointer whitespace-nowrap"
                                       title="Klik untuk melihat rincian alokasi belanja"
                                     >
                                       <span className="text-brand font-bold">{alk.coaCode}</span>
@@ -876,15 +876,15 @@ export function LaporanHutangPiutangClient({
                                 {isTambah ? "+ Piutang" : "− Hutang"}
                               </span>
                             </td>
-                            <td className="py-3 px-3 text-right tabular-nums font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            <td className="py-3 px-3 text-right tabular-nums font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                               {isTambah ? tx.nominalMutasiFmt : "—"}
                             </td>
-                            <td className="py-3 px-3 text-right tabular-nums font-mono font-bold text-rose-600 dark:text-rose-400">
+                            <td className="py-3 px-3 text-right tabular-nums font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                               {!isTambah ? tx.nominalMutasiFmt : "—"}
                             </td>
-                            <td className="py-3 px-5 text-right tabular-nums font-mono">
+                            <td className="py-3 px-5 text-right tabular-nums font-mono whitespace-nowrap">
                               <span
-                                className={`font-extrabold px-2.5 py-1 rounded-md text-[13px] inline-block ${
+                                className={`font-extrabold px-2.5 py-1 rounded-md text-[13px] inline-block whitespace-nowrap ${
                                   isPos
                                     ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
                                     : isNeg
@@ -959,7 +959,7 @@ export function LaporanHutangPiutangClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-surface-hover text-left bg-surface-card">
-                        <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
+                        <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase whitespace-nowrap">
                           Rekanan / Akun
                         </th>
                         <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
@@ -976,7 +976,7 @@ export function LaporanHutangPiutangClient({
                     <tbody className="divide-y divide-surface-subtle">
                       {rekapHutang.rows.map((row) => (
                         <tr key={row.code} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <div className="font-semibold text-navy-text text-[13px]">
                               Kas dan Bank {row.shortName}
                             </div>
@@ -984,29 +984,29 @@ export function LaporanHutangPiutangClient({
                               Akun {row.code} · {row.fullName}
                             </div>
                           </td>
-                          <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                          <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono whitespace-nowrap">
                             {row.hutangLaluFmt}
                           </td>
-                          <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                          <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono whitespace-nowrap">
                             {row.hutangTahunIniFmt}
                           </td>
-                          <td className="py-3.5 px-4 text-right tabular-nums font-bold text-navy-text text-[13px] font-mono">
+                          <td className="py-3.5 px-4 text-right tabular-nums font-bold text-navy-text text-[13px] font-mono whitespace-nowrap">
                             {row.totalHutangFmt}
                           </td>
                         </tr>
                       ))}
                       {/* Total Hutang Row */}
                       <tr className="bg-surface-subtle font-extrabold text-navy-text border-t-2 border-border-soft">
-                        <td className="py-3.5 px-4 uppercase text-[11px] tracking-wider">
+                        <td className="py-3.5 px-4 uppercase text-[11px] tracking-wider whitespace-nowrap">
                           Total Hutang per {year}
                         </td>
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                        <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger whitespace-nowrap">
                           {rekapHutang.totalHutangLaluFmt}
                         </td>
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                        <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger whitespace-nowrap">
                           {rekapHutang.totalHutangTahunIniFmt}
                         </td>
-                        <td className="py-3.5 px-4 text-right tabular-nums text-[13.5px] font-mono text-rose-600 dark:text-rose-400 underline decoration-double">
+                        <td className="py-3.5 px-4 text-right tabular-nums text-[13.5px] font-mono text-rose-600 dark:text-rose-400 underline decoration-double whitespace-nowrap">
                           {rekapHutang.totalHutangFmt}
                         </td>
                       </tr>
@@ -1034,7 +1034,7 @@ export function LaporanHutangPiutangClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-surface-hover text-left bg-surface-card">
-                        <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
+                        <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase whitespace-nowrap">
                           Akun Piutang
                         </th>
                         <th className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
@@ -1051,7 +1051,7 @@ export function LaporanHutangPiutangClient({
                     <tbody className="divide-y divide-surface-subtle">
                       {rekapPiutang.rows.map((row) => (
                         <tr key={row.code} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <div className="font-semibold text-navy-text text-[13px]">
                               PIUTANG {row.shortName}
                             </div>
@@ -1059,29 +1059,29 @@ export function LaporanHutangPiutangClient({
                               Akun {row.code} · {row.fullName}
                             </div>
                           </td>
-                          <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                          <td className="py-3.5 px-3 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono whitespace-nowrap">
                             {row.piutangLaluFmt}
                           </td>
-                          <td className="py-3.5 px-3 text-right tabular-nums font-bold text-navy-text text-[13px] font-mono">
+                          <td className="py-3.5 px-3 text-right tabular-nums font-bold text-navy-text text-[13px] font-mono whitespace-nowrap">
                             {row.piutangBerjalanFmt}
                           </td>
-                          <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                          <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono whitespace-nowrap">
                             {row.perubahanFmt}
                           </td>
                         </tr>
                       ))}
                       {/* Total Piutang Row */}
                       <tr className="bg-surface-subtle font-extrabold text-navy-text border-t-2 border-border-soft">
-                        <td className="py-3.5 px-4 uppercase text-[11px] tracking-wider">
+                        <td className="py-3.5 px-4 uppercase text-[11px] tracking-wider whitespace-nowrap">
                           Total Piutang
                         </td>
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                        <td className="py-3.5 px-3 text-right tabular-nums text-[12px] font-mono text-muted-stronger whitespace-nowrap">
                           {rekapPiutang.totalPiutangLaluFmt}
                         </td>
-                        <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-mono text-emerald-600 dark:text-emerald-400 underline decoration-double">
+                        <td className="py-3.5 px-3 text-right tabular-nums text-[13.5px] font-mono text-emerald-600 dark:text-emerald-400 underline decoration-double whitespace-nowrap">
                           {rekapPiutang.totalPiutangFmt}
                         </td>
-                        <td className="py-3.5 px-4 text-right tabular-nums text-[12px] font-mono text-muted-stronger">
+                        <td className="py-3.5 px-4 text-right tabular-nums text-[12px] font-mono text-muted-stronger whitespace-nowrap">
                           {rekapPiutang.totalPerubahanFmt}
                         </td>
                       </tr>
@@ -1350,24 +1350,24 @@ export function LaporanHutangPiutangClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-hover bg-surface-subtle/50 text-left">
-                  <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                  <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase whitespace-nowrap">
                     Entitas
                   </th>
                   {entities.map((e) => (
                     <th
                       key={e.key}
-                      className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-center"
+                      className="py-3 px-3 text-[11px] font-extrabold text-muted-faint uppercase text-center whitespace-nowrap"
                     >
                       {e.shortName}
                     </th>
                   ))}
-                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-emerald-600 dark:text-emerald-400">
+                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                     Total Piutang
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-rose-600 dark:text-rose-400">
+                  <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-rose-600 dark:text-rose-400 whitespace-nowrap">
                     Total Hutang
                   </th>
-                  <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                  <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right whitespace-nowrap">
                     Posisi Bersih
                   </th>
                 </tr>
@@ -1382,7 +1382,7 @@ export function LaporanHutangPiutangClient({
                   };
                   return (
                     <tr key={rowEnt.key} className="hover:bg-surface-hover/30 transition-colors">
-                      <td className="py-3.5 px-5 font-bold text-navy-text text-[13px]">
+                      <td className="py-3.5 px-5 font-bold text-navy-text text-[13px] whitespace-nowrap">
                         {rowEnt.name}{" "}
                         <span className="text-[11px] text-muted-faint font-normal">
                           ({rowEnt.shortName})
@@ -1393,7 +1393,7 @@ export function LaporanHutangPiutangClient({
                           return (
                             <td
                               key={colEnt.key}
-                              className="py-3 px-3 text-center bg-surface-subtle/40 text-muted-faint font-bold"
+                              className="py-3 px-3 text-center bg-surface-subtle/40 text-muted-faint font-bold whitespace-nowrap"
                             >
                               —
                             </td>
@@ -1405,30 +1405,30 @@ export function LaporanHutangPiutangClient({
                           net: 0,
                         };
                         return (
-                          <td key={colEnt.key} className="py-3 px-3 text-center tabular-nums">
+                          <td key={colEnt.key} className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
                             {cell.net === 0 ? (
-                              <span className="text-[11.5px] text-muted-faint font-mono">Rp 0</span>
+                              <span className="text-[11.5px] text-muted-faint font-mono whitespace-nowrap">Rp\u00A0-</span>
                             ) : cell.net > 0 ? (
-                              <span className="text-[11.5px] font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                              <span className="text-[11.5px] font-bold text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
                                 +{formatAccountingRupiah(cell.net)}
                               </span>
                             ) : (
-                              <span className="text-[11.5px] font-bold text-rose-600 dark:text-rose-400 font-mono">
+                              <span className="text-[11.5px] font-bold text-rose-600 dark:text-rose-400 font-mono whitespace-nowrap">
                                 {formatAccountingRupiah(cell.net)}
                               </span>
                             )}
                           </td>
                         );
                       })}
-                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400 text-[12.5px] font-mono">
+                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400 text-[12.5px] font-mono whitespace-nowrap">
                         {formatAccountingRupiah(totals.totalPiutang)}
                       </td>
-                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-rose-600 dark:text-rose-400 text-[12.5px] font-mono">
+                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-rose-600 dark:text-rose-400 text-[12.5px] font-mono whitespace-nowrap">
                         {formatAccountingRupiah(totals.totalHutang)}
                       </td>
-                      <td className="py-3.5 px-5 text-right tabular-nums">
+                      <td className="py-3.5 px-5 text-right tabular-nums whitespace-nowrap">
                         <span
-                          className={`font-extrabold text-[12.5px] px-2.5 py-1 rounded-md font-mono ${
+                          className={`font-extrabold text-[12.5px] px-2.5 py-1 rounded-md font-mono whitespace-nowrap inline-block ${
                             totals.status === "PIUTANG"
                               ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
                               : totals.status === "UTANG"
@@ -1464,34 +1464,34 @@ export function LaporanHutangPiutangClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-hover text-left bg-surface-subtle/40 text-[11px] font-extrabold text-muted-faint uppercase">
-                  <th className="py-3 px-6">Pasangan Entitas</th>
-                  <th className="py-3 px-4 text-right">Piutang A ke B</th>
-                  <th className="py-3 px-4 text-right">Hutang B ke A</th>
-                  <th className="py-3 px-6 text-center">Status Rekonsiliasi</th>
+                  <th className="py-3 px-6 whitespace-nowrap">Pasangan Entitas</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Piutang A ke B</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Hutang B ke A</th>
+                  <th className="py-3 px-6 text-center whitespace-nowrap">Status Rekonsiliasi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-subtle text-[12.5px]">
                 {reconciliations.map((rec, i) => (
                   <tr key={i} className="hover:bg-surface-hover/20">
-                    <td className="py-3 px-6 font-bold text-navy-text">
+                    <td className="py-3 px-6 font-bold text-navy-text whitespace-nowrap">
                       {rec.entityA.name} ({rec.entityA.shortName}){" "}
                       <span className="text-muted-faint">↔</span> {rec.entityB.name} (
                       {rec.entityB.shortName})
                     </td>
-                    <td className="py-3 px-4 text-right tabular-nums text-muted-stronger font-medium font-mono">
+                    <td className="py-3 px-4 text-right tabular-nums text-muted-stronger font-medium font-mono whitespace-nowrap">
                       {formatAccountingRupiah(rec.piutangAB)}
                     </td>
-                    <td className="py-3 px-4 text-right tabular-nums text-muted-stronger font-medium font-mono">
+                    <td className="py-3 px-4 text-right tabular-nums text-muted-stronger font-medium font-mono whitespace-nowrap">
                       {formatAccountingRupiah(rec.hutangBA)}
                     </td>
-                    <td className="py-3 px-6 text-center">
+                    <td className="py-3 px-6 text-center whitespace-nowrap">
                       {rec.isMatchAB ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                           <CheckCircle2 size={13} /> Sinkron
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 font-mono">
-                          <AlertTriangle size={13} /> Selisih Rp{" "}
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 font-mono whitespace-nowrap">
+                          <AlertTriangle size={13} /> Selisih Rp\u00A0
                           {Math.abs(rec.diffAB).toLocaleString("id-ID")}
                         </span>
                       )}

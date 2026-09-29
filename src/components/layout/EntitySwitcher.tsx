@@ -73,7 +73,7 @@ export function EntitySwitcher({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-[11px] border border-border-soft bg-surface-card text-[13px] font-bold text-navy-text hover:bg-surface-hover transition-colors"
+        className="h-[38px] flex items-center gap-2 px-3 rounded-[11px] border border-border-soft bg-surface-card text-[13px] font-bold text-navy-text hover:bg-surface-hover transition-colors cursor-pointer"
       >
         <EntityLogo entityKey={current.key} name={current.name} size={20} />
         <span className="max-w-[120px] truncate">{current.name}</span>

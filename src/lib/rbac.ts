@@ -37,6 +37,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
           ],
         },
+        { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
@@ -76,6 +77,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
           ],
         },
+        { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
       ],
     },
     {
@@ -115,6 +117,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan-keuangan?version=umum", version: "umum" },
           ],
         },
+        { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
         { label: "Kontrol Piutang & Termin", href: "/piutang", icon: "handCoins" },
       ],
     },

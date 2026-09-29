@@ -67,10 +67,36 @@ export async function saveJurnalTransaksi(formData: FormData) {
   const entity = await prisma.entity.findUnique({ where: { key: entityKey } });
   if (!entity) return { error: "Entity tidak ditemukan." };
 
-  const jenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "jurnalTransaksi" } });
-  if (!jenisInput) return { error: "Jenis input 'Jurnal Transaksi' belum dikonfigurasi di sistem." };
+  let jenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "jurnalTransaksi" } });
+  if (!jenisInput) {
+    jenisInput = await prisma.jenisInputTransaksi.create({
+      data: { key: "jurnalTransaksi", nama: "Jurnal Transaksi", active: true },
+    });
+  }
+
+  let preservedCrossingInfo: { crossingGroupId?: string; crossingFromEntityKey?: string; originalHutangCoaCode?: string } | null = null;
 
   if (editNoBukti) {
+    const oldTxs = await prisma.transaction.findMany({
+      where: {
+        entityId: entity.id,
+        jenisInputId: jenisInput.id,
+        noBukti: editNoBukti,
+      },
+      select: { extraFieldsJson: true },
+    });
+    for (const ot of oldTxs) {
+      const extra = ot.extraFieldsJson as Record<string, unknown> | null;
+      if (extra?.crossingFromEntityKey) {
+        preservedCrossingInfo = {
+          ...(typeof extra.crossingGroupId === "string" ? { crossingGroupId: extra.crossingGroupId } : {}),
+          ...(typeof extra.crossingFromEntityKey === "string" ? { crossingFromEntityKey: extra.crossingFromEntityKey } : {}),
+          ...(typeof extra.originalHutangCoaCode === "string" ? { originalHutangCoaCode: extra.originalHutangCoaCode } : {}),
+        };
+        break;
+      }
+    }
+
     await prisma.transaction.deleteMany({
       where: { entityId: entity.id, jenisInputId: jenisInput.id, noBukti: editNoBukti },
     });
@@ -105,6 +131,15 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   // Main journal rows
   for (const row of validRows) {
+    const isKredit = (row.kredit ?? 0) > 0;
+    const extraFieldsJson = preservedCrossingInfo
+      ? {
+          isCrossingEntry: true,
+          ...preservedCrossingInfo,
+          crossingRole: isKredit ? "HUTANG" : "BEBAN",
+        }
+      : undefined;
+
     allOps.push(
       prisma.transaction.create({
         data: {
@@ -118,6 +153,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           kredit: row.kredit ?? 0,
           saldoSetelah: 0,
           staffId: session.user.id,
+          ...(extraFieldsJson ? { extraFieldsJson } : {}),
         },
       })
     );
@@ -200,9 +236,13 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   revalidatePath("/jurnal-transaksi");
   revalidatePath("/jurnal");
+  revalidatePath("/buku-besar");
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
   revalidatePath("/buku-bank");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
   } catch (e) {
     console.error("[saveJurnalTransaksi]", e);
@@ -236,8 +276,12 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
   logActivity(session.user.id, `Hapus Jurnal Transaksi (${txIds.length} baris)`, "FINANCIAL_CHANGE", { txIds });
   revalidatePath("/jurnal-transaksi");
   revalidatePath("/jurnal");
+  revalidatePath("/buku-besar");
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
   revalidatePath("/buku-bank");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }

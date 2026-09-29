@@ -88,7 +88,9 @@ export default async function DashboardPage({
 
   // Hitung agregat grup
   const totalRevenue = entities.reduce((s, e) => s + e.revenue, 0);
-  const totalSpend = entities.reduce((s, e) => s + e.spend, 0);
+  const totalTalanganGrup = entities.reduce((s, e) => s + (e.talanganKeluar ?? 0), 0);
+  // Pengeluaran operasional konsolidasi grup (mengeliminasi talangan antar entitas agar tidak terjadi pencatatan ganda)
+  const totalSpend = entities.reduce((s, e) => s + (e.beban ?? (e.spend - (e.talanganKeluar ?? 0))), 0);
   const totalProfit = totalRevenue - totalSpend;
 
   // Pisahkan entitas utama dan Umum
@@ -168,7 +170,6 @@ export default async function DashboardPage({
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
             <div
               className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-              title={`Total Pendapatan Grup: ${formatRupiah(totalRevenue)}`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
@@ -189,7 +190,6 @@ export default async function DashboardPage({
 
             <div
               className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-              title={`Total Pengeluaran Grup: ${formatRupiah(totalSpend)}`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-500/15 flex items-center justify-center">
@@ -210,7 +210,6 @@ export default async function DashboardPage({
 
             <div
               className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-              title={`${totalProfit >= 0 ? "Total Laba Bersih Grup" : "Total Rugi Bersih Grup"}: ${(totalProfit < 0 ? "-" : "") + formatRupiah(Math.abs(totalProfit))}`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center">
@@ -246,7 +245,6 @@ export default async function DashboardPage({
 
             <div
               className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-              title={`Total Piutang Belum Tertagih: ${formatRupiah(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
@@ -278,6 +276,7 @@ export default async function DashboardPage({
                 legalName={e.legalName}
                 colorHex={e.colorHex}
                 revenue={e.revenue}
+                spend={e.spend}
                 profit={e.profit}
               />
             ))}
@@ -288,6 +287,7 @@ export default async function DashboardPage({
                 legalName={umumEntity.legalName}
                 colorHex={umumEntity.colorHex}
                 revenue={umumEntity.revenue}
+                spend={umumEntity.spend}
                 profit={umumEntity.profit}
                 isUmum
               />

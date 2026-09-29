@@ -37,6 +37,7 @@ export function EntityCardCompact({
   legalName,
   colorHex,
   revenue,
+  spend,
   profit,
   isUmum = false,
 }: {
@@ -45,6 +46,7 @@ export function EntityCardCompact({
   legalName: string;
   colorHex: string;
   revenue: number;
+  spend?: number;
   profit: number;
   isUmum?: boolean;
 }) {
@@ -107,6 +109,29 @@ export function EntityCardCompact({
             </div>
 
             <div className="h-px bg-surface-subtle" />
+
+            {/* Pengeluaran Row */}
+            {spend !== undefined && (
+              <>
+                <div
+                  className="group/spend relative flex items-center justify-between gap-1.5 py-0.5 rounded px-1 -mx-1 hover:bg-surface-hover/60 transition-colors"
+                  title={`Pengeluaran ${name}: ${formatRupiah(spend)}`}
+                >
+                  <span className="text-[11px] font-semibold text-muted-faint flex-none whitespace-nowrap">Pengeluaran</span>
+                  <span className="text-[12.5px] sm:text-[13px] font-bold text-navy-text tabular-nums whitespace-nowrap">{formatMiliar(spend)}</span>
+
+                  {/* Instant Floating Tooltip */}
+                  <div className="pointer-events-none absolute bottom-full right-0 mb-1 z-50 hidden group-hover/spend:flex flex-col items-end">
+                    <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                      Pengeluaran: {formatRupiah(spend)}
+                    </div>
+                    <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 mr-3" />
+                  </div>
+                </div>
+
+                <div className="h-px bg-surface-subtle" />
+              </>
+            )}
 
             {/* Laba Bersih Row */}
             <div

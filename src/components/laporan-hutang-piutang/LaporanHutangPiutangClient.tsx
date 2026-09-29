@@ -16,7 +16,6 @@ import {
   Minus,
   ArrowRight,
   ExternalLink,
-  Info,
 } from "lucide-react";
 import type {
   LaporanHutangPiutangEntityData,
@@ -303,22 +302,6 @@ export function LaporanHutangPiutangClient({
           </div>
 
           <div className="p-6 flex flex-col gap-6">
-            {/* ── Explanation Banner: Alur Pinjam-Meminjam & Eliminasi Neraca ── */}
-            <div className="p-4 rounded-2xl bg-brand/5 border border-brand/15 text-[12.5px] leading-relaxed text-navy-text">
-              <div className="font-bold flex items-center gap-1.5 text-brand mb-1.5">
-                <Info size={16} /> Aturan Transaksi Pinjam-Meminjam Antar-Entitas &amp; Eliminasi Neraca:
-              </div>
-              <ul className="list-disc pl-5 space-y-1 text-muted-stronger text-[12px]">
-                <li>
-                  <strong>Pencatatan Lengkap (Gross)</strong>: Pinjaman antar-entitas (misal Gaharu meminjamkan ke Kencana, lalu Kencana juga meminjamkan ke Gaharu) tetap dicatat penuh pada Laporan Hutang &amp; Piutang di atas sebagai hak tagih dan kewajiban masing-masing entitas.
-                </li>
-                <li>
-                  <strong>Eliminasi di Neraca (Netting = Piutang − Hutang)</strong>: Di Laporan Neraca, saldo Piutang dan Hutang untuk entitas rekanan yang sama diselisihkan. Sisi yang lebih besar yang masuk ke Neraca:
-                  <span className="inline-block mx-1 font-semibold text-status-green">Piutang &gt; Hutang → Aktiva Lancar</span>, atau 
-                  <span className="inline-block mx-1 font-semibold text-status-red">Hutang &gt; Piutang → Kewajiban</span>. Sisi yang lebih kecil dieliminasi menjadi Rp 0.
-                </li>
-              </ul>
-            </div>
 
             {/* ── Tabel Utama Netting (Format Lembar Kerja Excel Tim Finance) ── */}
             <div className="overflow-x-auto rounded-xl border border-border-soft">

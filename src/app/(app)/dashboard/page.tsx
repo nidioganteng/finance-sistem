@@ -88,9 +88,10 @@ export default async function DashboardPage({
 
   // Hitung agregat grup
   const totalRevenue = entities.reduce((s, e) => s + e.revenue, 0);
-  const totalSpend = entities.reduce((s, e) => s + e.spend, 0);
-  const totalProfit = totalRevenue - totalSpend;
   const totalTalanganGrup = entities.reduce((s, e) => s + (e.talanganKeluar ?? 0), 0);
+  // Pengeluaran operasional konsolidasi grup (mengeliminasi talangan antar entitas agar tidak terjadi pencatatan ganda)
+  const totalSpend = entities.reduce((s, e) => s + (e.beban ?? (e.spend - (e.talanganKeluar ?? 0))), 0);
+  const totalProfit = totalRevenue - totalSpend;
 
   // Pisahkan entitas utama dan Umum
   const mainEntities = entities.filter((e) => !e.isUmum);
@@ -285,6 +286,7 @@ export default async function DashboardPage({
                 legalName={e.legalName}
                 colorHex={e.colorHex}
                 revenue={e.revenue}
+                spend={e.spend}
                 profit={e.profit}
                 talanganKeluar={e.talanganKeluar}
                 talanganMasuk={e.talanganMasuk}
@@ -297,6 +299,7 @@ export default async function DashboardPage({
                 legalName={umumEntity.legalName}
                 colorHex={umumEntity.colorHex}
                 revenue={umumEntity.revenue}
+                spend={umumEntity.spend}
                 profit={umumEntity.profit}
                 talanganKeluar={umumEntity.talanganKeluar}
                 talanganMasuk={umumEntity.talanganMasuk}

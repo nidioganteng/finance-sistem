@@ -24,6 +24,7 @@ export interface AccessibleEntity {
   colorHex: string;
   isUmum: boolean;
   revenue: number;
+  beban?: number;
   spend: number;
   profit: number;
   talanganKeluar?: number;
@@ -159,9 +160,14 @@ export async function getAccessibleEntities(
 
   return entities.map((e) => {
     const revenue = revenueMap.get(e.id) ?? 0;
-    const spend = spendMap.get(e.id) ?? 0;
+    const beban = spendMap.get(e.id) ?? 0;
     const talanganKeluar = Math.max(0, talanganKeluarMap.get(e.id) ?? 0);
     const talanganMasuk = Math.max(0, talanganMasukMap.get(e.id) ?? 0);
+    // Spend di dashboard entitas mencakup beban operasional ditambah arus kas keluar talangan afiliasi
+    const spend = beban + talanganKeluar;
+    // Profit operasional entitas dihitung dari pendapatan dikurangi beban operasional
+    // (talangan keluar adalah piutang/aset yang akan kembali, bukan kerugian operasional)
+    const profit = revenue - beban;
     return {
       id: e.id,
       key: e.key,
@@ -170,8 +176,9 @@ export async function getAccessibleEntities(
       colorHex: e.colorHex,
       isUmum: e.isUmum,
       revenue,
+      beban,
       spend,
-      profit: revenue - spend,
+      profit,
       talanganKeluar,
       talanganMasuk,
       projects: e.projects.map((p) => ({

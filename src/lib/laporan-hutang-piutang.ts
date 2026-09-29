@@ -17,10 +17,10 @@ export const COUNTERPARTIES: CounterpartyConfig[] = [
 ];
 
 export function formatAccountingRupiah(n: number): string {
-  if (n === 0) return "Rp -";
+  if (n === 0) return "Rp\u00A0-";
   const abs = Math.round(Math.abs(n)).toLocaleString("id-ID");
-  if (n < 0) return `Rp (${abs})`;
-  return `Rp ${abs}`;
+  if (n < 0) return `Rp\u00A0(${abs})`;
+  return `Rp\u00A0${abs}`;
 }
 
 export function formatStandardRupiah(n: number): string {

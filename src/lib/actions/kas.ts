@@ -168,7 +168,15 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
+        ...((arahLaporan || r.keterangan || crossingGroupId)
+          ? {
+              extraFieldsJson: {
+                ...(arahLaporan ? { arahLaporan } : {}),
+                ...(r.keterangan ? { itemDescription: r.keterangan } : {}),
+                ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
+              },
+            }
+          : {}),
       },
     })
   );
@@ -460,7 +468,15 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
+        ...((arahLaporan || r.keterangan || crossingGroupId)
+          ? {
+              extraFieldsJson: {
+                ...(arahLaporan ? { arahLaporan } : {}),
+                ...(r.keterangan ? { itemDescription: r.keterangan } : {}),
+                ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
+              },
+            }
+          : {}),
       },
     })
   );

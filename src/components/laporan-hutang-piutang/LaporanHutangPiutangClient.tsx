@@ -16,6 +16,8 @@ import {
   Minus,
   ArrowRight,
   ExternalLink,
+  ArrowUpDown,
+  Filter,
 } from "lucide-react";
 import type {
   LaporanHutangPiutangEntityData,
@@ -36,7 +38,9 @@ export function LaporanHutangPiutangClient({
   selectedEntityKey,
   year,
 }: Props) {
-  const [showTxDetail, setShowTxDetail] = useState(false);
+  const [showTxDetail, setShowTxDetail] = useState(true);
+  const [filterCp, setFilterCp] = useState<string>("ALL");
+  const [sortAsc, setSortAsc] = useState<boolean>(false);
   const isGrup = !selectedEntityKey || selectedEntityKey === "grup";
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -308,19 +312,25 @@ export function LaporanHutangPiutangClient({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-surface-hover text-left bg-surface-subtle/50">
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
                       Posisi Neraca
                     </th>
                     <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
                       Entitas Rekanan
                     </th>
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
-                      Saldo Netto (Masuk Neraca)
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right">
+                      Saldo Awal Lalu
+                    </th>
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-status-green">
+                      Penambahan (+)
+                    </th>
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-right text-status-red">
+                      Pengurangan (−)
                     </th>
                     <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase text-right">
-                      Kalkulasi (Piutang − Hutang)
+                      Saldo Akhir Netto
                     </th>
-                    <th className="py-3 px-5 text-[11px] font-extrabold text-muted-faint uppercase">
+                    <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase">
                       Penempatan di Neraca
                     </th>
                   </tr>
@@ -331,7 +341,7 @@ export function LaporanHutangPiutangClient({
                       key={row.counterpartyKey}
                       className="hover:bg-surface-hover/30 transition-colors"
                     >
-                      <td className="py-3.5 px-5">
+                      <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-extrabold uppercase tracking-wide ${
                             row.status === "UTANG"
@@ -355,6 +365,15 @@ export function LaporanHutangPiutangClient({
                         {row.fullName}{" "}
                         <span className="text-muted-faint font-normal text-[11.5px]">({row.shortName})</span>
                       </td>
+                      <td className="py-3.5 px-4 text-right tabular-nums text-muted-stronger text-[12.5px] font-mono">
+                        {row.saldoAwalNetFmt}
+                      </td>
+                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-status-green text-[12.5px] font-mono">
+                        {row.penambahanPiutang > 0 ? `+${row.penambahanPiutangFmt}` : "Rp -"}
+                      </td>
+                      <td className="py-3.5 px-4 text-right tabular-nums font-bold text-status-red text-[12.5px] font-mono">
+                        {row.penambahanHutang > 0 ? `−${row.penambahanHutangFmt}` : "Rp -"}
+                      </td>
                       <td className="py-3.5 px-5 text-right tabular-nums">
                         <span
                           className={`font-extrabold text-[13.5px] px-2.5 py-1 rounded-md font-mono ${
@@ -368,10 +387,7 @@ export function LaporanHutangPiutangClient({
                           {row.netFmt}
                         </span>
                       </td>
-                      <td className="py-3.5 px-5 text-right tabular-nums text-muted-stronger text-[12px] font-mono">
-                        {row.piutangFmt} − {row.hutangFmt}
-                      </td>
-                      <td className="py-3.5 px-5">
+                      <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11.5px] font-semibold ${
                             row.status === "UTANG"
@@ -388,8 +404,17 @@ export function LaporanHutangPiutangClient({
                   ))}
                   {/* Total Netting Row */}
                   <tr className="bg-surface-subtle/80 font-extrabold text-navy-text border-t-2 border-border-soft">
-                    <td colSpan={2} className="py-3.5 px-5 text-left uppercase text-[11.5px] tracking-wider">
+                    <td colSpan={2} className="py-3.5 px-4 text-left uppercase text-[11.5px] tracking-wider">
                       Total Posisi Bersih Antar-Grup
+                    </td>
+                    <td className="py-3.5 px-4 text-right tabular-nums text-[12px] text-muted-stronger font-mono">
+                      {formatAccountingRupiah(rekapPiutang.totalPiutangLalu - rekapHutang.totalHutangLalu)}
+                    </td>
+                    <td className="py-3.5 px-4 text-right tabular-nums text-[12px] text-status-green font-mono">
+                      {rekapPiutang.totalPerubahan > 0 ? `+${rekapPiutang.totalPerubahanFmt}` : "Rp -"}
+                    </td>
+                    <td className="py-3.5 px-4 text-right tabular-nums text-[12px] text-status-red font-mono">
+                      {rekapHutang.totalHutangTahunIni > 0 ? `−${rekapHutang.totalHutangTahunIniFmt}` : "Rp -"}
                     </td>
                     <td className="py-3.5 px-5 text-right tabular-nums">
                       <span
@@ -404,10 +429,7 @@ export function LaporanHutangPiutangClient({
                         {netting.posisiBersihGlobalFmt}
                       </span>
                     </td>
-                    <td className="py-3.5 px-5 text-right tabular-nums text-[12px] text-muted-stronger font-mono">
-                      {rekapPiutang.totalPiutangFmt} − {rekapHutang.totalHutangFmt}
-                    </td>
-                    <td className="py-3.5 px-5 text-[11.5px] text-muted">
+                    <td className="py-3.5 px-4 text-[11.5px] text-muted">
                       {isNetKreditur ? "Net Hak Tagih (Kreditur)" : isNetDebitur ? "Net Kewajiban (Debitur)" : "Seimbang"}
                     </td>
                   </tr>
@@ -469,78 +491,252 @@ export function LaporanHutangPiutangClient({
           </div>
         </div>
 
-        {/* ── Section: Riwayat Transaksi Jurnal Afiliasi ── */}
+        {/* ── Section: Riwayat Transaksi Jurnal Afiliasi (Buku Pembantu Rekanan) ── */}
         <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
-          <button
-            onClick={() => setShowTxDetail((prev) => !prev)}
-            className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface-hover/30 transition-colors"
-          >
+          <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-surface-hover">
             <div className="flex items-center gap-2.5">
-              <Receipt size={16} className="text-muted-stronger" />
+              <Receipt size={18} className="text-brand" />
               <div>
-                <div className="text-[13px] font-bold text-navy-text">
-                  Buku Pembantu & Riwayat Transaksi Afiliasi ({transactions.length})
+                <div className="text-[14px] font-extrabold text-navy-text flex items-center gap-2">
+                  <span>Buku Pembantu & Riwayat Transaksi Afiliasi</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-surface-subtle border border-border-soft text-navy-text font-mono">
+                    {transactions.length} mutasi
+                  </span>
                 </div>
                 <div className="text-[11.5px] text-muted">
-                  Klik untuk melihat rincian jurnal mutasi akun 111-115 dan 311-315 di tahun {year}
+                  Kartu mutasi transaksi piutang & hutang antar-rekanan dengan tampilan Saldo Berjalan (Running Balance)
                 </div>
               </div>
             </div>
-            <div className="p-1 rounded-lg text-muted-faint">
-              {showTxDetail ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSortAsc(!sortAsc)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-semibold rounded-xl border border-border-soft bg-surface-subtle hover:bg-surface-hover text-navy-text transition-colors"
+                title="Ubah urutan tanggal transaksi"
+              >
+                <ArrowUpDown size={13} className="text-muted-stronger" />
+                <span>{sortAsc ? "Urutan: Terlama Dulu" : "Urutan: Terbaru Dulu"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowTxDetail((prev) => !prev)}
+                className="p-1.5 rounded-xl border border-border-soft hover:bg-surface-hover text-muted-stronger transition-colors"
+                title={showTxDetail ? "Sembunyikan detail" : "Buka detail"}
+              >
+                {showTxDetail ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
             </div>
-          </button>
+          </div>
 
           {showTxDetail && (
-            <div className="border-t border-surface-hover">
-              {transactions.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted">
-                  Belum ada mutasi transaksi pada akun hutang/piutang afiliasi di tahun {year}.
-                </div>
-              ) : (
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-surface-subtle border-b border-border-soft">
-                      <tr className="text-left text-[11px] font-bold text-muted-faint uppercase">
-                        <th className="py-2.5 px-6">Tanggal</th>
-                        <th className="py-2.5 px-3">No Bukti</th>
-                        <th className="py-2.5 px-3">Pihak Rekanan</th>
-                        <th className="py-2.5 px-3">Akun COA</th>
-                        <th className="py-2.5 px-4">Keterangan</th>
-                        <th className="py-2.5 px-3 text-right">Debit</th>
-                        <th className="py-2.5 px-6 text-right">Kredit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-subtle text-[12px]">
-                      {transactions.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-surface-hover/20">
-                          <td className="py-2.5 px-6 text-muted font-medium whitespace-nowrap">
-                            {tx.tanggal}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-[11px] text-navy-text">
-                            {tx.noBukti}
-                          </td>
-                          <td className="py-2.5 px-3 font-semibold text-navy-text whitespace-nowrap">
-                            {tx.counterpartyName}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-[11px] text-muted-stronger">
-                            {tx.coaCode} - {tx.coaName}
-                          </td>
-                          <td className="py-2.5 px-4 text-muted-stronger max-w-[240px] truncate">
-                            {tx.keterangan}
-                          </td>
-                          <td className="py-2.5 px-3 text-right tabular-nums font-medium text-navy-text">
-                            {tx.debit > 0 ? tx.debitFmt : "-"}
-                          </td>
-                          <td className="py-2.5 px-6 text-right tabular-nums font-medium text-navy-text">
-                            {tx.kredit > 0 ? tx.kreditFmt : "-"}
-                          </td>
+            <div className="p-6 flex flex-col gap-4">
+              {/* Filter Tabs Rekanan */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-bold text-muted-faint uppercase mr-1 flex items-center gap-1">
+                  <Filter size={12} />
+                  <span>Filter Rekanan:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFilterCp("ALL")}
+                  className={`px-3 py-1.5 rounded-xl text-[11.5px] font-bold transition-all ${
+                    filterCp === "ALL"
+                      ? "bg-brand text-white shadow-xs"
+                      : "bg-surface-subtle hover:bg-surface-hover text-navy-text border border-border-soft"
+                  }`}
+                >
+                  Semua Rekanan ({transactions.length})
+                </button>
+                {netting.rows.map((r) => {
+                  const cpTxCount = transactions.filter((t) => t.counterpartyKey === r.counterpartyKey).length;
+                  return (
+                    <button
+                      key={r.counterpartyKey}
+                      type="button"
+                      onClick={() => setFilterCp(r.counterpartyKey)}
+                      className={`px-3 py-1.5 rounded-xl text-[11.5px] font-bold transition-all flex items-center gap-1.5 ${
+                        filterCp === r.counterpartyKey
+                          ? "bg-brand text-white shadow-xs"
+                          : "bg-surface-subtle hover:bg-surface-hover text-navy-text border border-border-soft"
+                      }`}
+                    >
+                      <span>{r.fullName} ({r.shortName})</span>
+                      {cpTxCount > 0 && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                            filterCp === r.counterpartyKey
+                              ? "bg-white/20 text-white"
+                              : "bg-surface-hover text-muted-stronger"
+                          }`}
+                        >
+                          {cpTxCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Banner Ringkasan Kartu Rekanan yang Sedang Dipilih */}
+              {filterCp !== "ALL" && (() => {
+                const selRow = netting.rows.find((r) => r.counterpartyKey === filterCp);
+                if (!selRow) return null;
+                return (
+                  <div className="bg-surface-subtle/70 rounded-2xl border border-border-soft p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-extrabold text-muted-faint uppercase tracking-wider">
+                          Kartu Rekening Koran Rekanan:
+                        </span>
+                        <span className="text-[13px] font-extrabold text-navy-text">
+                          {selRow.fullName} ({selRow.shortName})
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-muted mt-0.5">
+                        Pengeluaran untuk rekanan menambah piutang (+), talangan/dana masuk dari rekanan mengurangi piutang (−)
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm font-mono">
+                      <div>
+                        <span className="text-[10px] font-sans font-bold text-muted-faint uppercase block">
+                          Saldo Awal Lalu
+                        </span>
+                        <span className="text-[12.5px] font-bold text-muted-stronger">
+                          {selRow.saldoAwalNetFmt}
+                        </span>
+                      </div>
+                      <span className="text-muted-faint font-bold">+</span>
+                      <div>
+                        <span className="text-[10px] font-sans font-bold text-muted-faint uppercase block text-status-green">
+                          Penambahan (+)
+                        </span>
+                        <span className="text-[12.5px] font-bold text-status-green">
+                          {selRow.penambahanPiutangFmt}
+                        </span>
+                      </div>
+                      <span className="text-muted-faint font-bold">−</span>
+                      <div>
+                        <span className="text-[10px] font-sans font-bold text-muted-faint uppercase block text-status-red">
+                          Pengurangan (−)
+                        </span>
+                        <span className="text-[12.5px] font-bold text-status-red">
+                          {selRow.penambahanHutangFmt}
+                        </span>
+                      </div>
+                      <span className="text-muted-faint font-bold">=</span>
+                      <div className="px-3 py-1.5 rounded-xl bg-surface-card border border-border-soft">
+                        <span className="text-[10px] font-sans font-bold text-muted-faint uppercase block">
+                          Saldo Akhir Bersih
+                        </span>
+                        <span
+                          className={`text-[13.5px] font-extrabold ${
+                            selRow.status === "PIUTANG"
+                              ? "text-status-green"
+                              : selRow.status === "UTANG"
+                              ? "text-status-red"
+                              : "text-navy-text"
+                          }`}
+                        >
+                          {selRow.netFmt} ({selRow.status})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tabel Transaksi dengan Kolom Penambahan, Pengurangan, dan Saldo Akhir */}
+              {(() => {
+                const displayedTx = transactions
+                  .filter((tx) => filterCp === "ALL" || tx.counterpartyKey === filterCp)
+                  .sort((a, b) => {
+                    const da = new Date(a.tanggalRaw || a.tanggal).getTime();
+                    const db = new Date(b.tanggalRaw || b.tanggal).getTime();
+                    return sortAsc ? da - db : db - da;
+                  });
+
+                if (displayedTx.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-sm text-muted rounded-xl border border-dashed border-border-soft">
+                      Belum ada mutasi transaksi pada akun hutang/piutang untuk rekanan ini di tahun {year}.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto rounded-xl border border-border-soft max-h-[460px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-surface-subtle border-b border-border-soft z-10">
+                        <tr className="text-left text-[11px] font-extrabold text-muted-faint uppercase">
+                          <th className="py-2.5 px-4">Tanggal</th>
+                          <th className="py-2.5 px-3">No Bukti</th>
+                          <th className="py-2.5 px-3">Pihak Rekanan</th>
+                          <th className="py-2.5 px-4">Keterangan</th>
+                          <th className="py-2.5 px-3 text-center">Efek Saldo</th>
+                          <th className="py-2.5 px-3 text-right text-status-green">Penambahan (+)</th>
+                          <th className="py-2.5 px-3 text-right text-status-red">Pengurangan (−)</th>
+                          <th className="py-2.5 px-4 text-right">Saldo Akhir</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-surface-subtle text-[12px]">
+                        {displayedTx.map((tx) => {
+                          const isTambah = tx.efekSaldo === "TAMBAH";
+                          return (
+                            <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
+                              <td className="py-2.5 px-4 text-muted font-medium whitespace-nowrap">
+                                {tx.tanggal}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-navy-text font-semibold">
+                                {tx.noBukti}
+                              </td>
+                              <td className="py-2.5 px-3 font-semibold text-navy-text whitespace-nowrap">
+                                {tx.counterpartyName}
+                              </td>
+                              <td className="py-2.5 px-4 text-muted-stronger max-w-[240px] truncate" title={tx.keterangan}>
+                                {tx.keterangan}
+                              </td>
+                              <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold uppercase ${
+                                    isTambah
+                                      ? "bg-status-green/15 text-status-green"
+                                      : "bg-status-red/15 text-status-red"
+                                  }`}
+                                >
+                                  {isTambah ? "+ Piutang" : "− Hutang"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right tabular-nums font-mono font-medium text-status-green">
+                                {isTambah ? tx.nominalMutasiFmt : "—"}
+                              </td>
+                              <td className="py-2.5 px-3 text-right tabular-nums font-mono font-medium text-status-red">
+                                {!isTambah ? tx.nominalMutasiFmt : "—"}
+                              </td>
+                              <td className="py-2.5 px-4 text-right tabular-nums font-mono">
+                                <span
+                                  className={`font-bold px-2 py-0.5 rounded text-[12.5px] ${
+                                    tx.saldoAkhir > 0
+                                      ? "text-status-green bg-green-500/10"
+                                      : tx.saldoAkhir < 0
+                                      ? "text-status-red bg-red-500/10"
+                                      : "text-muted bg-surface-subtle"
+                                  }`}
+                                >
+                                  {tx.saldoAkhirFmt}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

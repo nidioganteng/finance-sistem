@@ -18,10 +18,13 @@ import {
   Filter,
   Search,
   X,
+  Layers,
+  Info,
 } from "lucide-react";
 import type {
   LaporanHutangPiutangEntityData,
   LaporanHutangPiutangGrupData,
+  MutasiAfiliasiTx,
 } from "@/lib/laporan-hutang-piutang";
 import { formatAccountingRupiah, formatStandardRupiah, COUNTERPARTIES } from "@/lib/laporan-hutang-piutang";
 
@@ -44,6 +47,7 @@ export function LaporanHutangPiutangClient({
   const [filterCp, setFilterCp] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
+  const [selectedTxDetail, setSelectedTxDetail] = useState<MutasiAfiliasiTx | null>(null);
   const isGrup = !selectedEntityKey || selectedEntityKey === "grup";
 
   // Jump from Netting Row directly into Counterparty Ledger
@@ -786,7 +790,7 @@ export function LaporanHutangPiutangClient({
                         <th className="py-3 px-4">Tanggal</th>
                         <th className="py-3 px-3">No. Bukti</th>
                         <th className="py-3 px-3">Pihak Rekanan</th>
-                        <th className="py-3 px-4">Keterangan</th>
+                        <th className="py-3 px-4 min-w-[280px]">Keterangan &amp; Alokasi Penggunaan Dana</th>
                         <th className="py-3 px-3 text-center">Arus Mutasi</th>
                         <th className="py-3 px-3 text-right text-emerald-600 dark:text-emerald-400">
                           Penambahan (+)
@@ -795,6 +799,7 @@ export function LaporanHutangPiutangClient({
                           Pengurangan (−)
                         </th>
                         <th className="py-3 px-5 text-right">Saldo Akhir Berjalan</th>
+                        <th className="py-3 px-3 text-center">Detail</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-subtle text-[12.5px]">
@@ -823,11 +828,42 @@ export function LaporanHutangPiutangClient({
                                 Akun {tx.coaCode}
                               </div>
                             </td>
-                            <td
-                              className="py-3 px-4 text-muted-stronger max-w-[280px] truncate"
-                              title={tx.keterangan}
-                            >
-                              {tx.keterangan}
+                            <td className="py-3 px-4">
+                              <div
+                                className="font-semibold text-navy-text text-[12.5px] max-w-[340px]"
+                                title={tx.keterangan}
+                              >
+                                {tx.keterangan}
+                              </div>
+                              {tx.alokasiPenggunaan && tx.alokasiPenggunaan.length > 0 && (
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-brand flex items-center gap-1 bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded">
+                                    <Layers size={10} />
+                                    <span>
+                                      {tx.accountType === "PIUTANG"
+                                        ? `Dipakai di ${tx.counterpartyShortName || tx.counterpartyName}:`
+                                        : "Alokasi Belanja:"}
+                                    </span>
+                                  </span>
+                                  {tx.alokasiPenggunaan.map((alk, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => setSelectedTxDetail(tx)}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-surface-subtle hover:bg-surface-hover border border-border-soft text-navy-text font-mono transition-colors cursor-pointer"
+                                      title="Klik untuk melihat rincian alokasi belanja"
+                                    >
+                                      <span className="text-brand font-bold">{alk.coaCode}</span>
+                                      <span className="font-sans font-medium text-muted-stronger">
+                                        {alk.coaName}
+                                      </span>
+                                      <span className="text-[10px] text-muted-faint font-mono">
+                                        ({alk.nominalFmt})
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-3 text-center whitespace-nowrap">
                               <span
@@ -858,6 +894,16 @@ export function LaporanHutangPiutangClient({
                               >
                                 {tx.saldoAkhirFmt}
                               </span>
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTxDetail(tx)}
+                                className="p-1.5 rounded-lg border border-border-soft bg-surface-subtle hover:bg-navy hover:text-white text-muted-stronger transition-all cursor-pointer"
+                                title="Lihat detail alokasi penggunaan dana"
+                              >
+                                <Info size={14} />
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1042,6 +1088,176 @@ export function LaporanHutangPiutangClient({
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal Rincian Alokasi & Penggunaan Dana Rekanan ── */}
+        {selectedTxDetail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+            <div className="bg-surface-card rounded-[22px] border border-border-soft max-w-xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="px-6 py-4.5 border-b border-border-soft flex items-center justify-between bg-surface-subtle/50">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 rounded-xl bg-brand/10 text-brand">
+                    <Layers size={18} />
+                  </span>
+                  <div>
+                    <h3 className="text-[15px] font-extrabold text-navy-text">
+                      Rincian Alokasi &amp; Penggunaan Dana
+                    </h3>
+                    <p className="text-[12px] text-muted mt-0.5">
+                      No. Bukti:{" "}
+                      <strong className="font-mono text-navy-text font-bold">
+                        {selectedTxDetail.noBukti}
+                      </strong>{" "}
+                      • {selectedTxDetail.tanggal}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTxDetail(null)}
+                  className="p-1.5 rounded-xl hover:bg-surface-hover text-muted-stronger hover:text-navy-text transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto flex flex-col gap-4 text-sm">
+                {/* Ringkasan Aliran Dana */}
+                <div className="p-4 rounded-xl bg-surface-subtle/50 border border-border-soft flex flex-col gap-2.5">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint">
+                    Aliran Transaksi Antar-Perusahaan
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 items-center">
+                    <div className="p-3 rounded-xl bg-surface-card border border-border-soft">
+                      <span className="text-[10px] text-muted-faint uppercase font-bold block">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? "Entitas Sumber (Uang Keluar)"
+                          : "Pemberi Pinjaman"}
+                      </span>
+                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? entity.name
+                          : selectedTxDetail.counterpartyName}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-card border border-border-soft">
+                      <span className="text-[10px] text-muted-faint uppercase font-bold block">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? "Entitas Penerima (Tujuan)"
+                          : "Penerima Pinjaman"}
+                      </span>
+                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? selectedTxDetail.counterpartyName
+                          : entity.name}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-surface-card border border-border-soft">
+                    <span className="text-[11px] font-bold text-muted-faint uppercase">
+                      Nominal Transaksi:
+                    </span>
+                    <span className="text-[15px] font-extrabold text-navy-text font-mono">
+                      {selectedTxDetail.nominalMutasiFmt}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10.5px] text-muted-faint uppercase font-bold block">
+                      Keterangan Asal:
+                    </span>
+                    <p className="text-[12.5px] font-medium text-navy-text mt-1 bg-surface-card p-2.5 rounded-xl border border-border-soft">
+                      {selectedTxDetail.keterangan || "Tidak ada keterangan tertulis."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section: Bagaimana Uang Ini Digunakan? */}
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint mb-2.5 flex items-center justify-between">
+                    <span>
+                      {selectedTxDetail.accountType === "PIUTANG"
+                        ? `Uang Digunakan di ${selectedTxDetail.counterpartyName} Untuk:`
+                        : `Alokasi Penggunaan di ${entity.name}:`}
+                    </span>
+                    <span className="text-[11px] font-mono text-muted">
+                      {selectedTxDetail.alokasiPenggunaan?.length ?? 0} pos belanja
+                    </span>
+                  </div>
+
+                  {selectedTxDetail.alokasiPenggunaan && selectedTxDetail.alokasiPenggunaan.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {selectedTxDetail.alokasiPenggunaan.map((alk, idx) => {
+                        const isDefaultBeban = alk.coaCode === "530";
+                        return (
+                          <div
+                            key={idx}
+                            className="p-4 rounded-xl border bg-surface-card border-border-soft flex flex-col gap-2.5 shadow-xs"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 rounded-lg font-mono text-[12px] font-extrabold bg-brand/10 text-brand">
+                                  Akun {alk.coaCode}
+                                </span>
+                                <span className="font-extrabold text-navy-text text-[13.5px]">
+                                  {alk.coaName}
+                                </span>
+                              </div>
+                              <span className="font-mono font-extrabold text-navy-text text-[14px]">
+                                {alk.nominalFmt}
+                              </span>
+                            </div>
+
+                            <div className="text-[12px] text-muted-stronger bg-surface-subtle/70 p-2.5 rounded-xl">
+                              <span className="font-bold text-muted-faint text-[10.5px] uppercase block mb-0.5">
+                                Keterangan Belanja / Penggunaan:
+                              </span>
+                              {alk.keterangan}
+                            </div>
+
+                            <div className="text-[11.5px]">
+                              {isDefaultBeban ? (
+                                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                                  <strong>⚠️ Pos Biaya Sementara (Akun 530 By Lain):</strong> Transaksi ini otomatis tercatat di Jurnal Umum &amp; Buku Besar rekanan. Rekanan dapat mengubah kode akun ini ke akun biaya riil (misal 501 Biaya Bahan) di menu Jurnal Transaksi tanpa menghilangkan data di Laporan Hutang Piutang.
+                                </div>
+                              ) : alk.role === "KAS" ? (
+                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                                  <strong>✅ Penerimaan Kas / Bank:</strong> Dana diterima ke saldo kas/bank rekanan untuk keperluan operasional.
+                                </div>
+                              ) : (
+                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                                  <strong>✅ Telah Teralokasi Spesifik:</strong> Dana telah dicatat pada akun beban operasional / proyek ini pada pembukuan rekanan.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-5 rounded-xl bg-surface-subtle/50 border border-dashed border-border-soft text-center text-muted text-[12px]">
+                      Tidak ada rincian crossing otomatis. Transaksi ini dicatat langsung pada buku pembantu akun hutang/piutang afiliasi internal.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-border-soft bg-surface-subtle/30 flex items-center justify-between">
+                <span className="text-[11.5px] text-muted font-mono">
+                  Sistem Integrasi Rekonsiliasi Otomatis
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTxDetail(null)}
+                  className="px-5 py-2 rounded-xl bg-navy text-white text-[12.5px] font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Tutup
+                </button>
               </div>
             </div>
           </div>

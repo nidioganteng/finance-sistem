@@ -128,7 +128,7 @@ export function LaporanHutangPiutangClient({
               }`}
             >
               <Receipt size={16} />
-              <span>Buku Pembantu &amp; Mutasi</span>
+              <span>Mutasi</span>
               <span
                 className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
                   activeTab === "buku-pembantu"
@@ -306,7 +306,7 @@ export function LaporanHutangPiutangClient({
                         Penempatan di Neraca
                       </th>
                       <th className="py-3 px-4 text-[11px] font-extrabold text-muted-faint uppercase text-center whitespace-nowrap">
-                        Buku Pembantu
+                        Mutasi
                       </th>
                     </tr>
                   </thead>
@@ -379,7 +379,7 @@ export function LaporanHutangPiutangClient({
                             type="button"
                             onClick={() => handleViewCounterpartyLedger(row.counterpartyKey)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-subtle hover:bg-navy hover:text-white text-navy-text text-[11.5px] font-bold border border-border-soft transition-all cursor-pointer group whitespace-nowrap"
-                            title={`Buka Buku Pembantu Mutasi ${row.fullName}`}
+                            title={`Buka Mutasi ${row.fullName}`}
                           >
                             <span>Mutasi</span>
                             <ArrowRight
@@ -485,7 +485,7 @@ export function LaporanHutangPiutangClient({
                     <div className="flex items-center justify-between text-[11px] text-muted mt-2 pt-2 border-t border-border-soft/60">
                       <span className="truncate">{row.neracaPosition}</span>
                       <span className="text-brand font-bold text-[10.5px] ml-1 shrink-0">
-                        Buku Pembantu →
+                        Mutasi →
                       </span>
                     </div>
                   </button>

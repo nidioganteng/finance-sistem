@@ -246,8 +246,9 @@ export function formatMiliar(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
   const formatNum = (val: number, maxDec: number = 2) => {
-    const rounded = Number(val.toFixed(maxDec));
-    return rounded.toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: maxDec });
+    const factor = Math.pow(10, maxDec);
+    const truncated = Math.floor(val * factor + 1e-9) / factor;
+    return truncated.toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: maxDec });
   };
 
   if (abs >= 1e12) return `${sign}Rp ${formatNum(abs / 1e12, 2)} T`;

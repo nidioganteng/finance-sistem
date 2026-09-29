@@ -26,6 +26,8 @@ export interface AccessibleEntity {
   revenue: number;
   spend: number;
   profit: number;
+  talanganKeluar?: number;
+  talanganMasuk?: number;
   projects: {
     code: string;
     name: string;
@@ -55,7 +57,7 @@ export async function getAccessibleEntities(
 
   // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
   // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41) pada targetYear.
-  const [txRows, assetsRaw] = await Promise.all([
+  const [txRows, assetsRaw, talanganKeluarTx, talanganMasukTx] = await Promise.all([
     prisma.transaction.findMany({
       where: {
         entityId: { in: entityIds },
@@ -78,6 +80,32 @@ export async function getAccessibleEntities(
     }),
     prisma.asetTetap.findMany({
       where: { entityId: { in: entityIds } },
+    }),
+    // Mutasi kas keluar talangan / piutang afiliasi (kode akun 111-115) di targetYear
+    prisma.transaction.findMany({
+      where: {
+        entityId: { in: entityIds },
+        tanggal: {
+          gte: new Date(`${targetYear}-01-01`),
+          lte: new Date(`${targetYear}-12-31T23:59:59`),
+        },
+        coaAccount: { code: { in: ["111", "112", "113", "114", "115"] } },
+        debit: { gt: 0 },
+      },
+      select: { entityId: true, debit: true, kredit: true },
+    }),
+    // Mutasi talangan masuk / hutang afiliasi (kode akun 311-315) di targetYear
+    prisma.transaction.findMany({
+      where: {
+        entityId: { in: entityIds },
+        tanggal: {
+          gte: new Date(`${targetYear}-01-01`),
+          lte: new Date(`${targetYear}-12-31T23:59:59`),
+        },
+        coaAccount: { code: { in: ["311", "312", "313", "314", "315"] } },
+        kredit: { gt: 0 },
+      },
+      select: { entityId: true, debit: true, kredit: true },
     }),
   ]);
 
@@ -113,9 +141,27 @@ export async function getAccessibleEntities(
     }
   }
 
+  const talanganKeluarMap = new Map<string, number>();
+  for (const t of talanganKeluarTx) {
+    talanganKeluarMap.set(
+      t.entityId,
+      (talanganKeluarMap.get(t.entityId) ?? 0) + Number(t.debit) - Number(t.kredit)
+    );
+  }
+
+  const talanganMasukMap = new Map<string, number>();
+  for (const t of talanganMasukTx) {
+    talanganMasukMap.set(
+      t.entityId,
+      (talanganMasukMap.get(t.entityId) ?? 0) + Number(t.kredit) - Number(t.debit)
+    );
+  }
+
   return entities.map((e) => {
     const revenue = revenueMap.get(e.id) ?? 0;
     const spend = spendMap.get(e.id) ?? 0;
+    const talanganKeluar = Math.max(0, talanganKeluarMap.get(e.id) ?? 0);
+    const talanganMasuk = Math.max(0, talanganMasukMap.get(e.id) ?? 0);
     return {
       id: e.id,
       key: e.key,
@@ -126,6 +172,8 @@ export async function getAccessibleEntities(
       revenue,
       spend,
       profit: revenue - spend,
+      talanganKeluar,
+      talanganMasuk,
       projects: e.projects.map((p) => ({
         code: p.code,
         name: p.name,

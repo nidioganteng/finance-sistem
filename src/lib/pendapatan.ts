@@ -189,6 +189,8 @@ export interface LaporanPendapatanData {
     id: string;
     code: string;
     name: string;
+    contractValue: number;
+    contractValueFmt: string;
   }>;
   bankOptions: Array<{
     id: string;
@@ -264,7 +266,7 @@ export async function getLaporanPendapatanData(
   // 4. Ambil opsi proyek
   const projects = await prisma.project.findMany({
     where: { entityId: entity.id },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, contractValue: true },
     orderBy: { code: "asc" },
   });
 
@@ -590,7 +592,13 @@ export async function getLaporanPendapatanData(
       jenis: t.jenis,
       tarifPersen: Number(t.tarifPersen),
     })),
-    projectOptions: projects,
+    projectOptions: projects.map((p) => ({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      contractValue: Number(p.contractValue),
+      contractValueFmt: formatRupiah(Number(p.contractValue)),
+    })),
     bankOptions: defaultBankList,
   };
 }

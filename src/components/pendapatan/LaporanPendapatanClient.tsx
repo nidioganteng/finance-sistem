@@ -1,0 +1,1751 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  FileText,
+  Receipt,
+  TrendingUp,
+  Wallet,
+  Building2,
+  Scale,
+  Plus,
+  FileSpreadsheet,
+  Search,
+  Filter,
+  CheckCircle2,
+  AlertTriangle,
+  Pencil,
+  Trash2,
+  X,
+  Calculator,
+  ChevronDown,
+  Info,
+  Calendar,
+  Layers,
+  ArrowRight,
+  ShieldCheck,
+  Building,
+} from "lucide-react";
+import type {
+  LaporanPendapatanData,
+  FakturPendapatanItem,
+  RekonsiliasiPajakItem,
+} from "@/lib/pendapatan";
+import { NAMA_BULAN, hitungPajakFaktur } from "@/lib/pendapatan";
+import {
+  createFakturPendapatanAction,
+  updateFakturPendapatanAction,
+  deleteFakturPendapatanAction,
+  upsertRekonsiliasiPajakAction,
+  type FakturPendapatanInput,
+} from "@/lib/actions/pendapatan";
+import { formatRupiah } from "@/lib/dashboard-data";
+
+interface Props {
+  data: LaporanPendapatanData;
+  canEdit: boolean;
+  availableEntities: Array<{ id: string; key: string; name: string }>;
+}
+
+type TabType = "faktur" | "rekap-bulanan" | "rekonsiliasi";
+
+export function LaporanPendapatanClient({
+  data,
+  canEdit,
+  availableEntities,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+
+  const [activeTab, setActiveTab] = useState<TabType>("faktur");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterJenisProyek, setFilterJenisProyek] = useState<string>("ALL");
+
+  // Modals state
+  const [isFakturModalOpen, setIsFakturModalOpen] = useState(false);
+  const [editingFaktur, setEditingFaktur] = useState<FakturPendapatanItem | null>(null);
+
+  const [isReconModalOpen, setIsReconModalOpen] = useState(false);
+  const [editingRecon, setEditingRecon] = useState<RekonsiliasiPajakItem | null>(null);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingFaktur, setDeletingFaktur] = useState<FakturPendapatanItem | null>(null);
+
+  // Form states for Faktur
+  const [formFaktur, setFormFaktur] = useState({
+    npwp: "",
+    noFaktur: "",
+    masaPajak: data.masaPajak ?? 1,
+    tahunPajak: data.year,
+    namaRekanan: "",
+    namaJkp: "",
+    dpp: 0,
+    dppNilaiLain: 0,
+    tarifPpnPersen: 11,
+    tarifPphPersen: 3.5,
+    kodeJenisProyek: 1, // 1 = Perencanaan, 2 = Pengawasan
+    pekerjaanPerusahaan: 0,
+    pekerjaanYangDipinjam: 0,
+    tanggalTerima: new Date().toISOString().split("T")[0],
+    bank: data.bankOptions[0]?.nama ?? "BPD",
+    nominalDiterima: 0,
+    projectId: "",
+  });
+
+  // Form state for Rekonsiliasi
+  const [formRecon, setFormRecon] = useState({
+    month: 1,
+    dppTerlapor: 0,
+    pajakTerlapor: 0,
+    keterangan: "",
+  });
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filter faktur list
+  const filteredFaktur = data.fakturList.filter((f) => {
+    const matchSearch =
+      searchQuery === "" ||
+      f.noFaktur.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.npwp.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.namaRekanan.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.namaJkp.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.bank.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchJenis =
+      filterJenisProyek === "ALL" ||
+      (filterJenisProyek === "1" && f.kodeJenisProyek === 1) ||
+      (filterJenisProyek === "2" && f.kodeJenisProyek === 2);
+
+    return matchSearch && matchJenis;
+  });
+
+  // Live calculation for Faktur Form
+  const liveCalc = hitungPajakFaktur(
+    formFaktur.dpp,
+    formFaktur.dppNilaiLain,
+    formFaktur.tarifPpnPersen,
+    formFaktur.tarifPphPersen
+  );
+
+  // Navigation handlers
+  function handleFilterChange(newEntity?: string, newYear?: number, newMasa?: number | null) {
+    const currentYear = newYear !== undefined ? newYear : data.year;
+    const currentEntity = newEntity !== undefined ? newEntity : data.entity.key;
+    const currentMasa = newMasa !== undefined ? newMasa : data.masaPajak;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("entity", currentEntity);
+    params.set("year", currentYear.toString());
+    if (currentMasa) {
+      params.set("masaPajak", currentMasa.toString());
+    } else {
+      params.delete("masaPajak");
+    }
+
+    startTransition(() => {
+      router.push(`/pendapatan?${params.toString()}`);
+    });
+  }
+
+  function openCreateFakturModal() {
+    setEditingFaktur(null);
+    setFormFaktur({
+      npwp: "",
+      noFaktur: "",
+      masaPajak: data.masaPajak ?? new Date().getMonth() + 1,
+      tahunPajak: data.year,
+      namaRekanan: "",
+      namaJkp: "",
+      dpp: 0,
+      dppNilaiLain: 0,
+      tarifPpnPersen: 11,
+      tarifPphPersen: 3.5,
+      kodeJenisProyek: 1,
+      pekerjaanPerusahaan: 0,
+      pekerjaanYangDipinjam: 0,
+      tanggalTerima: new Date().toISOString().split("T")[0],
+      bank: data.bankOptions[0]?.nama ?? "BPD",
+      nominalDiterima: 0,
+      projectId: "",
+    });
+    setErrorMessage(null);
+    setIsFakturModalOpen(true);
+  }
+
+  function openEditFakturModal(f: FakturPendapatanItem) {
+    setEditingFaktur(f);
+    setFormFaktur({
+      npwp: f.npwp,
+      noFaktur: f.noFaktur,
+      masaPajak: f.masaPajak,
+      tahunPajak: f.tahunPajak,
+      namaRekanan: f.namaRekanan,
+      namaJkp: f.namaJkp,
+      dpp: f.dpp,
+      dppNilaiLain: f.dppNilaiLain,
+      tarifPpnPersen: f.tarifPpnPersen,
+      tarifPphPersen: f.tarifPphPersen,
+      kodeJenisProyek: f.kodeJenisProyek,
+      pekerjaanPerusahaan: f.pekerjaanPerusahaan,
+      pekerjaanYangDipinjam: f.pekerjaanYangDipinjam,
+      tanggalTerima: f.tanggalTerima,
+      bank: f.bank,
+      nominalDiterima: f.nominalDiterima,
+      projectId: f.projectId ?? "",
+    });
+    setErrorMessage(null);
+    setIsFakturModalOpen(true);
+  }
+
+  function openReconModal(rec: RekonsiliasiPajakItem) {
+    setEditingRecon(rec);
+    setFormRecon({
+      month: rec.month,
+      dppTerlapor: rec.dppTerlapor,
+      pajakTerlapor: rec.pajakTerlapor,
+      keterangan: rec.keterangan,
+    });
+    setErrorMessage(null);
+    setIsReconModalOpen(true);
+  }
+
+  async function handleSaveFaktur(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const payload: FakturPendapatanInput = {
+        entityId: data.entity.id,
+        npwp: formFaktur.npwp,
+        noFaktur: formFaktur.noFaktur,
+        masaPajak: Number(formFaktur.masaPajak),
+        tahunPajak: Number(formFaktur.tahunPajak),
+        namaRekanan: formFaktur.namaRekanan,
+        namaJkp: formFaktur.namaJkp,
+        dpp: Number(formFaktur.dpp),
+        dppNilaiLain: Number(formFaktur.dppNilaiLain),
+        tarifPpnPersen: Number(formFaktur.tarifPpnPersen),
+        tarifPphPersen: Number(formFaktur.tarifPphPersen),
+        kodeJenisProyek: Number(formFaktur.kodeJenisProyek),
+        pekerjaanPerusahaan: Number(formFaktur.pekerjaanPerusahaan),
+        pekerjaanYangDipinjam: Number(formFaktur.pekerjaanYangDipinjam),
+        tanggalTerima: formFaktur.tanggalTerima,
+        bank: formFaktur.bank,
+        nominalDiterima: Number(formFaktur.nominalDiterima),
+        projectId: formFaktur.projectId || null,
+      };
+
+      let res;
+      if (editingFaktur) {
+        res = await updateFakturPendapatanAction(editingFaktur.id, payload);
+      } else {
+        res = await createFakturPendapatanAction(payload);
+      }
+
+      if (res.error) {
+        setErrorMessage(res.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      setIsFakturModalOpen(false);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || "Terjadi kesalahan sistem.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteFaktur() {
+    if (!deletingFaktur) return;
+    setIsSubmitting(true);
+    try {
+      const res = await deleteFakturPendapatanAction(deletingFaktur.id);
+      if (res.error) {
+        alert(res.error);
+      } else {
+        setIsDeleteModalOpen(false);
+        setDeletingFaktur(null);
+        startTransition(() => {
+          router.refresh();
+        });
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus faktur.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSaveRecon(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingRecon) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await upsertRekonsiliasiPajakAction({
+        entityId: data.entity.id,
+        year: data.year,
+        month: formRecon.month,
+        dppTerlapor: Number(formRecon.dppTerlapor),
+        pajakTerlapor: Number(formRecon.pajakTerlapor),
+        keterangan: formRecon.keterangan,
+      });
+
+      if (res.error) {
+        setErrorMessage(res.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      setIsReconModalOpen(false);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || "Terjadi kesalahan.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const exportUrl = `/api/pendapatan/export?entityId=${data.entity.id}&year=${data.year}${
+    data.masaPajak ? `&masaPajak=${data.masaPajak}` : ""
+  }`;
+
+  return (
+    <div className="space-y-6">
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* HEADER SECTION */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-surface-card p-6 rounded-2xl border border-border-soft shadow-sm">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Receipt className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-navy-text tracking-tight">
+                Laporan Pendapatan
+              </h1>
+              <p className="text-sm text-navy-soft">
+                Rekap E-Faktur, Realisasi Kas Bank, dan Audit Rekonsiliasi Pajak
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              {data.entity.legalName}
+            </span>
+            <span className="px-3 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              Tahun Pajak {data.year}
+            </span>
+            {data.masaPajak ? (
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                Masa Pajak: {NAMA_BULAN[data.masaPajak - 1]}
+              </span>
+            ) : (
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Semua Masa (12 Bulan)
+              </span>
+            )}
+            {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
+              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Audit SPT Sesuai (100%)
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih SPT
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Entity Filter */}
+          <select
+            value={data.entity.key}
+            onChange={(e) => handleFilterChange(e.target.value)}
+            className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+          >
+            {availableEntities.map((ent) => (
+              <option key={ent.key} value={ent.key}>
+                {ent.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Year Filter */}
+          <select
+            value={data.year}
+            onChange={(e) => handleFilterChange(undefined, Number(e.target.value))}
+            className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+          >
+            {[2024, 2025, 2026, 2027].map((yr) => (
+              <option key={yr} value={yr}>
+                {yr}
+              </option>
+            ))}
+          </select>
+
+          {/* Masa Pajak Filter */}
+          <select
+            value={data.masaPajak ?? ""}
+            onChange={(e) =>
+              handleFilterChange(
+                undefined,
+                undefined,
+                e.target.value ? Number(e.target.value) : null
+              )
+            }
+            className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+          >
+            <option value="">Semua Masa (Tahunan)</option>
+            {NAMA_BULAN.map((m, idx) => (
+              <option key={idx + 1} value={idx + 1}>
+                {m}
+              </option>
+            ))}
+          </select>
+
+          {/* Export Excel */}
+          <a
+            href={exportUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Ekspor Excel</span>
+          </a>
+
+          {/* Add Faktur Button */}
+          {canEdit && (
+            <button
+              onClick={openCreateFakturModal}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Input E-Faktur</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* 6 KPI SUMMARY METRICS */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* KPI 1 */}
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+          <div className="flex items-center justify-between text-navy-soft mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Nilai Proyek (111%)
+            </span>
+            <TrendingUp className="w-4 h-4 text-blue-500" />
+          </div>
+          <div className="text-lg font-bold text-navy-text truncate">
+            {data.kpiSummary.totalNilaiProyekFmt}
+          </div>
+          <p className="text-[11px] text-navy-soft mt-1">
+            Diakui sebagai Pendapatan di Laba Rugi
+          </p>
+        </div>
+
+        {/* KPI 2 */}
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+          <div className="flex items-center justify-between text-navy-soft mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Total DPP
+            </span>
+            <FileText className="w-4 h-4 text-indigo-500" />
+          </div>
+          <div className="text-lg font-bold text-navy-text truncate">
+            {data.kpiSummary.totalDppFmt}
+          </div>
+          <p className="text-[11px] text-navy-soft mt-1">
+            DPP Nilai Lain: {data.totalPeriod.dppNilaiLainFmt}
+          </p>
+        </div>
+
+        {/* KPI 3 */}
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+          <div className="flex items-center justify-between text-navy-soft mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Kewajiban Pajak
+            </span>
+            <Receipt className="w-4 h-4 text-purple-500" />
+          </div>
+          <div className="text-lg font-bold text-navy-text truncate">
+            {data.kpiSummary.totalPajakFmt}
+          </div>
+          <p className="text-[11px] text-navy-soft mt-1">
+            PPN: {data.totalPeriod.ppnFmt} | PPh: {data.totalPeriod.pphFmt}
+          </p>
+        </div>
+
+        {/* KPI 4 */}
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+          <div className="flex items-center justify-between text-navy-soft mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Laba Stlh Pajak
+            </span>
+            <Wallet className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="text-lg font-bold text-emerald-600 truncate">
+            {data.kpiSummary.totalLabaSetelahPajakFmt}
+          </div>
+          <p className="text-[11px] text-navy-soft mt-1">
+            Margin bersih setelah PPN & PPh
+          </p>
+        </div>
+
+        {/* KPI 5 */}
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+          <div className="flex items-center justify-between text-navy-soft mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Total Dana Cair
+            </span>
+            <Building2 className="w-4 h-4 text-sky-500" />
+          </div>
+          <div className="text-lg font-bold text-navy-text truncate">
+            {data.kpiSummary.totalNominalDiterimaFmt}
+          </div>
+          <p className="text-[11px] text-navy-soft mt-1">
+            {data.totalPeriod.jumlahFaktur} faktur tercatat
+          </p>
+        </div>
+
+        {/* KPI 6 */}
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+          <div className="flex items-center justify-between text-navy-soft mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              Audit SPT Pajak
+            </span>
+            <Scale className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-lg font-bold text-navy-text truncate">
+            {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
+              <span className="text-emerald-600">Match 100%</span>
+            ) : (
+              <span className="text-rose-600">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>
+            )}
+          </div>
+          <p className="text-[11px] text-navy-soft mt-1">
+            Selisih PPN: {data.kpiSummary.totalSelisihPajakFmt}
+          </p>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* 3 LAYER TABS NAVIGATION */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      <div className="flex border-b border-border-soft bg-surface-card rounded-t-2xl px-4 pt-2">
+        <button
+          onClick={() => setActiveTab("faktur")}
+          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === "faktur"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-navy-soft hover:text-navy-text"
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>Lapis 1: Daftar E-Faktur & Total Periode</span>
+          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+            {filteredFaktur.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("rekap-bulanan")}
+          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === "rekap-bulanan"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-navy-soft hover:text-navy-text"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Lapis 2: Rekap Bulanan (Jan - Des)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("rekonsiliasi")}
+          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === "rekonsiliasi"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-navy-soft hover:text-navy-text"
+          }`}
+        >
+          <Scale className="w-4 h-4" />
+          <span>Lapis 3: Rekonsiliasi Audit Pajak (Faktur vs SPT)</span>
+          {data.kpiSummary.jumlahBulanSelisih > 0 && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-rose-100 text-rose-700 font-bold">
+              {data.kpiSummary.jumlahBulanSelisih}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB 1: LAPIS 1 - DAFTAR E-FAKTUR & TOTAL PERIODE */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === "faktur" && (
+        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-navy-soft" />
+              <input
+                type="text"
+                placeholder="Cari no. faktur, rekanan, JKP, bank..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-3 text-navy-soft hover:text-navy-text"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs text-navy-soft font-medium">Jenis:</span>
+              <select
+                value={filterJenisProyek}
+                onChange={(e) => setFilterJenisProyek(e.target.value)}
+                className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              >
+                <option value="ALL">Semua Jenis Proyek</option>
+                <option value="1">Perencanaan</option>
+                <option value="2">Pengawasan</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Data Table */}
+          <div className="overflow-x-auto rounded-xl border border-border-soft">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-slate-50 text-navy-text border-b border-border-soft font-semibold">
+                <tr>
+                  <th className="p-3 text-center w-10">No</th>
+                  <th className="p-3">No. Faktur / NPWP</th>
+                  <th className="p-3">Rekanan & Uraian JKP</th>
+                  <th className="p-3 text-center">Masa</th>
+                  <th className="p-3">Tgl Terima / Bank</th>
+                  <th className="p-3 text-right">DPP</th>
+                  <th className="p-3 text-right">DPP Nilai Lain</th>
+                  <th className="p-3 text-right">PPN</th>
+                  <th className="p-3 text-right">PPh (3.5%)</th>
+                  <th className="p-3 text-right font-bold text-blue-700 bg-blue-50/50">
+                    Nilai Proyek (111%)
+                  </th>
+                  <th className="p-3 text-right text-emerald-700 bg-emerald-50/50">
+                    Laba Stlh Pajak
+                  </th>
+                  <th className="p-3 text-right">Dana Cair</th>
+                  <th className="p-3 text-center">Jenis</th>
+                  {canEdit && <th className="p-3 text-center w-20">Aksi</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-soft text-navy-text">
+                {filteredFaktur.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={canEdit ? 14 : 13}
+                      className="p-8 text-center text-navy-soft"
+                    >
+                      <Receipt className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                      Tidak ada data e-faktur untuk periode ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredFaktur.map((f, idx) => (
+                    <tr
+                      key={f.id}
+                      className="hover:bg-slate-50/75 transition-colors"
+                    >
+                      <td className="p-3 text-center text-navy-soft">{idx + 1}</td>
+                      <td className="p-3">
+                        <div className="font-semibold text-navy-text">
+                          {f.noFaktur}
+                        </div>
+                        <div className="text-[11px] text-navy-soft font-mono">
+                          {f.npwp}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium text-navy-text max-w-xs truncate">
+                          {f.namaRekanan}
+                        </div>
+                        <div className="text-[11px] text-navy-soft max-w-xs truncate">
+                          {f.namaJkp}
+                        </div>
+                        {f.projectName && (
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] rounded bg-slate-100 text-slate-700">
+                            Proyek: {f.projectCode} - {f.projectName}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className="px-2 py-1 text-[11px] font-medium rounded-full bg-slate-100 text-slate-700">
+                          {f.namaBulan}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-mono text-xs">{f.tanggalTerima}</div>
+                        <div className="text-[11px] font-semibold text-blue-600">
+                          {f.bank}
+                        </div>
+                      </td>
+                      <td className="p-3 text-right font-mono">{f.dppFmt}</td>
+                      <td className="p-3 text-right font-mono text-navy-soft">
+                        {f.dppNilaiLainFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono text-purple-700">
+                        <div>{f.ppnFmt}</div>
+                        <span className="text-[10px] text-navy-soft">
+                          {f.tarifPpnPersen}%
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-mono text-amber-700">
+                        <div>{f.pphFmt}</div>
+                        <span className="text-[10px] text-navy-soft">
+                          {f.tarifPphPersen}%
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold text-blue-700 bg-blue-50/30">
+                        {f.nilaiProyekFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold text-emerald-700 bg-emerald-50/30">
+                        {f.labaSetelahPajakFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono font-medium">
+                        {f.nominalDiterimaFmt}
+                      </td>
+                      <td className="p-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                            f.kodeJenisProyek === 2
+                              ? "bg-purple-50 text-purple-700 border border-purple-200"
+                              : "bg-blue-50 text-blue-700 border border-blue-200"
+                          }`}
+                        >
+                          {f.jenisProyekLabel}
+                        </span>
+                        {f.pekerjaanYangDipinjam > 0 && (
+                          <div className="text-[10px] text-amber-600 mt-0.5">
+                            Dipinjam: {f.pekerjaanYangDipinjamFmt}
+                          </div>
+                        )}
+                      </td>
+                      {canEdit && (
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => openEditFakturModal(f)}
+                              title="Edit Faktur"
+                              className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeletingFaktur(f);
+                                setIsDeleteModalOpen(true);
+                              }}
+                              title="Hapus Faktur"
+                              className="p-1.5 text-navy-soft hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {/* Footer Total */}
+              <tfoot className="bg-slate-100 font-bold text-navy-text border-t-2 border-slate-300">
+                <tr>
+                  <td colSpan={5} className="p-3 text-center uppercase tracking-wider">
+                    Total Periode ({data.totalPeriod.jumlahFaktur} Faktur)
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {data.totalPeriod.dppFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-navy-soft">
+                    {data.totalPeriod.dppNilaiLainFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-purple-700">
+                    {data.totalPeriod.ppnFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-amber-700">
+                    {data.totalPeriod.pphFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-blue-700 bg-blue-100/50">
+                    {data.totalPeriod.nilaiProyekFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-emerald-700 bg-emerald-100/50">
+                    {data.totalPeriod.labaSetelahPajakFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {data.totalPeriod.nominalDiterimaFmt}
+                  </td>
+                  <td colSpan={canEdit ? 2 : 1}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB 2: LAPIS 2 - REKAP BULANAN */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === "rekap-bulanan" && (
+        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-navy-text">
+                Rekapitulasi Pendapatan Dinamis Bulanan (Tahun {data.year})
+              </h2>
+              <p className="text-xs text-navy-soft">
+                Agregasi otomatis berdasarkan Masa Pajak (Januari - Desember)
+              </p>
+            </div>
+            <a
+              href={exportUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Ekspor Rekap</span>
+            </a>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-border-soft">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-slate-50 text-navy-text border-b border-border-soft font-semibold">
+                <tr>
+                  <th className="p-3 text-center w-12">Bulan</th>
+                  <th className="p-3">Nama Bulan</th>
+                  <th className="p-3 text-center">Jml Faktur</th>
+                  <th className="p-3 text-right">Total DPP</th>
+                  <th className="p-3 text-right">Total DPP Nilai Lain</th>
+                  <th className="p-3 text-right">Total PPN</th>
+                  <th className="p-3 text-right">Total PPh (3.5%)</th>
+                  <th className="p-3 text-right font-bold text-blue-700 bg-blue-50/50">
+                    Nilai Proyek (111%)
+                  </th>
+                  <th className="p-3 text-right text-emerald-700 bg-emerald-50/50">
+                    Laba Stlh Pajak
+                  </th>
+                  <th className="p-3 text-right">Total Cair</th>
+                  <th className="p-3 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-soft text-navy-text">
+                {data.rekapBulanan.map((b) => (
+                  <tr
+                    key={b.month}
+                    className="hover:bg-slate-50/75 transition-colors"
+                  >
+                    <td className="p-3 text-center font-mono font-bold text-navy-soft">
+                      {String(b.month).padStart(2, "0")}
+                    </td>
+                    <td className="p-3 font-semibold text-navy-text">
+                      {b.namaBulan}
+                    </td>
+                    <td className="p-3 text-center">
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                          b.jumlahFaktur > 0
+                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {b.jumlahFaktur} faktur
+                      </span>
+                    </td>
+                    <td className="p-3 text-right font-mono">{b.dppFmt}</td>
+                    <td className="p-3 text-right font-mono text-navy-soft">
+                      {b.dppNilaiLainFmt}
+                    </td>
+                    <td className="p-3 text-right font-mono text-purple-700">
+                      {b.ppnFmt}
+                    </td>
+                    <td className="p-3 text-right font-mono text-amber-700">
+                      {b.pphFmt}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-blue-700 bg-blue-50/30">
+                      {b.nilaiProyekFmt}
+                    </td>
+                    <td className="p-3 text-right font-mono font-semibold text-emerald-700 bg-emerald-50/30">
+                      {b.labaSetelahPajakFmt}
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      {b.nominalDiterimaFmt}
+                    </td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => {
+                          handleFilterChange(undefined, undefined, b.month);
+                          setActiveTab("faktur");
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        <span>Lihat Faktur</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-100 font-bold text-navy-text border-t-2 border-slate-300">
+                <tr>
+                  <td colSpan={2} className="p-3 text-center uppercase tracking-wider">
+                    Total Setahun
+                  </td>
+                  <td className="p-3 text-center font-mono">
+                    {data.totalTahunanRekap.jumlahFaktur} faktur
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {data.totalTahunanRekap.dppFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-navy-soft">
+                    {data.totalTahunanRekap.dppNilaiLainFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-purple-700">
+                    {data.totalTahunanRekap.ppnFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-amber-700">
+                    {data.totalTahunanRekap.pphFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-blue-700 bg-blue-100/50">
+                    {data.totalTahunanRekap.nilaiProyekFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono text-emerald-700 bg-emerald-100/50">
+                    {data.totalTahunanRekap.labaSetelahPajakFmt}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {data.totalTahunanRekap.nominalDiterimaFmt}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB 3: LAPIS 3 - REKONSILIASI AUDIT PAJAK (FAKTUR VS SPT) */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === "rekonsiliasi" && (
+        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-navy-text">
+                  Audit Kepatuhan & Rekonsiliasi Faktur vs SPT Pajak Resmi
+                </h3>
+                <p className="text-xs text-navy-soft mt-0.5">
+                  Membandingkan DPP dan PPN hasil rekap faktur sistem dengan angka yang dilaporkan resmi ke kantor pajak (SPT Masa).
+                  Baris bertanda merah mengindikasikan adanya faktur yang belum atau salah dilaporkan.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Selisih Rp 0 = Sesuai
+              </span>
+              <span className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Selisih ≠ 0 = Alert
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-border-soft">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-slate-50 text-navy-text border-b border-border-soft font-semibold">
+                <tr>
+                  <th className="p-3 text-center w-10">Bulan</th>
+                  <th className="p-3">Nama Masa</th>
+                  <th className="p-3 text-right">DPP Rekap Faktur</th>
+                  <th className="p-3 text-right bg-blue-50/50">DPP Terlapor (SPT)</th>
+                  <th className="p-3 text-right">Selisih DPP</th>
+                  <th className="p-3 text-right">PPN Rekap Faktur</th>
+                  <th className="p-3 text-right bg-blue-50/50">Pajak Terlapor (SPT)</th>
+                  <th className="p-3 text-right">Selisih PPN</th>
+                  <th className="p-3 text-center">Status Audit</th>
+                  <th className="p-3">Catatan / Tindak Lanjut</th>
+                  {canEdit && <th className="p-3 text-center w-16">Aksi</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-soft text-navy-text">
+                {data.rekonsiliasiList.map((rec) => {
+                  const isMatch = rec.status === "MATCH";
+                  const isUnreported = rec.status === "BELUM_DILAPORKAN";
+                  const rowAlertBg = isMatch
+                    ? ""
+                    : isUnreported
+                    ? "bg-amber-50/30"
+                    : "bg-rose-50/40";
+
+                  return (
+                    <tr
+                      key={rec.month}
+                      className={`hover:bg-slate-50/80 transition-colors ${rowAlertBg}`}
+                    >
+                      <td className="p-3 text-center font-mono font-bold text-navy-soft">
+                        {String(rec.month).padStart(2, "0")}
+                      </td>
+                      <td className="p-3 font-semibold text-navy-text">
+                        {rec.namaBulan}
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        {rec.dppRekapFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 text-blue-800">
+                        {rec.dppTerlaporFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        <span
+                          className={`font-semibold ${
+                            Math.abs(rec.selisihDpp) > 0.01
+                              ? "text-rose-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {rec.selisihDppFmt}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-mono text-purple-700">
+                        {rec.ppnRekapFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 text-blue-800">
+                        {rec.pajakTerlaporFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        <span
+                          className={`font-semibold ${
+                            Math.abs(rec.selisihPajak) > 0.01
+                              ? "text-rose-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {rec.selisihPajakFmt}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        {isMatch ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            SESUAI
+                          </span>
+                        ) : isUnreported ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            BELUM LAPOR
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-100 text-rose-800 border border-rose-300 font-bold">
+                            <AlertTriangle className="w-3 h-3 text-rose-600" />
+                            SELISIH
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-xs text-navy-soft max-w-xs truncate">
+                        {rec.keterangan || "-"}
+                      </td>
+                      {canEdit && (
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => openReconModal(rec)}
+                            title="Edit Angka Terlapor SPT"
+                            className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* MODAL: INPUT / EDIT FAKTUR PENDAPATAN */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {isFakturModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-xl w-full max-w-3xl overflow-hidden my-8">
+            <div className="flex items-center justify-between p-5 border-b border-border-soft bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-navy-text">
+                    {editingFaktur ? "Edit E-Faktur Pendapatan" : "Input E-Faktur Baru"}
+                  </h3>
+                  <p className="text-xs text-navy-soft">
+                    {data.entity.legalName} • Tahun {formFaktur.tahunPajak}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsFakturModalOpen(false)}
+                className="p-1.5 text-navy-soft hover:text-navy-text rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFaktur} className="p-6 space-y-5">
+              {errorMessage && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {/* Form Grid 1: Basic Faktur Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Nomor E-Faktur <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="010.000-24.00000001"
+                    value={formFaktur.noFaktur}
+                    onChange={(e) =>
+                      setFormFaktur({ ...formFaktur, noFaktur: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    NPWP Rekanan <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="00.000.000.0-000.000"
+                    value={formFaktur.npwp}
+                    onChange={(e) =>
+                      setFormFaktur({ ...formFaktur, npwp: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Masa Pajak <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formFaktur.masaPajak}
+                    onChange={(e) =>
+                      setFormFaktur({
+                        ...formFaktur,
+                        masaPajak: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    {NAMA_BULAN.map((m, idx) => (
+                      <option key={idx + 1} value={idx + 1}>
+                        Bulan {idx + 1} - {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Form Grid 2: Rekanan & JKP */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Nama Rekanan / Klien <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: RSUD dr. Doris Sylvanus"
+                    value={formFaktur.namaRekanan}
+                    onChange={(e) =>
+                      setFormFaktur({ ...formFaktur, namaRekanan: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Uraian JKP / Pekerjaan <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Perencanaan Gedung Rawat Inap"
+                    value={formFaktur.namaJkp}
+                    onChange={(e) =>
+                      setFormFaktur({ ...formFaktur, namaJkp: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Form Grid 3: Tax Rates & DPP Inputs */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-navy-text uppercase tracking-wider flex items-center gap-1.5">
+                    <Calculator className="w-4 h-4 text-blue-600" />
+                    Parameter Nilai & Perhitungan Pajak Otomatis
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormFaktur((prev) => ({
+                          ...prev,
+                          dppNilaiLain: prev.dpp,
+                        }))
+                      }
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                    >
+                      Samakan DPP Nilai Lain = DPP
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      DPP Dasar <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step="any"
+                      value={formFaktur.dpp || ""}
+                      onChange={(e) =>
+                        setFormFaktur({
+                          ...formFaktur,
+                          dpp: Number(e.target.value),
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      DPP Nilai Lain (Basis PPN) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step="any"
+                      value={formFaktur.dppNilaiLain || ""}
+                      onChange={(e) =>
+                        setFormFaktur({
+                          ...formFaktur,
+                          dppNilaiLain: Number(e.target.value),
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      Tarif PPN
+                    </label>
+                    <select
+                      value={formFaktur.tarifPpnPersen}
+                      onChange={(e) =>
+                        setFormFaktur({
+                          ...formFaktur,
+                          tarifPpnPersen: Number(e.target.value),
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    >
+                      <option value={11}>PPN 11%</option>
+                      <option value={12}>PPN 12%</option>
+                      <option value={0}>Bebas PPN (0%)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      Tarif PPh Final Jasa Konstruksi
+                    </label>
+                    <select
+                      value={formFaktur.tarifPphPersen}
+                      onChange={(e) =>
+                        setFormFaktur({
+                          ...formFaktur,
+                          tarifPphPersen: Number(e.target.value),
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    >
+                      <option value={3.5}>PPh Final 3.5% (Standar)</option>
+                      <option value={2.65}>PPh Final 2.65%</option>
+                      <option value={0}>Tanpa PPh (0%)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Live Automatic Calculation Banner */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-blue-50/70 border border-blue-200 text-xs">
+                  <div>
+                    <span className="text-[11px] text-blue-700 block">
+                      PPN ({formFaktur.tarifPpnPersen}% × DPP Lain)
+                    </span>
+                    <span className="font-mono font-bold text-purple-700 text-sm">
+                      {formatRupiah(liveCalc.ppn)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-blue-700 block">
+                      PPh ({formFaktur.tarifPphPersen}% × DPP)
+                    </span>
+                    <span className="font-mono font-bold text-amber-700 text-sm">
+                      {formatRupiah(liveCalc.pph)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-blue-700 block">
+                      Nilai Proyek (DPP × 111%)
+                    </span>
+                    <span className="font-mono font-bold text-blue-700 text-sm">
+                      {formatRupiah(liveCalc.nilaiProyek)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-blue-700 block">
+                      Laba Setelah Pajak
+                    </span>
+                    <span className="font-mono font-bold text-emerald-700 text-sm">
+                      {formatRupiah(liveCalc.labaSetelahPajak)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Grid 4: Jenis Proyek & Porsi Pekerjaan */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Jenis Proyek <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formFaktur.kodeJenisProyek}
+                    onChange={(e) =>
+                      setFormFaktur({
+                        ...formFaktur,
+                        kodeJenisProyek: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    <option value={1}>1 - Perencanaan</option>
+                    <option value={2}>2 - Pengawasan</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Pekerjaan Perusahaan (Sendiri)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={formFaktur.pekerjaanPerusahaan || ""}
+                    onChange={(e) =>
+                      setFormFaktur({
+                        ...formFaktur,
+                        pekerjaanPerusahaan: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Pekerjaan yang Dipinjam
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={formFaktur.pekerjaanYangDipinjam || ""}
+                    onChange={(e) =>
+                      setFormFaktur({
+                        ...formFaktur,
+                        pekerjaanYangDipinjam: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Form Grid 5: Realisasi Pencairan Kas Bank */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Tanggal Terima Dana di Bank <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formFaktur.tanggalTerima}
+                    onChange={(e) =>
+                      setFormFaktur({
+                        ...formFaktur,
+                        tanggalTerima: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Rekening Bank Tujuan <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formFaktur.bank}
+                    onChange={(e) =>
+                      setFormFaktur({ ...formFaktur, bank: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    {data.bankOptions.map((b) => (
+                      <option key={b.id} value={b.nama}>
+                        {b.nama}
+                      </option>
+                    ))}
+                    <option value="KAS BESAR">KAS BESAR</option>
+                    <option value="KAS KECIL">KAS KECIL</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Nominal Benar-Benar Cair <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step="any"
+                    value={formFaktur.nominalDiterima || ""}
+                    onChange={(e) =>
+                      setFormFaktur({
+                        ...formFaktur,
+                        nominalDiterima: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Form Grid 6: Optional Project Relation */}
+              {data.projectOptions.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Hubungkan ke Proyek Kontrak (Opsional)
+                  </label>
+                  <select
+                    value={formFaktur.projectId}
+                    onChange={(e) =>
+                      setFormFaktur({ ...formFaktur, projectId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    <option value="">-- Tidak Terhubung ke Proyek Tertentu --</option>
+                    {data.projectOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.code}] {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border-soft">
+                <button
+                  type="button"
+                  onClick={() => setIsFakturModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text rounded-xl border border-border-soft"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {isSubmitting ? "Menyimpan..." : "Simpan Faktur"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* MODAL: EDIT REKONSILIASI SPT */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {isReconModalOpen && editingRecon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-border-soft bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-navy-text">
+                    Input Data SPT Terlapor (Masa {editingRecon.namaBulan})
+                  </h3>
+                  <p className="text-xs text-navy-soft">
+                    {data.entity.legalName} • Tahun {data.year}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsReconModalOpen(false)}
+                className="p-1.5 text-navy-soft hover:text-navy-text rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRecon} className="p-6 space-y-4">
+              {errorMessage && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {/* Reference from invoices */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-navy-soft block text-[11px]">
+                    DPP Rekap Faktur Sistem:
+                  </span>
+                  <span className="font-mono font-bold text-navy-text">
+                    {editingRecon.dppRekapFmt}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-navy-soft block text-[11px]">
+                    PPN Rekap Faktur Sistem:
+                  </span>
+                  <span className="font-mono font-bold text-purple-700">
+                    {editingRecon.ppnRekapFmt}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-navy-text mb-1">
+                  DPP Terlapor di SPT Masa Resmi
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={formRecon.dppTerlapor}
+                  onChange={(e) =>
+                    setFormRecon({
+                      ...formRecon,
+                      dppTerlapor: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-navy-text mb-1">
+                  PPN / Pajak Terlapor di SPT Masa Resmi
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={formRecon.pajakTerlapor}
+                  onChange={(e) =>
+                    setFormRecon({
+                      ...formRecon,
+                      pajakTerlapor: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Live Preview of Differences */}
+              <div className="p-3 rounded-lg bg-blue-50/70 border border-blue-200 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-blue-700 block text-[11px]">
+                    Selisih DPP:
+                  </span>
+                  <span
+                    className={`font-mono font-bold ${
+                      Math.abs(editingRecon.dppRekap - formRecon.dppTerlapor) > 0.01
+                        ? "text-rose-600"
+                        : "text-emerald-600"
+                    }`}
+                  >
+                    {formatRupiah(editingRecon.dppRekap - formRecon.dppTerlapor)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-blue-700 block text-[11px]">
+                    Selisih PPN:
+                  </span>
+                  <span
+                    className={`font-mono font-bold ${
+                      Math.abs(editingRecon.ppnRekap - formRecon.pajakTerlapor) > 0.01
+                        ? "text-rose-600"
+                        : "text-emerald-600"
+                    }`}
+                  >
+                    {formatRupiah(editingRecon.ppnRekap - formRecon.pajakTerlapor)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-navy-text mb-1">
+                  Catatan Rekonsiliasi / Keterangan
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Misal: Faktur 010.xxx belum dilaporkan di SPT Masa bulan ini, akan dilaporkan pembetulan..."
+                  value={formRecon.keterangan}
+                  onChange={(e) =>
+                    setFormRecon({ ...formRecon, keterangan: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border-soft">
+                <button
+                  type="button"
+                  onClick={() => setIsReconModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text rounded-xl border border-border-soft"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {isSubmitting ? "Menyimpan..." : "Simpan SPT"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* MODAL: DELETE CONFIRMATION */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {isDeleteModalOpen && deletingFaktur && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 rounded-full bg-rose-100">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-navy-text">
+                Hapus Faktur Pendapatan?
+              </h3>
+            </div>
+            <p className="text-xs text-navy-soft leading-relaxed">
+              Apakah Anda yakin ingin menghapus faktur nomor{" "}
+              <strong className="text-navy-text font-mono">
+                {deletingFaktur.noFaktur}
+              </strong>{" "}
+              atas nama rekanan{" "}
+              <strong className="text-navy-text">
+                {deletingFaktur.namaRekanan}
+              </strong>
+              ? Data yang dihapus tidak dapat dipulihkan.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text rounded-xl border border-border-soft"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteFaktur}
+                disabled={isSubmitting}
+                className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+              >
+                {isSubmitting ? "Menghapus..." : "Ya, Hapus Faktur"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

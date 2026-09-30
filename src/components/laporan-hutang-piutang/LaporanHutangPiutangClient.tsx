@@ -20,13 +20,14 @@ import {
   X,
   Layers,
   Info,
+  Wallet,
 } from "lucide-react";
 import type {
   LaporanHutangPiutangEntityData,
   LaporanHutangPiutangGrupData,
   MutasiAfiliasiTx,
 } from "@/lib/laporan-hutang-piutang";
-import { formatAccountingRupiah, formatStandardRupiah, COUNTERPARTIES } from "@/lib/laporan-hutang-piutang";
+import { formatAccountingRupiah, formatStandardRupiah, COUNTERPARTIES, ALL_COUNTERPARTIES } from "@/lib/laporan-hutang-piutang";
 
 interface Props {
   entityData: LaporanHutangPiutangEntityData | null;
@@ -97,7 +98,7 @@ export function LaporanHutangPiutangClient({
         ? netting.rows.find((r) => r.counterpartyKey === filterCp)
         : null;
     const selectedCpConfig = selectedCpRow
-      ? COUNTERPARTIES.find((c) => c.key === selectedCpRow.counterpartyKey)
+      ? ALL_COUNTERPARTIES.find((c) => c.key === selectedCpRow.counterpartyKey)
       : null;
 
     return (
@@ -791,6 +792,7 @@ export function LaporanHutangPiutangClient({
                         <th className="py-3 px-3 whitespace-nowrap">No. Bukti</th>
                         <th className="py-3 px-3 whitespace-nowrap">Pihak Rekanan</th>
                         <th className="py-3 px-4 min-w-[280px]">Keterangan &amp; Alokasi Penggunaan Dana</th>
+                        <th className="py-3 px-3 whitespace-nowrap">Sumber Kas/Bank</th>
                         <th className="py-3 px-3 text-center whitespace-nowrap">Arus Mutasi</th>
                         <th className="py-3 px-3 text-right text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                           Penambahan (+)
@@ -863,6 +865,21 @@ export function LaporanHutangPiutangClient({
                                     </button>
                                   ))}
                                 </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              {tx.sumberPengeluaran ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                    <Wallet size={12} />
+                                  </span>
+                                  <div>
+                                    <div className="font-semibold text-navy-text text-[12px]">{tx.sumberPengeluaran.coaName}</div>
+                                    <div className="text-[10px] text-muted-faint font-mono">Akun {tx.sumberPengeluaran.coaCode}</div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-muted-faint text-[11px] font-mono">—</span>
                               )}
                             </td>
                             <td className="py-3 px-3 text-center whitespace-nowrap">
@@ -1158,6 +1175,27 @@ export function LaporanHutangPiutangClient({
                       </span>
                     </div>
                   </div>
+                  {selectedTxDetail.sumberPengeluaran && (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface-card border border-border-soft">
+                      <div className="flex items-center gap-2.5">
+                        <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <Wallet size={16} />
+                        </span>
+                        <div>
+                          <span className="text-[10px] text-muted-faint uppercase font-bold tracking-wide block">
+                            Sumber Pengeluaran (Kas / Bank):
+                          </span>
+                          <span className="text-[13.5px] font-extrabold text-navy-text block mt-0.5">
+                            {selectedTxDetail.sumberPengeluaran.namaLengkap}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="font-mono text-[11px] font-extrabold text-brand bg-brand/10 px-2.5 py-1 rounded-lg">
+                        Akun {selectedTxDetail.sumberPengeluaran.coaCode}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between p-3 rounded-xl bg-surface-card border border-border-soft">
                     <span className="text-[11px] font-bold text-muted-faint uppercase">
                       Nominal Transaksi:
@@ -1192,7 +1230,6 @@ export function LaporanHutangPiutangClient({
                   {selectedTxDetail.alokasiPenggunaan && selectedTxDetail.alokasiPenggunaan.length > 0 ? (
                     <div className="flex flex-col gap-3">
                       {selectedTxDetail.alokasiPenggunaan.map((alk, idx) => {
-                        const isDefaultBeban = alk.coaCode === "530";
                         return (
                           <div
                             key={idx}
@@ -1220,17 +1257,17 @@ export function LaporanHutangPiutangClient({
                             </div>
 
                             <div className="text-[11.5px]">
-                              {isDefaultBeban ? (
-                                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
-                                  <strong>⚠️ Pos Biaya Sementara (Akun 530 By Lain):</strong> Transaksi ini otomatis tercatat di Jurnal Umum &amp; Buku Besar rekanan. Rekanan dapat mengubah kode akun ini ke akun biaya riil (misal 501 Biaya Bahan) di menu Jurnal Transaksi tanpa menghilangkan data di Laporan Hutang Piutang.
-                                </div>
-                              ) : alk.role === "KAS" ? (
+                              {alk.role === "KAS" ? (
                                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
                                   <strong>✅ Penerimaan Kas / Bank:</strong> Dana diterima ke saldo kas/bank rekanan untuk keperluan operasional.
                                 </div>
-                              ) : (
+                              ) : alk.role === "BEBAN" ? (
                                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
-                                  <strong>✅ Telah Teralokasi Spesifik:</strong> Dana telah dicatat pada akun beban operasional / proyek ini pada pembukuan rekanan.
+                                  <strong>✅ Beban Operasional / Proyek:</strong> Dana dicatat pada pos biaya operasional rekanan.
+                                </div>
+                              ) : (
+                                <div className="p-3 rounded-xl bg-brand/10 border border-brand/20 text-brand">
+                                  <strong>✅ Alokasi Pos Akun:</strong> Dana dialokasikan ke {alk.coaName} (Akun {alk.coaCode}).
                                 </div>
                               )}
                             </div>
@@ -1502,6 +1539,157 @@ export function LaporanHutangPiutangClient({
             </table>
           </div>
         </div>
+
+        {/* Ringkasan Utang & Piutang Pemegang Saham di Grup */}
+        {grupData.pemegangSahamSummary && grupData.pemegangSahamSummary.items.length > 0 && (
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
+            <div className="px-6 py-4 border-b border-surface-hover flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-[14px] font-extrabold text-navy-text flex items-center gap-2">
+                  <Scale size={17} className="text-brand" />
+                  <span>Laporan Utang &amp; Piutang Pemegang Saham (Kencana &amp; Gaharu) {year}</span>
+                </h3>
+                <p className="text-[12px] text-muted mt-0.5">
+                  Rekapitulasi hak tagih piutang (Akun 117) dan kewajiban hutang (Akun 317) pemegang saham
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10.5px] font-extrabold text-muted-faint uppercase block">
+                  Posisi Bersih Global PS
+                </span>
+                <span className={`text-[15px] font-extrabold font-mono ${
+                  grupData.pemegangSahamSummary.netGlobal > 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : grupData.pemegangSahamSummary.netGlobal < 0
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-navy-text"
+                }`}>
+                  {grupData.pemegangSahamSummary.netGlobalFmt}
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-hover text-left bg-surface-subtle/40 text-[11px] font-extrabold text-muted-faint uppercase">
+                    <th className="py-3 px-6 whitespace-nowrap">Entitas</th>
+                    <th className="py-3 px-4 text-right text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Piutang PS (117)</th>
+                    <th className="py-3 px-4 text-right text-rose-600 dark:text-rose-400 whitespace-nowrap">Hutang PS (317)</th>
+                    <th className="py-3 px-5 text-right whitespace-nowrap">Saldo Bersih (Net)</th>
+                    <th className="py-3 px-6 text-center whitespace-nowrap">Status Neraca</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-subtle text-[12.5px]">
+                  {grupData.pemegangSahamSummary.items.map((ps) => (
+                    <tr key={ps.entityKey} className="hover:bg-surface-hover/20">
+                      <td className="py-3.5 px-6 font-bold text-navy-text whitespace-nowrap">
+                        {ps.entityName} ({ps.shortName})
+                      </td>
+                      <td className="py-3.5 px-4 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold font-mono whitespace-nowrap">
+                        {ps.piutangFmt}
+                      </td>
+                      <td className="py-3.5 px-4 text-right tabular-nums text-rose-600 dark:text-rose-400 font-bold font-mono whitespace-nowrap">
+                        {ps.hutangFmt}
+                      </td>
+                      <td className="py-3.5 px-5 text-right tabular-nums font-mono font-extrabold whitespace-nowrap">
+                        {ps.netFmt}
+                      </td>
+                      <td className="py-3.5 px-6 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          ps.status === "PIUTANG"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : ps.status === "UTANG"
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                            : "bg-surface-subtle text-muted"
+                        }`}>
+                          {ps.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-surface-subtle/80 font-extrabold text-navy-text border-t-2 border-border-soft">
+                    <td className="py-3.5 px-6 uppercase text-[11.5px] tracking-wide">
+                      Total Pemegang Saham
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                      {grupData.pemegangSahamSummary.totalPiutangFmt}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono text-rose-600 dark:text-rose-400">
+                      {grupData.pemegangSahamSummary.totalHutangFmt}
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-mono text-[13.5px]">
+                      {grupData.pemegangSahamSummary.netGlobalFmt}
+                    </td>
+                    <td className="py-3.5 px-6 text-center text-[11px] text-muted font-normal">
+                      {grupData.pemegangSahamSummary.netGlobal > 0 ? "Hak Tagih Bersih" : grupData.pemegangSahamSummary.netGlobal < 0 ? "Kewajiban Bersih" : "Nihil"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Ringkasan Piutang Lainnya di Seluruh Entitas */}
+        {grupData.piutangLainnyaSummary && (
+          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden shadow-xs">
+            <div className="px-6 py-4 border-b border-surface-hover flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-[14px] font-extrabold text-navy-text flex items-center gap-2">
+                  <Receipt size={17} className="text-brand" />
+                  <span>Laporan Piutang Lainnya (Akun 118) di Semua Entitas {year}</span>
+                </h3>
+                <p className="text-[12px] text-muted mt-0.5">
+                  Rincian saldo piutang lainnya non-afiliasi yang tercatat di masing-masing entitas
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10.5px] font-extrabold text-muted-faint uppercase block">
+                  Total Piutang Lainnya
+                </span>
+                <span className="text-[15px] font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
+                  {grupData.piutangLainnyaSummary.totalFmt}
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-hover text-left bg-surface-subtle/40 text-[11px] font-extrabold text-muted-faint uppercase">
+                    <th className="py-3 px-6 whitespace-nowrap">Entitas</th>
+                    <th className="py-3 px-4 whitespace-nowrap">Kode Akun</th>
+                    <th className="py-3 px-5 text-right text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Saldo Piutang Lainnya</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-subtle text-[12.5px]">
+                  {grupData.piutangLainnyaSummary.items.map((it) => (
+                    <tr key={it.entityKey} className="hover:bg-surface-hover/20">
+                      <td className="py-3.5 px-6 font-bold text-navy-text whitespace-nowrap">
+                        {it.entityName} ({it.shortName})
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-muted text-[11.5px] whitespace-nowrap">
+                        118 PIUTANG LAINNYA
+                      </td>
+                      <td className="py-3.5 px-5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold font-mono whitespace-nowrap">
+                        {it.nominalFmt}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-surface-subtle/80 font-extrabold text-navy-text border-t-2 border-border-soft">
+                    <td colSpan={2} className="py-3.5 px-6 uppercase text-[11.5px] tracking-wide">
+                      Total Seluruh Entitas
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-mono text-[13.5px] text-emerald-600 dark:text-emerald-400">
+                      {grupData.piutangLainnyaSummary.totalFmt}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

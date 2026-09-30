@@ -133,6 +133,7 @@ async function main() {
     { code: "313",  name: "Hutang TB",                   kategori: K },
     { code: "314",  name: "Hutang CAD",                  kategori: K },
     { code: "315",  name: "Hutang KP",                   kategori: K },
+    { code: "317",  name: "Hutang PS",                   kategori: K },
     { code: "310",  name: "Laba Ditahan",                kategori: M },
     { code: "320",  name: "Modal",                       kategori: M },
     { code: "400",  name: "PENDAPATAN",                  kategori: P },

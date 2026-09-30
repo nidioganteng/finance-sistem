@@ -32,6 +32,9 @@ export interface SumberPengeluaranInfo {
   coaName: string;
   namaLengkap: string;
   rekeningNama?: string;
+  entityKey: string;
+  entityName: string;
+  entityShortName?: string;
 }
 
 export function formatAccountingRupiah(n: number): string {
@@ -136,6 +139,7 @@ export interface MutasiAfiliasiTx {
   saldoAkhirGlobalFmt?: string;
   sumberPengeluaran?: SumberPengeluaranInfo;
   alokasiPenggunaan?: AlokasiPenggunaanDana[];
+  narasiAlur?: string;
 }
 
 export interface LaporanHutangPiutangEntityData {
@@ -718,12 +722,32 @@ export async function getLaporanHutangPiutangEntityData(
           role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
         });
       }
+      if (alokasiPenggunaan.length === 0) {
+        const selfKas = selfRows.filter((r) => {
+          const rx = r.extraFieldsJson as Record<string, unknown> | null;
+          return rx?.isKasEntry || Number(r.debit) > 0;
+        });
+        for (const kr of selfKas) {
+          const nom = Number(kr.debit) > 0 ? Number(kr.debit) : Number(kr.kredit);
+          alokasiPenggunaan.push({
+            entityKey: kr.entity.key,
+            entityName: kr.entity.name,
+            entityShortName: entity.name,
+            coaCode: kr.coaAccount?.code ?? "-",
+            coaName: kr.coaAccount?.name ?? "Kas / Bank Penerima",
+            nominal: nom,
+            nominalFmt: formatStandardRupiah(nom),
+            keterangan: kr.keterangan || t.keterangan,
+            role: "KAS",
+          });
+        }
+      }
     }
 
     // Resolusi Sumber Pengeluaran (Kas/Bank asal dana)
     let sumberPengeluaran: SumberPengeluaranInfo | undefined;
     const isKasCoa = (code: string) =>
-      /^(11|12|13|14|21|22|23|24|31|32|41|51|110|120|130|140|1100|1200|1300|1400|1500)$/.test(code);
+      /^(11|12|13|14|21|22|23|24|31|32|41|51|110|120|130|140|150|1100|1200|1300|1400|1500)$/.test(code);
 
     if (extra?.crossingFromEntityKey) {
       // Hutang crossing yang diterima entitas ini: Sumber pengeluaran adalah Kas/Bank entitas asal
@@ -737,11 +761,15 @@ export async function getLaporanHutangPiutangEntityData(
       if (kasRow && kasRow.coaAccount) {
         const kx = kasRow.extraFieldsJson as Record<string, unknown> | null;
         const rek = typeof kx?.rekeningNama === "string" ? kx.rekeningNama : undefined;
+        const sourceCp = ALL_COUNTERPARTIES.find((c) => c.key === kasRow.entity.key);
         sumberPengeluaran = {
           coaCode: kasRow.coaAccount.code,
           coaName: kasRow.coaAccount.name,
           namaLengkap: rek ? `${kasRow.coaAccount.name} (${kasRow.coaAccount.code}) - ${rek}` : `${kasRow.coaAccount.name} (${kasRow.coaAccount.code})`,
           rekeningNama: rek,
+          entityKey: kasRow.entity.key,
+          entityName: kasRow.entity.name,
+          entityShortName: sourceCp?.shortName ?? kasRow.entity.name,
         };
       }
     } else {
@@ -755,12 +783,48 @@ export async function getLaporanHutangPiutangEntityData(
       if (kasRow && kasRow.coaAccount) {
         const kx = kasRow.extraFieldsJson as Record<string, unknown> | null;
         const rek = typeof kx?.rekeningNama === "string" ? kx.rekeningNama : undefined;
+        const selfCp = ALL_COUNTERPARTIES.find((c) => c.key === entity.key);
         sumberPengeluaran = {
           coaCode: kasRow.coaAccount.code,
           coaName: kasRow.coaAccount.name,
           namaLengkap: rek ? `${kasRow.coaAccount.name} (${kasRow.coaAccount.code}) - ${rek}` : `${kasRow.coaAccount.name} (${kasRow.coaAccount.code})`,
           rekeningNama: rek,
+          entityKey: entity.key,
+          entityName: entity.name,
+          entityShortName: selfCp?.shortName ?? entity.name,
         };
+      }
+    }
+
+    // Narasi Alur Transaksi untuk Finance (Contoh: "pembelian materai di Kencana menggunakan Kas Kecil GS (Akun 1200) dari Gaharu")
+    let narasiAlur = "";
+    const cleanKet = t.keterangan?.trim() || "";
+    const firstAlloc = alokasiPenggunaan.length > 0 ? alokasiPenggunaan[0] : undefined;
+    const allocSuffix = firstAlloc && firstAlloc.coaCode !== "-"
+      ? ` (Akun ${firstAlloc.coaCode} ${firstAlloc.coaName})`
+      : "";
+
+    if (accountType === "HUTANG") {
+      if (sumberPengeluaran) {
+        if (firstAlloc?.role === "KAS") {
+          narasiAlur = `Penerimaan kas ke ${firstAlloc.coaName}${allocSuffix} di ${entity.name} menggunakan dana ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${sumberPengeluaran.entityName}`;
+        } else {
+          narasiAlur = `${cleanKet || "Pengeluaran operasional"} di ${entity.name}${allocSuffix} menggunakan ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${sumberPengeluaran.entityName}`;
+        }
+      } else {
+        narasiAlur = `${cleanKet || "Kewajiban hutang"} di ${entity.name} dari ${cp.fullName}`;
+      }
+    } else {
+      // PIUTANG
+      if (sumberPengeluaran) {
+        const destEntity = firstAlloc?.entityName || cp.fullName;
+        if (firstAlloc?.role === "KAS") {
+          narasiAlur = `Penyaluran dana ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${entity.name} masuk ke ${firstAlloc.coaName}${allocSuffix} di ${destEntity}`;
+        } else {
+          narasiAlur = `Pengeluaran ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${entity.name} digunakan untuk ${cleanKet || "keperluan operasional"} di ${destEntity}${allocSuffix}`;
+        }
+      } else {
+        narasiAlur = `Hak tagih piutang kepada ${cp.fullName}: ${cleanKet || "Pinjaman / talangan dana"}`;
       }
     }
 
@@ -793,6 +857,7 @@ export async function getLaporanHutangPiutangEntityData(
       saldoAkhirGlobalFmt: formatAccountingRupiah(globalRunningBalance),
       sumberPengeluaran,
       alokasiPenggunaan: alokasiPenggunaan.length > 0 ? alokasiPenggunaan : undefined,
+      narasiAlur,
     });
   }
 

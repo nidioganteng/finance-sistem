@@ -191,6 +191,13 @@ export interface LaporanPendapatanData {
     name: string;
     contractValue: number;
     contractValueFmt: string;
+    termins: Array<{
+      id: string;
+      name: string;
+      percentage: number;
+      nominal: number;
+      nominalFmt: string;
+    }>;
   }>;
   bankOptions: Array<{
     id: string;
@@ -263,10 +270,14 @@ export async function getLaporanPendapatanData(
     orderBy: [{ jenis: "asc" }, { tarifPersen: "asc" }],
   });
 
-  // 4. Ambil opsi proyek
+  // 4. Ambil opsi proyek beserta termin
   const projects = await prisma.project.findMany({
     where: { entityId: entity.id },
-    select: { id: true, code: true, name: true, contractValue: true },
+    include: {
+      termin: {
+        orderBy: { createdAt: "asc" },
+      },
+    },
     orderBy: { code: "asc" },
   });
 
@@ -592,13 +603,29 @@ export async function getLaporanPendapatanData(
       jenis: t.jenis,
       tarifPersen: Number(t.tarifPersen),
     })),
-    projectOptions: projects.map((p) => ({
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      contractValue: Number(p.contractValue),
-      contractValueFmt: formatRupiah(Number(p.contractValue)),
-    })),
+    projectOptions: projects.map((p) => {
+      const contractValue = Number(p.contractValue);
+      const termins = p.termin.map((t, i) => {
+        const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+        const nominal = ((t.percentage - prevPct) / 100) * contractValue;
+        return {
+          id: t.id,
+          name: t.name,
+          percentage: t.percentage,
+          nominal,
+          nominalFmt: formatRupiah(nominal),
+        };
+      });
+
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        contractValue,
+        contractValueFmt: formatRupiah(contractValue),
+        termins,
+      };
+    }),
     bankOptions: defaultBankList,
   };
 }

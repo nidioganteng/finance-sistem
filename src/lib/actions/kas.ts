@@ -103,26 +103,15 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
 }
 
 async function resolveCrossingDebitCoa(
-  jenisInputKey: string,
-  crossEntityKey: string,
-  rekeningId: string | undefined,
   primaryRowCoaId: string | undefined
-): Promise<{ coaAccountId: string; role: "KAS" | "BEBAN" } | null> {
+): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
   const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
-  const isPiutang = coa && ["111", "112", "113", "114", "115", "117", "118"].includes(coa.code);
-
-  if (isPiutang || !coa) {
-    const kasId = await resolveKasCoa(jenisInputKey, crossEntityKey, rekeningId);
-    if (kasId) return { coaAccountId: kasId, role: "KAS" };
-  } else if (coa.kategori === "BEBAN") {
-    const matchingBeban = await prisma.coaAccount.findFirst({ where: { code: coa.code } });
-    if (matchingBeban) return { coaAccountId: matchingBeban.id, role: "BEBAN" };
+  if (coa) {
+    return {
+      coaAccountId: coa.id,
+      role: coa.kategori === "BEBAN" ? "BEBAN" : "PIUTANG",
+    };
   }
-
-  // Fallback ke kas/bank entitas penerima
-  const fallbackKasId = await resolveKasCoa(jenisInputKey, crossEntityKey, rekeningId);
-  if (fallbackKasId) return { coaAccountId: fallbackKasId, role: "KAS" };
-
   return null;
 }
 
@@ -289,12 +278,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(
-        input.jenisInputKey,
-        crossEntity.key,
-        input.rekeningId,
-        primaryRowCoaId
-      );
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId);
 
       if (debitTarget) {
         ops.push(
@@ -308,8 +292,10 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
                 isCrossingEntry: true,
                 crossingGroupId,
                 crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
                 crossingRole: debitTarget.role,
-                ...(debitTarget.role === "KAS" ? { isKasEntry: true } : {}),
               },
             },
           })
@@ -328,6 +314,9 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
                 isCrossingEntry: true,
                 crossingGroupId,
                 crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
                 crossingRole: "HUTANG",
                 originalHutangCoaCode: hutangCode,
               },
@@ -560,12 +549,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(
-        input.jenisInputKey,
-        crossEntity.key,
-        input.rekeningId,
-        primaryRowCoaIdReplace
-      );
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace);
 
       if (debitTarget) {
         ops.push(
@@ -579,8 +563,10 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
                 isCrossingEntry: true,
                 crossingGroupId,
                 crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
                 crossingRole: debitTarget.role,
-                ...(debitTarget.role === "KAS" ? { isKasEntry: true } : {}),
               },
             },
           })
@@ -599,6 +585,9 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
                 isCrossingEntry: true,
                 crossingGroupId,
                 crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
                 crossingRole: "HUTANG",
                 originalHutangCoaCode: hutangCodeReplace,
               },

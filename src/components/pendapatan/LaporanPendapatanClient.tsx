@@ -648,6 +648,7 @@ export function LaporanPendapatanClient({
               <thead className="bg-slate-50 text-navy-text border-b border-border-soft font-semibold">
                 <tr>
                   <th className="p-3 text-center w-10">No</th>
+                  <th className="p-3 text-blue-700 bg-blue-50/50">Kode Proyek</th>
                   <th className="p-3">No. Faktur / NPWP</th>
                   <th className="p-3">Rekanan & Uraian JKP</th>
                   <th className="p-3 text-center">Masa</th>
@@ -671,7 +672,7 @@ export function LaporanPendapatanClient({
                 {filteredFaktur.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canEdit ? 14 : 13}
+                      colSpan={canEdit ? 15 : 14}
                       className="p-8 text-center text-navy-soft"
                     >
                       <Receipt className="w-8 h-8 mx-auto text-slate-300 mb-2" />
@@ -685,6 +686,25 @@ export function LaporanPendapatanClient({
                       className="hover:bg-slate-50/75 transition-colors"
                     >
                       <td className="p-3 text-center text-navy-soft">{idx + 1}</td>
+                      <td className="p-3">
+                        {f.projectCode ? (
+                          <div>
+                            <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                              {f.projectCode}
+                            </span>
+                            {f.projectName && (
+                              <div
+                                className="text-[10px] text-navy-soft max-w-[130px] truncate mt-0.5"
+                                title={f.projectName}
+                              >
+                                {f.projectName}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-xs">-</span>
+                        )}
+                      </td>
                       <td className="p-3">
                         <div className="font-semibold text-navy-text">
                           {f.noFaktur}
@@ -700,11 +720,6 @@ export function LaporanPendapatanClient({
                         <div className="text-[11px] text-navy-soft max-w-xs truncate">
                           {f.namaJkp}
                         </div>
-                        {f.projectName && (
-                          <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] rounded bg-slate-100 text-slate-700">
-                            Proyek: {f.projectCode} - {f.projectName}
-                          </span>
-                        )}
                       </td>
                       <td className="p-3 text-center">
                         <span className="px-2 py-1 text-[11px] font-medium rounded-full bg-slate-100 text-slate-700">
@@ -788,7 +803,7 @@ export function LaporanPendapatanClient({
               {/* Footer Total */}
               <tfoot className="bg-slate-100 font-bold text-navy-text border-t-2 border-slate-300">
                 <tr>
-                  <td colSpan={5} className="p-3 text-center uppercase tracking-wider">
+                  <td colSpan={6} className="p-3 text-center uppercase tracking-wider">
                     Total Periode ({data.totalPeriod.jumlahFaktur} Faktur)
                   </td>
                   <td className="p-3 text-right font-mono">
@@ -1139,6 +1154,65 @@ export function LaporanPendapatanClient({
                 </div>
               )}
 
+              {/* Form Section 1: Kode Proyek dari Sidamon */}
+              <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-navy-text flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    Pilih Kode Proyek (Master Proyek Sidamon)
+                  </label>
+                  {formFaktur.projectId && (
+                    <button
+                      type="button"
+                      onClick={() => setFormFaktur({ ...formFaktur, projectId: "" })}
+                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-800"
+                    >
+                      Batal Pilih Proyek
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={formFaktur.projectId}
+                  onChange={(e) => {
+                    const selectedProjId = e.target.value;
+                    const p = data.projectOptions.find((x) => x.id === selectedProjId);
+                    setFormFaktur((prev) => ({
+                      ...prev,
+                      projectId: selectedProjId,
+                      namaRekanan: prev.namaRekanan || (p ? p.name : ""),
+                      namaJkp: prev.namaJkp || (p ? `Jasa Konsultansi ${p.name}` : ""),
+                    }));
+                  }}
+                  className="w-full px-3 py-2 text-xs border border-blue-300 rounded-xl bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  <option value="">-- Pilih Kode Proyek yang Sesuai --</option>
+                  {data.projectOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {formFaktur.projectId ? (
+                  (() => {
+                    const sel = data.projectOptions.find((x) => x.id === formFaktur.projectId);
+                    return sel ? (
+                      <div className="text-[11px] text-blue-800 bg-white p-2.5 rounded-lg border border-blue-100 flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          Kode Proyek: <strong className="font-mono">{sel.code}</strong> • {sel.name}
+                        </span>
+                        <span className="font-semibold text-navy-text">
+                          Nilai Kontrak: {sel.contractValueFmt}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()
+                ) : (
+                  <p className="text-[11px] text-navy-soft">
+                    Pilih proyek dari daftar proyek yang sudah diinput oleh Admin Sidamon untuk entitas ini.
+                  </p>
+                )}
+              </div>
+
               {/* Form Grid 1: Basic Faktur Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
@@ -1257,13 +1331,14 @@ export function LaporanPendapatanClient({
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-navy-text mb-1">
-                      DPP Dasar <span className="text-rose-500">*</span>
+                      DPP Dasar (Nilai Termin Keluar) <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="number"
                       required
                       min={0}
                       step="any"
+                      placeholder="Masukkan nilai termin..."
                       value={formFaktur.dpp || ""}
                       onChange={(e) =>
                         setFormFaktur({
@@ -1273,6 +1348,9 @@ export function LaporanPendapatanClient({
                       }
                       className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <span className="text-[10px] text-navy-soft mt-0.5 block">
+                      Nilai termin yang sedang ditagihkan/keluar untuk proyek ini.
+                    </span>
                   </div>
 
                   <div>
@@ -1494,29 +1572,6 @@ export function LaporanPendapatanClient({
                   />
                 </div>
               </div>
-
-              {/* Form Grid 6: Optional Project Relation */}
-              {data.projectOptions.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Hubungkan ke Proyek Kontrak (Opsional)
-                  </label>
-                  <select
-                    value={formFaktur.projectId}
-                    onChange={(e) =>
-                      setFormFaktur({ ...formFaktur, projectId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  >
-                    <option value="">-- Tidak Terhubung ke Proyek Tertentu --</option>
-                    {data.projectOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {/* Modal Buttons */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border-soft">

@@ -837,8 +837,22 @@ export function LaporanHutangPiutangClient({
                               >
                                 {tx.keterangan}
                               </div>
+                              {tx.sumberPengeluaran && (
+                                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shrink-0">
+                                    <Wallet size={10} />
+                                    <span>Sumber:</span>
+                                  </span>
+                                  <span className="truncate text-muted-stronger">
+                                    <strong className="font-semibold text-navy-text">{tx.sumberPengeluaran.coaName}</strong> ({tx.sumberPengeluaran.coaCode})
+                                    {tx.sumberPengeluaran.entityName && (
+                                      <> dari <strong className="text-navy-text">{tx.sumberPengeluaran.entityName}</strong></>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
                               {tx.alokasiPenggunaan && tx.alokasiPenggunaan.length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                   <span className="text-[10px] font-extrabold uppercase tracking-wide text-brand flex items-center gap-1 bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded whitespace-nowrap">
                                     <Layers size={10} />
                                     <span>
@@ -870,12 +884,21 @@ export function LaporanHutangPiutangClient({
                             <td className="py-3 px-3 whitespace-nowrap">
                               {tx.sumberPengeluaran ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                    <Wallet size={12} />
+                                  <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                    <Wallet size={13} />
                                   </span>
                                   <div>
-                                    <div className="font-semibold text-navy-text text-[12px]">{tx.sumberPengeluaran.coaName}</div>
-                                    <div className="text-[10px] text-muted-faint font-mono">Akun {tx.sumberPengeluaran.coaCode}</div>
+                                    <div className="font-bold text-navy-text text-[12px]">{tx.sumberPengeluaran.coaName}</div>
+                                    <div className="text-[10.5px] text-muted font-medium flex items-center gap-1">
+                                      <span>dari</span>
+                                      <span className="font-extrabold text-navy-text">
+                                        {tx.sumberPengeluaran.entityName || tx.sumberPengeluaran.entityShortName}
+                                      </span>
+                                      <span>•</span>
+                                      <span className="font-mono text-[10px] text-muted-faint font-semibold">
+                                        {tx.sumberPengeluaran.coaCode}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                               ) : (
@@ -1144,6 +1167,33 @@ export function LaporanHutangPiutangClient({
 
               {/* Modal Body */}
               <div className="p-6 overflow-y-auto flex flex-col gap-4 text-sm">
+                {/* ── Banner Alur Transaksi untuk Finance ── */}
+                <div className="p-4.5 rounded-2xl bg-brand/5 border border-brand/20 flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-brand font-extrabold text-[11px] uppercase tracking-wider">
+                    <Info size={14} />
+                    <span>Alur &amp; Penjelasan Transaksi (Finance Narrative)</span>
+                  </div>
+                  <p className="text-[14px] font-bold text-navy-text leading-relaxed">
+                    {selectedTxDetail.narasiAlur || selectedTxDetail.keterangan}
+                  </p>
+                  {selectedTxDetail.sumberPengeluaran && (
+                    <div className="flex flex-wrap items-center gap-3 pt-2 text-[11.5px] text-muted border-t border-brand/10">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Wallet size={13} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>Uang berasal dari:</span>
+                        <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.coaName}</strong>
+                        <span className="font-mono text-[10.5px] font-bold">(Akun {selectedTxDetail.sumberPengeluaran.coaCode})</span>
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Building2 size={13} className="text-brand" />
+                        <span>Entitas sumber dana:</span>
+                        <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Ringkasan Aliran Dana */}
                 <div className="p-4 rounded-xl bg-surface-subtle/50 border border-border-soft flex flex-col gap-2.5">
                   <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint">
@@ -1188,6 +1238,11 @@ export function LaporanHutangPiutangClient({
                           <span className="text-[13.5px] font-extrabold text-navy-text block mt-0.5">
                             {selectedTxDetail.sumberPengeluaran.namaLengkap}
                           </span>
+                          {selectedTxDetail.sumberPengeluaran.entityName && (
+                            <span className="text-[11.5px] text-muted font-medium block mt-0.5">
+                              Dikeluarkan dari kas/bank entitas: <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
+                            </span>
+                          )}
                         </div>
                       </div>
                       <span className="font-mono text-[11px] font-extrabold text-brand bg-brand/10 px-2.5 py-1 rounded-lg">

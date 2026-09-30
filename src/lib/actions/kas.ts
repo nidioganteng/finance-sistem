@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo, ENTITY_PREFIX, ENTITY_PREFIX_UMUM } from "@/lib/kas";
-import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
+import { isValidRekening, getRekeningNama, REKENING_COA_CODE, REKENING_BY_ENTITY } from "@/lib/bank-accounts";
 import { computeNewTerminPercentage } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
@@ -91,9 +91,26 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
     if (!code) return null;
     return (await prisma.coaAccount.findUnique({ where: { code } }))?.id ?? null;
   }
-  if (jenisInputKey === "bankBuku" && rekeningId) {
-    const coaCode = REKENING_COA_CODE[rekeningId];
+  if (jenisInputKey === "bankBuku") {
+    let effectiveRekeningId = rekeningId;
+    if (!effectiveRekeningId || !isValidRekening(entityKey, effectiveRekeningId)) {
+      effectiveRekeningId = REKENING_BY_ENTITY[entityKey]?.[0]?.id;
+    }
+    const coaCode = effectiveRekeningId ? REKENING_COA_CODE[effectiveRekeningId] : undefined;
     if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code: coaCode } }))?.id ?? null;
+  }
+  return null;
+}
+
+async function resolveCrossingDebitCoa(
+  primaryRowCoaId: string | undefined
+): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
+  const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
+  if (coa) {
+    return {
+      coaAccountId: coa.id,
+      role: coa.kategori === "BEBAN" ? "BEBAN" : "PIUTANG",
+    };
   }
   return null;
 }
@@ -243,62 +260,74 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       data: { key: "jurnalTransaksi", nama: "Jurnal Transaksi", active: true },
     });
   }
-  const defaultBebanCoa = await prisma.coaAccount.findFirst({ where: { code: "530" } });
-
   // Build crossing entity ops: tidak masuk ke kas/bank entitas tujuan,
   // melainkan langsung dicatat ke Jurnal Transaksi (Jurnal Umum & Buku Besar):
-  // 1. Debet Beban (awal: By Lain 530, bisa diedit tim finance ke akun beban spesifik di Jurnal Transaksi)
+  // 1. Debet Kas/Bank rekanan jika pinjaman/piutang (atau akun Beban jika belanja riil)
   // 2. Kredit Hutang Afiliasi (Hutang entitas asal, misal 312 Hutang GS)
-  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity }) => {
-    const crossCommon = {
-      entityId: crossEntity.id,
-      jenisInputId: jurnalJenisInput?.id ?? jenisInput.id,
-      tanggal: new Date(input.tanggal),
-      noBukti: input.noBukti,
-      keterangan: input.keterangan,
-      saldoSetelah: 0,
-      staffId: session.user.id,
-    };
-    const ops: ReturnType<typeof prisma.transaction.create>[] = [];
-    if (defaultBebanCoa) {
-      ops.push(
-        prisma.transaction.create({
-          data: {
-            ...crossCommon,
-            coaAccountId: defaultBebanCoa.id,
-            debit: total,
-            kredit: 0,
-            extraFieldsJson: {
-              isCrossingEntry: true,
-              crossingGroupId,
-              crossingFromEntityKey: input.entityKey,
-              crossingRole: "BEBAN",
+  const primaryRowCoaId = validRows[0]?.coaAccountId;
+  const crossingOpsNested = await Promise.all(
+    crossingEntries.map(async ({ entity: crossEntity }) => {
+      const crossCommon = {
+        entityId: crossEntity.id,
+        jenisInputId: jurnalJenisInput?.id ?? jenisInput.id,
+        tanggal: new Date(input.tanggal),
+        noBukti: input.noBukti,
+        keterangan: input.keterangan,
+        saldoSetelah: 0,
+        staffId: session.user.id,
+      };
+      const ops: ReturnType<typeof prisma.transaction.create>[] = [];
+
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId);
+
+      if (debitTarget) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: debitTarget.coaAccountId,
+              debit: total,
+              kredit: 0,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: debitTarget.role,
+              },
             },
-          },
-        })
-      );
-    }
-    if (hutangCoa) {
-      ops.push(
-        prisma.transaction.create({
-          data: {
-            ...crossCommon,
-            coaAccountId: hutangCoa.id,
-            debit: 0,
-            kredit: total,
-            extraFieldsJson: {
-              isCrossingEntry: true,
-              crossingGroupId,
-              crossingFromEntityKey: input.entityKey,
-              crossingRole: "HUTANG",
-              originalHutangCoaCode: hutangCode,
+          })
+        );
+      }
+
+      if (hutangCoa) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: hutangCoa.id,
+              debit: 0,
+              kredit: total,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: "HUTANG",
+                originalHutangCoaCode: hutangCode,
+              },
             },
-          },
-        })
-      );
-    }
-    return ops;
-  });
+          })
+        );
+      }
+      return ops;
+    })
+  );
+  const crossingOps = crossingOpsNested.flat();
 
   // Saat auto-sync aktif, skip akunRows — Buku Bank keluar sudah jadi counterpart-nya
   const isSyncMode = !!((input.jenisInputKey === "kasKecil" || input.jenisInputKey === "kasBesar") && input.arah === "masuk" && input.syncBukuBankRekeningId);
@@ -505,59 +534,71 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
       data: { key: "jurnalTransaksi", nama: "Jurnal Transaksi", active: true },
     });
   }
-  const defaultBebanCoaReplace = await prisma.coaAccount.findFirst({ where: { code: "530" } });
+  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Kas (atau Beban) / Cr. HUTANG_A (masuk ke Jurnal Transaksi)
+  const primaryRowCoaIdReplace = validRows[0]?.coaAccountId;
+  const crossingOpsNested = await Promise.all(
+    crossingEntries.map(async ({ entity: crossEntity }) => {
+      const crossCommon = {
+        entityId: crossEntity.id,
+        jenisInputId: jurnalJenisInputReplace?.id ?? jenisInput.id,
+        tanggal: new Date(input.tanggal),
+        noBukti: input.noBukti,
+        keterangan: input.keterangan,
+        saldoSetelah: 0,
+        staffId: session.user.id,
+      };
+      const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Beban / Cr. HUTANG_A (masuk ke Jurnal Transaksi)
-  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity }) => {
-    const crossCommon = {
-      entityId: crossEntity.id,
-      jenisInputId: jurnalJenisInputReplace?.id ?? jenisInput.id,
-      tanggal: new Date(input.tanggal),
-      noBukti: input.noBukti,
-      keterangan: input.keterangan,
-      saldoSetelah: 0,
-      staffId: session.user.id,
-    };
-    const ops: ReturnType<typeof prisma.transaction.create>[] = [];
-    if (defaultBebanCoaReplace) {
-      ops.push(
-        prisma.transaction.create({
-          data: {
-            ...crossCommon,
-            coaAccountId: defaultBebanCoaReplace.id,
-            debit: total,
-            kredit: 0,
-            extraFieldsJson: {
-              isCrossingEntry: true,
-              crossingGroupId,
-              crossingFromEntityKey: input.entityKey,
-              crossingRole: "BEBAN",
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace);
+
+      if (debitTarget) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: debitTarget.coaAccountId,
+              debit: total,
+              kredit: 0,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: debitTarget.role,
+              },
             },
-          },
-        })
-      );
-    }
-    if (hutangCoaReplace) {
-      ops.push(
-        prisma.transaction.create({
-          data: {
-            ...crossCommon,
-            coaAccountId: hutangCoaReplace.id,
-            debit: 0,
-            kredit: total,
-            extraFieldsJson: {
-              isCrossingEntry: true,
-              crossingGroupId,
-              crossingFromEntityKey: input.entityKey,
-              crossingRole: "HUTANG",
-              originalHutangCoaCode: hutangCodeReplace,
+          })
+        );
+      }
+
+      if (hutangCoaReplace) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: hutangCoaReplace.id,
+              debit: 0,
+              kredit: total,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: "HUTANG",
+                originalHutangCoaCode: hutangCodeReplace,
+              },
             },
-          },
-        })
-      );
-    }
-    return ops;
-  });
+          })
+        );
+      }
+      return ops;
+    })
+  );
+  const crossingOps = crossingOpsNested.flat();
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);
 

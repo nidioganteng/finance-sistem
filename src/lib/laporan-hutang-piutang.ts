@@ -6,6 +6,7 @@ export interface CounterpartyConfig {
   fullName: string;
   piutangCode: string;
   hutangCode: string;
+  isSpecial?: boolean;
 }
 
 export const COUNTERPARTIES: CounterpartyConfig[] = [
@@ -15,6 +16,26 @@ export const COUNTERPARTIES: CounterpartyConfig[] = [
   { key: "ciptaAsri", shortName: "CAD", fullName: "Cipta Asri", piutangCode: "114", hutangCode: "314" },
   { key: "umum", shortName: "KP", fullName: "Kardi Pratama", piutangCode: "115", hutangCode: "315" },
 ];
+
+export const SPECIAL_COUNTERPARTIES: CounterpartyConfig[] = [
+  { key: "pemegangSaham", shortName: "PS", fullName: "Pemegang Saham", piutangCode: "117", hutangCode: "317", isSpecial: true },
+  { key: "piutangLainnya", shortName: "Lainnya", fullName: "Piutang Lainnya", piutangCode: "118", hutangCode: "", isSpecial: true },
+];
+
+export const ALL_COUNTERPARTIES: CounterpartyConfig[] = [
+  ...COUNTERPARTIES,
+  ...SPECIAL_COUNTERPARTIES,
+];
+
+export interface SumberPengeluaranInfo {
+  coaCode: string;
+  coaName: string;
+  namaLengkap: string;
+  rekeningNama?: string;
+  entityKey: string;
+  entityName: string;
+  entityShortName?: string;
+}
 
 export function formatAccountingRupiah(n: number): string {
   if (n === 0) return "Rp\u00A0-";
@@ -116,7 +137,9 @@ export interface MutasiAfiliasiTx {
   saldoAkhirFmt: string;
   saldoAkhirGlobal?: number;
   saldoAkhirGlobalFmt?: string;
+  sumberPengeluaran?: SumberPengeluaranInfo;
   alokasiPenggunaan?: AlokasiPenggunaanDana[];
+  narasiAlur?: string;
 }
 
 export interface LaporanHutangPiutangEntityData {
@@ -170,6 +193,27 @@ export interface ReconciliationPair {
   isMatchBA: boolean;
 }
 
+export interface PemegangSahamGrupItem {
+  entityKey: string;
+  entityName: string;
+  shortName: string;
+  piutang: number;
+  piutangFmt: string;
+  hutang: number;
+  hutangFmt: string;
+  net: number;
+  netFmt: string;
+  status: "PIUTANG" | "UTANG" | "NIHIL";
+}
+
+export interface PiutangLainnyaGrupItem {
+  entityKey: string;
+  entityName: string;
+  shortName: string;
+  nominal: number;
+  nominalFmt: string;
+}
+
 export interface LaporanHutangPiutangGrupData {
   year: number;
   entities: { id: string; key: string; name: string; shortName: string }[];
@@ -181,6 +225,20 @@ export interface LaporanHutangPiutangGrupData {
   grandTotalPiutang: number;
   grandTotalHutang: number;
   reconciliations: ReconciliationPair[];
+  pemegangSahamSummary: {
+    items: PemegangSahamGrupItem[];
+    totalPiutang: number;
+    totalPiutangFmt: string;
+    totalHutang: number;
+    totalHutangFmt: string;
+    netGlobal: number;
+    netGlobalFmt: string;
+  };
+  piutangLainnyaSummary: {
+    items: PiutangLainnyaGrupItem[];
+    total: number;
+    totalFmt: string;
+  };
 }
 
 export async function getLaporanHutangPiutangEntityData(
@@ -198,11 +256,33 @@ export async function getLaporanHutangPiutangEntityData(
   const endYear = new Date(year + 1, 0, 1);
 
   // Counterparty excludes self
-  const counterparties = COUNTERPARTIES.filter((c) => c.key !== entity.key);
+  const counterparties: CounterpartyConfig[] = COUNTERPARTIES.filter((c) => c.key !== entity.key);
+
+  // 1. Pemegang Saham: Khusus Kencana dan Gaharu
+  if (entity.key === "kencana" || entity.key === "gaharu") {
+    counterparties.push({
+      key: "pemegangSaham",
+      shortName: "PS",
+      fullName: "Pemegang Saham",
+      piutangCode: "117",
+      hutangCode: "317",
+      isSpecial: true,
+    });
+  }
+
+  // 2. Piutang Lainnya: Di semua entitas
+  counterparties.push({
+    key: "piutangLainnya",
+    shortName: "Lainnya",
+    fullName: "Piutang Lainnya",
+    piutangCode: "118",
+    hutangCode: "",
+    isSpecial: true,
+  });
 
   // Collect all coa codes needed
-  const hutangCodes = counterparties.map((c) => c.hutangCode);
-  const piutangCodes = counterparties.map((c) => c.piutangCode);
+  const hutangCodes = counterparties.map((c) => c.hutangCode).filter(Boolean);
+  const piutangCodes = counterparties.map((c) => c.piutangCode).filter(Boolean);
   const allCodes = [...hutangCodes, ...piutangCodes];
 
   const coaAccounts = await prisma.coaAccount.findMany({
@@ -261,6 +341,7 @@ export async function getLaporanHutangPiutangEntityData(
   let sumTotalHutang = 0;
 
   for (const cp of counterparties) {
+    if (!cp.hutangCode) continue;
     const coa = coaMap.get(cp.hutangCode);
     const coaId = coa?.id;
     let hutangLalu = 0;
@@ -346,6 +427,7 @@ export async function getLaporanHutangPiutangEntityData(
   let sumTotalPiutang = 0;
 
   for (const cp of counterparties) {
+    if (!cp.piutangCode) continue;
     const coa = coaMap.get(cp.piutangCode);
     const coaId = coa?.id;
     let piutangAwal = 0;
@@ -393,11 +475,11 @@ export async function getLaporanHutangPiutangEntityData(
 
   for (let i = 0; i < counterparties.length; i++) {
     const cp = counterparties[i];
-    const hRow = hutangRows[i];
-    const pRow = piutangRows[i];
+    const hRow = hutangRows.find((r) => r.counterpartyKey === cp.key);
+    const pRow = piutangRows.find((r) => r.counterpartyKey === cp.key);
 
-    const piutang = pRow.piutang;
-    const hutang = hRow.totalHutang;
+    const piutang = pRow?.piutang ?? 0;
+    const hutang = hRow?.totalHutang ?? 0;
     const net = piutang - hutang;
 
     let status: "UTANG" | "PIUTANG" | "NIHIL" = "NIHIL";
@@ -416,9 +498,9 @@ export async function getLaporanHutangPiutangEntityData(
       totalNetUtang += Math.abs(net);
     }
 
-    const saldoAwalNet = pRow.piutangLalu - hRow.hutangLalu;
-    const penambahanPiutang = pRow.perubahan;
-    const penambahanHutang = hRow.hutangTahunIni;
+    const saldoAwalNet = (pRow?.piutangLalu ?? 0) - (hRow?.hutangLalu ?? 0);
+    const penambahanPiutang = pRow?.perubahan ?? 0;
+    const penambahanHutang = hRow?.hutangTahunIni ?? 0;
 
     nettingRows.push({
       counterpartyKey: cp.key,
@@ -640,6 +722,110 @@ export async function getLaporanHutangPiutangEntityData(
           role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
         });
       }
+      if (alokasiPenggunaan.length === 0) {
+        const selfKas = selfRows.filter((r) => {
+          const rx = r.extraFieldsJson as Record<string, unknown> | null;
+          return rx?.isKasEntry || Number(r.debit) > 0;
+        });
+        for (const kr of selfKas) {
+          const nom = Number(kr.debit) > 0 ? Number(kr.debit) : Number(kr.kredit);
+          alokasiPenggunaan.push({
+            entityKey: kr.entity.key,
+            entityName: kr.entity.name,
+            entityShortName: entity.name,
+            coaCode: kr.coaAccount?.code ?? "-",
+            coaName: kr.coaAccount?.name ?? "Kas / Bank Penerima",
+            nominal: nom,
+            nominalFmt: formatStandardRupiah(nom),
+            keterangan: kr.keterangan || t.keterangan,
+            role: "KAS",
+          });
+        }
+      }
+    }
+
+    // Resolusi Sumber Pengeluaran (Kas/Bank asal dana)
+    let sumberPengeluaran: SumberPengeluaranInfo | undefined;
+    const isKasCoa = (code: string) =>
+      /^(11|12|13|14|21|22|23|24|31|32|41|51|110|120|130|140|150|1100|1200|1300|1400|1500)$/.test(code);
+
+    if (extra?.crossingFromEntityKey) {
+      // Hutang crossing yang diterima entitas ini: Sumber pengeluaran adalah Kas/Bank entitas asal
+      const fromKey = String(extra.crossingFromEntityKey);
+      const sourceRows = matchedRows.filter((r) => r.entity.key === fromKey);
+      const kasRow = sourceRows.find((r) => {
+        const rx = r.extraFieldsJson as Record<string, unknown> | null;
+        const code = r.coaAccount?.code ?? "";
+        return rx?.isKasEntry || r.coaAccount?.reportType === "ARUS_KAS" || isKasCoa(code) || Number(r.kredit) > 0;
+      });
+      if (kasRow && kasRow.coaAccount) {
+        const kx = kasRow.extraFieldsJson as Record<string, unknown> | null;
+        const rek = typeof kx?.rekeningNama === "string" ? kx.rekeningNama : undefined;
+        const sourceCp = ALL_COUNTERPARTIES.find((c) => c.key === kasRow.entity.key);
+        sumberPengeluaran = {
+          coaCode: kasRow.coaAccount.code,
+          coaName: kasRow.coaAccount.name,
+          namaLengkap: rek ? `${kasRow.coaAccount.name} (${kasRow.coaAccount.code}) - ${rek}` : `${kasRow.coaAccount.name} (${kasRow.coaAccount.code})`,
+          rekeningNama: rek,
+          entityKey: kasRow.entity.key,
+          entityName: kasRow.entity.name,
+          entityShortName: sourceCp?.shortName ?? kasRow.entity.name,
+        };
+      }
+    } else {
+      // Transaksi entitas sendiri: Cari baris kas/bank berpasangan di noBukti yang sama
+      const selfPaired = matchedRows.filter((r) => r.entity.key === entity.key && r.id !== t.id);
+      const kasRow = selfPaired.find((r) => {
+        const rx = r.extraFieldsJson as Record<string, unknown> | null;
+        const code = r.coaAccount?.code ?? "";
+        return rx?.isKasEntry || r.coaAccount?.reportType === "ARUS_KAS" || isKasCoa(code) || Number(r.kredit) > 0;
+      });
+      if (kasRow && kasRow.coaAccount) {
+        const kx = kasRow.extraFieldsJson as Record<string, unknown> | null;
+        const rek = typeof kx?.rekeningNama === "string" ? kx.rekeningNama : undefined;
+        const selfCp = ALL_COUNTERPARTIES.find((c) => c.key === entity.key);
+        sumberPengeluaran = {
+          coaCode: kasRow.coaAccount.code,
+          coaName: kasRow.coaAccount.name,
+          namaLengkap: rek ? `${kasRow.coaAccount.name} (${kasRow.coaAccount.code}) - ${rek}` : `${kasRow.coaAccount.name} (${kasRow.coaAccount.code})`,
+          rekeningNama: rek,
+          entityKey: entity.key,
+          entityName: entity.name,
+          entityShortName: selfCp?.shortName ?? entity.name,
+        };
+      }
+    }
+
+    // Narasi Alur Transaksi untuk Finance (Contoh: "pembelian materai di Kencana menggunakan Kas Kecil GS (Akun 1200) dari Gaharu")
+    let narasiAlur = "";
+    const cleanKet = t.keterangan?.trim() || "";
+    const firstAlloc = alokasiPenggunaan.length > 0 ? alokasiPenggunaan[0] : undefined;
+    const allocSuffix = firstAlloc && firstAlloc.coaCode !== "-"
+      ? ` (Akun ${firstAlloc.coaCode} ${firstAlloc.coaName})`
+      : "";
+
+    if (accountType === "HUTANG") {
+      if (sumberPengeluaran) {
+        if (firstAlloc?.role === "KAS") {
+          narasiAlur = `Penerimaan kas ke ${firstAlloc.coaName}${allocSuffix} di ${entity.name} menggunakan dana ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${sumberPengeluaran.entityName}`;
+        } else {
+          narasiAlur = `${cleanKet || "Pengeluaran operasional"} di ${entity.name}${allocSuffix} menggunakan ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${sumberPengeluaran.entityName}`;
+        }
+      } else {
+        narasiAlur = `${cleanKet || "Kewajiban hutang"} di ${entity.name} dari ${cp.fullName}`;
+      }
+    } else {
+      // PIUTANG
+      if (sumberPengeluaran) {
+        const destEntity = firstAlloc?.entityName || cp.fullName;
+        if (firstAlloc?.role === "KAS") {
+          narasiAlur = `Penyaluran dana ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${entity.name} masuk ke ${firstAlloc.coaName}${allocSuffix} di ${destEntity}`;
+        } else {
+          narasiAlur = `Pengeluaran ${sumberPengeluaran.coaName} (Akun ${sumberPengeluaran.coaCode}) dari ${entity.name} digunakan untuk ${cleanKet || "keperluan operasional"} di ${destEntity}${allocSuffix}`;
+        }
+      } else {
+        narasiAlur = `Hak tagih piutang kepada ${cp.fullName}: ${cleanKet || "Pinjaman / talangan dana"}`;
+      }
     }
 
     chronologicalTransactions.push({
@@ -669,7 +855,9 @@ export async function getLaporanHutangPiutangEntityData(
       saldoAkhirFmt: formatAccountingRupiah(newCpBalance),
       saldoAkhirGlobal: globalRunningBalance,
       saldoAkhirGlobalFmt: formatAccountingRupiah(globalRunningBalance),
+      sumberPengeluaran,
       alokasiPenggunaan: alokasiPenggunaan.length > 0 ? alokasiPenggunaan : undefined,
+      narasiAlur,
     });
   }
 
@@ -732,6 +920,12 @@ export async function getLaporanHutangPiutangGrupData(year: number): Promise<Lap
   let grandTotalPiutang = 0;
   let grandTotalHutang = 0;
 
+  const psItems: PemegangSahamGrupItem[] = [];
+  const piutangLainnyaItems: PiutangLainnyaGrupItem[] = [];
+  let totalPsPiutang = 0;
+  let totalPsHutang = 0;
+  let totalPiutangLainnya = 0;
+
   for (const ent of entities) {
     const data = await getLaporanHutangPiutangEntityData(ent.id, year);
     matrix[ent.key] = {};
@@ -741,13 +935,40 @@ export async function getLaporanHutangPiutangGrupData(year: number): Promise<Lap
 
     if (data) {
       for (const row of data.netting.rows) {
-        matrix[ent.key][row.counterpartyKey] = {
-          piutang: row.piutang,
-          hutang: row.hutang,
-          net: row.net,
-        };
-        entPiutang += row.piutang;
-        entHutang += row.hutang;
+        const isOperatingEntity = COUNTERPARTIES.some((c) => c.key === row.counterpartyKey);
+        if (isOperatingEntity) {
+          matrix[ent.key][row.counterpartyKey] = {
+            piutang: row.piutang,
+            hutang: row.hutang,
+            net: row.net,
+          };
+          entPiutang += row.piutang;
+          entHutang += row.hutang;
+        } else if (row.counterpartyKey === "pemegangSaham") {
+          psItems.push({
+            entityKey: ent.key,
+            entityName: ent.name,
+            shortName: entityShortNameMap[ent.key] ?? ent.name.substring(0, 3).toUpperCase(),
+            piutang: row.piutang,
+            piutangFmt: row.piutangFmt,
+            hutang: row.hutang,
+            hutangFmt: row.hutangFmt,
+            net: row.net,
+            netFmt: row.netFmt,
+            status: row.status,
+          });
+          totalPsPiutang += row.piutang;
+          totalPsHutang += row.hutang;
+        } else if (row.counterpartyKey === "piutangLainnya") {
+          piutangLainnyaItems.push({
+            entityKey: ent.key,
+            entityName: ent.name,
+            shortName: entityShortNameMap[ent.key] ?? ent.name.substring(0, 3).toUpperCase(),
+            nominal: row.piutang,
+            nominalFmt: row.piutangFmt,
+          });
+          totalPiutangLainnya += row.piutang;
+        }
       }
     }
 
@@ -790,6 +1011,8 @@ export async function getLaporanHutangPiutangGrupData(year: number): Promise<Lap
     }
   }
 
+  const netGlobalPs = totalPsPiutang - totalPsHutang;
+
   return {
     year,
     entities: entities.map((e) => ({
@@ -801,5 +1024,19 @@ export async function getLaporanHutangPiutangGrupData(year: number): Promise<Lap
     grandTotalPiutang,
     grandTotalHutang,
     reconciliations,
+    pemegangSahamSummary: {
+      items: psItems,
+      totalPiutang: totalPsPiutang,
+      totalPiutangFmt: formatAccountingRupiah(totalPsPiutang),
+      totalHutang: totalPsHutang,
+      totalHutangFmt: formatAccountingRupiah(totalPsHutang),
+      netGlobal: netGlobalPs,
+      netGlobalFmt: formatAccountingRupiah(netGlobalPs),
+    },
+    piutangLainnyaSummary: {
+      items: piutangLainnyaItems,
+      total: totalPiutangLainnya,
+      totalFmt: formatAccountingRupiah(totalPiutangLainnya),
+    },
   };
 }

@@ -43,6 +43,7 @@ model User {
   dokumenUpload    Dokumen[]             @relation("DokumenUploader")
   activityLogs     ActivityLog[]         @relation("ActivityActor")
   terminAudits     Termin[]              @relation("TerminAuditor")
+  fakturPendapatan FakturPendapatan[]    @relation("FakturPendapatanCreator")
 }
 
 // 4 entitas inti + 1 entitas "Umum" (ruang transit KSO / pinjam bendera).
@@ -60,8 +61,10 @@ model Entity {
   projects     Project[]
   transactions Transaction[]
   loadingDock  LoadingDockTransaksi[]
-  saldoAwal    SaldoAwal[]
-  asetTetap    AsetTetap[]
+  saldoAwal        SaldoAwal[]
+  asetTetap        AsetTetap[]
+  fakturPendapatan FakturPendapatan[]
+  rekonsiliasiPajak RekonsiliasiPajakBulanan[]
 }
 
 model UserEntityAccess {
@@ -92,8 +95,9 @@ model Project {
   createdAt     DateTime      @default(now())
 
   entity  Entity   @relation(fields: [entityId], references: [id])
-  termin  Termin[]
-  jurnal  Transaction[]
+  termin           Termin[]
+  jurnal           Transaction[]
+  fakturPendapatan FakturPendapatan[]
 
   // profit dihitung di query layer (contractValue - spend), tidak disimpan
 }
@@ -310,5 +314,68 @@ model AsetTetap {
   entity Entity @relation(fields: [entityId], references: [id])
 
   @@index([entityId])
+}
+
+// Modul Laporan Pendapatan (Rekap E-Faktur & Rekonsiliasi Pajak)
+model FakturPendapatan {
+  id                    String   @id @default(cuid())
+  entityId              String
+  npwp                  String   // NPWP klien/rekanan
+  noFaktur              String   // Nomor e-faktur pajak resmi
+  masaPajak             Int      // Bulan pajak (1 - 12)
+  tahunPajak            Int      // Tahun pajak terkait
+  namaRekanan           String   // Nama klien / rekanan
+  namaJkp               String   // Deskripsi JKP / pekerjaan
+  dpp                   Decimal  @db.Decimal(18, 2)
+  dppNilaiLain          Decimal  @db.Decimal(18, 2)
+  tarifPpnPersen        Decimal  @db.Decimal(5, 2) @default(11.00)
+  tarifPphPersen        Decimal  @db.Decimal(5, 2) @default(3.50)
+  ppn                   Decimal  @db.Decimal(18, 2)
+  pph                   Decimal  @db.Decimal(18, 2)
+  nilaiProyek           Decimal  @db.Decimal(18, 2)
+  labaSetelahPajak      Decimal  @db.Decimal(18, 2)
+  kodeJenisProyek       Int      @default(1) // 1 = Perencanaan, 2 = Pengawasan
+  pekerjaanPerusahaan   Decimal  @default(0.00) @db.Decimal(18, 2)
+  pekerjaanYangDipinjam Decimal  @default(0.00) @db.Decimal(18, 2)
+  tanggalTerima         DateTime // Tanggal uang benar-benar diterima di bank
+  bank                  String   // Rekening tujuan pembayaran (BPD/BRI/MDR/BNI)
+  nominalDiterima       Decimal  @db.Decimal(18, 2)
+  projectId             String?  // Relasi opsional ke Kontrol Piutang & Termin Proyek
+  bankTransactionId     String?  // Relasi opsional ke transaksi Bank Buku
+  createdById           String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  entity    Entity   @relation(fields: [entityId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+  createdBy User     @relation("FakturPendapatanCreator", fields: [createdById], references: [id])
+
+  @@index([entityId, tahunPajak, masaPajak])
+}
+
+model RekonsiliasiPajakBulanan {
+  id            String   @id @default(cuid())
+  entityId      String
+  year          Int
+  month         Int      // 1 - 12
+  dppTerlapor   Decimal  @default(0.00) @db.Decimal(18, 2)
+  pajakTerlapor Decimal  @default(0.00) @db.Decimal(18, 2)
+  keterangan    String?  @db.Text
+  updatedAt     DateTime @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id])
+
+  @@unique([entityId, year, month])
+}
+
+model TarifPajak {
+  id             String    @id @default(cuid())
+  nama           String    // Misal "PPN 11%", "PPN 12%", "PPh 3.5%"
+  jenis          String    // "PPN" | "PPH"
+  tarifPersen    Decimal   @db.Decimal(5, 2)
+  tanggalMulai   DateTime
+  tanggalSelesai DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
 }
 

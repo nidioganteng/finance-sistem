@@ -26,8 +26,6 @@ import {
   ArrowRight,
   ShieldCheck,
   Building,
-  Lock,
-  Unlock,
   Sparkles,
 } from "lucide-react";
 import type {
@@ -99,7 +97,7 @@ export function LaporanPendapatanClient({
 
   // Termin selection state for auto-syncing DPP
   const [selectedTerminId, setSelectedTerminId] = useState<string>("");
-  const [isManualDpp, setIsManualDpp] = useState(false);
+  const [showManualDppFallback, setShowManualDppFallback] = useState(false);
 
   // Form state for Rekonsiliasi
   const [formRecon, setFormRecon] = useState({
@@ -141,18 +139,17 @@ export function LaporanPendapatanClient({
   // Selected project & termin helpers for auto-syncing DPP
   const selectedProject = data.projectOptions.find((p) => p.id === formFaktur.projectId);
   const selectedTermin = selectedProject?.termins.find((t) => t.id === selectedTerminId);
-  const isDppLocked = Boolean(selectedTermin && !isManualDpp);
 
   function handleSelectTermin(terminId: string) {
     setSelectedTerminId(terminId);
     if (!terminId || terminId === "manual") {
-      setIsManualDpp(true);
+      setShowManualDppFallback(true);
       return;
     }
+    setShowManualDppFallback(false);
     const proj = data.projectOptions.find((x) => x.id === formFaktur.projectId);
     const term = proj?.termins.find((t) => t.id === terminId);
     if (term) {
-      setIsManualDpp(false);
       const nominal = term.nominal;
       const pphNominal = Math.round((nominal * formFaktur.tarifPphPersen) / 100);
       const netReceived = nominal - pphNominal;
@@ -161,7 +158,7 @@ export function LaporanPendapatanClient({
         dpp: nominal,
         dppNilaiLain: nominal,
         namaJkp: proj ? `Jasa Konsultansi ${proj.name} - ${term.name}` : prev.namaJkp,
-        nominalDiterima: prev.nominalDiterima === 0 ? netReceived : prev.nominalDiterima,
+        nominalDiterima: netReceived,
       }));
     }
   }
@@ -193,7 +190,7 @@ export function LaporanPendapatanClient({
   function openCreateFakturModal() {
     setEditingFaktur(null);
     setSelectedTerminId("");
-    setIsManualDpp(false);
+    setShowManualDppFallback(false);
     setFormFaktur({
       npwp: "",
       noFaktur: "",
@@ -223,10 +220,10 @@ export function LaporanPendapatanClient({
     const matchedTermin = proj?.termins.find((t) => t.nominal === f.dpp);
     if (matchedTermin) {
       setSelectedTerminId(matchedTermin.id);
-      setIsManualDpp(false);
+      setShowManualDppFallback(false);
     } else {
-      setSelectedTerminId(f.projectId ? "manual" : "");
-      setIsManualDpp(true);
+      setSelectedTerminId("");
+      setShowManualDppFallback(true);
     }
     setFormFaktur({
       npwp: f.npwp,
@@ -1187,8 +1184,14 @@ export function LaporanPendapatanClient({
                       type="button"
                       onClick={() => {
                         setSelectedTerminId("");
-                        setIsManualDpp(false);
-                        setFormFaktur((prev) => ({ ...prev, projectId: "" }));
+                        setShowManualDppFallback(false);
+                        setFormFaktur((prev) => ({
+                          ...prev,
+                          projectId: "",
+                          dpp: 0,
+                          dppNilaiLain: 0,
+                          nominalDiterima: 0,
+                        }));
                       }}
                       className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
                     >
@@ -1202,7 +1205,7 @@ export function LaporanPendapatanClient({
                     const selectedProjId = e.target.value;
                     const p = data.projectOptions.find((x) => x.id === selectedProjId);
                     setSelectedTerminId("");
-                    setIsManualDpp(false);
+                    setShowManualDppFallback(false);
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
@@ -1405,138 +1408,131 @@ export function LaporanPendapatanClient({
                   </div>
                 </div>
 
-                {/* Visual sync badge/notice when a termin is selected */}
+                {/* 1. KASUS TERSEDIA TERMIN: Tampilan Nilai DPP Otomatis (Tanpa Input Box) */}
                 {selectedTermin && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs">
-                    <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
-                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <div>
-                        {isManualDpp ? (
-                          <span>
-                            Mode <strong>Edit Manual</strong> aktif untuk {selectedTermin.name} (Termin asli: {selectedTermin.nominalFmt}).
+                  <div className="space-y-3">
+                    <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/90 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex items-center gap-2 text-emerald-950 font-bold">
+                        <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Nilai DPP Otomatis Tersinkron dari {selectedTermin.name}</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold self-start sm:self-auto">
+                        Otomatis Tanpa Input Manual
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Card DPP Dasar */}
+                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 shadow-xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-navy-text">DPP Dasar (Nilai Termin)</span>
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                            Basis PPh Final ({formFaktur.tarifPphPersen}%)
                           </span>
-                        ) : (
-                          <span>
-                            Nilai DPP tersinkron otomatis dari <strong>{selectedTermin.name}</strong> ({selectedTermin.nominalFmt}).
+                        </div>
+                        <div className="text-xl font-black font-mono text-emerald-800">
+                          {selectedTermin.nominalFmt}
+                        </div>
+                        <span className="text-[11px] text-navy-soft block">
+                          Sesuai termin keluar ({selectedTermin.percentage}% dari nilai kontrak)
+                        </span>
+                      </div>
+
+                      {/* Card DPP Nilai Lain */}
+                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 shadow-xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-navy-text">DPP Nilai Lain</span>
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                            Basis PPN ({formFaktur.tarifPpnPersen}%)
                           </span>
-                        )}
+                        </div>
+                        <div className="text-xl font-black font-mono text-emerald-800">
+                          {selectedTermin.nominalFmt}
+                        </div>
+                        <span className="text-[11px] text-navy-soft block">
+                          Otomatis disamakan dengan DPP Dasar termin
+                        </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!isManualDpp) {
-                          setIsManualDpp(true);
-                        } else {
-                          setIsManualDpp(false);
-                          setFormFaktur((prev) => ({
-                            ...prev,
-                            dpp: selectedTermin.nominal,
-                            dppNilaiLain: selectedTermin.nominal,
-                          }));
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                        isManualDpp
-                          ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs"
-                          : "bg-white hover:bg-slate-50 text-navy-text border-border-soft hover:border-slate-300 shadow-xs"
-                      }`}
-                    >
-                      {isManualDpp ? (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-white" />
-                          <span>Reset ke Nilai Termin</span>
-                        </>
-                      ) : (
-                        <>
-                          <Unlock className="w-3.5 h-3.5 text-navy-soft" />
-                          <span>Buka Kunci (Edit Manual)</span>
-                        </>
-                      )}
-                    </button>
                   </div>
                 )}
 
-                {/* Sub-grid 1: DPP Inputs (2 Columns - Roomy & Clear) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* DPP Dasar */}
-                  <div className={`p-3.5 rounded-xl border space-y-1.5 shadow-xs transition-colors ${
-                    isDppLocked 
-                      ? "bg-slate-50/80 border-slate-200" 
-                      : "bg-surface-card border-border-soft"
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-navy-text flex items-center gap-1">
-                        <span>DPP Dasar (Nilai Termin Keluar)</span>
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        {isDppLocked && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
-                            <Lock className="w-2.5 h-2.5" />
-                            Tersinkron Termin
-                          </span>
-                        )}
-                        <span className="text-[10px] text-navy-soft bg-surface-subtle px-1.5 py-0.5 rounded font-mono font-semibold">
-                          Basis PPh
-                        </span>
+                {/* 2. KASUS BELUM PILIH TERMIN: Informasi untuk memilih termin */}
+                {!selectedTermin && !showManualDppFallback && (
+                  <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 space-y-2">
+                    <div className="flex items-start gap-2.5">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Nilai DPP Tidak Perlu Diinput di Sini</span>
+                        <p className="text-blue-800 text-[11.5px] mt-0.5 leading-relaxed">
+                          Sistem akan mengambil nilai DPP secara otomatis dari termin proyek. Silakan pilih <strong>Kode Proyek</strong> dan <strong>Termin</strong> pada bagian atas formulir. Nilai DPP, PPh, PPN, dan laba setelah pajak akan langsung terisi otomatis.
+                        </p>
                       </div>
                     </div>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                        Rp
-                      </span>
-                      <input
-                        type="number"
-                        required
-                        min={0}
-                        step="any"
-                        placeholder="0"
-                        readOnly={isDppLocked}
-                        value={formFaktur.dpp || ""}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setFormFaktur((prev) => ({
-                            ...prev,
-                            dpp: val,
-                            dppNilaiLain: prev.dppNilaiLain === 0 || prev.dppNilaiLain === prev.dpp ? val : prev.dppNilaiLain,
-                          }));
-                        }}
-                        className={`w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border rounded-xl focus:outline-none ${
-                          isDppLocked
-                            ? "bg-slate-100/70 text-slate-700 border-slate-300 cursor-not-allowed"
-                            : "bg-surface-card border-border-soft text-navy-text focus:ring-2 focus:ring-blue-500"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-navy-soft pt-0.5">
-                      <span>Nilai termin yang ditagihkan</span>
-                      {formFaktur.dpp > 0 && (
-                        <span className="font-bold text-blue-600 font-mono">
-                          {formatRupiah(formFaktur.dpp)}
-                        </span>
-                      )}
+                    <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px]">
+                      <span className="text-blue-700">Tidak ada data termin atau bukan faktur berbasis proyek?</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowManualDppFallback(true)}
+                        className="font-semibold text-blue-700 hover:text-blue-900 underline cursor-pointer"
+                      >
+                        Buka Opsi Input Manual
+                      </button>
                     </div>
                   </div>
+                )}
 
-                  {/* DPP Nilai Lain */}
-                  <div className={`p-3.5 rounded-xl border space-y-1.5 shadow-xs transition-colors ${
-                    isDppLocked 
-                      ? "bg-slate-50/80 border-slate-200" 
-                      : "bg-surface-card border-border-soft"
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-navy-text flex items-center gap-1">
-                        <span>DPP Nilai Lain (Basis PPN)</span>
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        {isDppLocked ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
-                            <Lock className="w-2.5 h-2.5" />
-                            Tersinkron Termin
+                {/* 3. KASUS FALLBACK INPUT MANUAL (Hanya jika belum pilih termin & klik opsi manual) */}
+                {!selectedTermin && showManualDppFallback && (
+                  <div className="p-3.5 rounded-xl bg-surface-card border border-amber-200 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-amber-600" />
+                        Mode Input DPP Manual (Khusus Non-Termin)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowManualDppFallback(false)}
+                        className="text-[10px] text-amber-700 hover:text-amber-900 underline cursor-pointer"
+                      >
+                        Tutup Input Manual
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* DPP Dasar Input */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-navy-text">
+                          DPP Dasar (Manual) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
+                            Rp
                           </span>
-                        ) : (
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder="0"
+                            value={formFaktur.dpp || ""}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setFormFaktur((prev) => ({
+                                ...prev,
+                                dpp: val,
+                                dppNilaiLain: prev.dppNilaiLain === 0 || prev.dppNilaiLain === prev.dpp ? val : prev.dppNilaiLain,
+                              }));
+                            }}
+                            className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* DPP Nilai Lain Input */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-navy-text">
+                            DPP Nilai Lain (Manual) <span className="text-rose-500">*</span>
+                          </label>
                           <button
                             type="button"
                             onClick={() =>
@@ -1545,49 +1541,34 @@ export function LaporanPendapatanClient({
                                 dppNilaiLain: prev.dpp,
                               }))
                             }
-                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
-                            title="Klik untuk menyamakan DPP Nilai Lain dengan DPP Dasar"
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 cursor-pointer"
                           >
-                            ⚡ Samakan = DPP Dasar
+                            ⚡ Samakan
                           </button>
-                        )}
+                        </div>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
+                            Rp
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder="0"
+                            value={formFaktur.dppNilaiLain || ""}
+                            onChange={(e) =>
+                              setFormFaktur({
+                                ...formFaktur,
+                                dppNilaiLain: Number(e.target.value),
+                              })
+                            }
+                            className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                        Rp
-                      </span>
-                      <input
-                        type="number"
-                        required
-                        min={0}
-                        step="any"
-                        placeholder="0"
-                        readOnly={isDppLocked}
-                        value={formFaktur.dppNilaiLain || ""}
-                        onChange={(e) =>
-                          setFormFaktur({
-                            ...formFaktur,
-                            dppNilaiLain: Number(e.target.value),
-                          })
-                        }
-                        className={`w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border rounded-xl focus:outline-none ${
-                          isDppLocked
-                            ? "bg-slate-100/70 text-slate-700 border-slate-300 cursor-not-allowed"
-                            : "bg-surface-card border-border-soft text-navy-text focus:ring-2 focus:ring-blue-500"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-navy-soft pt-0.5">
-                      <span>Dasar pengenaan faktur PPN</span>
-                      {formFaktur.dppNilaiLain > 0 && (
-                        <span className="font-bold text-blue-600 font-mono">
-                          {formatRupiah(formFaktur.dppNilaiLain)}
-                        </span>
-                      )}
-                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Sub-grid 2: Tarif Pajak (2 Columns - No truncation!) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

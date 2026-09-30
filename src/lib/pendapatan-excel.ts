@@ -19,6 +19,7 @@ export async function generateLaporanPendapatanExcel(
 
   wsFaktur.columns = [
     { key: "no", width: 6 },
+    { key: "kodeProyek", width: 16 },
     { key: "noFaktur", width: 22 },
     { key: "npwp", width: 22 },
     { key: "namaRekanan", width: 30 },
@@ -55,6 +56,7 @@ export async function generateLaporanPendapatanExcel(
   // Header
   const headerFaktur = wsFaktur.addRow([
     "NO",
+    "KODE PROYEK",
     "NO. FAKTUR",
     "NPWP",
     "NAMA REKANAN",
@@ -87,6 +89,7 @@ export async function generateLaporanPendapatanExcel(
   data.fakturList.forEach((f, idx) => {
     const row = wsFaktur.addRow([
       idx + 1,
+      f.projectCode || "-",
       f.noFaktur,
       f.npwp,
       f.namaRekanan,
@@ -110,15 +113,16 @@ export async function generateLaporanPendapatanExcel(
 
     row.height = 20;
     row.getCell(1).alignment = { vertical: "middle", horizontal: "center" };
-    row.getCell(6).alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell(2).alignment = { vertical: "middle", horizontal: "center" };
     row.getCell(7).alignment = { vertical: "middle", horizontal: "center" };
     row.getCell(8).alignment = { vertical: "middle", horizontal: "center" };
-    row.getCell(11).alignment = { vertical: "middle", horizontal: "center" };
-    row.getCell(13).alignment = { vertical: "middle", horizontal: "center" };
-    row.getCell(18).alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell(9).alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell(12).alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell(14).alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell(19).alignment = { vertical: "middle", horizontal: "center" };
 
-    // Currency columns: 9, 10, 12, 14, 15, 16, 17, 19, 20
-    [9, 10, 12, 14, 15, 16, 17, 19, 20].forEach((colIdx) => {
+    // Currency columns: 10, 11, 13, 15, 16, 17, 18, 20, 21
+    [10, 11, 13, 15, 16, 17, 18, 20, 21].forEach((colIdx) => {
       const c = row.getCell(colIdx);
       c.numFmt = accountingFmt;
       c.alignment = { vertical: "middle", horizontal: "right" };
@@ -143,6 +147,7 @@ export async function generateLaporanPendapatanExcel(
     "",
     "",
     "",
+    "",
     data.totalPeriod.dpp,
     data.totalPeriod.dppNilaiLain,
     "",
@@ -160,7 +165,7 @@ export async function generateLaporanPendapatanExcel(
   totRow.eachCell((cell, colIdx) => {
     cell.font = { bold: true, size: 10, color: { argb: "FF0F172A" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
-    if ([9, 10, 12, 14, 15, 16, 17, 19, 20].includes(colIdx)) {
+    if ([10, 11, 13, 15, 16, 17, 18, 20, 21].includes(colIdx)) {
       cell.numFmt = accountingFmt;
       cell.alignment = { vertical: "middle", horizontal: "right" };
     } else {

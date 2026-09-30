@@ -26,6 +26,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Building,
+  Lock,
+  Unlock,
+  Sparkles,
 } from "lucide-react";
 import type {
   LaporanPendapatanData,
@@ -94,6 +97,10 @@ export function LaporanPendapatanClient({
     projectId: "",
   });
 
+  // Termin selection state for auto-syncing DPP
+  const [selectedTerminId, setSelectedTerminId] = useState<string>("");
+  const [isManualDpp, setIsManualDpp] = useState(false);
+
   // Form state for Rekonsiliasi
   const [formRecon, setFormRecon] = useState({
     month: 1,
@@ -131,6 +138,34 @@ export function LaporanPendapatanClient({
     formFaktur.tarifPphPersen
   );
 
+  // Selected project & termin helpers for auto-syncing DPP
+  const selectedProject = data.projectOptions.find((p) => p.id === formFaktur.projectId);
+  const selectedTermin = selectedProject?.termins.find((t) => t.id === selectedTerminId);
+  const isDppLocked = Boolean(selectedTermin && !isManualDpp);
+
+  function handleSelectTermin(terminId: string) {
+    setSelectedTerminId(terminId);
+    if (!terminId || terminId === "manual") {
+      setIsManualDpp(true);
+      return;
+    }
+    const proj = data.projectOptions.find((x) => x.id === formFaktur.projectId);
+    const term = proj?.termins.find((t) => t.id === terminId);
+    if (term) {
+      setIsManualDpp(false);
+      const nominal = term.nominal;
+      const pphNominal = Math.round((nominal * formFaktur.tarifPphPersen) / 100);
+      const netReceived = nominal - pphNominal;
+      setFormFaktur((prev) => ({
+        ...prev,
+        dpp: nominal,
+        dppNilaiLain: nominal,
+        namaJkp: proj ? `Jasa Konsultansi ${proj.name} - ${term.name}` : prev.namaJkp,
+        nominalDiterima: prev.nominalDiterima === 0 ? netReceived : prev.nominalDiterima,
+      }));
+    }
+  }
+
   // Navigation handlers
   function handleFilterChange(newEntity?: string, newYear?: number, newMasa?: number | null) {
     const currentYear = newYear !== undefined ? newYear : data.year;
@@ -157,6 +192,8 @@ export function LaporanPendapatanClient({
 
   function openCreateFakturModal() {
     setEditingFaktur(null);
+    setSelectedTerminId("");
+    setIsManualDpp(false);
     setFormFaktur({
       npwp: "",
       noFaktur: "",
@@ -182,6 +219,15 @@ export function LaporanPendapatanClient({
 
   function openEditFakturModal(f: FakturPendapatanItem) {
     setEditingFaktur(f);
+    const proj = data.projectOptions.find((p) => p.id === f.projectId);
+    const matchedTermin = proj?.termins.find((t) => t.nominal === f.dpp);
+    if (matchedTermin) {
+      setSelectedTerminId(matchedTermin.id);
+      setIsManualDpp(false);
+    } else {
+      setSelectedTerminId(f.projectId ? "manual" : "");
+      setIsManualDpp(true);
+    }
     setFormFaktur({
       npwp: f.npwp,
       noFaktur: f.noFaktur,
@@ -1139,8 +1185,12 @@ export function LaporanPendapatanClient({
                   {formFaktur.projectId && (
                     <button
                       type="button"
-                      onClick={() => setFormFaktur({ ...formFaktur, projectId: "" })}
-                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-800"
+                      onClick={() => {
+                        setSelectedTerminId("");
+                        setIsManualDpp(false);
+                        setFormFaktur((prev) => ({ ...prev, projectId: "" }));
+                      }}
+                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
                     >
                       Batal Pilih Proyek
                     </button>
@@ -1151,6 +1201,8 @@ export function LaporanPendapatanClient({
                   onChange={(e) => {
                     const selectedProjId = e.target.value;
                     const p = data.projectOptions.find((x) => x.id === selectedProjId);
+                    setSelectedTerminId("");
+                    setIsManualDpp(false);
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
@@ -1158,7 +1210,7 @@ export function LaporanPendapatanClient({
                       namaJkp: prev.namaJkp || (p ? `Jasa Konsultansi ${p.name}` : ""),
                     }));
                   }}
-                  className="w-full px-3 py-2 text-xs border border-blue-300 rounded-xl bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full px-3 py-2 text-xs border border-blue-300 rounded-xl bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                 >
                   <option value="">-- Pilih Kode Proyek yang Sesuai --</option>
                   {data.projectOptions.map((p) => (
@@ -1171,13 +1223,67 @@ export function LaporanPendapatanClient({
                   (() => {
                     const sel = data.projectOptions.find((x) => x.id === formFaktur.projectId);
                     return sel ? (
-                      <div className="text-[11px] text-blue-800 bg-white p-2.5 rounded-lg border border-blue-100 flex flex-wrap items-center justify-between gap-2">
-                        <span>
-                          Kode Proyek: <strong className="font-mono">{sel.code}</strong> • {sel.name}
-                        </span>
-                        <span className="font-semibold text-navy-text">
-                          Nilai Kontrak: {sel.contractValueFmt}
-                        </span>
+                      <div className="space-y-2.5 pt-1">
+                        <div className="text-[11px] text-blue-800 bg-white p-2.5 rounded-lg border border-blue-100 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                          <span>
+                            Kode Proyek: <strong className="font-mono">{sel.code}</strong> • {sel.name}
+                          </span>
+                          <span className="font-semibold text-navy-text">
+                            Nilai Kontrak: {sel.contractValueFmt}
+                          </span>
+                        </div>
+
+                        {/* Dropdown Termin untuk Sinkronisasi DPP */}
+                        {sel.termins && sel.termins.length > 0 ? (
+                          <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/90 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Pilih Termin Proyek (Sumber Otomatis Nilai DPP)</span>
+                              </label>
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                                {sel.termins.length} Termin Terdaftar
+                              </span>
+                            </div>
+                            <select
+                              value={selectedTerminId}
+                              onChange={(e) => handleSelectTermin(e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold cursor-pointer"
+                            >
+                              <option value="">-- Pilih Termin yang Ditagihkan --</option>
+                              {sel.termins.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name} ({t.percentage}% Kontrak) — {t.nominalFmt}
+                                </option>
+                              ))}
+                              <option value="manual">✍️ Input Nilai DPP Manual (Tanpa Termin)</option>
+                            </select>
+                            {selectedTermin ? (
+                              <div className="text-[11px] text-emerald-900 bg-white/90 p-2 rounded-lg border border-emerald-100 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                                <span>
+                                  ⚡ Nilai Termin: <strong className="font-mono">{selectedTermin.nominalFmt}</strong> ({selectedTermin.percentage}% dari nilai kontrak)
+                                </span>
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                  DPP otomatis tersinkron
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-emerald-800">
+                                Pilih termin yang sedang ditagihkan agar nilai DPP & DPP Nilai Lain langsung terisi otomatis sesuai termin di Finance.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-800 flex items-start gap-2.5">
+                            <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">Belum ada termin pembayaran tercatat di Finance untuk proyek ini.</span>
+                              <p className="text-amber-700 text-[11px] mt-0.5">
+                                Proyek telah didaftarkan Sidamon. Anda dapat menginput nilai DPP secara manual pada bagian perhitungan pajak di bawah.
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : null;
                   })()
@@ -1299,18 +1405,82 @@ export function LaporanPendapatanClient({
                   </div>
                 </div>
 
+                {/* Visual sync badge/notice when a termin is selected */}
+                {selectedTermin && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div>
+                        {isManualDpp ? (
+                          <span>
+                            Mode <strong>Edit Manual</strong> aktif untuk {selectedTermin.name} (Termin asli: {selectedTermin.nominalFmt}).
+                          </span>
+                        ) : (
+                          <span>
+                            Nilai DPP tersinkron otomatis dari <strong>{selectedTermin.name}</strong> ({selectedTermin.nominalFmt}).
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isManualDpp) {
+                          setIsManualDpp(true);
+                        } else {
+                          setIsManualDpp(false);
+                          setFormFaktur((prev) => ({
+                            ...prev,
+                            dpp: selectedTermin.nominal,
+                            dppNilaiLain: selectedTermin.nominal,
+                          }));
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isManualDpp
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs"
+                          : "bg-white hover:bg-slate-50 text-navy-text border-border-soft hover:border-slate-300 shadow-xs"
+                      }`}
+                    >
+                      {isManualDpp ? (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-white" />
+                          <span>Reset ke Nilai Termin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="w-3.5 h-3.5 text-navy-soft" />
+                          <span>Buka Kunci (Edit Manual)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 {/* Sub-grid 1: DPP Inputs (2 Columns - Roomy & Clear) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* DPP Dasar */}
-                  <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft space-y-1.5 shadow-xs">
+                  <div className={`p-3.5 rounded-xl border space-y-1.5 shadow-xs transition-colors ${
+                    isDppLocked 
+                      ? "bg-slate-50/80 border-slate-200" 
+                      : "bg-surface-card border-border-soft"
+                  }`}>
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-navy-text flex items-center gap-1">
                         <span>DPP Dasar (Nilai Termin Keluar)</span>
                         <span className="text-rose-500">*</span>
                       </label>
-                      <span className="text-[10px] text-navy-soft bg-surface-subtle px-1.5 py-0.5 rounded font-mono font-semibold">
-                        Basis PPh
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {isDppLocked && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
+                            <Lock className="w-2.5 h-2.5" />
+                            Tersinkron Termin
+                          </span>
+                        )}
+                        <span className="text-[10px] text-navy-soft bg-surface-subtle px-1.5 py-0.5 rounded font-mono font-semibold">
+                          Basis PPh
+                        </span>
+                      </div>
                     </div>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
@@ -1322,6 +1492,7 @@ export function LaporanPendapatanClient({
                         min={0}
                         step="any"
                         placeholder="0"
+                        readOnly={isDppLocked}
                         value={formFaktur.dpp || ""}
                         onChange={(e) => {
                           const val = Number(e.target.value);
@@ -1331,7 +1502,11 @@ export function LaporanPendapatanClient({
                             dppNilaiLain: prev.dppNilaiLain === 0 || prev.dppNilaiLain === prev.dpp ? val : prev.dppNilaiLain,
                           }));
                         }}
-                        className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border rounded-xl focus:outline-none ${
+                          isDppLocked
+                            ? "bg-slate-100/70 text-slate-700 border-slate-300 cursor-not-allowed"
+                            : "bg-surface-card border-border-soft text-navy-text focus:ring-2 focus:ring-blue-500"
+                        }`}
                       />
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-navy-soft pt-0.5">
@@ -1345,25 +1520,38 @@ export function LaporanPendapatanClient({
                   </div>
 
                   {/* DPP Nilai Lain */}
-                  <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft space-y-1.5 shadow-xs">
+                  <div className={`p-3.5 rounded-xl border space-y-1.5 shadow-xs transition-colors ${
+                    isDppLocked 
+                      ? "bg-slate-50/80 border-slate-200" 
+                      : "bg-surface-card border-border-soft"
+                  }`}>
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-navy-text flex items-center gap-1">
                         <span>DPP Nilai Lain (Basis PPN)</span>
                         <span className="text-rose-500">*</span>
                       </label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormFaktur((prev) => ({
-                            ...prev,
-                            dppNilaiLain: prev.dpp,
-                          }))
-                        }
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
-                        title="Klik untuk menyamakan DPP Nilai Lain dengan DPP Dasar"
-                      >
-                        ⚡ Samakan = DPP Dasar
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {isDppLocked ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
+                            <Lock className="w-2.5 h-2.5" />
+                            Tersinkron Termin
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormFaktur((prev) => ({
+                                ...prev,
+                                dppNilaiLain: prev.dpp,
+                              }))
+                            }
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+                            title="Klik untuk menyamakan DPP Nilai Lain dengan DPP Dasar"
+                          >
+                            ⚡ Samakan = DPP Dasar
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
@@ -1375,6 +1563,7 @@ export function LaporanPendapatanClient({
                         min={0}
                         step="any"
                         placeholder="0"
+                        readOnly={isDppLocked}
                         value={formFaktur.dppNilaiLain || ""}
                         onChange={(e) =>
                           setFormFaktur({
@@ -1382,7 +1571,11 @@ export function LaporanPendapatanClient({
                             dppNilaiLain: Number(e.target.value),
                           })
                         }
-                        className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border rounded-xl focus:outline-none ${
+                          isDppLocked
+                            ? "bg-slate-100/70 text-slate-700 border-slate-300 cursor-not-allowed"
+                            : "bg-surface-card border-border-soft text-navy-text focus:ring-2 focus:ring-blue-500"
+                        }`}
                       />
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-navy-soft pt-0.5">

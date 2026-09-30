@@ -137,6 +137,10 @@ export function LaporanPendapatanClient({
     const currentEntity = newEntity !== undefined ? newEntity : data.entity.key;
     const currentMasa = newMasa !== undefined ? newMasa : data.masaPajak;
 
+    if (newEntity) {
+      document.cookie = `lastEntityKey=${newEntity}; path=/; max-age=2592000`;
+    }
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("entity", currentEntity);
     params.set("year", currentYear.toString());

@@ -198,6 +198,20 @@ async function main() {
     });
   }
 
+  // ── Tarif Pajak ───────────────────────────────────────────────────
+  const defaultTarif = [
+    { nama: "PPN 11%", jenis: "PPN", tarifPersen: 11.0, tanggalMulai: new Date("2022-04-01"), active: true },
+    { nama: "PPN 12%", jenis: "PPN", tarifPersen: 12.0, tanggalMulai: new Date("2025-01-01"), active: true },
+    { nama: "PPh Final 3.5%", jenis: "PPH", tarifPersen: 3.5, tanggalMulai: new Date("2022-01-01"), active: true },
+    { nama: "PPh Final 2.65%", jenis: "PPH", tarifPersen: 2.65, tanggalMulai: new Date("2022-01-01"), active: true },
+  ];
+  for (const t of defaultTarif) {
+    const existing = await prisma.tarifPajak.findFirst({ where: { nama: t.nama } });
+    if (!existing) {
+      await prisma.tarifPajak.create({ data: t });
+    }
+  }
+
   console.log("✅ Seed selesai. Entitas, user, jenis input, dan COA sudah siap.");
   console.log("   " + coaMaster.length + " akun COA (dipakai bareng di Kas & Bank)");
   console.log("");

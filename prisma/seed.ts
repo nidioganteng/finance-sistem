@@ -247,6 +247,34 @@ async function main() {
     });
   }
 
+  // Seed contoh termin untuk pengujian kontrol piutang & sinkronisasi faktur pendapatan
+  const sampleTermins = [
+    { projectCode: "GHR-001", name: "Termin 1 (Uang Muka 20%)", percentage: 20 },
+    { projectCode: "GHR-001", name: "Termin 2 (Progres Fisik 50%)", percentage: 50 },
+    { projectCode: "GHR-002", name: "Termin 1 (Uang Muka 30%)", percentage: 30 },
+    { projectCode: "TB-001", name: "Termin 1 (Uang Muka 30%)", percentage: 30 },
+    { projectCode: "TB-001", name: "Termin 2 (Pelunasan 100%)", percentage: 100 },
+    { projectCode: "KAK-001", name: "Termin 1 (Uang Muka 25%)", percentage: 25 },
+  ];
+  for (const t of sampleTermins) {
+    const proj = await prisma.project.findUnique({ where: { code: t.projectCode } });
+    if (proj) {
+      const existing = await prisma.termin.findFirst({
+        where: { projectId: proj.id, name: t.name },
+      });
+      if (!existing) {
+        await prisma.termin.create({
+          data: {
+            projectId: proj.id,
+            name: t.name,
+            percentage: t.percentage,
+            status: "ON_TRACK",
+          },
+        });
+      }
+    }
+  }
+
   console.log("✅ Seed selesai. Entitas, user, jenis input, dan COA sudah siap.");
   console.log("   " + coaMaster.length + " akun COA (dipakai bareng di Kas & Bank)");
   console.log("");

@@ -329,117 +329,79 @@ export function LaporanPendapatanClient({
   return (
     <div className="space-y-6">
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* HEADER SECTION */}
+      {/* TOOLBAR: FILTERS & ACTIONS */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-surface-card p-6 rounded-2xl border border-border-soft shadow-sm">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
-              <Receipt className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-navy-text tracking-tight">
-                Laporan Pendapatan
-              </h1>
-              <p className="text-sm text-navy-soft">
-                Rekap E-Faktur, Realisasi Kas Bank, dan Audit Rekonsiliasi Pajak
-              </p>
-            </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between bg-surface-card p-4 rounded-2xl border border-border-soft shadow-xs">
+        {/* Left: Filter Controls & Audit Badge */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-navy-soft">Tahun:</span>
+            <select
+              value={data.year}
+              onChange={(e) => handleFilterChange(undefined, Number(e.target.value))}
+              className="px-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold cursor-pointer"
+            >
+              {[2024, 2025, 2026, 2027].map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              {data.entity.legalName}
-            </span>
-            <span className="px-3 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-              Tahun Pajak {data.year}
-            </span>
-            {data.masaPajak ? (
-              <span className="px-3 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                Masa Pajak: {NAMA_BULAN[data.masaPajak - 1]}
-              </span>
-            ) : (
-              <span className="px-3 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Semua Masa (12 Bulan)
-              </span>
-            )}
-            {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
-              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Audit SPT Sesuai (100%)
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih SPT
-              </span>
-            )}
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-navy-soft">Masa Pajak:</span>
+            <select
+              value={data.masaPajak ?? ""}
+              onChange={(e) =>
+                handleFilterChange(
+                  undefined,
+                  undefined,
+                  e.target.value ? Number(e.target.value) : null
+                )
+              }
+              className="px-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold cursor-pointer"
+            >
+              <option value="">Semua Masa (Tahunan)</option>
+              {NAMA_BULAN.map((m, idx) => (
+                <option key={idx + 1} value={idx + 1}>
+                  Bulan {idx + 1} - {m}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <div className="h-4 w-px bg-border-soft hidden sm:block" />
+
+          {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              Audit SPT Sesuai (100%)
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+              {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih SPT
+            </span>
+          )}
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Entity Filter */}
-          <select
-            value={data.entity.key}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-          >
-            {availableEntities.map((ent) => (
-              <option key={ent.key} value={ent.key}>
-                {ent.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Year Filter */}
-          <select
-            value={data.year}
-            onChange={(e) => handleFilterChange(undefined, Number(e.target.value))}
-            className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-          >
-            {[2024, 2025, 2026, 2027].map((yr) => (
-              <option key={yr} value={yr}>
-                {yr}
-              </option>
-            ))}
-          </select>
-
-          {/* Masa Pajak Filter */}
-          <select
-            value={data.masaPajak ?? ""}
-            onChange={(e) =>
-              handleFilterChange(
-                undefined,
-                undefined,
-                e.target.value ? Number(e.target.value) : null
-              )
-            }
-            className="px-3 py-2 text-sm bg-surface-card border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-          >
-            <option value="">Semua Masa (Tahunan)</option>
-            {NAMA_BULAN.map((m, idx) => (
-              <option key={idx + 1} value={idx + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-
-          {/* Export Excel */}
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2.5">
           <a
             href={exportUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-xs"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
             <span>Ekspor Excel</span>
           </a>
 
-          {/* Add Faktur Button */}
           {canEdit && (
             <button
               onClick={openCreateFakturModal}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Input E-Faktur</span>
@@ -1122,11 +1084,12 @@ export function LaporanPendapatanClient({
       {/* MODAL: INPUT / EDIT FAKTUR PENDAPATAN */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {isFakturModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-xl w-full max-w-3xl overflow-hidden my-8">
-            <div className="flex items-center justify-between p-5 border-b border-border-soft bg-slate-50">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header (Fixed at top) */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
                   <Receipt className="w-5 h-5" />
                 </div>
                 <div>
@@ -1139,14 +1102,17 @@ export function LaporanPendapatanClient({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsFakturModalOpen(false)}
-                className="p-1.5 text-navy-soft hover:text-navy-text rounded-lg"
+                className="p-1.5 text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-lg transition-colors cursor-pointer"
+                aria-label="Tutup Modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveFaktur} className="p-6 space-y-5">
+            <form onSubmit={handleSaveFaktur} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-6 space-y-5 overflow-y-auto flex-1">
               {errorMessage && (
                 <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -1573,20 +1539,22 @@ export function LaporanPendapatanClient({
                 </div>
               </div>
 
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border-soft">
+              </div>
+
+              {/* Modal Footer (Fixed at bottom) */}
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border-soft bg-surface-subtle/30 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsFakturModalOpen(false)}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text rounded-xl border border-border-soft"
+                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-xl border border-border-soft transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting ? "Menyimpan..." : "Simpan Faktur"}
                 </button>
@@ -1600,11 +1568,12 @@ export function LaporanPendapatanClient({
       {/* MODAL: EDIT REKONSILIASI SPT */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {isReconModalOpen && editingRecon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-border-soft bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle/50 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
+                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
                   <Scale className="w-5 h-5" />
                 </div>
                 <div>
@@ -1617,14 +1586,17 @@ export function LaporanPendapatanClient({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsReconModalOpen(false)}
-                className="p-1.5 text-navy-soft hover:text-navy-text rounded-lg"
+                className="p-1.5 text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-lg transition-colors cursor-pointer"
+                aria-label="Tutup Modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveRecon} className="p-6 space-y-4">
+            <form onSubmit={handleSaveRecon} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
               {errorMessage && (
                 <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -1737,19 +1709,22 @@ export function LaporanPendapatanClient({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border-soft">
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border-soft bg-surface-subtle/30 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsReconModalOpen(false)}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text rounded-xl border border-border-soft"
+                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-xl border border-border-soft transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting ? "Menyimpan..." : "Simpan SPT"}
                 </button>
@@ -1763,8 +1738,8 @@ export function LaporanPendapatanClient({
       {/* MODAL: DELETE CONFIRMATION */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {isDeleteModalOpen && deletingFaktur && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-rose-600">
               <div className="p-2.5 rounded-full bg-rose-100">
                 <Trash2 className="w-5 h-5" />
@@ -1789,7 +1764,7 @@ export function LaporanPendapatanClient({
                 type="button"
                 onClick={() => setIsDeleteModalOpen(false)}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text rounded-xl border border-border-soft"
+                className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-xl border border-border-soft transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -1797,7 +1772,7 @@ export function LaporanPendapatanClient({
                 type="button"
                 onClick={handleDeleteFaktur}
                 disabled={isSubmitting}
-                className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? "Menghapus..." : "Ya, Hapus Faktur"}
               </button>

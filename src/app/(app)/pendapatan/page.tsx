@@ -2,9 +2,10 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
-import { resolveReportEntityKey } from "@/lib/entity-prefs";
+import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canManageTransaksi } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { getLaporanPendapatanData } from "@/lib/pendapatan";
 import { LaporanPendapatanClient } from "@/components/pendapatan/LaporanPendapatanClient";
@@ -33,7 +34,7 @@ export default async function LaporanPendapatanPage({
   }
 
   const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveReportEntityKey(searchParams.entity, entityKeys, false);
+  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey) ?? entities[0];
 
   if (!selectedEntity) {
@@ -61,8 +62,15 @@ export default async function LaporanPendapatanPage({
   return (
     <PageTransition>
       <PageHeader
-        title="Laporan Pendapatan (Rekap E-Faktur)"
-        subtitle={`Rekapitulasi Faktur Pajak Penjualan, Realisasi Kas Bank, dan Audit SPT — ${selectedEntity.name} (${currentYear})`}
+        title={`Laporan Pendapatan – ${selectedEntity.name}`}
+        subtitle={`Rekapitulasi Faktur Pajak Penjualan, Realisasi Kas Bank, dan Audit SPT — ${selectedEntity.legalName ?? selectedEntity.name} (${currentYear})`}
+        rightSlot={
+          <EntitySwitcher
+            entities={entities.map((e) => ({ key: e.key, name: e.name }))}
+            showGrupOption={false}
+            currentEntityKey={selectedEntity.key}
+          />
+        }
       />
       <div className="mt-6">
         <LaporanPendapatanClient

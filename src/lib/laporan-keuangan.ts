@@ -492,10 +492,34 @@ export async function getLaporanJurnalData(
   const totalKredit = rows.reduce((s, r) => s + Number(r.kredit), 0);
   const isBalanced = Math.round(totalDebit * 100) === Math.round(totalKredit * 100);
 
+  const ENTITY_LABEL_MAP: Record<string, string> = {
+    kencana: "Kencana",
+    gaharu: "Gaharu",
+    tataring: "Tataring",
+    ciptaAsri: "Cipta Asri",
+    umum: "Umum",
+  };
+
   const formattedRows: LaporanJurnalRow[] = rows.map((r) => {
-    const style = SUMBER_STYLE[r.jenisInput.key] ?? { bg: "#ede9fe", color: "#6d28d9", label: r.jenisInput.nama };
+    let style = SUMBER_STYLE[r.jenisInput.key] ?? { bg: "#ede9fe", color: "#6d28d9", label: r.jenisInput.nama };
     const extra = r.extraFieldsJson as Record<string, unknown> | null;
-    const isKasEntry = extra?.isKasEntry === true;
+    const isCrossing = extra?.isCrossingEntry === true;
+    const isKasEntry = extra?.isKasEntry === true && !isCrossing;
+
+    if (isCrossing) {
+      const fromEntityKey = typeof extra?.crossingFromEntityKey === "string" ? extra.crossingFromEntityKey : "";
+      const fromEntityName = ENTITY_LABEL_MAP[fromEntityKey] ?? fromEntityKey;
+      const fromJenisKey =
+        (typeof extra?.crossingFromJenisInputKey === "string" ? extra.crossingFromJenisInputKey : "") ||
+        (typeof extra?.crossingFromRekeningNama === "string" || typeof extra?.rekeningNama === "string" ? "bankBuku" : "kasKecil");
+      const baseStyle = SUMBER_STYLE[fromJenisKey] ?? SUMBER_STYLE.kasKecil;
+      const rekSuffix = typeof extra?.crossingFromRekeningNama === "string" ? ` (${extra.crossingFromRekeningNama})` : "";
+      style = {
+        bg: baseStyle.bg,
+        color: baseStyle.color,
+        label: fromEntityName ? `${baseStyle.label} ${fromEntityName}${rekSuffix}` : baseStyle.label,
+      };
+    }
 
     let kodeAkun = r.coaAccount?.code ?? "—";
     let namaAkun = r.coaAccount?.name ?? "—";

@@ -112,7 +112,10 @@ export async function getKasLedger(
       jenisInputId,
       ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
     },
-    include: { coaAccount: true },
+    include: {
+      coaAccount: true,
+      project: { select: { id: true, code: true, name: true } },
+    },
     orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "desc" }],
     take: 2000,
   });
@@ -135,6 +138,7 @@ export async function getKasLedger(
       hasKasEntry: boolean;
       allTxIds: string[];
       coaRows: { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string }[];
+      project?: { id: string; code: string; name: string } | null;
     }
   >();
 
@@ -154,10 +158,14 @@ export async function getKasLedger(
         hasKasEntry: false,
         allTxIds: [],
         coaRows: [],
+        project: r.project ?? null,
       });
     }
     const g = groups.get(key)!;
     g.allTxIds.push(r.id);
+    if (r.project && !g.project) {
+      g.project = r.project;
+    }
 
     const extra = r.extraFieldsJson as Record<string, unknown> | null;
     const isKasEntry = extra?.isKasEntry === true;
@@ -224,6 +232,7 @@ export async function getKasLedger(
       saldoFmt: formatRupiah(g.saldo),
       allTxIds: g.allTxIds,
       coaRows: g.coaRows,
+      project: g.project ?? null,
     })),
   };
 }

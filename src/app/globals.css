@@ -87,3 +87,24 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/*
+ * Custom select styling across all features:
+ * - appearance: none removes the browser's default misaligned native arrow that clips against rounded corners.
+ * - background-image draws a crisp, clean SVG chevron placed comfortably inside the rounded border.
+ * - padding-right ensures text never runs into the chevron or overflows the box.
+ */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.15em 1.15em;
+  padding-right: 2.25rem !important;
+}
+
+:root.dark select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}

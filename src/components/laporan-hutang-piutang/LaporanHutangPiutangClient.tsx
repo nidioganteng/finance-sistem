@@ -21,6 +21,7 @@ import {
   Layers,
   Info,
   Wallet,
+  ArrowRightLeft,
 } from "lucide-react";
 import type {
   LaporanHutangPiutangEntityData,
@@ -1168,34 +1169,36 @@ export function LaporanHutangPiutangClient({
               {/* Modal Body */}
               <div className="p-6 overflow-y-auto flex flex-col gap-4 text-sm">
                 {/* ── Banner Alur Transaksi untuk Finance ── */}
-                <div className="p-4.5 rounded-2xl bg-brand/5 border border-brand/20 flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-brand font-extrabold text-[11px] uppercase tracking-wider">
-                    <Info size={14} />
-                    <span>Alur &amp; Penjelasan Transaksi (Finance Narrative)</span>
+                <div className="p-4 rounded-2xl bg-brand/5 border border-brand/20 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 text-brand font-bold text-[11.5px] uppercase tracking-wider">
+                    <Info size={14} className="flex-none" />
+                    <span>Alur &amp; Penjelasan Transaksi</span>
                   </div>
-                  <p className="text-[14px] font-bold text-navy-text leading-relaxed">
+                  <p className="text-[13.5px] font-bold text-navy-text leading-relaxed break-words">
                     {selectedTxDetail.narasiAlur || selectedTxDetail.keterangan}
                   </p>
                   {selectedTxDetail.sumberPengeluaran && (
-                    <div className="flex flex-wrap items-center gap-3 pt-2 text-[11.5px] text-muted border-t border-brand/10">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Wallet size={13} className="text-emerald-600 dark:text-emerald-400" />
-                        <span>Uang berasal dari:</span>
-                        <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.coaName}</strong>
-                        <span className="font-mono text-[10.5px] font-bold">(Akun {selectedTxDetail.sumberPengeluaran.coaCode})</span>
+                    <div className="flex flex-wrap items-center gap-2.5 pt-2.5 text-[11.5px] text-muted-stronger border-t border-brand/15">
+                      <span className="flex items-center gap-1.5 font-medium flex-wrap">
+                        <Wallet size={13} className="text-emerald-600 dark:text-emerald-400 flex-none" />
+                        <span className="text-muted-faint">Uang berasal dari:</span>
+                        <strong className="text-navy-text font-bold break-words">{selectedTxDetail.sumberPengeluaran.coaName}</strong>
+                        <span className="font-mono text-[10.5px] font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                          Akun {selectedTxDetail.sumberPengeluaran.coaCode}
+                        </span>
                       </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Building2 size={13} className="text-brand" />
-                        <span>Entitas sumber dana:</span>
-                        <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
+                      <span className="text-muted-faint hidden sm:inline">•</span>
+                      <span className="flex items-center gap-1.5 font-medium flex-wrap">
+                        <Building2 size={13} className="text-brand flex-none" />
+                        <span className="text-muted-faint">Entitas sumber dana:</span>
+                        <strong className="text-navy-text font-bold break-words">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
                       </span>
                     </div>
                   )}
                 </div>
 
                 {/* Ringkasan Aliran Dana */}
-                <div className="p-4 rounded-xl bg-surface-subtle/50 border border-border-soft flex flex-col gap-2.5">
+                <div className="p-4 rounded-xl bg-surface-subtle/50 border border-border-soft flex flex-col gap-3">
                   <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint">
                     Aliran Transaksi Antar-Perusahaan
                   </div>
@@ -1206,7 +1209,7 @@ export function LaporanHutangPiutangClient({
                           ? "Entitas Sumber (Uang Keluar)"
                           : "Pemberi Pinjaman"}
                       </span>
-                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5">
+                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5 break-words">
                         {selectedTxDetail.accountType === "PIUTANG"
                           ? entity.name
                           : selectedTxDetail.counterpartyName}
@@ -1218,7 +1221,7 @@ export function LaporanHutangPiutangClient({
                           ? "Entitas Penerima (Tujuan)"
                           : "Penerima Pinjaman"}
                       </span>
-                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5">
+                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5 break-words">
                         {selectedTxDetail.accountType === "PIUTANG"
                           ? selectedTxDetail.counterpartyName
                           : entity.name}
@@ -1226,26 +1229,26 @@ export function LaporanHutangPiutangClient({
                     </div>
                   </div>
                   {selectedTxDetail.sumberPengeluaran && (
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface-card border border-border-soft">
-                      <div className="flex items-center gap-2.5">
-                        <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface-card border border-border-soft flex-wrap gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex-none">
                           <Wallet size={16} />
                         </span>
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-[10px] text-muted-faint uppercase font-bold tracking-wide block">
                             Sumber Pengeluaran (Kas / Bank):
                           </span>
-                          <span className="text-[13.5px] font-extrabold text-navy-text block mt-0.5">
+                          <span className="text-[13px] font-extrabold text-navy-text block mt-0.5 break-words">
                             {selectedTxDetail.sumberPengeluaran.namaLengkap}
                           </span>
                           {selectedTxDetail.sumberPengeluaran.entityName && (
-                            <span className="text-[11.5px] text-muted font-medium block mt-0.5">
+                            <span className="text-[11px] text-muted font-medium block mt-0.5 break-words">
                               Dikeluarkan dari kas/bank entitas: <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className="font-mono text-[11px] font-extrabold text-brand bg-brand/10 px-2.5 py-1 rounded-lg">
+                      <span className="font-mono text-[11px] font-extrabold text-brand bg-brand/10 px-2.5 py-1 rounded-lg flex-none">
                         Akun {selectedTxDetail.sumberPengeluaran.coaCode}
                       </span>
                     </div>
@@ -1260,10 +1263,10 @@ export function LaporanHutangPiutangClient({
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10.5px] text-muted-faint uppercase font-bold block">
+                    <span className="text-[10.5px] text-muted-faint uppercase font-bold block mb-1">
                       Keterangan Asal:
                     </span>
-                    <p className="text-[12.5px] font-medium text-navy-text mt-1 bg-surface-card p-2.5 rounded-xl border border-border-soft">
+                    <p className="text-[12.5px] font-medium text-navy-text bg-surface-card p-2.5 rounded-xl border border-border-soft break-words whitespace-pre-wrap">
                       {selectedTxDetail.keterangan || "Tidak ada keterangan tertulis."}
                     </p>
                   </div>
@@ -1283,45 +1286,47 @@ export function LaporanHutangPiutangClient({
                   </div>
 
                   {selectedTxDetail.alokasiPenggunaan && selectedTxDetail.alokasiPenggunaan.length > 0 ? (
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2.5">
                       {selectedTxDetail.alokasiPenggunaan.map((alk, idx) => {
                         return (
                           <div
                             key={idx}
-                            className="p-4 rounded-xl border bg-surface-card border-border-soft flex flex-col gap-2.5 shadow-xs"
+                            className="p-3.5 rounded-xl border bg-surface-card border-border-soft flex flex-col gap-2.5 shadow-xs"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-0.5 rounded-lg font-mono text-[12px] font-extrabold bg-brand/10 text-brand">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="px-2 py-0.5 rounded-lg font-mono text-[11.5px] font-extrabold bg-brand/10 text-brand flex-none">
                                   Akun {alk.coaCode}
                                 </span>
-                                <span className="font-extrabold text-navy-text text-[13.5px]">
+                                <span className="font-extrabold text-navy-text text-[13px] break-words">
                                   {alk.coaName}
                                 </span>
                               </div>
-                              <span className="font-mono font-extrabold text-navy-text text-[14px]">
+                              <span className="font-mono font-extrabold text-navy-text text-[13.5px] flex-none">
                                 {alk.nominalFmt}
                               </span>
                             </div>
 
-                            <div className="text-[12px] text-muted-stronger bg-surface-subtle/70 p-2.5 rounded-xl">
-                              <span className="font-bold text-muted-faint text-[10.5px] uppercase block mb-0.5">
-                                Keterangan Belanja / Penggunaan:
-                              </span>
-                              {alk.keterangan}
-                            </div>
+                            {alk.keterangan && (
+                              <div className="text-[12px] text-muted-stronger bg-surface-subtle/70 p-2.5 rounded-lg break-words whitespace-pre-wrap">
+                                <span className="font-bold text-muted-faint text-[10px] uppercase block mb-0.5">
+                                  Keterangan Belanja / Penggunaan:
+                                </span>
+                                {alk.keterangan}
+                              </div>
+                            )}
 
                             <div className="text-[11.5px]">
                               {alk.role === "KAS" ? (
-                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 break-words">
                                   <strong>✅ Penerimaan Kas / Bank:</strong> Dana diterima ke saldo kas/bank rekanan untuk keperluan operasional.
                                 </div>
                               ) : alk.role === "BEBAN" ? (
-                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 break-words">
                                   <strong>✅ Beban Operasional / Proyek:</strong> Dana dicatat pada pos biaya operasional rekanan.
                                 </div>
                               ) : (
-                                <div className="p-3 rounded-xl bg-brand/10 border border-brand/20 text-brand">
+                                <div className="p-2.5 rounded-lg bg-brand/10 border border-brand/20 text-brand break-words">
                                   <strong>✅ Alokasi Pos Akun:</strong> Dana dialokasikan ke {alk.coaName} (Akun {alk.coaCode}).
                                 </div>
                               )}
@@ -1331,7 +1336,7 @@ export function LaporanHutangPiutangClient({
                       })}
                     </div>
                   ) : (
-                    <div className="p-5 rounded-xl bg-surface-subtle/50 border border-dashed border-border-soft text-center text-muted text-[12px]">
+                    <div className="p-4 rounded-xl bg-surface-subtle/50 border border-dashed border-border-soft text-center text-muted text-[12px]">
                       Tidak ada rincian crossing otomatis. Transaksi ini dicatat langsung pada buku pembantu akun hutang/piutang afiliasi internal.
                     </div>
                   )}

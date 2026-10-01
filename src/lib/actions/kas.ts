@@ -103,16 +103,34 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
 }
 
 async function resolveCrossingDebitCoa(
-  primaryRowCoaId: string | undefined
+  primaryRowCoaId: string | undefined,
+  hasProject = false
 ): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
   const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
-  if (coa) {
+  if (!coa) return null;
+
+  if (coa.kategori === "BEBAN") {
     return {
       coaAccountId: coa.id,
-      role: coa.kategori === "BEBAN" ? "BEBAN" : "PIUTANG",
+      role: "BEBAN",
     };
   }
-  return null;
+
+  // Jika transaksi ini terkait pembayaran proyek lintas entitas (misal Gaharu bayarin proyek Kencana),
+  // di entitas tujuan (Kencana) dicatat sebagai Beban Proyek (COA 630 Biaya Lainnya / 528 By Umum)
+  if (hasProject) {
+    const bebanProyek =
+      (await prisma.coaAccount.findUnique({ where: { code: "630" } })) ??
+      (await prisma.coaAccount.findUnique({ where: { code: "528" } }));
+    if (bebanProyek) {
+      return { coaAccountId: bebanProyek.id, role: "BEBAN" };
+    }
+  }
+
+  return {
+    coaAccountId: coa.id,
+    role: "PIUTANG",
+  };
 }
 
 export async function createKasTransaction(input: CreateKasTransactionInput) {
@@ -176,6 +194,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     keterangan: input.keterangan,
     saldoSetelah: newSaldo,
     staffId: session.user.id,
+    projectId: input.projectId || null,
   };
 
   const akunRows = validRows.map((r) =>
@@ -209,15 +228,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         ...(rekeningNama ? { rekeningNama } : {}),
         ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
         ...(arahLaporan ? { arahLaporan } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
       },
     },
   });
 
   // Uang masuk yang ditandai buat proyek tertentu otomatis jadi termin baru
-  // proyek itu — dinomori urut per proyek (Termin 1, Termin 2, dst), bukan
-  // diberi nama tanggal. Persentase tetap dihitung & disimpan di belakang
-  // layar (dipakai buku besar perhitungan Piutang Perlu Perhatian dkk), tapi
-  // bukan yang ditampilkan/diinput Keuangan — itu bagian tampilan Sidamon.
+  // proyek itu — dinomori urut per proyek (Termin 1, Termin 2, dst) dengan persentase progres.
   const terminCreate: ReturnType<typeof prisma.termin.create>[] = [];
   if (!isKeluar && input.projectId) {
     const project = await prisma.project.findUnique({
@@ -225,24 +242,25 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       include: { termin: { select: { percentage: true } } },
     });
     if (project) {
+      const maxPctSoFar = project.termin.map((t) => t.percentage).reduce((max, p) => Math.max(max, p), 0);
       const newPct = computeNewTerminPercentage(
         Number(project.contractValue),
         project.termin.map((t) => t.percentage),
         total
       );
       const terminKe = project.termin.length + 1;
+      const deltaPct = Math.max(0, newPct - maxPctSoFar);
       terminCreate.push(
         prisma.termin.create({
           data: {
             projectId: input.projectId,
-            name: `Termin ${terminKe}`,
+            name: `Termin ${terminKe} (${deltaPct}% Kontrak)`,
             percentage: newPct,
             status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
           },
         })
       );
-      // Termin 100% → proyek otomatis selesai, hilang dari Kontrol Piutang.
-      // Jurnal transaksinya tetap ada.
+      // Termin 100% → proyek otomatis selesai
       if (newPct >= 100) {
         terminCreate.push(
           prisma.project.update({ where: { id: input.projectId }, data: { status: "COMPLETED" } }) as never
@@ -275,10 +293,11 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         keterangan: input.keterangan,
         saldoSetelah: 0,
         staffId: session.user.id,
+        projectId: input.projectId || null,
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId, !!input.projectId);
 
       if (debitTarget) {
         ops.push(
@@ -296,6 +315,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
                 crossingFromRekeningId: input.rekeningId,
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: debitTarget.role,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -319,6 +339,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: "HUTANG",
                 originalHutangCoaCode: hutangCode,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -367,6 +388,8 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
+  revalidatePath("/bank-buku");
+  revalidatePath("/pendapatan");
   revalidatePath("/jurnal");
   revalidatePath("/jurnal-transaksi");
   revalidatePath("/buku-besar");
@@ -488,6 +511,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
     keterangan: input.keterangan,
     saldoSetelah: newSaldo,
     staffId: session.user.id,
+    projectId: input.projectId || null,
   };
 
   const akunRows = validRows.map((r) =>
@@ -521,6 +545,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         ...(rekeningNama ? { rekeningNama } : {}),
         ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
         ...(arahLaporan ? { arahLaporan } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
       },
     },
   });
@@ -546,10 +571,11 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         keterangan: input.keterangan,
         saldoSetelah: 0,
         staffId: session.user.id,
+        projectId: input.projectId || null,
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace, !!input.projectId);
 
       if (debitTarget) {
         ops.push(
@@ -567,6 +593,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
                 crossingFromRekeningId: input.rekeningId,
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: debitTarget.role,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -590,6 +617,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: "HUTANG",
                 originalHutangCoaCode: hutangCodeReplace,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -605,9 +633,12 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
+  revalidatePath("/bank-buku");
+  revalidatePath("/pendapatan");
   revalidatePath("/jurnal");
   revalidatePath("/jurnal-transaksi");
   revalidatePath("/buku-besar");
+  revalidatePath("/piutang");
   revalidatePath("/laporan-hutang-piutang");
   revalidatePath("/neraca");
   revalidatePath("/laporan-keuangan");

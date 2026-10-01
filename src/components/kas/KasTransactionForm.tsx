@@ -98,7 +98,9 @@ export function KasTransactionForm({
     generateNoBukti(entityKey, tanggal).then(setNoBukti).catch(() => {});
   }, [entityKey, tanggal, isEdit, isNoBuktiManual]);
 
-  const [keterangan, setKeterangan] = useState(initialValues?.keterangan ?? "");
+  const [keterangan, setKeterangan] = useState(
+    initialValues?.keterangan ?? (initialValues?.arah === "masuk" ? "Pendapatan " : "Pengeluaran ")
+  );
   const [arah, setArah] = useState<"masuk" | "keluar">(initialValues?.arah ?? "keluar");
 
   function handleArahChange(newArah: "masuk" | "keluar") {
@@ -117,6 +119,30 @@ export function KasTransactionForm({
         }
       }
     }
+
+    // Auto-update teks keterangan: uang masuk jadi Pendapatan, keluar jadi Pengeluaran (tetap bisa diedit manual)
+    const sel = projectOptions.find((p) => p.id === projectId);
+    if (sel) {
+      if (newArah === "masuk") {
+        const nextKe = (sel.terminCount ?? 0) + 1;
+        setKeterangan(`Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`);
+      } else {
+        const isOther = !!(sel.entityKey && sel.entityKey !== entityKey);
+        setKeterangan(
+          isOther
+            ? `Pengeluaran Proyek ${sel.name} (${sel.code}) - ${sel.entityName ?? sel.entityKey}`
+            : `Pengeluaran Proyek ${sel.name} (${sel.code})`
+        );
+      }
+    } else {
+      if (keterangan.startsWith("Pengeluaran") && newArah === "masuk") {
+        setKeterangan(keterangan.replace(/^Pengeluaran/, "Pendapatan"));
+      } else if (keterangan.startsWith("Pendapatan") && newArah === "keluar") {
+        setKeterangan(keterangan.replace(/^Pendapatan/, "Pengeluaran"));
+      } else if (!keterangan.trim()) {
+        setKeterangan(newArah === "masuk" ? "Pendapatan " : "Pengeluaran ");
+      }
+    }
   }
   const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
   const [crossingEntityKeys, setCrossingEntityKeys] = useState<string[]>(initialValues?.crossingEntityKeys ?? []);
@@ -124,7 +150,12 @@ export function KasTransactionForm({
 
   function handleProjectChange(newProjectId: string) {
     setProjectId(newProjectId);
-    if (!newProjectId) return;
+    if (!newProjectId) {
+      if (keterangan.startsWith("Pengeluaran Proyek") || keterangan.startsWith("Pendapatan Termin")) {
+        setKeterangan(arah === "masuk" ? "Pendapatan " : "Pengeluaran ");
+      }
+      return;
+    }
 
     const sel = projectOptions.find((p) => p.id === newProjectId);
     if (!sel) return;
@@ -145,13 +176,13 @@ export function KasTransactionForm({
           if (piutangCoa) {
             setRows((prev) => {
               if (prev.length === 1 && !prev[0].coaAccountId) {
-                return [{ ...prev[0], coaAccountId: piutangCoa.id, keterangan: `Pembayaran Proyek ${sel.code} (${sel.name})` }];
+                return [{ ...prev[0], coaAccountId: piutangCoa.id, keterangan: `Pengeluaran Proyek ${sel.code} (${sel.name})` }];
               }
               const emptyIdx = prev.findIndex((r) => !r.coaAccountId);
               if (emptyIdx !== -1) {
                 return prev.map((r, i) =>
                   i === emptyIdx
-                    ? { ...r, coaAccountId: piutangCoa.id, keterangan: `Pembayaran Proyek ${sel.code} (${sel.name})` }
+                    ? { ...r, coaAccountId: piutangCoa.id, keterangan: `Pengeluaran Proyek ${sel.code} (${sel.name})` }
                     : r
                 );
               }
@@ -160,20 +191,14 @@ export function KasTransactionForm({
           }
         }
 
-        if (!keterangan || keterangan.startsWith("Pembayaran Proyek") || keterangan.startsWith("Pengeluaran Proyek")) {
-          setKeterangan(`Pembayaran Proyek ${sel.name} (${sel.code}) - ${sel.entityName ?? sel.entityKey}`);
-        }
+        setKeterangan(`Pengeluaran Proyek ${sel.name} (${sel.code}) - ${sel.entityName ?? sel.entityKey}`);
       } else {
-        if (!keterangan || keterangan.startsWith("Pembayaran Proyek") || keterangan.startsWith("Pengeluaran Proyek")) {
-          setKeterangan(`Pengeluaran Proyek ${sel.name} (${sel.code})`);
-        }
+        setKeterangan(`Pengeluaran Proyek ${sel.name} (${sel.code})`);
       }
     } else {
       // arah === "masuk"
       const nextKe = (sel.terminCount ?? 0) + 1;
-      if (!keterangan || keterangan.startsWith("Penerimaan Termin")) {
-        setKeterangan(`Penerimaan Termin ${nextKe} - ${sel.name} (${sel.code})`);
-      }
+      setKeterangan(`Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`);
     }
   }
 
@@ -412,11 +437,13 @@ export function KasTransactionForm({
 
           const autoKeterangan = selectedProject
             ? arah === "masuk"
-              ? `Penerimaan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`
+              ? `Pendapatan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`
               : isOtherEntity
-              ? `Pembayaran Proyek ${selectedProject.name} (${selectedProject.code}) - ${selectedProject.entityName ?? selectedProject.entityKey}`
+              ? `Pengeluaran Proyek ${selectedProject.name} (${selectedProject.code}) - ${selectedProject.entityName ?? selectedProject.entityKey}`
               : `Pengeluaran Proyek ${selectedProject.name} (${selectedProject.code})`
-            : "";
+            : arah === "masuk"
+            ? "Pendapatan "
+            : "Pengeluaran ";
 
           return (
             <div className={`rounded-[14px] border p-4 flex flex-col gap-3 transition-colors ${

@@ -10,6 +10,8 @@ import { getMetricValueFontSize } from "@/lib/dashboard-data";
 type TerminItem = {
   id: string;
   name: string;
+  percentage?: number;
+  percentageDelta?: number;
   nominalFmt: string;
   status: TerminStatus;
   auditedAt: string | null;
@@ -347,9 +349,9 @@ export function PiutangClient({
                             {p.terminTagihFmt}
                           </td>
                           <td className="py-3 px-3">
-                            {(p.status === "CANCELLED" || p.status === "COMPLETED") ? (
+                            {p.status === "CANCELLED" ? (
                               <span className="text-[12px] text-muted-faint">
-                                {p.status === "COMPLETED" ? "Proyek selesai" : "Proyek dibatalkan"}
+                                Proyek dibatalkan
                               </span>
                             ) : (
                               <>
@@ -357,7 +359,7 @@ export function PiutangClient({
                                   <div className="w-28 h-2 bg-surface-hover rounded-full overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all ${
-                                        p.maxPercentage >= 80
+                                        p.maxPercentage >= 80 || p.status === "COMPLETED"
                                           ? "bg-status-green"
                                           : p.maxPercentage >= 50
                                           ? "bg-brand"
@@ -366,12 +368,12 @@ export function PiutangClient({
                                       style={{ width: `${Math.min(p.maxPercentage, 100)}%` }}
                                     />
                                   </div>
-                                  <span className="text-[12.5px] font-bold text-muted-stronger">
+                                  <span className={`text-[12.5px] font-bold ${p.status === "COMPLETED" ? "text-status-green" : "text-muted-stronger"}`}>
                                     {p.maxPercentage}%
                                   </span>
                                 </div>
                                 <div className={`text-[11px] mt-1 ${p.isOverdue ? "text-status-red font-semibold" : "text-muted-faint"}`}>
-                                  Batas kontrak: {p.deadlineFmt}{p.isOverdue ? " · Lewat tempo" : ""}
+                                  {p.status === "COMPLETED" ? "Kontrak selesai 100%" : `Batas kontrak: ${p.deadlineFmt}${p.isOverdue ? " · Lewat tempo" : ""}`}
                                 </div>
                               </>
                             )}
@@ -428,7 +430,13 @@ export function PiutangClient({
                               <td className="py-2.5 px-3 text-right tabular-nums text-[12px] font-semibold text-status-green whitespace-nowrap">
                                 {t.nominalFmt}
                               </td>
-                              <td className="py-2.5 px-3" />
+                              <td className="py-2.5 px-3">
+                                {t.percentage !== undefined && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-status-green bg-green-50 dark:bg-green-950/40 px-2 py-0.5 rounded border border-green-200 dark:border-green-800">
+                                    +{t.percentageDelta ?? t.percentage}% ({t.percentage}% Kontrak)
+                                  </span>
+                                )}
+                              </td>
                               <td className="py-2.5 px-3">
                                 <span
                                   className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${STATUS_BADGE[t.status]}`}

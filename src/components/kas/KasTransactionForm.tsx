@@ -5,10 +5,18 @@ import { useRouter } from "next/navigation";
 import { createKasTransaction, replaceKasTransaction, generateNoBukti } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { CoaCombobox } from "./CoaCombobox";
-import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, Zap } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, Zap, Briefcase, TrendingUp } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
-type ProjectOption = { id: string; code: string; name: string };
+type ProjectOption = {
+  id: string;
+  code: string;
+  name: string;
+  contractValue?: number;
+  contractValueFmt?: string;
+  maxPercentage?: number;
+  terminCount?: number;
+};
 type Row = { id: number; coaAccountId: string; nominal: string; keterangan?: string };
 type InitialValues = {
   tanggal: string;
@@ -17,6 +25,7 @@ type InitialValues = {
   arah: "masuk" | "keluar";
   rekeningId?: string;
   crossingEntityKeys?: string[];
+  projectId?: string;
   rows: { coaAccountId: string; nominal: string; keterangan?: string }[];
   existingTxIds: string[];
 };
@@ -104,7 +113,7 @@ export function KasTransactionForm({
   }
   const [rekeningId, setRekeningId] = useState(initialValues?.rekeningId ?? defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
   const [crossingEntityKeys, setCrossingEntityKeys] = useState<string[]>(initialValues?.crossingEntityKeys ?? []);
-  const [projectId, setProjectId] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>(initialValues?.projectId ?? "");
   const [arahLaporan, setArahLaporan] = useState<string[]>(defaultArahLaporan);
   const isCustomInput = !SYSTEM_KEYS.includes(jenisInputKey);
   const [rows, setRows] = useState<Row[]>(
@@ -322,21 +331,132 @@ export function KasTransactionForm({
           </div>
         )}
 
-        {/* Proyek Terkait */}
-        {arah === "masuk" && projectOptions.length > 0 && (
-          <div>
-            <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">
-              Proyek Terkait{" "}
-              <span className="text-[10px] font-normal text-muted-faint normal-case">(opsional — otomatis jadi progres termin)</span>
-            </label>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inputClass}>
-              <option value="">— Bukan pembayaran termin proyek —</option>
-              {projectOptions.map((p) => (
-                <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Integrasi Kode Proyek Sidamon / Termin */}
+        {arah === "masuk" && projectOptions.length > 0 && (() => {
+          const selectedProject = projectOptions.find((p) => p.id === projectId);
+          const contractVal = selectedProject?.contractValue ?? 0;
+          const maxPctSoFar = selectedProject?.maxPercentage ?? 0;
+          const terminCount = selectedProject?.terminCount ?? 0;
+          const nextTerminKe = terminCount + 1;
+          const cumulativeBefore = (maxPctSoFar / 100) * contractVal;
+          const cumulativeAfter = cumulativeBefore + rowsTotal;
+          const newPct = contractVal > 0 ? Math.min(100, Math.round((cumulativeAfter / contractVal) * 100)) : maxPctSoFar;
+          const deltaPct = Math.max(0, newPct - maxPctSoFar);
+          const autoKeterangan = selectedProject
+            ? `Penerimaan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`
+            : "";
+
+          return (
+            <div className="rounded-[14px] border border-amber-200/80 dark:border-amber-500/30 bg-amber-500/5 p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Briefcase size={15} className="text-amber-600 dark:text-amber-400 flex-none" />
+                  <label className="text-[12px] font-bold text-navy-text uppercase tracking-wide">
+                    Kode Proyek (Sidamon) / Termin
+                  </label>
+                </div>
+                {selectedProject && (
+                  <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-full">
+                    Termin Ke-{nextTerminKe}
+                  </span>
+                )}
+              </div>
+
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className={`${inputClass} border-amber-300/80 dark:border-amber-500/40 bg-surface-card font-medium`}
+              >
+                <option value="">— Bukan pembayaran termin proyek —</option>
+                {projectOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    [{p.code}] {p.name} · Kontrak: {p.contractValueFmt ?? "-"} · Progres: {p.maxPercentage ?? 0}%
+                  </option>
+                ))}
+              </select>
+
+              {!selectedProject ? (
+                <p className="text-[11px] text-muted-faint leading-relaxed">
+                  💡 Pilih <b>Kode Proyek</b> jika uang masuk ini adalah pencairan termin dari Sidamon. Sistem otomatis menghitung kenaikan progres % dan menautkannya ke <b>Kontrol Piutang & Termin</b>.
+                </p>
+              ) : (
+                <div className="bg-surface-card border border-amber-200/60 dark:border-amber-500/20 rounded-[12px] p-3 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-[12px]">
+                    <div className="font-semibold text-navy-text">
+                      <span className="font-bold text-amber-600 dark:text-amber-400 mr-1.5">[{selectedProject.code}]</span>
+                      {selectedProject.name}
+                    </div>
+                    <div className="text-muted-faint text-[11px]">
+                      Nilai Kontrak: <span className="font-bold text-navy-text">{selectedProject.contractValueFmt ?? `Rp ${contractVal.toLocaleString("id-ID")}`}</span>
+                    </div>
+                  </div>
+
+                  {rowsTotal === 0 ? (
+                    <div className="text-[11.5px] text-muted-faint bg-surface-subtle/60 rounded-[8px] p-2.5">
+                      Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun untuk menghitung kenaikan termin berikutnya.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-[11.5px] font-semibold">
+                        <span className="flex items-center gap-1.5 text-navy-text">
+                          <TrendingUp size={13} className="text-emerald-500" />
+                          Simulasi Progres Termin:
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-faint">{maxPctSoFar}%</span>
+                          <span className="text-muted-faint">→</span>
+                          <span className="text-status-green font-bold text-[12.5px]">{newPct}%</span>
+                          <span className="text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded">
+                            +{deltaPct}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visual 2-color Progress Bar */}
+                      <div className="w-full h-2.5 bg-surface-hover rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-status-green transition-all"
+                          style={{ width: `${Math.min(maxPctSoFar, 100)}%` }}
+                          title={`Progres sebelumnya: ${maxPctSoFar}%`}
+                        />
+                        <div
+                          className="h-full bg-blue-500 transition-all"
+                          style={{ width: `${Math.min(deltaPct, 100 - maxPctSoFar)}%` }}
+                          title={`Penambahan transaksi ini: +${deltaPct}%`}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-[10.5px] pt-1 border-t border-border-subtle">
+                        <div>
+                          <span className="text-muted-faint block">Sebelumnya</span>
+                          <span className="font-bold text-navy-text">Rp {Math.round(cumulativeBefore).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-faint block">Termin {nextTerminKe}</span>
+                          <span className="font-bold text-status-green">+Rp {Math.round(rowsTotal).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-faint block">Sisa Kontrak</span>
+                          <span className="font-bold text-muted-stronger">Rp {Math.round(Math.max(0, contractVal - cumulativeAfter)).toLocaleString("id-ID")}</span>
+                        </div>
+                      </div>
+
+                      {keterangan !== autoKeterangan && (
+                        <button
+                          type="button"
+                          onClick={() => setKeterangan(autoKeterangan)}
+                          className="mt-1 text-left text-[11px] font-semibold text-brand hover:underline flex items-center gap-1"
+                        >
+                          ⚡ Gunakan keterangan: &quot;{autoKeterangan}&quot;
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Crossing Entitas — hanya tampil saat keluar */}
         {arah === "keluar" && allEntities.filter((e) => e.key !== entityKey).length > 0 && (

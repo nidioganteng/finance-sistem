@@ -270,15 +270,24 @@ export async function getLaporanPendapatanData(
     orderBy: [{ jenis: "asc" }, { tarifPersen: "asc" }],
   });
 
-  // 4. Ambil opsi proyek beserta termin
-  const projects = await prisma.project.findMany({
-    where: { entityId: entity.id },
+  // 4. Ambil opsi proyek beserta termin (semua proyek aktif, urutkan entitas ini dulu)
+  const allProjectsRaw = await prisma.project.findMany({
+    where: { status: "ACTIVE" },
     include: {
+      entity: { select: { id: true, key: true, name: true } },
       termin: {
         orderBy: { createdAt: "asc" },
       },
     },
     orderBy: { code: "asc" },
+  });
+
+  const projects = [...allProjectsRaw].sort((a, b) => {
+    const aCurrent = a.entityId === entity.id;
+    const bCurrent = b.entityId === entity.id;
+    if (aCurrent && !bCurrent) return -1;
+    if (!aCurrent && bCurrent) return 1;
+    return a.code.localeCompare(b.code);
   });
 
   // 5. Opsi Bank Rekening
@@ -621,6 +630,9 @@ export async function getLaporanPendapatanData(
         id: p.id,
         code: p.code,
         name: p.name,
+        entityId: p.entityId,
+        entityKey: p.entity.key,
+        entityName: p.entity.name,
         contractValue,
         contractValueFmt: formatRupiah(contractValue),
         termins,

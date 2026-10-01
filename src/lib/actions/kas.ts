@@ -103,16 +103,34 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
 }
 
 async function resolveCrossingDebitCoa(
-  primaryRowCoaId: string | undefined
+  primaryRowCoaId: string | undefined,
+  hasProject = false
 ): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
   const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
-  if (coa) {
+  if (!coa) return null;
+
+  if (coa.kategori === "BEBAN") {
     return {
       coaAccountId: coa.id,
-      role: coa.kategori === "BEBAN" ? "BEBAN" : "PIUTANG",
+      role: "BEBAN",
     };
   }
-  return null;
+
+  // Jika transaksi ini terkait pembayaran proyek lintas entitas (misal Gaharu bayarin proyek Kencana),
+  // di entitas tujuan (Kencana) dicatat sebagai Beban Proyek (COA 630 Biaya Lainnya / 528 By Umum)
+  if (hasProject) {
+    const bebanProyek =
+      (await prisma.coaAccount.findUnique({ where: { code: "630" } })) ??
+      (await prisma.coaAccount.findUnique({ where: { code: "528" } }));
+    if (bebanProyek) {
+      return { coaAccountId: bebanProyek.id, role: "BEBAN" };
+    }
+  }
+
+  return {
+    coaAccountId: coa.id,
+    role: "PIUTANG",
+  };
 }
 
 export async function createKasTransaction(input: CreateKasTransactionInput) {
@@ -275,10 +293,11 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         keterangan: input.keterangan,
         saldoSetelah: 0,
         staffId: session.user.id,
+        projectId: input.projectId || null,
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId, !!input.projectId);
 
       if (debitTarget) {
         ops.push(
@@ -296,6 +315,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
                 crossingFromRekeningId: input.rekeningId,
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: debitTarget.role,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -319,6 +339,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: "HUTANG",
                 originalHutangCoaCode: hutangCode,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -550,10 +571,11 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         keterangan: input.keterangan,
         saldoSetelah: 0,
         staffId: session.user.id,
+        projectId: input.projectId || null,
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace, !!input.projectId);
 
       if (debitTarget) {
         ops.push(
@@ -571,6 +593,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
                 crossingFromRekeningId: input.rekeningId,
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: debitTarget.role,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })
@@ -594,6 +617,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
                 crossingFromRekeningNama: rekeningNama,
                 crossingRole: "HUTANG",
                 originalHutangCoaCode: hutangCodeReplace,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
               },
             },
           })

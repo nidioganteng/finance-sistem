@@ -27,9 +27,18 @@ type LedgerRow = {
   saldoFmt: string;
   allTxIds: string[];
   coaRows: CoaRow[];
+  project?: { id: string; code: string; name: string } | null;
 };
 
-type ProjectOption = { id: string; code: string; name: string };
+type ProjectOption = {
+  id: string;
+  code: string;
+  name: string;
+  contractValue?: number;
+  contractValueFmt?: string;
+  maxPercentage?: number;
+  terminCount?: number;
+};
 
 export function KasScreenClient({
   entityKey,
@@ -150,7 +159,9 @@ export function KasScreenClient({
               rekeningOptions={rekeningOptions}
               defaultRekeningId={selectedRekeningId}
               allEntities={allEntities}
+              projectOptions={projectOptions}
               defaultArahLaporan={defaultArahLaporan}
+              bukuBankRekeningOptions={bukuBankRekeningOptions}
               initialValues={{
                 tanggal: editingRow.tanggalRaw,
                 noBukti: editingRow.noBukti,
@@ -158,6 +169,7 @@ export function KasScreenClient({
                 arah: editingRow.masuk > 0 ? "masuk" : "keluar",
                 rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
                 crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
+                projectId: editingRow.project?.id,
                 rows: editingRow.coaRows.map((cr) => ({
                   coaAccountId: cr.coaAccountId,
                   nominal: String(cr.nominal),
@@ -333,6 +345,11 @@ export function KasScreenClient({
                     <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                     <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                       {r.keterangan}
+                      {r.project && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
+                          {r.project.code}
+                        </span>
+                      )}
                       {r.rekening && (
                         <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                           {r.rekening}

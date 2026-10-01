@@ -446,23 +446,24 @@ export function KasTransactionForm({
             : "Pengeluaran ";
 
           return (
-            <div className={`rounded-[14px] border p-4 flex flex-col gap-3 transition-colors ${
-              isOtherEntity
-                ? "border-purple-200/90 dark:border-purple-500/30 bg-purple-500/5"
-                : "border-amber-200/80 dark:border-amber-500/30 bg-amber-500/5"
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Briefcase size={15} className={isOtherEntity ? "text-purple-600 dark:text-purple-400 flex-none" : "text-amber-600 dark:text-amber-400 flex-none"} />
-                  <label className="text-[12px] font-bold text-navy-text uppercase tracking-wide">
-                    Kode Proyek (Sidamon) {isOtherEntity ? "· Lintas Entitas" : ""}
-                  </label>
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
+                  <Briefcase size={12} className="text-muted-faint" />
+                  Proyek Terkait (Sidamon)
+                  {isOtherEntity && (
+                    <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
+                      Lintas Entitas
+                    </span>
+                  )}
+                </label>
                 {selectedProject && (
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                    isOtherEntity
-                      ? "text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-500/20"
-                      : "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/20"
+                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${
+                    arah === "masuk"
+                      ? "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40"
+                      : isOtherEntity
+                      ? "text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40"
+                      : "text-muted-stronger bg-surface-subtle border border-border-subtle"
                   }`}>
                     {arah === "masuk"
                       ? `Termin Ke-${nextTerminKe}`
@@ -476,11 +477,7 @@ export function KasTransactionForm({
               <select
                 value={projectId}
                 onChange={(e) => handleProjectChange(e.target.value)}
-                className={`${inputClass} ${
-                  isOtherEntity
-                    ? "border-purple-300/80 dark:border-purple-500/40"
-                    : "border-amber-300/80 dark:border-amber-500/40"
-                } bg-surface-card font-medium`}
+                className={inputClass}
               >
                 <option value="">— Bukan transaksi proyek —</option>
                 {currentEntityProjects.length > 0 && (
@@ -504,23 +501,34 @@ export function KasTransactionForm({
               </select>
 
               {!selectedProject ? (
-                <p className="text-[11px] text-muted-faint leading-relaxed">
-                  💡 Pilih <b>Kode Proyek</b> untuk menghubungkan transaksi ini ke proyek Sidamon. Tersedia juga proyek dari entitas lain untuk pembayaran talangan/lintas entitas (otomatis dicatat sebagai Piutang & Hutang antar entitas).
+                <p className="text-[10.5px] text-muted-faint mt-1">
+                  Opsional. Hubungkan transaksi ke proyek Sidamon untuk sinkronisasi termin atau talangan lintas entitas.
                 </p>
               ) : (
-                <div className={`bg-surface-card border rounded-[12px] p-3 flex flex-col gap-2.5 ${
-                  isOtherEntity
-                    ? "border-purple-200/60 dark:border-purple-500/20"
-                    : "border-amber-200/60 dark:border-amber-500/20"
+                <div className={`mt-2.5 rounded-[12px] border p-3.5 flex flex-col gap-3 ${
+                  arah === "masuk"
+                    ? "border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-950/10"
+                    : isOtherEntity
+                    ? "border-purple-200/80 dark:border-purple-800/40 bg-purple-50/30 dark:bg-purple-950/10"
+                    : "border-border-subtle bg-surface-subtle/50"
                 }`}>
+                  {/* Top Header Row of Project Info */}
                   <div className="flex items-center justify-between flex-wrap gap-2 text-[12px]">
-                    <div className="font-semibold text-navy-text">
-                      <span className={`font-bold mr-1.5 ${isOtherEntity ? "text-purple-600 dark:text-purple-400" : "text-amber-600 dark:text-amber-400"}`}>
-                        [{selectedProject.code}]
+                    <div className="flex items-center gap-1.5">
+                      <span className={`font-bold font-mono text-[11.5px] px-1.5 py-0.5 rounded ${
+                        arah === "masuk"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : isOtherEntity
+                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
+                          : "bg-surface-hover text-navy-text"
+                      }`}>
+                        {selectedProject.code}
                       </span>
-                      {selectedProject.name}
+                      <span className="font-semibold text-navy-text">
+                        {selectedProject.name}
+                      </span>
                       {selectedProject.entityName && (
-                        <span className="ml-2 text-[10.5px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold text-muted-faint bg-surface-card px-1.5 py-0.5 rounded border border-border-subtle">
                           {selectedProject.entityName}
                         </span>
                       )}
@@ -532,33 +540,33 @@ export function KasTransactionForm({
 
                   {/* Kasus 1: PENGELUARAN LINTAS ENTITAS (misal Gaharu bayarin proyek Kencana) */}
                   {arah === "keluar" && isOtherEntity && (
-                    <div className="flex flex-col gap-2 p-2.5 rounded-[9px] bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/50 dark:border-purple-800/30 text-[11.5px]">
-                      <div className="flex items-center gap-1.5 font-bold text-purple-800 dark:text-purple-300">
+                    <div className="flex flex-col gap-1.5 p-2.5 rounded-[9px] bg-purple-100/50 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-800/40 text-[11px]">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-200">
                         <ArrowRightLeft size={13} />
-                        Otomatisasi Jurnal Lintas Entitas (Crossing):
+                        Pencatatan Otomatis Antar Entitas (Crossing Journal):
                       </div>
-                      <div className="text-muted-stronger space-y-1 text-[11px]">
-                        <p>• <b>Entitas Ini ({allEntities.find(e => e.key === entityKey)?.name ?? entityKey}):</b> Mencatat pengeluaran sebagai <b>Piutang ke {selectedProject.entityName ?? selectedProject.entityKey} (Akun {PIUTANG_COA_MAP[selectedProject.entityKey!] ?? "11x"})</b>.</p>
-                        <p>• <b>Entitas Tujuan ({selectedProject.entityName ?? selectedProject.entityKey}):</b> Otomatis menerima pencatatan <b>Hutang ke {allEntities.find(e => e.key === entityKey)?.name ?? entityKey} (Akun {HUTANG_COA_MAP[entityKey] ?? "31x"})</b> dan beban proyek <b>[{selectedProject.code}]</b>.</p>
+                      <div className="text-muted-stronger space-y-1">
+                        <p>• <b>Entitas Ini ({allEntities.find(e => e.key === entityKey)?.name ?? entityKey}):</b> Dicatat sebagai <b>Piutang ke {selectedProject.entityName ?? selectedProject.entityKey} (Akun {PIUTANG_COA_MAP[selectedProject.entityKey!] ?? "11x"})</b>.</p>
+                        <p>• <b>Entitas Tujuan ({selectedProject.entityName ?? selectedProject.entityKey}):</b> Otomatis dicatat sebagai <b>Hutang ke {allEntities.find(e => e.key === entityKey)?.name ?? entityKey} (Akun {HUTANG_COA_MAP[entityKey] ?? "31x"})</b> dan beban proyek <b>[{selectedProject.code}]</b>.</p>
                       </div>
                     </div>
                   )}
 
                   {/* Kasus 2: PENGELUARAN PROYEK ENTITAS SENDIRI */}
                   {arah === "keluar" && !isOtherEntity && (
-                    <div className="text-[11.5px] text-muted-faint bg-surface-subtle/60 rounded-[8px] p-2.5">
-                      Pengeluaran biaya/belanja operasional untuk proyek <b className="text-navy-text">[{selectedProject.code}] {selectedProject.name}</b>. Transaksi akan terhubung langsung ke proyek ini di Buku Bank & Laporan Keuangan.
+                    <div className="text-[11.5px] text-muted-strong bg-surface-card border border-border-subtle rounded-[9px] p-2.5">
+                      Pengeluaran biaya/operasional proyek. Transaksi ini akan tercatat dan terhubung ke proyek <b className="text-navy-text">[{selectedProject.code}]</b> di Buku Bank & Laporan Keuangan.
                     </div>
                   )}
 
                   {/* Kasus 3: PENERIMAAN TERMIN (Uang Masuk) */}
                   {arah === "masuk" && (
                     rowsTotal === 0 ? (
-                      <div className="text-[11.5px] text-muted-faint bg-surface-subtle/60 rounded-[8px] p-2.5">
-                        Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun untuk menghitung kenaikan termin berikutnya.
+                      <div className="text-[11.5px] text-muted-strong bg-surface-card border border-border-subtle rounded-[9px] p-2.5">
+                        Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun di bawah untuk melihat simulasi termin ke-{nextTerminKe}.
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2.5 bg-surface-card border border-border-subtle rounded-[10px] p-3">
                         <div className="flex items-center justify-between text-[11.5px] font-semibold">
                           <span className="flex items-center gap-1.5 text-navy-text">
                             <TrendingUp size={13} className="text-emerald-500" />
@@ -575,7 +583,7 @@ export function KasTransactionForm({
                         </div>
 
                         {/* Visual 2-color Progress Bar */}
-                        <div className="w-full h-2.5 bg-surface-hover rounded-full overflow-hidden flex">
+                        <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden flex">
                           <div
                             className="h-full bg-status-green transition-all"
                             style={{ width: `${Math.min(maxPctSoFar, 100)}%` }}
@@ -588,7 +596,7 @@ export function KasTransactionForm({
                           />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 text-[10.5px] pt-1 border-t border-border-subtle">
+                        <div className="grid grid-cols-3 gap-2 text-[10.5px] pt-2 border-t border-border-subtle">
                           <div>
                             <span className="text-muted-faint block">Sebelumnya</span>
                             <span className="font-bold text-navy-text">Rp {Math.round(cumulativeBefore).toLocaleString("id-ID")}</span>
@@ -610,7 +618,7 @@ export function KasTransactionForm({
                     <button
                       type="button"
                       onClick={() => setKeterangan(autoKeterangan)}
-                      className="mt-0.5 text-left text-[11px] font-semibold text-brand hover:underline flex items-center gap-1"
+                      className="self-start text-left text-[11px] font-semibold text-brand hover:underline flex items-center gap-1"
                     >
                       ⚡ Gunakan keterangan: &quot;{autoKeterangan}&quot;
                     </button>

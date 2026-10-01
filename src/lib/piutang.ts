@@ -119,13 +119,15 @@ export async function getInterEntityBalances(entityId: string): Promise<InterEnt
 // Daftar proyek satu entitas buat dropdown "Proyek Terkait" di form transaksi
 // Kas/Buku Bank — dipakai staf/manajer keuangan pas mencatat uang masuk yang
 // sekalian jadi pembayaran termin proyek tertentu.
-export async function getProjectOptions(entityId: string) {
+export async function getProjectOptions(currentEntityId?: string) {
   const projects = await prisma.project.findMany({
-    where: { entityId, status: "ACTIVE" },
+    where: { status: "ACTIVE" },
     select: {
       id: true,
       code: true,
       name: true,
+      entityId: true,
+      entity: { select: { id: true, key: true, name: true } },
       contractValue: true,
       termin: {
         select: { id: true, name: true, percentage: true },
@@ -134,19 +136,36 @@ export async function getProjectOptions(entityId: string) {
     },
     orderBy: { createdAt: "asc" },
   });
-  return projects.map((p) => {
+  const mapped = projects.map((p) => {
     const contractValueNum = Number(p.contractValue);
     const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
     return {
       id: p.id,
       code: p.code,
       name: p.name,
+      entityId: p.entityId,
+      entityKey: p.entity.key,
+      entityName: p.entity.name,
       contractValue: contractValueNum,
       contractValueFmt: formatRupiah(contractValueNum),
       maxPercentage: maxPct,
       terminCount: p.termin.length,
     };
   });
+
+  if (currentEntityId) {
+    mapped.sort((a, b) => {
+      const aCurrent = a.entityId === currentEntityId;
+      const bCurrent = b.entityId === currentEntityId;
+      if (aCurrent && !bCurrent) return -1;
+      if (!aCurrent && bCurrent) return 1;
+      return a.code.localeCompare(b.code);
+    });
+  } else {
+    mapped.sort((a, b) => a.code.localeCompare(b.code));
+  }
+
+  return mapped;
 }
 
 // Persentase termin baru dihitung dari akumulasi uang masuk (termin-termin

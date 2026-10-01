@@ -1135,227 +1135,230 @@ export function LaporanHutangPiutangClient({
         )}
 
         {/* ── Modal Rincian Alokasi & Penggunaan Dana Rekanan ── */}
-        {selectedTxDetail && (() => {
-          const isPiutang = selectedTxDetail.accountType === "PIUTANG";
-          const sourceEntity = isPiutang
-            ? entity.name
-            : (selectedTxDetail.sumberPengeluaran?.entityName || selectedTxDetail.counterpartyName);
-          const destEntity = isPiutang
-            ? selectedTxDetail.counterpartyName
-            : entity.name;
-
-          const sourceAccountName = selectedTxDetail.sumberPengeluaran?.coaName || "Kas / Bank";
-          const sourceAccountCode = selectedTxDetail.sumberPengeluaran?.coaCode;
-
-          const firstAlloc = selectedTxDetail.alokasiPenggunaan?.[0];
-          const destAccountName = firstAlloc?.coaName || selectedTxDetail.coaName;
-          const destAccountCode = firstAlloc?.coaCode || selectedTxDetail.coaCode;
-
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-              <div className="bg-surface-card rounded-[22px] border border-border-soft max-w-xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                {/* Modal Header */}
-                <div className="px-6 py-4.5 border-b border-border-soft flex items-center justify-between bg-surface-subtle/50">
-                  <div className="flex items-center gap-3">
-                    <span className="p-2 rounded-xl bg-brand/10 text-brand">
-                      <ArrowRightLeft size={18} />
-                    </span>
-                    <div>
-                      <h3 className="text-[15px] font-extrabold text-navy-text">
-                        Rincian Transaksi Rekanan
-                      </h3>
-                      <p className="text-[12px] text-muted-faint mt-0.5">
-                        No. Bukti:{" "}
-                        <strong className="font-mono text-navy-text font-bold">
-                          {selectedTxDetail.noBukti}
-                        </strong>{" "}
-                        • {selectedTxDetail.tanggal}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-[13.5px] font-extrabold text-navy-text px-3 py-1 rounded-xl bg-surface-card border border-border-soft shadow-xs">
-                      {selectedTxDetail.nominalMutasiFmt}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTxDetail(null)}
-                      className="p-1.5 rounded-xl hover:bg-surface-hover text-muted-stronger hover:text-navy-text transition-colors cursor-pointer"
-                    >
-                      <X size={18} />
-                    </button>
+        {selectedTxDetail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+            <div className="bg-surface-card rounded-[22px] border border-border-soft max-w-xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="px-6 py-4.5 border-b border-border-soft flex items-center justify-between bg-surface-subtle/50">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 rounded-xl bg-brand/10 text-brand">
+                    <Layers size={18} />
+                  </span>
+                  <div>
+                    <h3 className="text-[15px] font-extrabold text-navy-text">
+                      Rincian Alokasi &amp; Penggunaan Dana
+                    </h3>
+                    <p className="text-[12px] text-muted mt-0.5">
+                      No. Bukti:{" "}
+                      <strong className="font-mono text-navy-text font-bold">
+                        {selectedTxDetail.noBukti}
+                      </strong>{" "}
+                      • {selectedTxDetail.tanggal}
+                    </p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTxDetail(null)}
+                  className="p-1.5 rounded-xl hover:bg-surface-hover text-muted-stronger hover:text-navy-text transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-                {/* Modal Body */}
-                <div className="p-6 overflow-y-auto flex flex-col gap-4 text-sm">
-                  {/* ── 1. Aliran Dana Antar-Entitas (Visual Flow) ── */}
-                  <div className="p-4 rounded-2xl bg-surface-subtle/50 border border-border-soft flex flex-col gap-3">
-                    <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-muted-faint">
-                      <span className="flex items-center gap-1.5">
-                        <Building2 size={13} className="text-muted-faint" />
-                        Aliran Dana Antar-Entitas
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        isPiutang
-                          ? "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40"
-                          : "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40"
-                      }`}>
-                        {isPiutang ? "Penyaluran / Piutang" : "Talangan Masuk / Hutang"}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-[1fr,auto,1fr] gap-2.5 items-center">
-                      {/* Sumber Dana */}
-                      <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft flex flex-col gap-1 min-w-0">
-                        <span className="text-[10px] text-muted-faint uppercase font-bold tracking-wider">
-                          Sumber Dana (Keluar)
-                        </span>
-                        <div className="text-[13.5px] font-extrabold text-navy-text truncate">
-                          {sourceEntity}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-stronger truncate">
-                          <Wallet size={12} className="text-emerald-600 dark:text-emerald-400 flex-none" />
-                          <span className="truncate">{sourceAccountName}</span>
-                          {sourceAccountCode && (
-                            <span className="font-mono text-[9.5px] font-bold text-muted bg-surface-subtle px-1 py-0.2 rounded border border-border-subtle flex-none">
-                              {sourceAccountCode}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Arrow */}
-                      <div className="flex flex-col items-center justify-center px-1">
-                        <div className="w-7 h-7 rounded-full bg-brand/10 text-brand flex items-center justify-center shadow-xs">
-                          <ArrowRight size={14} />
-                        </div>
-                      </div>
-
-                      {/* Tujuan / Penerima */}
-                      <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft flex flex-col gap-1 min-w-0">
-                        <span className="text-[10px] text-muted-faint uppercase font-bold tracking-wider">
-                          Entitas Tujuan (Alokasi)
-                        </span>
-                        <div className="text-[13.5px] font-extrabold text-navy-text truncate">
-                          {destEntity}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-stronger truncate">
-                          <Layers size={12} className="text-brand flex-none" />
-                          <span className="truncate">{destAccountName}</span>
-                          {destAccountCode && (
-                            <span className="font-mono text-[9.5px] font-bold text-muted bg-surface-subtle px-1 py-0.2 rounded border border-border-subtle flex-none">
-                              {destAccountCode}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto flex flex-col gap-4 text-sm">
+                {/* ── Banner Alur Transaksi untuk Finance ── */}
+                <div className="p-4 rounded-2xl bg-brand/5 border border-brand/20 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 text-brand font-bold text-[11.5px] uppercase tracking-wider">
+                    <Info size={14} className="flex-none" />
+                    <span>Alur &amp; Penjelasan Transaksi</span>
                   </div>
-
-                  {/* ── 2. Keterangan & Jurnal Rekonsiliasi Otomatis ── */}
-                  <div className="p-4 rounded-xl bg-surface-card border border-border-soft flex flex-col gap-3">
-                    <div>
-                      <span className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider block mb-1">
-                        Keterangan Transaksi
-                      </span>
-                      <p className="text-[13px] font-semibold text-navy-text leading-snug">
-                        {selectedTxDetail.keterangan || "Tidak ada keterangan tertulis."}
-                      </p>
-                    </div>
-
-                    <div className="pt-2.5 border-t border-border-subtle flex flex-col gap-1.5">
-                      <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-muted-faint flex items-center gap-1.5">
-                        <Info size={12} className="text-brand" />
-                        Jurnal Rekonsiliasi Otomatis (Crossing)
-                      </span>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11.5px]">
-                        <div className="p-2.5 rounded-lg bg-surface-subtle/70 border border-border-subtle/60 flex flex-col gap-0.5">
-                          <span className="font-bold text-navy-text text-[11.5px]">{sourceEntity}</span>
-                          <span className="text-muted-stronger text-[11px]">
-                            Pengeluaran dari <b>{sourceAccountName}</b> dicatat sebagai <b className="text-blue-600 dark:text-blue-400">Piutang ke {destEntity}</b>.
-                          </span>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-surface-subtle/70 border border-border-subtle/60 flex flex-col gap-0.5">
-                          <span className="font-bold text-navy-text text-[11.5px]">{destEntity}</span>
-                          <span className="text-muted-stronger text-[11px]">
-                            Alokasi belanja <b>{destAccountName}</b> dicatat sebagai <b className="text-amber-600 dark:text-amber-400">Hutang ke {sourceEntity}</b>.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── 3. Rincian Pos Penggunaan Dana ── */}
-                  {selectedTxDetail.alokasiPenggunaan && selectedTxDetail.alokasiPenggunaan.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint flex items-center justify-between">
-                        <span>Rincian Pos Penggunaan Dana</span>
-                        <span className="text-[11px] font-mono text-muted">
-                          {selectedTxDetail.alokasiPenggunaan.length} pos belanja
+                  <p className="text-[13.5px] font-bold text-navy-text leading-relaxed break-words">
+                    {selectedTxDetail.narasiAlur || selectedTxDetail.keterangan}
+                  </p>
+                  {selectedTxDetail.sumberPengeluaran && (
+                    <div className="flex flex-wrap items-center gap-2.5 pt-2.5 text-[11.5px] text-muted-stronger border-t border-brand/15">
+                      <span className="flex items-center gap-1.5 font-medium flex-wrap">
+                        <Wallet size={13} className="text-emerald-600 dark:text-emerald-400 flex-none" />
+                        <span className="text-muted-faint">Uang berasal dari:</span>
+                        <strong className="text-navy-text font-bold break-words">{selectedTxDetail.sumberPengeluaran.coaName}</strong>
+                        <span className="font-mono text-[10.5px] font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                          Akun {selectedTxDetail.sumberPengeluaran.coaCode}
                         </span>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {selectedTxDetail.alokasiPenggunaan.map((alk, idx) => (
-                          <div
-                            key={idx}
-                            className="p-3 rounded-xl border border-border-soft bg-surface-card flex items-center justify-between gap-3 text-[12px]"
-                          >
-                            <div className="flex flex-col gap-0.5 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-brand/10 text-brand">
-                                  Akun {alk.coaCode}
-                                </span>
-                                <span className="font-bold text-navy-text truncate">
-                                  {alk.coaName}
-                                </span>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                                  alk.role === "KAS"
-                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/50"
-                                    : alk.role === "BEBAN"
-                                    ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/50"
-                                    : "bg-surface-hover text-muted-stronger border border-border-subtle"
-                                }`}>
-                                  {alk.role === "KAS" ? "Kas / Bank" : alk.role === "BEBAN" ? "Beban Operasional" : alk.role}
-                                </span>
-                              </div>
-                              {alk.keterangan && (
-                                <span className="text-[11px] text-muted-faint truncate">
-                                  {alk.keterangan}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-mono font-bold text-navy-text text-[13px] flex-none">
-                              {alk.nominalFmt}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-dashed border-border-soft text-center text-muted text-[11.5px]">
-                      Transaksi dicatat langsung pada buku pembantu akun hutang/piutang afiliasi internal.
+                      </span>
+                      <span className="text-muted-faint hidden sm:inline">•</span>
+                      <span className="flex items-center gap-1.5 font-medium flex-wrap">
+                        <Building2 size={13} className="text-brand flex-none" />
+                        <span className="text-muted-faint">Entitas sumber dana:</span>
+                        <strong className="text-navy-text font-bold break-words">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
+                      </span>
                     </div>
                   )}
                 </div>
 
-                {/* Modal Footer */}
-                <div className="px-6 py-4 border-t border-border-soft bg-surface-subtle/30 flex items-center justify-between">
-                  <span className="text-[11px] text-muted-faint font-mono">
-                    Integrasi Otomatis Antar-Entitas
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTxDetail(null)}
-                    className="px-5 py-2 rounded-xl bg-navy text-white text-[12.5px] font-bold hover:opacity-90 transition-opacity cursor-pointer"
-                  >
-                    Tutup
-                  </button>
+                {/* Ringkasan Aliran Dana */}
+                <div className="p-4 rounded-xl bg-surface-subtle/50 border border-border-soft flex flex-col gap-3">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint">
+                    Aliran Transaksi Antar-Perusahaan
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 items-center">
+                    <div className="p-3 rounded-xl bg-surface-card border border-border-soft">
+                      <span className="text-[10px] text-muted-faint uppercase font-bold block">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? "Entitas Sumber (Uang Keluar)"
+                          : "Pemberi Pinjaman"}
+                      </span>
+                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5 break-words">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? entity.name
+                          : selectedTxDetail.counterpartyName}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-surface-card border border-border-soft">
+                      <span className="text-[10px] text-muted-faint uppercase font-bold block">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? "Entitas Penerima (Tujuan)"
+                          : "Penerima Pinjaman"}
+                      </span>
+                      <span className="text-[13px] font-extrabold text-navy-text block mt-0.5 break-words">
+                        {selectedTxDetail.accountType === "PIUTANG"
+                          ? selectedTxDetail.counterpartyName
+                          : entity.name}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedTxDetail.sumberPengeluaran && (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface-card border border-border-soft flex-wrap gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex-none">
+                          <Wallet size={16} />
+                        </span>
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-muted-faint uppercase font-bold tracking-wide block">
+                            Sumber Pengeluaran (Kas / Bank):
+                          </span>
+                          <span className="text-[13px] font-extrabold text-navy-text block mt-0.5 break-words">
+                            {selectedTxDetail.sumberPengeluaran.namaLengkap}
+                          </span>
+                          {selectedTxDetail.sumberPengeluaran.entityName && (
+                            <span className="text-[11px] text-muted font-medium block mt-0.5 break-words">
+                              Dikeluarkan dari kas/bank entitas: <strong className="text-navy-text">{selectedTxDetail.sumberPengeluaran.entityName}</strong>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="font-mono text-[11px] font-extrabold text-brand bg-brand/10 px-2.5 py-1 rounded-lg flex-none">
+                        Akun {selectedTxDetail.sumberPengeluaran.coaCode}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-surface-card border border-border-soft">
+                    <span className="text-[11px] font-bold text-muted-faint uppercase">
+                      Nominal Transaksi:
+                    </span>
+                    <span className="text-[15px] font-extrabold text-navy-text font-mono">
+                      {selectedTxDetail.nominalMutasiFmt}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10.5px] text-muted-faint uppercase font-bold block mb-1">
+                      Keterangan Asal:
+                    </span>
+                    <p className="text-[12.5px] font-medium text-navy-text bg-surface-card p-2.5 rounded-xl border border-border-soft break-words whitespace-pre-wrap">
+                      {selectedTxDetail.keterangan || "Tidak ada keterangan tertulis."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section: Bagaimana Uang Ini Digunakan? */}
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-faint mb-2.5 flex items-center justify-between">
+                    <span>
+                      {selectedTxDetail.accountType === "PIUTANG"
+                        ? `Uang Digunakan di ${selectedTxDetail.counterpartyName} Untuk:`
+                        : `Alokasi Penggunaan di ${entity.name}:`}
+                    </span>
+                    <span className="text-[11px] font-mono text-muted">
+                      {selectedTxDetail.alokasiPenggunaan?.length ?? 0} pos belanja
+                    </span>
+                  </div>
+
+                  {selectedTxDetail.alokasiPenggunaan && selectedTxDetail.alokasiPenggunaan.length > 0 ? (
+                    <div className="flex flex-col gap-2.5">
+                      {selectedTxDetail.alokasiPenggunaan.map((alk, idx) => {
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3.5 rounded-xl border bg-surface-card border-border-soft flex flex-col gap-2.5 shadow-xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="px-2 py-0.5 rounded-lg font-mono text-[11.5px] font-extrabold bg-brand/10 text-brand flex-none">
+                                  Akun {alk.coaCode}
+                                </span>
+                                <span className="font-extrabold text-navy-text text-[13px] break-words">
+                                  {alk.coaName}
+                                </span>
+                              </div>
+                              <span className="font-mono font-extrabold text-navy-text text-[13.5px] flex-none">
+                                {alk.nominalFmt}
+                              </span>
+                            </div>
+
+                            {alk.keterangan && (
+                              <div className="text-[12px] text-muted-stronger bg-surface-subtle/70 p-2.5 rounded-lg break-words whitespace-pre-wrap">
+                                <span className="font-bold text-muted-faint text-[10px] uppercase block mb-0.5">
+                                  Keterangan Belanja / Penggunaan:
+                                </span>
+                                {alk.keterangan}
+                              </div>
+                            )}
+
+                            <div className="text-[11.5px]">
+                              {alk.role === "KAS" ? (
+                                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 break-words">
+                                  <strong>✅ Penerimaan Kas / Bank:</strong> Dana diterima ke saldo kas/bank rekanan untuk keperluan operasional.
+                                </div>
+                              ) : alk.role === "BEBAN" ? (
+                                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 break-words">
+                                  <strong>✅ Beban Operasional / Proyek:</strong> Dana dicatat pada pos biaya operasional rekanan.
+                                </div>
+                              ) : (
+                                <div className="p-2.5 rounded-lg bg-brand/10 border border-brand/20 text-brand break-words">
+                                  <strong>✅ Alokasi Pos Akun:</strong> Dana dialokasikan ke {alk.coaName} (Akun {alk.coaCode}).
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-surface-subtle/50 border border-dashed border-border-soft text-center text-muted text-[12px]">
+                      Tidak ada rincian crossing otomatis. Transaksi ini dicatat langsung pada buku pembantu akun hutang/piutang afiliasi internal.
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-border-soft bg-surface-subtle/30 flex items-center justify-between">
+                <span className="text-[11.5px] text-muted font-mono">
+                  Sistem Integrasi Rekonsiliasi Otomatis
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTxDetail(null)}
+                  className="px-5 py-2 rounded-xl bg-navy text-white text-[12.5px] font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     );
   }

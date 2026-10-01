@@ -34,6 +34,9 @@ type ProjectOption = {
   id: string;
   code: string;
   name: string;
+  entityId?: string;
+  entityKey?: string;
+  entityName?: string;
   contractValue?: number;
   contractValueFmt?: string;
   maxPercentage?: number;

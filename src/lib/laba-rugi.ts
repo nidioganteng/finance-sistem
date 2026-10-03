@@ -72,6 +72,46 @@ export async function getLabaRugiData(
     }
   }
 
+  // Integrasi Laporan Pendapatan (alur_laporan_pendapata.md bagian 4):
+  // Tarik total Nilai Proyek dari FakturPendapatan untuk periode ini,
+  // menyelesaikan bug link putus di Excel asli klien (yang sebelumnya menghasilkan Rp 0).
+  const fakturAgg = await prisma.fakturPendapatan.aggregate({
+    where: {
+      entityId,
+      tahunPajak: year,
+      ...(month ? { masaPajak: month } : {}),
+    },
+    _sum: { nilaiProyek: true },
+  });
+  const totalNilaiProyekFaktur = Number(fakturAgg._sum.nilaiProyek ?? 0);
+
+  if (totalNilaiProyekFaktur > 0) {
+    let foundPendapatanKey: string | null = null;
+    for (const [key, val] of pendapatan.entries()) {
+      if (val.code === "400" || /pendapatan/i.test(val.name)) {
+        foundPendapatanKey = key;
+        break;
+      }
+    }
+
+    if (foundPendapatanKey) {
+      pendapatan.get(foundPendapatanKey)!.total += totalNilaiProyekFaktur;
+    } else {
+      const coaPendapatan = await prisma.coaAccount.findFirst({
+        where: {
+          kategori: "PENDAPATAN",
+          OR: [{ code: "400" }, { name: { contains: "pendapatan" } }],
+        },
+      });
+      const key = coaPendapatan?.id ?? "auto_faktur_pendapatan";
+      pendapatan.set(key, {
+        code: coaPendapatan?.code ?? "400",
+        name: coaPendapatan?.name ?? "Pendapatan Proyek (E-Faktur)",
+        total: totalNilaiProyekFaktur,
+      });
+    }
+  }
+
   // Issue 39 & SRS v2.0: Biaya penyusutan aset dihitung otomatis dan ditarik (linked) dari Modul Aktiva Tetap
   if (penyusutanSummary.totalBebanPenyusutan > 0) {
     let foundDepreciationKey: string | null = null;
@@ -124,6 +164,8 @@ export async function getLabaRugiData(
     labaBersihPositive: labaBersih >= 0,
     penyusutanOtomatis: penyusutanSummary.totalBebanPenyusutan,
     penyusutanOtomatisFmt: formatRupiah(penyusutanSummary.totalBebanPenyusutan),
+    pendapatanFaktur: totalNilaiProyekFaktur,
+    pendapatanFakturFmt: formatRupiah(totalNilaiProyekFaktur),
     version: normVersion,
   };
 }

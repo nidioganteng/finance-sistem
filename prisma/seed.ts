@@ -133,6 +133,7 @@ async function main() {
     { code: "313",  name: "Hutang TB",                   kategori: K },
     { code: "314",  name: "Hutang CAD",                  kategori: K },
     { code: "315",  name: "Hutang KP",                   kategori: K },
+    { code: "317",  name: "Hutang PS",                   kategori: K },
     { code: "310",  name: "Laba Ditahan",                kategori: M },
     { code: "320",  name: "Modal",                       kategori: M },
     { code: "400",  name: "PENDAPATAN",                  kategori: P },
@@ -195,6 +196,83 @@ async function main() {
       update: { name: c.name, kategori: c.kategori, reportType, urutan: i, reportCategory: c.reportCategory ?? "SEMUA" },
       create: { code: c.code, name: c.name, kategori: c.kategori, reportType, urutan: i, reportCategory: c.reportCategory ?? "SEMUA" },
     });
+  }
+
+  // ── Tarif Pajak ───────────────────────────────────────────────────
+  const defaultTarif = [
+    { nama: "PPN 11%", jenis: "PPN", tarifPersen: 11.0, tanggalMulai: new Date("2022-04-01"), active: true },
+    { nama: "PPN 12%", jenis: "PPN", tarifPersen: 12.0, tanggalMulai: new Date("2025-01-01"), active: true },
+    { nama: "PPh Final 3.5%", jenis: "PPH", tarifPersen: 3.5, tanggalMulai: new Date("2022-01-01"), active: true },
+    { nama: "PPh Final 2.65%", jenis: "PPH", tarifPersen: 2.65, tanggalMulai: new Date("2022-01-01"), active: true },
+  ];
+  for (const t of defaultTarif) {
+    const existing = await prisma.tarifPajak.findFirst({ where: { nama: t.nama } });
+    if (!existing) {
+      await prisma.tarifPajak.create({ data: t });
+    }
+  }
+
+  // ── Proyek (Sidamon Master Data) ──────────────────────────────────
+  const sampleProjects = [
+    { entityId: entities.gaharu.id, code: "GHR-001", name: "Pembangunan Gedung RSUD Doris Sylvanus", contractValue: 1250000000 },
+    { entityId: entities.gaharu.id, code: "GHR-002", name: "Perencanaan Jembatan Sei Kahayan Tahap 2", contractValue: 480000000 },
+    { entityId: entities.gaharu.id, code: "GHR-003", name: "Pengawasan Pembangunan Saluran Drainase Kota", contractValue: 320000000 },
+    { entityId: entities.gaharu.id, code: "GHR-004", name: "Renovasi Gedung Bappeda Prov. Kalteng", contractValue: 750000000 },
+    { entityId: entities.gaharu.id, code: "GHR-005", name: "Pengawasan Pembangunan Puskesmas Pahandut", contractValue: 280000000 },
+    { entityId: entities.gaharu.id, code: "GHR-006", name: "Perencanaan Laboratorium Kesehatan Dinkes", contractValue: 390000000 },
+    { entityId: entities.gaharu.id, code: "GHR-007", name: "Pengawasan Konstruksi Jalan Akses Pelabuhan", contractValue: 620000000 },
+    { entityId: entities.gaharu.id, code: "GHR-008", name: "Perencanaan Gedung Arsip Daerah", contractValue: 450000000 },
+    { entityId: entities.gaharu.id, code: "GHR-009", name: "Pengawasan Rehabilitasi Jaringan Irigasi Primer", contractValue: 540000000 },
+    { entityId: entities.gaharu.id, code: "GHR-010", name: "Perencanaan Ruang Terbuka Hijau Bundaran Besar", contractValue: 880000000 },
+    { entityId: entities.kencana.id, code: "KAK-001", name: "Perencanaan Perumahan Griya Kencana Asri", contractValue: 650000000 },
+    { entityId: entities.kencana.id, code: "KAK-002", name: "Pembangunan Ruko Komersial Sentra Niaga", contractValue: 1100000000 },
+    { entityId: entities.kencana.id, code: "KAK-003", name: "Pengawasan Kawasan Hunian Mandiri", contractValue: 420000000 },
+    { entityId: entities.tataring.id, code: "TB-001", name: "Perencanaan Gedung Serbaguna Tataring", contractValue: 520000000 },
+    { entityId: entities.tataring.id, code: "TB-002", name: "Pengawasan Konstruksi Baja Pabrik", contractValue: 780000000 },
+    { entityId: entities.ciptaAsri.id, code: "CAD-001", name: "Landscape Taman Kota Palangka Raya", contractValue: 350000000 },
+  ];
+  for (const p of sampleProjects) {
+    await prisma.project.upsert({
+      where: { code: p.code },
+      update: { name: p.name, contractValue: p.contractValue, entityId: p.entityId },
+      create: {
+        code: p.code,
+        name: p.name,
+        contractValue: p.contractValue,
+        spend: 0,
+        deadline: new Date("2026-12-31"),
+        status: "ACTIVE",
+        entityId: p.entityId,
+      },
+    });
+  }
+
+  // Seed contoh termin untuk pengujian kontrol piutang & sinkronisasi faktur pendapatan
+  const sampleTermins = [
+    { projectCode: "GHR-001", name: "Termin 1 (Uang Muka 20%)", percentage: 20 },
+    { projectCode: "GHR-001", name: "Termin 2 (Progres Fisik 50%)", percentage: 50 },
+    { projectCode: "GHR-002", name: "Termin 1 (Uang Muka 30%)", percentage: 30 },
+    { projectCode: "TB-001", name: "Termin 1 (Uang Muka 30%)", percentage: 30 },
+    { projectCode: "TB-001", name: "Termin 2 (Pelunasan 100%)", percentage: 100 },
+    { projectCode: "KAK-001", name: "Termin 1 (Uang Muka 25%)", percentage: 25 },
+  ];
+  for (const t of sampleTermins) {
+    const proj = await prisma.project.findUnique({ where: { code: t.projectCode } });
+    if (proj) {
+      const existing = await prisma.termin.findFirst({
+        where: { projectId: proj.id, name: t.name },
+      });
+      if (!existing) {
+        await prisma.termin.create({
+          data: {
+            projectId: proj.id,
+            name: t.name,
+            percentage: t.percentage,
+            status: "ON_TRACK",
+          },
+        });
+      }
+    }
   }
 
   console.log("✅ Seed selesai. Entitas, user, jenis input, dan COA sudah siap.");

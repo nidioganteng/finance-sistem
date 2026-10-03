@@ -5,24 +5,26 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getRunningSaldo, ENTITY_PREFIX } from "@/lib/kas";
-import { isValidRekening, getRekeningNama, REKENING_COA_CODE } from "@/lib/bank-accounts";
+import { getRunningSaldo, ENTITY_PREFIX, ENTITY_PREFIX_UMUM } from "@/lib/kas";
+import { isValidRekening, getRekeningNama, REKENING_COA_CODE, REKENING_BY_ENTITY } from "@/lib/bank-accounts";
 import { computeNewTerminPercentage } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 
-// Format: {PREFIX}/{MMDD}{SEQ} — SEQ mulai dari 1, naik per hari per entitas
+// Format Pengeluaran Umum: {PREFIX}{MMDD}{SEQ}
+// Contoh: UK09281 (Kencana), UG09281 (Gaharu), UT09281 (Tataring), UC09281 (Cipta Asri)
+// SEQ mulai dari 1, naik berurutan per hari per entitas
 export async function generateNoBukti(entityKey: string, tanggal: string): Promise<string> {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
 
-  const prefix = ENTITY_PREFIX[entityKey] ?? entityKey.toUpperCase().slice(0, 3);
+  const prefix = ENTITY_PREFIX_UMUM[entityKey] ?? ENTITY_PREFIX[entityKey] ?? entityKey.toUpperCase().slice(0, 2);
   const d = new Date(tanggal);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const dayPart = `${mm}${dd}`;
-  const pattern = `${prefix}/${dayPart}`;
+  const pattern = `${prefix}${dayPart}`;
 
   const entity = await prisma.entity.findUnique({ where: { key: entityKey } });
   if (!entity) throw new Error("Entity tidak ditemukan.");
@@ -89,11 +91,46 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
     if (!code) return null;
     return (await prisma.coaAccount.findUnique({ where: { code } }))?.id ?? null;
   }
-  if (jenisInputKey === "bankBuku" && rekeningId) {
-    const coaCode = REKENING_COA_CODE[rekeningId];
+  if (jenisInputKey === "bankBuku") {
+    let effectiveRekeningId = rekeningId;
+    if (!effectiveRekeningId || !isValidRekening(entityKey, effectiveRekeningId)) {
+      effectiveRekeningId = REKENING_BY_ENTITY[entityKey]?.[0]?.id;
+    }
+    const coaCode = effectiveRekeningId ? REKENING_COA_CODE[effectiveRekeningId] : undefined;
     if (coaCode) return (await prisma.coaAccount.findUnique({ where: { code: coaCode } }))?.id ?? null;
   }
   return null;
+}
+
+async function resolveCrossingDebitCoa(
+  primaryRowCoaId: string | undefined,
+  hasProject = false
+): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
+  const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
+  if (!coa) return null;
+
+  if (coa.kategori === "BEBAN") {
+    return {
+      coaAccountId: coa.id,
+      role: "BEBAN",
+    };
+  }
+
+  // Jika transaksi ini terkait pembayaran proyek lintas entitas (misal Gaharu bayarin proyek Kencana),
+  // di entitas tujuan (Kencana) dicatat sebagai Beban Proyek (COA 630 Biaya Lainnya / 528 By Umum)
+  if (hasProject) {
+    const bebanProyek =
+      (await prisma.coaAccount.findUnique({ where: { code: "630" } })) ??
+      (await prisma.coaAccount.findUnique({ where: { code: "528" } }));
+    if (bebanProyek) {
+      return { coaAccountId: bebanProyek.id, role: "BEBAN" };
+    }
+  }
+
+  return {
+    coaAccountId: coa.id,
+    role: "PIUTANG",
+  };
 }
 
 export async function createKasTransaction(input: CreateKasTransactionInput) {
@@ -141,16 +178,12 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   const crossingGroupId = crossingEntityKeys.length > 0 ? randomUUID() : undefined;
   const arahLaporan = Array.isArray(input.arahLaporan) && input.arahLaporan.length > 0 ? input.arahLaporan : undefined;
 
-  // Pre-calculate crossing entity saldos (read-only, safe to do before transaction)
-  type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number; kasCoaId: string | null };
+  // Crossing entities (hanya saat keluar): langsung masuk ke Jurnal Transaksi (Non-Kas)
+  type CrossingEntry = { entity: { id: string; key: string } };
   const crossingEntries: CrossingEntry[] = [];
   for (const crossKey of crossingEntityKeys) {
     const crossEntity = await prisma.entity.findUnique({ where: { key: crossKey } });
-    if (!crossEntity) continue;
-    const crossPrev = await getRunningSaldo(crossEntity.id, jenisInput.id);
-    const crossNewSaldo = crossPrev + total; // crossing entity receives money (masuk)
-    const crossKasCoaId = await resolveKasCoa(input.jenisInputKey, crossKey);
-    crossingEntries.push({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId });
+    if (crossEntity) crossingEntries.push({ entity: crossEntity });
   }
 
   const commonData = {
@@ -161,6 +194,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     keterangan: input.keterangan,
     saldoSetelah: newSaldo,
     staffId: session.user.id,
+    projectId: input.projectId || null,
   };
 
   const akunRows = validRows.map((r) =>
@@ -170,7 +204,15 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
+        ...((arahLaporan || r.keterangan || crossingGroupId)
+          ? {
+              extraFieldsJson: {
+                ...(arahLaporan ? { arahLaporan } : {}),
+                ...(r.keterangan ? { itemDescription: r.keterangan } : {}),
+                ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
+              },
+            }
+          : {}),
       },
     })
   );
@@ -186,15 +228,13 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         ...(rekeningNama ? { rekeningNama } : {}),
         ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
         ...(arahLaporan ? { arahLaporan } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
       },
     },
   });
 
   // Uang masuk yang ditandai buat proyek tertentu otomatis jadi termin baru
-  // proyek itu — dinomori urut per proyek (Termin 1, Termin 2, dst), bukan
-  // diberi nama tanggal. Persentase tetap dihitung & disimpan di belakang
-  // layar (dipakai buku besar perhitungan Piutang Perlu Perhatian dkk), tapi
-  // bukan yang ditampilkan/diinput Keuangan — itu bagian tampilan Sidamon.
+  // proyek itu — dinomori urut per proyek (Termin 1, Termin 2, dst) dengan persentase progres.
   const terminCreate: ReturnType<typeof prisma.termin.create>[] = [];
   if (!isKeluar && input.projectId) {
     const project = await prisma.project.findUnique({
@@ -202,24 +242,25 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       include: { termin: { select: { percentage: true } } },
     });
     if (project) {
+      const maxPctSoFar = project.termin.map((t) => t.percentage).reduce((max, p) => Math.max(max, p), 0);
       const newPct = computeNewTerminPercentage(
         Number(project.contractValue),
         project.termin.map((t) => t.percentage),
         total
       );
       const terminKe = project.termin.length + 1;
+      const deltaPct = Math.max(0, newPct - maxPctSoFar);
       terminCreate.push(
         prisma.termin.create({
           data: {
             projectId: input.projectId,
-            name: `Termin ${terminKe}`,
+            name: `Termin ${terminKe} (${deltaPct}% Kontrak)`,
             percentage: newPct,
             status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
           },
         })
       );
-      // Termin 100% → proyek otomatis selesai, hilang dari Kontrol Piutang.
-      // Jurnal transaksinya tetap ada.
+      // Termin 100% → proyek otomatis selesai
       if (newPct >= 100) {
         terminCreate.push(
           prisma.project.update({ where: { id: input.projectId }, data: { status: "COMPLETED" } }) as never
@@ -231,44 +272,83 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   // Pre-resolve hutang COA for the source entity (used as liability in crossing entries)
   const hutangCode = HUTANG_COA_CODE[input.entityKey];
   const hutangCoa = hutangCode ? await prisma.coaAccount.findUnique({ where: { code: hutangCode } }) : null;
-
-  // Build crossing entity ops — tagged with crossingGroupId so they can be deleted/found together
-  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Kas B / Cr. HUTANG_A
-  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId }) => {
-    const crossCommon = {
-      entityId: crossEntity.id,
-      jenisInputId: jenisInput.id,
-      tanggal: new Date(input.tanggal),
-      noBukti: input.noBukti,
-      keterangan: input.keterangan,
-      saldoSetelah: crossNewSaldo,
-      staffId: session.user.id,
-    };
-    // Crossing entity receives money (masuk): Dr. Kas B
-    const crossKas = prisma.transaction.create({
-      data: {
-        ...crossCommon,
-        coaAccountId: crossKasCoaId,
-        debit: total,
-        kredit: 0,
-        extraFieldsJson: { isKasEntry: true, crossingGroupId, crossingFromEntityKey: input.entityKey },
-      },
+  let jurnalJenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "jurnalTransaksi" } });
+  if (!jurnalJenisInput) {
+    jurnalJenisInput = await prisma.jenisInputTransaksi.create({
+      data: { key: "jurnalTransaksi", nama: "Jurnal Transaksi", active: true },
     });
-    // Crossing entity records liability: Cr. HUTANG_A
-    const ops: ReturnType<typeof prisma.transaction.create>[] = [crossKas];
-    if (hutangCoa) {
-      ops.push(prisma.transaction.create({
-        data: {
-          ...crossCommon,
-          coaAccountId: hutangCoa.id,
-          debit: 0,
-          kredit: total,
-          extraFieldsJson: { crossingGroupId, crossingFromEntityKey: input.entityKey },
-        },
-      }));
-    }
-    return ops;
-  });
+  }
+  // Build crossing entity ops: tidak masuk ke kas/bank entitas tujuan,
+  // melainkan langsung dicatat ke Jurnal Transaksi (Jurnal Umum & Buku Besar):
+  // 1. Debet Kas/Bank rekanan jika pinjaman/piutang (atau akun Beban jika belanja riil)
+  // 2. Kredit Hutang Afiliasi (Hutang entitas asal, misal 312 Hutang GS)
+  const primaryRowCoaId = validRows[0]?.coaAccountId;
+  const crossingOpsNested = await Promise.all(
+    crossingEntries.map(async ({ entity: crossEntity }) => {
+      const crossCommon = {
+        entityId: crossEntity.id,
+        jenisInputId: jurnalJenisInput?.id ?? jenisInput.id,
+        tanggal: new Date(input.tanggal),
+        noBukti: input.noBukti,
+        keterangan: input.keterangan,
+        saldoSetelah: 0,
+        staffId: session.user.id,
+        projectId: input.projectId || null,
+      };
+      const ops: ReturnType<typeof prisma.transaction.create>[] = [];
+
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId, !!input.projectId);
+
+      if (debitTarget) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: debitTarget.coaAccountId,
+              debit: total,
+              kredit: 0,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: debitTarget.role,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
+              },
+            },
+          })
+        );
+      }
+
+      if (hutangCoa) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: hutangCoa.id,
+              debit: 0,
+              kredit: total,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: "HUTANG",
+                originalHutangCoaCode: hutangCode,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
+              },
+            },
+          })
+        );
+      }
+      return ops;
+    })
+  );
+  const crossingOps = crossingOpsNested.flat();
 
   // Saat auto-sync aktif, skip akunRows — Buku Bank keluar sudah jadi counterpart-nya
   const isSyncMode = !!((input.jenisInputKey === "kasKecil" || input.jenisInputKey === "kasBesar") && input.arah === "masuk" && input.syncBukuBankRekeningId);
@@ -305,11 +385,18 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     }
   }
 
-  logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
+  logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
+  revalidatePath("/bank-buku");
+  revalidatePath("/pendapatan");
   revalidatePath("/jurnal");
+  revalidatePath("/jurnal-transaksi");
+  revalidatePath("/buku-besar");
   revalidatePath("/piutang");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }
 
@@ -343,6 +430,11 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
 
   revalidatePath(pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/jurnal-transaksi");
+  revalidatePath("/buku-besar");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }
 
@@ -403,15 +495,12 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   const crossingGroupId = crossingEntityKeys.length > 0 ? randomUUID() : undefined;
   const arahLaporan = Array.isArray(input.arahLaporan) && input.arahLaporan.length > 0 ? input.arahLaporan : undefined;
 
-  type CrossingEntry = { entity: { id: string; key: string }; newSaldo: number; kasCoaId: string | null };
+  // Entitas tujuan crossing: tidak masuk ke kas/bank tujuan, melainkan langsung ke Jurnal Transaksi
+  type CrossingEntry = { entity: { id: string; key: string } };
   const crossingEntries: CrossingEntry[] = [];
   for (const crossKey of crossingEntityKeys) {
     const crossEntity = await prisma.entity.findUnique({ where: { key: crossKey } });
-    if (!crossEntity) continue;
-    const crossPrev = await getRunningSaldo(crossEntity.id, jenisInput.id);
-    const crossNewSaldo = crossPrev + total; // crossing entity receives money (masuk)
-    const crossKasCoaId = await resolveKasCoa(input.jenisInputKey, crossKey);
-    crossingEntries.push({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId });
+    if (crossEntity) crossingEntries.push({ entity: crossEntity });
   }
 
   const commonData = {
@@ -422,6 +511,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
     keterangan: input.keterangan,
     saldoSetelah: newSaldo,
     staffId: session.user.id,
+    projectId: input.projectId || null,
   };
 
   const akunRows = validRows.map((r) =>
@@ -431,7 +521,15 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         coaAccountId: r.coaAccountId,
         debit: isKeluar ? r.nominal : 0,
         kredit: isKeluar ? 0 : r.nominal,
-        ...((arahLaporan || r.keterangan) ? { extraFieldsJson: { ...(arahLaporan ? { arahLaporan } : {}), ...(r.keterangan ? { itemDescription: r.keterangan } : {}) } } : {}),
+        ...((arahLaporan || r.keterangan || crossingGroupId)
+          ? {
+              extraFieldsJson: {
+                ...(arahLaporan ? { arahLaporan } : {}),
+                ...(r.keterangan ? { itemDescription: r.keterangan } : {}),
+                ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
+              },
+            }
+          : {}),
       },
     })
   );
@@ -447,6 +545,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         ...(rekeningNama ? { rekeningNama } : {}),
         ...(crossingGroupId ? { crossingEntityKeys, crossingGroupId } : {}),
         ...(arahLaporan ? { arahLaporan } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
       },
     },
   });
@@ -454,50 +553,95 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   // Pre-resolve hutang COA for the source entity (used as liability in crossing entries)
   const hutangCodeReplace = HUTANG_COA_CODE[input.entityKey];
   const hutangCoaReplace = hutangCodeReplace ? await prisma.coaAccount.findUnique({ where: { code: hutangCodeReplace } }) : null;
-
-  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Kas B / Cr. HUTANG_A
-  const crossingOps = crossingEntries.flatMap(({ entity: crossEntity, newSaldo: crossNewSaldo, kasCoaId: crossKasCoaId }) => {
-    const crossCommon = {
-      entityId: crossEntity.id,
-      jenisInputId: jenisInput.id,
-      tanggal: new Date(input.tanggal),
-      noBukti: input.noBukti,
-      keterangan: input.keterangan,
-      saldoSetelah: crossNewSaldo,
-      staffId: session.user.id,
-    };
-    // Crossing entity receives money (masuk): Dr. Kas B
-    const crossKas = prisma.transaction.create({
-      data: {
-        ...crossCommon,
-        coaAccountId: crossKasCoaId,
-        debit: total,
-        kredit: 0,
-        extraFieldsJson: { isKasEntry: true, crossingGroupId, crossingFromEntityKey: input.entityKey },
-      },
+  let jurnalJenisInputReplace = await prisma.jenisInputTransaksi.findUnique({ where: { key: "jurnalTransaksi" } });
+  if (!jurnalJenisInputReplace) {
+    jurnalJenisInputReplace = await prisma.jenisInputTransaksi.create({
+      data: { key: "jurnalTransaksi", nama: "Jurnal Transaksi", active: true },
     });
-    // Crossing entity records liability: Cr. HUTANG_A
-    const ops: ReturnType<typeof prisma.transaction.create>[] = [crossKas];
-    if (hutangCoaReplace) {
-      ops.push(prisma.transaction.create({
-        data: {
-          ...crossCommon,
-          coaAccountId: hutangCoaReplace.id,
-          debit: 0,
-          kredit: total,
-          extraFieldsJson: { crossingGroupId, crossingFromEntityKey: input.entityKey },
-        },
-      }));
-    }
-    return ops;
-  });
+  }
+  // Source KELUAR: Entity A Dr. PIUTANG_B / Cr. Kas A  →  Entity B Dr. Kas (atau Beban) / Cr. HUTANG_A (masuk ke Jurnal Transaksi)
+  const primaryRowCoaIdReplace = validRows[0]?.coaAccountId;
+  const crossingOpsNested = await Promise.all(
+    crossingEntries.map(async ({ entity: crossEntity }) => {
+      const crossCommon = {
+        entityId: crossEntity.id,
+        jenisInputId: jurnalJenisInputReplace?.id ?? jenisInput.id,
+        tanggal: new Date(input.tanggal),
+        noBukti: input.noBukti,
+        keterangan: input.keterangan,
+        saldoSetelah: 0,
+        staffId: session.user.id,
+        projectId: input.projectId || null,
+      };
+      const ops: ReturnType<typeof prisma.transaction.create>[] = [];
+
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace, !!input.projectId);
+
+      if (debitTarget) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: debitTarget.coaAccountId,
+              debit: total,
+              kredit: 0,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: debitTarget.role,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
+              },
+            },
+          })
+        );
+      }
+
+      if (hutangCoaReplace) {
+        ops.push(
+          prisma.transaction.create({
+            data: {
+              ...crossCommon,
+              coaAccountId: hutangCoaReplace.id,
+              debit: 0,
+              kredit: total,
+              extraFieldsJson: {
+                isCrossingEntry: true,
+                crossingGroupId,
+                crossingFromEntityKey: input.entityKey,
+                crossingFromJenisInputKey: input.jenisInputKey,
+                crossingFromRekeningId: input.rekeningId,
+                crossingFromRekeningNama: rekeningNama,
+                crossingRole: "HUTANG",
+                originalHutangCoaCode: hutangCodeReplace,
+                ...(input.projectId ? { projectId: input.projectId } : {}),
+              },
+            },
+          })
+        );
+      }
+      return ops;
+    })
+  );
+  const crossingOps = crossingOpsNested.flat();
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);
 
-  logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah });
+  logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
+  revalidatePath("/bank-buku");
+  revalidatePath("/pendapatan");
   revalidatePath("/jurnal");
+  revalidatePath("/jurnal-transaksi");
+  revalidatePath("/buku-besar");
+  revalidatePath("/piutang");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }
 
@@ -527,5 +671,8 @@ export async function updateKasTransactionGroup(input: {
 
   revalidatePath(input.pagePath);
   revalidatePath("/jurnal");
+  revalidatePath("/laporan-hutang-piutang");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }

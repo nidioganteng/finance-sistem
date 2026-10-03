@@ -9,7 +9,6 @@ import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PrintButton } from "@/components/shared/PrintButton";
 import { AlertTriangle, ChevronRight, ChevronLeft } from "lucide-react";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 const KATEGORI_BADGE: Record<string, string> = {
@@ -27,7 +26,6 @@ export default async function BukuBesarPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Buku Besar", "USER_ACTIVITY", { path: "/buku-besar" });
   if (role === "SUPER_ADMIN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
@@ -53,7 +51,11 @@ export default async function BukuBesarPage({
         subtitle={`Ledger per akun COA — ${currentYear}`}
         rightSlot={
           <>
-            <PrintButton />
+            <PrintButton
+              title="Buku Besar"
+              entityName={selectedEntity.name}
+              year={currentYear}
+            />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}

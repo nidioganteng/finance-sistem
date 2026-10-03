@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { registerUser } from "@/lib/actions/auth";
 
-const BG_IMAGE = "/img/login/gambar2.webp";
+const BG_IMAGE = "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop";
 
 const ENTITY_LOGOS = [
   { key: "gaharu",    src: "/logo-entitas/gaharu.webp",    name: "Gaharu" },
@@ -103,8 +103,11 @@ function AuthForm() {
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-4 mb-12">
+          <div className="flex items-center gap-3 mb-12">
             <Image src="/logo-sidamon.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
+            <h1 className="text-3xl font-black tracking-tight text-white">
+              SIMATRA<span className="text-[#158ed4]">.</span>
+            </h1>
           </div>
 
           <h2 className="text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-white mb-6">
@@ -139,6 +142,9 @@ function AuthForm() {
           {/* Mobile branding */}
           <div className="md:hidden text-center mb-10">
             <Image src="/logo-sidamon.png" alt="Logo" width={72} height={72} className="object-contain mx-auto mb-4 drop-shadow-lg" />
+            <h1 className="text-2xl font-black tracking-tight text-white mb-1">
+              SIMATRA<span className="text-[#158ed4]">.</span>
+            </h1>
             <p className="text-sm text-slate-400">Gaharu Sempana Group</p>
           </div>
 

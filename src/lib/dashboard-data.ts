@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { Role, type ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
+import { getExcludedNoBuktiForVersion } from "./akuntansi";
 
 export function formatRupiah(n: number) {
   return "Rp\u00A0" + Math.round(n).toLocaleString("id-ID");
@@ -23,8 +24,11 @@ export interface AccessibleEntity {
   colorHex: string;
   isUmum: boolean;
   revenue: number;
+  beban?: number;
   spend: number;
   profit: number;
+  talanganKeluar?: number;
+  talanganMasuk?: number;
   projects: {
     code: string;
     name: string;
@@ -43,31 +47,66 @@ export async function getAccessibleEntities(
   entityKeys: string[],
   targetYear: number = new Date().getFullYear()
 ): Promise<AccessibleEntity[]> {
-  const [entities, txRows, assetsRaw] = await Promise.all([
-    prisma.entity.findMany({
-      where: { key: { in: entityKeys } },
-      include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
-      orderBy: { createdAt: "asc" },
-    }),
-    // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
-    // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41).
+  const entities = await prisma.entity.findMany({
+    where: { key: { in: entityKeys } },
+    include: { projects: { where: { status: "ACTIVE" }, include: { termin: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const entityIds = entities.map((e) => e.id);
+  const excludedNoBukti = await getExcludedNoBuktiForVersion(entityIds, targetYear, "INTERNAL");
+
+  // Revenue & spend dihitung dari transaksi aktual (COA kategori PENDAPATAN/BEBAN)
+  // disinkronkan dengan Modul Aktiva Tetap (Issue 39) dan dikunci ke Versi Internal (Issue 41) pada targetYear.
+  const [txRows, assetsRaw, talanganKeluarTx, talanganMasukTx] = await Promise.all([
     prisma.transaction.findMany({
       where: {
-        entity: { key: { in: entityKeys } },
+        entityId: { in: entityIds },
+        tanggal: {
+          gte: new Date(`${targetYear}-01-01`),
+          lte: new Date(`${targetYear}-12-31T23:59:59`),
+        },
         coaAccount: {
           kategori: { in: ["PENDAPATAN", "BEBAN"] },
           reportCategory: { in: ["INTERNAL", "SEMUA"] },
         },
+        ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
       },
       select: {
         entityId: true,
         kredit: true,
         debit: true,
-        coaAccount: { select: { kategori: true } },
+        coaAccount: { select: { kategori: true, code: true, name: true } },
       },
     }),
     prisma.asetTetap.findMany({
-      where: { entity: { key: { in: entityKeys } } },
+      where: { entityId: { in: entityIds } },
+    }),
+    // Mutasi kas keluar talangan / piutang afiliasi (kode akun 111-115) di targetYear
+    prisma.transaction.findMany({
+      where: {
+        entityId: { in: entityIds },
+        tanggal: {
+          gte: new Date(`${targetYear}-01-01`),
+          lte: new Date(`${targetYear}-12-31T23:59:59`),
+        },
+        coaAccount: { code: { in: ["111", "112", "113", "114", "115"] } },
+        debit: { gt: 0 },
+      },
+      select: { entityId: true, debit: true, kredit: true },
+    }),
+    // Mutasi talangan masuk / hutang afiliasi (kode akun 311-315) di targetYear
+    prisma.transaction.findMany({
+      where: {
+        entityId: { in: entityIds },
+        tanggal: {
+          gte: new Date(`${targetYear}-01-01`),
+          lte: new Date(`${targetYear}-12-31T23:59:59`),
+        },
+        coaAccount: { code: { in: ["311", "312", "313", "314", "315"] } },
+        kredit: { gt: 0 },
+      },
+      select: { entityId: true, debit: true, kredit: true },
     }),
   ]);
 
@@ -75,9 +114,21 @@ export async function getAccessibleEntities(
   const spendMap = new Map<string, number>();
   for (const tx of txRows) {
     if (tx.coaAccount?.kategori === "PENDAPATAN") {
-      revenueMap.set(tx.entityId, (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit));
+      revenueMap.set(
+        tx.entityId,
+        (revenueMap.get(tx.entityId) ?? 0) + Number(tx.kredit) - Number(tx.debit)
+      );
     } else if (tx.coaAccount?.kategori === "BEBAN") {
-      spendMap.set(tx.entityId, (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit));
+      const isDeprCoa =
+        tx.coaAccount.code === "512" ||
+        tx.coaAccount.code === "540" ||
+        /penyusutan/i.test(tx.coaAccount.name);
+      if (!isDeprCoa) {
+        spendMap.set(
+          tx.entityId,
+          (spendMap.get(tx.entityId) ?? 0) + Number(tx.debit) - Number(tx.kredit)
+        );
+      }
     }
   }
 
@@ -91,9 +142,32 @@ export async function getAccessibleEntities(
     }
   }
 
+  const talanganKeluarMap = new Map<string, number>();
+  for (const t of talanganKeluarTx) {
+    talanganKeluarMap.set(
+      t.entityId,
+      (talanganKeluarMap.get(t.entityId) ?? 0) + Number(t.debit) - Number(t.kredit)
+    );
+  }
+
+  const talanganMasukMap = new Map<string, number>();
+  for (const t of talanganMasukTx) {
+    talanganMasukMap.set(
+      t.entityId,
+      (talanganMasukMap.get(t.entityId) ?? 0) + Number(t.kredit) - Number(t.debit)
+    );
+  }
+
   return entities.map((e) => {
     const revenue = revenueMap.get(e.id) ?? 0;
-    const spend = spendMap.get(e.id) ?? 0;
+    const beban = spendMap.get(e.id) ?? 0;
+    const talanganKeluar = Math.max(0, talanganKeluarMap.get(e.id) ?? 0);
+    const talanganMasuk = Math.max(0, talanganMasukMap.get(e.id) ?? 0);
+    // Spend di dashboard entitas mencakup beban operasional ditambah arus kas keluar talangan afiliasi
+    const spend = beban + talanganKeluar;
+    // Profit operasional entitas dihitung dari pendapatan dikurangi beban operasional
+    // (talangan keluar adalah piutang/aset yang akan kembali, bukan kerugian operasional)
+    const profit = revenue - beban;
     return {
       id: e.id,
       key: e.key,
@@ -102,8 +176,11 @@ export async function getAccessibleEntities(
       colorHex: e.colorHex,
       isUmum: e.isUmum,
       revenue,
+      beban,
       spend,
-      profit: revenue - spend,
+      profit,
+      talanganKeluar,
+      talanganMasuk,
       projects: e.projects.map((p) => ({
         code: p.code,
         name: p.name,
@@ -151,9 +228,11 @@ export async function getGrupPiutangMetrics() {
 
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
-export async function getMonthlyChartData(entityKeys: string[], year: number) {
+export async function getMonthlyChartData(entityKeys: string[], year: number, version: string = "INTERNAL") {
   const start = new Date(`${year}-01-01`);
   const end = new Date(`${year + 1}-01-01`);
+  const allowedCategories: ReportCategory[] =
+    version.toUpperCase() === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const rows = await prisma.transaction.findMany({
     where: {
@@ -161,7 +240,7 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
       tanggal: { gte: start, lt: end },
       coaAccount: {
         kategori: "PENDAPATAN",
-        reportCategory: { in: ["INTERNAL", "SEMUA"] },
+        reportCategory: { in: allowedCategories },
       },
     },
     select: {
@@ -185,10 +264,12 @@ export async function getMonthlyChartData(entityKeys: string[], year: number) {
 // Pendapatan bulanan satu (atau beberapa) entitas, dipecah per TAHUN alih-alih
 // per entitas — dipakai chart komparasi antar-tahun saat cuma 1 entitas yang
 // dipilih (warna chart jadi merepresentasikan tahun, bukan entitas).
-export async function getMonthlyByYear(entityIds: string[], years: number[]) {
+export async function getMonthlyByYear(entityIds: string[], years: number[], version: string = "INTERNAL") {
   if (years.length === 0) return [];
   const minYear = Math.min(...years);
   const maxYear = Math.max(...years);
+  const allowedCategories: ReportCategory[] =
+    version.toUpperCase() === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
 
   const rows = await prisma.transaction.findMany({
     where: {
@@ -196,7 +277,7 @@ export async function getMonthlyByYear(entityIds: string[], years: number[]) {
       tanggal: { gte: new Date(`${minYear}-01-01`), lt: new Date(`${maxYear + 1}-01-01`) },
       coaAccount: {
         kategori: "PENDAPATAN",
-        reportCategory: { in: ["INTERNAL", "SEMUA"] },
+        reportCategory: { in: allowedCategories },
       },
     },
     select: { tanggal: true, kredit: true },
@@ -219,9 +300,15 @@ export async function getMonthlyByYear(entityIds: string[], years: number[]) {
 export function formatMiliar(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
-  if (abs >= 1e12) return sign + "Rp " + (abs / 1e12).toFixed(1).replace(".", ",") + " T";
-  if (abs >= 1e9) return sign + "Rp " + (abs / 1e9).toFixed(1).replace(".", ",") + " M";
-  if (abs >= 1e6) return sign + "Rp " + (abs / 1e6).toFixed(1).replace(".", ",") + " JT";
-  if (abs >= 1e3) return sign + "Rp " + (abs / 1e3).toFixed(1).replace(".", ",") + " rb";
+  const formatNum = (val: number, maxDec: number = 2) => {
+    const factor = Math.pow(10, maxDec);
+    const truncated = Math.floor(val * factor + 1e-9) / factor;
+    return truncated.toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: maxDec });
+  };
+
+  if (abs >= 1e12) return `${sign}Rp ${formatNum(abs / 1e12, 2)} T`;
+  if (abs >= 1e9) return `${sign}Rp ${formatNum(abs / 1e9, 2)} M`;
+  if (abs >= 1e6) return `${sign}Rp ${formatNum(abs / 1e6, 1)} JT`;
+  if (abs >= 1e3) return `${sign}Rp ${formatNum(abs / 1e3, 1)} rb`;
   return formatRupiah(n);
 }

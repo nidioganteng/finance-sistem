@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getLaporanPajakData } from "@/lib/pajak";
-import { generateLaporanPajakExcel } from "@/lib/pajak-excel";
+import { getLaporanPendapatanData } from "@/lib/pendapatan";
+import { generateLaporanPendapatanExcel } from "@/lib/pendapatan-excel";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -16,8 +16,8 @@ export async function GET(req: NextRequest) {
   const entityKey = searchParams.get("entityKey");
   const yearParam = searchParams.get("year");
   const year = parseInt(yearParam ?? "") || new Date().getFullYear();
-  const versionParam = searchParams.get("version");
-  const version = versionParam?.toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const masaPajakParam = searchParams.get("masaPajak");
+  const masaPajak = masaPajakParam ? parseInt(masaPajakParam) : null;
 
   let targetEntityId = entityId;
 
@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Entity ID is required", { status: 400 });
   }
 
-  // Validasi otorisasi entitas
   const entity = await prisma.entity.findUnique({
     where: { id: targetEntityId },
     select: { id: true, key: true, name: true },
@@ -50,43 +49,28 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await getLaporanPajakData(targetEntityId, year, version);
-    const excelBuffer = await generateLaporanPajakExcel(data, version);
-
-    const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const filename = `Laporan_Laba_Rugi_${safeName}_${year}_${version.toLowerCase()}.xlsx`;
-
-    const versionLabel = version === "UMUM" ? "Umum" : "Internal";
-    try {
-      await prisma.activityLog.create({
-        data: {
-          actorId: session.user.id,
-          action: `Export Excel Laporan Laba Rugi (${versionLabel}) – ${entity.name} (${year})`,
-          category: "USER_ACTIVITY",
-          detail: {
-            format: "Excel",
-            jenis: "Laba Rugi",
-            version: versionLabel,
-            entitas: entity.name,
-            entityKey: entity.key,
-            year,
-          },
-        },
-      });
-    } catch (logErr) {
-      console.error("Gagal mencatat log aktivitas ekspor:", logErr);
+    const data = await getLaporanPendapatanData(targetEntityId, year, masaPajak);
+    if (!data) {
+      return new NextResponse("Data not found", { status: 404 });
     }
 
-    return new NextResponse(new Uint8Array(excelBuffer), {
+    const excelBuffer = await generateLaporanPendapatanExcel(data);
+
+    const safeName = entity.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const monthSuffix = masaPajak ? `_Masa_${masaPajak}` : "_Tahunan";
+    const filename = `Laporan_Pendapatan_${safeName}_${year}${monthSuffix}.xlsx`;
+
+    return new NextResponse(excelBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": excelBuffer.length.toString(),
       },
     });
   } catch (error) {
-    console.error("Error generating tax excel:", error);
+    console.error("Export Laporan Pendapatan Excel error:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

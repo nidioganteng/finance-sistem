@@ -6,6 +6,7 @@ import {
   getGrupPiutangMetrics,
   getMonthlyChartData,
   formatMiliar,
+  formatRupiah,
 } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate, roleLabel } from "@/lib/rbac";
@@ -24,30 +25,29 @@ import {
   CalendarClock,
   Sparkles,
 } from "lucide-react";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; chartYear?: string; compareYears?: string };
+  searchParams: { entity?: string; chartYear?: string; compareYears?: string; year?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys, name } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Dashboard", "USER_ACTIVITY", { path: "/dashboard" });
 
-  const entities = await getAccessibleEntities(entityKeys);
+  const currentYear = searchParams.year ? parseInt(searchParams.year) : new Date().getFullYear();
+  const entities = await getAccessibleEntities(entityKeys, currentYear);
   const canGrup = canViewGrupAggregate(role);
 
   const selectedKey = canGrup
-    // Semua role yang boleh lihat grup: kalau URL tidak ada entity → tampilkan grup (undefined)
-    ? (searchParams.entity && entityKeys.includes(searchParams.entity) ? searchParams.entity : searchParams.entity)
+    // Semua role yang boleh lihat grup: kalau URL tidak ada entity atau entity=grup → tampilkan grup (undefined)
+    ? (searchParams.entity && searchParams.entity !== "grup" && entityKeys.includes(searchParams.entity)
+        ? searchParams.entity
+        : undefined)
     // Role tanpa akses grup: selalu resolve ke entity pertama
     : resolveEntityKey(searchParams.entity, entityKeys);
   const showingGrup = canGrup && !selectedKey;
   const selectedEntity = entities.find((e) => e.key === selectedKey);
-
-  const currentYear = new Date().getFullYear();
   const chartYear = searchParams.chartYear ? parseInt(searchParams.chartYear) : currentYear;
   // Tahun pembanding tambahan (di luar chartYear) — maksimal 4 (jadi 5 tahun
   // sekaligus), pembatasan lebih ketat (grup cuma 1) ditegakkan di RevenueChart
@@ -88,7 +88,9 @@ export default async function DashboardPage({
 
   // Hitung agregat grup
   const totalRevenue = entities.reduce((s, e) => s + e.revenue, 0);
-  const totalSpend = entities.reduce((s, e) => s + e.spend, 0);
+  const totalTalanganGrup = entities.reduce((s, e) => s + (e.talanganKeluar ?? 0), 0);
+  // Pengeluaran operasional konsolidasi grup (mengeliminasi talangan antar entitas agar tidak terjadi pencatatan ganda)
+  const totalSpend = entities.reduce((s, e) => s + (e.beban ?? (e.spend - (e.talanganKeluar ?? 0))), 0);
   const totalProfit = totalRevenue - totalSpend;
 
   // Pisahkan entitas utama dan Umum
@@ -166,7 +168,9 @@ export default async function DashboardPage({
         <>
           {/* 5 KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
                   <TrendingUp size={16} className="text-blue-500 dark:text-blue-400" />
@@ -174,9 +178,19 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pendapatan Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalRevenue)}</div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {formatRupiah(totalRevenue)}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
+              </div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-500/15 flex items-center justify-center">
                   <TrendingDown size={16} className="text-slate-400 dark:text-slate-500" />
@@ -184,9 +198,19 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pengeluaran Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {formatRupiah(totalSpend)}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
+              </div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center">
                   <BarChart3 size={16} className="text-status-green" />
@@ -195,6 +219,14 @@ export default async function DashboardPage({
               </div>
               <div className={`text-[22px] font-extrabold tabular-nums ${totalProfit >= 0 ? "text-status-green" : "text-status-red"}`}>
                 {totalProfit < 0 ? "-" : ""}{formatMiliar(Math.abs(totalProfit))}
+              </div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className={`text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight ${totalProfit >= 0 ? "bg-status-green" : "bg-status-red"}`}>
+                  {(totalProfit < 0 ? "-" : "") + formatRupiah(Math.abs(totalProfit))}
+                </div>
+                <div className={`w-0 h-0 border-x-4 border-x-transparent border-t-4 ml-4 ${totalProfit >= 0 ? "border-t-status-green" : "border-t-status-red"}`} />
               </div>
             </div>
 
@@ -211,7 +243,9 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div className="bg-surface-card rounded-[16px] border border-border p-4">
+            <div
+              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
                   <CalendarClock size={16} className="text-purple-500 dark:text-purple-400" />
@@ -220,6 +254,14 @@ export default async function DashboardPage({
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
                 {formatMiliar(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
+              </div>
+
+              {/* Instant Floating Tooltip */}
+              <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
+                <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
+                  {formatRupiah(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
+                </div>
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 dark:border-t-slate-800 ml-4" />
               </div>
             </div>
           </div>
@@ -234,6 +276,7 @@ export default async function DashboardPage({
                 legalName={e.legalName}
                 colorHex={e.colorHex}
                 revenue={e.revenue}
+                spend={e.spend}
                 profit={e.profit}
               />
             ))}
@@ -244,6 +287,7 @@ export default async function DashboardPage({
                 legalName={umumEntity.legalName}
                 colorHex={umumEntity.colorHex}
                 revenue={umumEntity.revenue}
+                spend={umumEntity.spend}
                 profit={umumEntity.profit}
                 isUmum
               />
@@ -289,7 +333,7 @@ export default async function DashboardPage({
           <div className="bg-surface-card rounded-2xl border border-border p-5">
             <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-left text-[11.5px] font-bold text-muted-faint">
                   <td className="pb-2">Kode</td>
@@ -311,14 +355,14 @@ export default async function DashboardPage({
                     <tr key={p.code} className="border-t border-border">
                       <td className="py-3 font-semibold text-muted-stronger">{p.code}</td>
                       <td className="py-3">{p.name}</td>
-                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.contractValue)}</td>
-                      <td className="py-3 text-right tabular-nums">{formatMiliar(p.spend)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatRupiah(p.contractValue)}</td>
+                      <td className="py-3 text-right tabular-nums">{formatRupiah(p.spend)}</td>
                       <td
                         className={`py-3 text-right tabular-nums font-semibold ${
                           p.profit >= 0 ? "text-status-green" : "text-status-red"
                         }`}
                       >
-                        {formatMiliar(p.profit)}
+                        {p.profit < 0 ? "-" : ""}{formatRupiah(Math.abs(p.profit))}
                       </td>
                     </tr>
                   ))

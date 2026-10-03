@@ -5,7 +5,6 @@ import { getDokumenList } from "@/lib/dokumen";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DokumenFilterTabs } from "@/components/dokumen/DokumenFilterTabs";
 import { ExternalLink } from "lucide-react";
-import { logActivity } from "@/lib/actions/log";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 const KATEGORI_LABEL: Record<string, string> = {
@@ -20,7 +19,6 @@ export default async function DokumenPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  logActivity(session!.user.id, "Buka halaman Dokumen & SOP", "USER_ACTIVITY", { path: "/dokumen" });
   if (role === "SUPER_ADMIN" || role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") {
     redirect("/dashboard");
   }

@@ -104,7 +104,7 @@ function AuthForm() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
-            <Image src="/logo-sidamon.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
+            <Image src="/logo-entitas/logo-simatra.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
             <h1 className="text-3xl font-black tracking-tight text-white">
               SIMATRA<span className="text-[#158ed4]">.</span>
             </h1>
@@ -141,7 +141,7 @@ function AuthForm() {
         <div className="w-full max-w-md">
           {/* Mobile branding */}
           <div className="md:hidden text-center mb-10">
-            <Image src="/logo-sidamon.png" alt="Logo" width={72} height={72} className="object-contain mx-auto mb-4 drop-shadow-lg" />
+            <Image src="/logo-entitas/logo-simatra.png" alt="Logo" width={72} height={72} className="object-contain mx-auto mb-4 drop-shadow-lg" />
             <h1 className="text-2xl font-black tracking-tight text-white mb-1">
               SIMATRA<span className="text-[#158ed4]">.</span>
             </h1>

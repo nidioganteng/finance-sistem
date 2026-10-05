@@ -165,7 +165,8 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   const kasCoaId = await resolveKasCoa(input.jenisInputKey, input.entityKey, input.rekeningId);
 
   const total = validRows.reduce((sum, r) => sum + r.nominal, 0);
-  const prevSaldo = await getRunningSaldo(entity.id, jenisInput.id, rekeningNama);
+  const txYear = new Date(input.tanggal).getFullYear();
+  const prevSaldo = await getRunningSaldo(entity.id, jenisInput.id, rekeningNama, txYear);
   const newSaldo = prevSaldo + (input.arah === "masuk" ? total : -total);
   const isKeluar = input.arah === "keluar";
 
@@ -359,7 +360,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     const bankJenisInput = await prisma.jenisInputTransaksi.findUnique({ where: { key: "bankBuku" } });
     if (bankJenisInput) {
       const rekeningNama = getRekeningNama(input.entityKey, input.syncBukuBankRekeningId!);
-      const bankPrevSaldo = await getRunningSaldo(entity.id, bankJenisInput.id, rekeningNama);
+      const bankPrevSaldo = await getRunningSaldo(entity.id, bankJenisInput.id, rekeningNama, txYear);
       const bankNewSaldo = bankPrevSaldo - total;
       const bankCoaId = await resolveKasCoa("bankBuku", input.entityKey, input.syncBukuBankRekeningId);
       await prisma.transaction.create({
@@ -482,7 +483,8 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
 
   // Recalculate with new values
   const total = validRows.reduce((sum, r) => sum + r.nominal, 0);
-  const prevSaldo = await getRunningSaldo(entity.id, jenisInput.id, rekeningNama);
+  const txYear = new Date(input.tanggal).getFullYear();
+  const prevSaldo = await getRunningSaldo(entity.id, jenisInput.id, rekeningNama, txYear);
   const newSaldo = prevSaldo + (input.arah === "masuk" ? total : -total);
   const isKeluar = input.arah === "keluar";
 

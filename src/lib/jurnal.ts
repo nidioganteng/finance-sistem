@@ -113,10 +113,10 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
   umum: "Umum",
 };
 
-  const projectByNoBukti = new Map<string, { code: string; name: string }>();
+  const projectByNoBukti = new Map<string, { id: string; code: string; name: string }>();
   for (const r of allRows) {
     if (r.project) {
-      projectByNoBukti.set(r.noBukti, { code: r.project.code, name: r.project.name });
+      projectByNoBukti.set(r.noBukti, { id: r.project.id, code: r.project.code, name: r.project.name });
     }
   }
 
@@ -152,7 +152,8 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
           typeof extra?.rekeningNama === "string" ? extra.rekeningNama : "Rekening Bank";
       }
 
-      const proj = r.project ? { code: r.project.code, name: r.project.name } : projectByNoBukti.get(r.noBukti);
+      const proj = r.project ? { id: r.project.id, code: r.project.code, name: r.project.name } : projectByNoBukti.get(r.noBukti);
+      const projectId = proj?.id ?? r.projectId ?? null;
       const projectCode = proj?.code ?? null;
       const projectName = proj?.name ?? null;
 
@@ -166,6 +167,7 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
         tanggal: r.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
         noBukti: r.noBukti,
         keterangan: r.keterangan,
+        projectId,
         projectCode,
         projectName,
         sumberBg: style.bg,

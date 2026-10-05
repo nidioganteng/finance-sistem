@@ -42,6 +42,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
   const entityKey = (formData.get("entityKey") as string | null)?.trim() ?? "";
   const noBukti = (formData.get("noBukti") as string | null)?.trim() ?? "";
   const editNoBukti = (formData.get("editNoBukti") as string | null)?.trim() ?? "";
+  const projectId = (formData.get("projectId") as string | null)?.trim() || null;
 
   if (!tanggal) return { error: "Tanggal wajib diisi." };
   if (!noBukti) return { error: "No. Bukti wajib diisi." };
@@ -154,6 +155,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           kredit: row.kredit ?? 0,
           saldoSetelah: 0,
           staffId,
+          projectId: projectId || null,
           ...(extraFieldsJson ? { extraFieldsJson } : {}),
         },
       })
@@ -216,6 +218,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           kredit: arahMasuk ? 0 : nominal,
           saldoSetelah: newSaldo,
           staffId,
+          projectId: projectId || null,
           extraFieldsJson: {
             isKasEntry: true,
             autoPostedFromJurnal: true,
@@ -233,7 +236,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
     session.user.id,
     `${editNoBukti ? "Edit" : "Input"} Jurnal Transaksi – ${noBukti} (${entity.name})${firstKeterangan ? ": " + firstKeterangan : ""}`,
     "FINANCIAL_CHANGE",
-    { entityKey, noBukti, rowCount: validRows.length }
+    { entityKey, noBukti, projectId, rowCount: validRows.length }
   );
 
   revalidatePath("/jurnal-transaksi");

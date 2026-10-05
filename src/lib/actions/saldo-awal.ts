@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
+import { getCoaOwnerEntityKey, ENTITY_NAMES } from "@/lib/bank-accounts";
 
 export async function upsertSaldoAwal(entityId: string, coaAccountId: string, year: number, nominal: number) {
   const session = await getServerSession(authOptions);
@@ -21,13 +22,22 @@ export async function upsertSaldoAwal(entityId: string, coaAccountId: string, ye
 
   if (!Number.isFinite(nominal)) throw new Error("Nominal saldo awal tidak valid.");
 
+  const coa = await prisma.coaAccount.findUnique({ where: { id: coaAccountId }, select: { code: true, name: true } });
+  if (!coa) throw new Error("Akun COA tidak ditemukan.");
+
+  const ownerKey = getCoaOwnerEntityKey(coa.code);
+  if (ownerKey && ownerKey !== entity.key) {
+    const ownerName = ENTITY_NAMES[ownerKey] ?? ownerKey;
+    throw new Error(
+      `Akun ${coa.code} – ${coa.name} adalah Kas/Bank khusus entitas ${ownerName}. Silakan beralih ke entitas ${ownerName} untuk mengisi saldo awal.`
+    );
+  }
+
   await prisma.saldoAwal.upsert({
     where: { entityId_coaAccountId_year: { entityId, coaAccountId, year } },
     update: { nominal },
     create: { entityId, coaAccountId, year, nominal },
   });
-
-  const coa = await prisma.coaAccount.findUnique({ where: { id: coaAccountId }, select: { code: true, name: true } });
   logActivity(session.user.id, `Update saldo awal ${coa?.code} – ${coa?.name} (${entity.name}, ${year})`, "FINANCIAL_CHANGE", {
     entityId,
     coaAccountId,

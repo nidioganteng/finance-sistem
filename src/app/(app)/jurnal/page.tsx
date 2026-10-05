@@ -101,6 +101,7 @@ export default async function JurnalPage({
         totalDebitFmt={totalDebitFmt}
         totalKreditFmt={totalKreditFmt}
         coaOptions={coaList}
+        projectOptions={projectOptions.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
         canEditAkun={canManageTransaksi(role)}
       />
 

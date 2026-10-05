@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
-import { getCoaOwnerEntityKey, ENTITY_NAMES } from "@/lib/bank-accounts";
+import { getCoaOwnerEntityKey, ENTITY_NAMES, getIntercompanyMirror, isSelfIntercompanyAccount } from "@/lib/bank-accounts";
 
 export async function upsertSaldoAwal(entityId: string, coaAccountId: string, year: number, nominal: number) {
   const session = await getServerSession(authOptions);
@@ -33,11 +33,57 @@ export async function upsertSaldoAwal(entityId: string, coaAccountId: string, ye
     );
   }
 
+  if (isSelfIntercompanyAccount(entity.key, coa.code)) {
+    throw new Error(
+      `Akun ${coa.code} – ${coa.name} adalah akun lawan yang digunakan entitas lain untuk mencatat hutang/piutang ke ${entity.name}. Silakan isi akun piutang/hutang ke entitas rekanan terkait.`
+    );
+  }
+
   await prisma.saldoAwal.upsert({
     where: { entityId_coaAccountId_year: { entityId, coaAccountId, year } },
     update: { nominal },
     create: { entityId, coaAccountId, year, nominal },
   });
+
+  // Auto-mirror pasangan cermin antar entitas (jika akun hutang/piutang antar entitas)
+  const mirror = getIntercompanyMirror(entity.key, coa.code);
+  if (mirror) {
+    const targetEntity = await prisma.entity.findFirst({ where: { key: mirror.targetEntityKey } });
+    const targetCoa = await prisma.coaAccount.findFirst({ where: { code: mirror.targetCoaCode } });
+
+    if (targetEntity && targetCoa) {
+      await prisma.saldoAwal.upsert({
+        where: {
+          entityId_coaAccountId_year: {
+            entityId: targetEntity.id,
+            coaAccountId: targetCoa.id,
+            year,
+          },
+        },
+        update: { nominal },
+        create: {
+          entityId: targetEntity.id,
+          coaAccountId: targetCoa.id,
+          year,
+          nominal,
+        },
+      });
+
+      logActivity(
+        session.user.id,
+        `Auto-sync saldo awal cermin ${targetCoa.code} – ${targetCoa.name} (${targetEntity.name}, ${year})`,
+        "FINANCIAL_CHANGE",
+        {
+          sourceEntityId: entityId,
+          targetEntityId: targetEntity.id,
+          targetCoaId: targetCoa.id,
+          year,
+          nominal,
+        }
+      );
+    }
+  }
+
   logActivity(session.user.id, `Update saldo awal ${coa?.code} – ${coa?.name} (${entity.name}, ${year})`, "FINANCIAL_CHANGE", {
     entityId,
     coaAccountId,

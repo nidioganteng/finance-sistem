@@ -8,6 +8,8 @@ export type JurnalTransaksiGroup = {
   tanggal: string;
   tanggalRaw: string;
   keterangan: string;
+  projectId?: string | null;
+  project?: { id: string; code: string; name: string } | null;
   rows: { coaAccountId: string; coaName: string; coaCode: string; keterangan: string; debit: number; kredit: number }[];
   totalDebit: number;
   totalKredit: number;
@@ -56,7 +58,10 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
 
   const rows = await prisma.transaction.findMany({
     where: { entityId, jenisInputId: jenisInput.id, noBukti: { in: pagedNoBuktis } },
-    include: { coaAccount: true },
+    include: {
+      coaAccount: true,
+      project: { select: { id: true, code: true, name: true } },
+    },
     orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "asc" }],
   });
 
@@ -68,6 +73,8 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
       tanggal: "",
       tanggalRaw: "",
       keterangan: "",
+      projectId: null,
+      project: null,
       rows: [],
       totalDebit: 0,
       totalKredit: 0,
@@ -87,6 +94,11 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
         year: "numeric",
       });
       group.keterangan = row.keterangan;
+      group.projectId = row.projectId ?? null;
+      group.project = row.project ?? null;
+    } else if (!group.projectId && row.projectId) {
+      group.projectId = row.projectId;
+      group.project = row.project ?? null;
     }
 
     const debit = Number(row.debit);

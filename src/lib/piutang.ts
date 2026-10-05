@@ -130,7 +130,7 @@ export async function getProjectOptions(currentEntityId?: string) {
       entity: { select: { id: true, key: true, name: true } },
       contractValue: true,
       termin: {
-        select: { id: true, name: true, percentage: true },
+        select: { id: true, name: true, percentage: true, nominal: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -138,7 +138,16 @@ export async function getProjectOptions(currentEntityId?: string) {
   });
   const mapped = projects.map((p) => {
     const contractValueNum = Number(p.contractValue);
-    const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
+    const sumNominal = p.termin.reduce((sum, t, i) => {
+      const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+      const nom = t.nominal && Number(t.nominal) > 0
+        ? Number(t.nominal)
+        : ((t.percentage - prevPct) / 100) * contractValueNum;
+      return sum + nom;
+    }, 0);
+    const maxPct = contractValueNum > 0
+      ? Math.min(100, Math.round((sumNominal / contractValueNum) * 100))
+      : p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
     return {
       id: p.id,
       code: p.code,
@@ -150,6 +159,7 @@ export async function getProjectOptions(currentEntityId?: string) {
       contractValueFmt: formatRupiah(contractValueNum),
       maxPercentage: maxPct,
       terminCount: p.termin.length,
+      totalTerminTagih: sumNominal,
     };
   });
 
@@ -174,11 +184,14 @@ export async function getProjectOptions(currentEntityId?: string) {
 export function computeNewTerminPercentage(
   contractValue: number,
   existingTerminPercentages: number[],
-  nominalMasuk: number
+  nominalMasuk: number,
+  existingCumulativeNominal?: number
 ): number {
   if (contractValue <= 0) return 0;
-  const maxPctSoFar = existingTerminPercentages.reduce((max, p) => Math.max(max, p), 0);
-  const cumulativeBefore = (maxPctSoFar / 100) * contractValue;
+  const cumulativeBefore =
+    existingCumulativeNominal !== undefined && existingCumulativeNominal > 0
+      ? existingCumulativeNominal
+      : (existingTerminPercentages.reduce((max, p) => Math.max(max, p), 0) / 100) * contractValue;
   const cumulativeAfter = cumulativeBefore + nominalMasuk;
   return Math.min(100, Math.round((cumulativeAfter / contractValue) * 100));
 }
@@ -210,9 +223,31 @@ export async function getPiutangData(entityId: string) {
     const isCancelled = p.status === "CANCELLED";
     const isCompleted = p.status === "COMPLETED";
 
-    // Progress tertagih = persentase termin tertinggi × nilai kontrak
-    const maxPct = isCompleted ? 100 : p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
-    const terminTagih = (maxPct / 100) * contractValue;
+    const terminItems = p.termin.map((t, i) => {
+      const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+      const deltaPct = Math.max(0, t.percentage - prevPct);
+      const nominalTermin =
+        t.nominal && Number(t.nominal) > 0
+          ? Number(t.nominal)
+          : ((t.percentage - prevPct) / 100) * contractValue;
+      return {
+        id: t.id,
+        name: t.name,
+        percentage: t.percentage,
+        percentageDelta: deltaPct,
+        nominal: nominalTermin,
+        nominalFmt: formatRupiah(nominalTermin),
+        status: t.status,
+        auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
+        auditedByName: t.auditedBy?.name ?? null,
+      };
+    });
+
+    const sumNominalTermin = terminItems.reduce((sum, t) => sum + t.nominal, 0);
+    const maxPct = isCompleted
+      ? 100
+      : (contractValue > 0 ? Math.min(100, Math.round((sumNominalTermin / contractValue) * 100)) : 0);
+    const terminTagih = isCompleted ? contractValue : sumNominalTermin;
     const sisaTagih = isCancelled ? 0 : Math.max(0, contractValue - terminTagih);
 
     // "Total Nilai Kontrak Aktif" cuma menjumlah proyek yang masih aktif
@@ -235,21 +270,7 @@ export async function getPiutangData(entityId: string) {
       terminTagihFmt: formatRupiah(terminTagih),
       sisaTagih,
       sisaTagihFmt: formatRupiah(sisaTagih),
-      termin: p.termin.map((t, i) => {
-        const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
-        const deltaPct = Math.max(0, t.percentage - prevPct);
-        const nominalTermin = ((t.percentage - prevPct) / 100) * contractValue;
-        return {
-          id: t.id,
-          name: t.name,
-          percentage: t.percentage,
-          percentageDelta: deltaPct,
-          nominalFmt: formatRupiah(nominalTermin),
-          status: t.status,
-          auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
-          auditedByName: t.auditedBy?.name ?? null,
-        };
-      }),
+      termin: terminItems,
     };
   });
 

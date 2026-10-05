@@ -34,14 +34,14 @@ export default async function JurnalTransaksiPage({
 
   const [coaAccounts, { groups, totalPages }, projectOptions] = await Promise.all([
     prisma.coaAccount.findMany({
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, kategori: true },
       orderBy: { urutan: "asc" },
     }),
     getJurnalTransaksiHistory(selectedEntity.id, page, searchParams.dari, searchParams.sampai),
     getProjectOptions(selectedEntity.id),
   ]);
 
-  const coa = coaAccounts.map((c) => ({ id: c.id, code: c.code, name: c.name }));
+  const coa = coaAccounts.map((c) => ({ id: c.id, code: c.code, name: c.name, kategori: c.kategori }));
 
   // Build search params record for pagination href builder (exclude page)
   const spRecord: Record<string, string> = {};

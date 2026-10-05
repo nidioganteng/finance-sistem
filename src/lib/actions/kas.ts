@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
-import { authOptions } from "@/lib/auth";
+import { authOptions, resolveStaffId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo, ENTITY_PREFIX, ENTITY_PREFIX_UMUM } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE, REKENING_BY_ENTITY } from "@/lib/bank-accounts";
@@ -187,6 +187,8 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     if (crossEntity) crossingEntries.push({ entity: crossEntity });
   }
 
+  const staffId = await resolveStaffId(session.user.id, session.user.email);
+
   const commonData = {
     entityId: entity.id,
     jenisInputId: jenisInput.id,
@@ -194,7 +196,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     noBukti: input.noBukti,
     keterangan: input.keterangan,
     saldoSetelah: newSaldo,
-    staffId: session.user.id,
+    staffId,
     projectId: input.projectId || null,
   };
 
@@ -293,7 +295,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
         noBukti: input.noBukti,
         keterangan: input.keterangan,
         saldoSetelah: 0,
-        staffId: session.user.id,
+        staffId,
         projectId: input.projectId || null,
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
@@ -370,7 +372,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
           tanggal: new Date(input.tanggal),
           noBukti: input.noBukti,
           keterangan: `[Auto] ${input.keterangan}`,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: bankCoaId,
           debit: 0,
           kredit: total,
@@ -505,6 +507,8 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
     if (crossEntity) crossingEntries.push({ entity: crossEntity });
   }
 
+  const staffId = await resolveStaffId(session.user.id, session.user.email);
+
   const commonData = {
     entityId: entity.id,
     jenisInputId: jenisInput.id,
@@ -512,7 +516,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
     noBukti: input.noBukti,
     keterangan: input.keterangan,
     saldoSetelah: newSaldo,
-    staffId: session.user.id,
+    staffId,
     projectId: input.projectId || null,
   };
 
@@ -572,7 +576,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
         noBukti: input.noBukti,
         keterangan: input.keterangan,
         saldoSetelah: 0,
-        staffId: session.user.id,
+        staffId,
         projectId: input.projectId || null,
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];

@@ -75,11 +75,21 @@ export async function getLabaRugiData(
   // Integrasi Laporan Pendapatan (alur_laporan_pendapata.md bagian 4):
   // Tarik total Nilai Proyek dari FakturPendapatan untuk periode ini,
   // menyelesaikan bug link putus di Excel asli klien (yang sebelumnya menghasilkan Rp 0).
+  // Jangan gandakan faktur yang noFaktur-nya sudah tercatat sebagai transaksi jurnal pendapatan.
+  const recordedPendapatanNoBukti = new Set(
+    transactions
+      .filter((t) => t.coaAccount?.kategori === "PENDAPATAN")
+      .map((t) => t.noBukti)
+  );
+
   const fakturAgg = await prisma.fakturPendapatan.aggregate({
     where: {
       entityId,
       tahunPajak: year,
       ...(month ? { masaPajak: month } : {}),
+      ...(recordedPendapatanNoBukti.size > 0
+        ? { noFaktur: { notIn: Array.from(recordedPendapatanNoBukti) } }
+        : {}),
     },
     _sum: { nilaiProyek: true },
   });

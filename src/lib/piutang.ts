@@ -89,6 +89,36 @@ export type ProjectBreakdownSummary = {
   sisaKontrakFmt: string;
 };
 
+export type ProjectExpenseItem = {
+  id: string;
+  tanggal: string;
+  tanggalFmt: string;
+  noBukti: string;
+  keterangan: string;
+  coaCode: string;
+  coaName: string;
+  kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya";
+  nominal: number;
+  nominalFmt: string;
+  sumberKasBank: string;
+};
+
+export type ProjectExpensesSummary = {
+  totalPengeluaran: number;
+  totalPengeluaranFmt: string;
+  totalGaji: number;
+  totalGajiFmt: string;
+  totalMaterial: number;
+  totalMaterialFmt: string;
+  totalOperasional: number;
+  totalOperasionalFmt: string;
+  totalLainnya: number;
+  totalLainnyaFmt: string;
+  labaKotor: number;
+  labaKotorFmt: string;
+  items: ProjectExpenseItem[];
+};
+
 export type InterEntityBalance = {
   type: "piutang" | "hutang";
   coaCode: string;
@@ -274,8 +304,8 @@ export async function getPiutangData(entityId: string) {
           orderBy: { tanggalTerima: "asc" },
         },
         jurnal: {
-          include: { coaAccount: true },
-          orderBy: { createdAt: "asc" },
+          include: { coaAccount: true, jenisInput: true },
+          orderBy: { tanggal: "desc" },
         },
       },
       orderBy: { createdAt: "asc" },
@@ -445,6 +475,103 @@ export async function getPiutangData(entityId: string) {
       sisaKontrakFmt: formatRupiah(sisaKontrak),
     };
 
+    // 1. Kumpulkan noBukti yang merupakan pendapatan termin (ada akun kategori PENDAPATAN atau kredit ke 400)
+    const incomeNoBuktis = new Set<string>();
+    p.jurnal.forEach((j) => {
+      if (
+        j.noBukti &&
+        (j.coaAccount?.kategori === "PENDAPATAN" ||
+          j.coaAccount?.code === "400" ||
+          /pendapatan/i.test(j.coaAccount?.name ?? ""))
+      ) {
+        incomeNoBuktis.add(j.noBukti);
+      }
+    });
+    p.termin.forEach((t) => {
+      const m = t.name.match(/\[(.*?)\]/);
+      if (m && m[1]) incomeNoBuktis.add(m[1]);
+    });
+
+    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, dll.)
+    const expenseRows = p.jurnal.filter((j) => {
+      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) return false;
+      const isBeban =
+        j.coaAccount?.kategori === "BEBAN" ||
+        j.coaAccount?.code?.startsWith("5") ||
+        j.coaAccount?.code?.startsWith("6");
+      if (isBeban && Number(j.debit) > 0) return true;
+      if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
+        return true;
+      }
+      return false;
+    });
+
+    const expenseItems: ProjectExpenseItem[] = expenseRows.map((j) => {
+      const nominal = Number(j.debit);
+      const txt = `${j.coaAccount?.name || ""} ${j.keterangan || ""}`.toLowerCase();
+      let kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya" = "Lainnya";
+
+      if (/gaji|upah|mandor|tukang|honor|tenaga ahli/i.test(txt)) {
+        kategoriBeban = "Gaji & Upah";
+      } else if (/bahan|material|perlengkapan|semen|pasir|besi|batu|kayu|cat|baut|alat/i.test(txt)) {
+        kategoriBeban = "Bahan & Material";
+      } else if (/transport|perjalanan|bensin|bbm|solar|konsumsi|makan|listrik|telepon|pdam|survey|sewa|akomodasi/i.test(txt)) {
+        kategoriBeban = "Operasional & Transport";
+      }
+
+      // Cari baris pasangan dengan noBukti yang sama yang memiliki kredit > 0 (sumber kas/bank)
+      const counterpart = p.jurnal.find(
+        (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
+      );
+      const sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
+
+      return {
+        id: j.id,
+        tanggal: j.tanggal.toISOString(),
+        tanggalFmt: j.tanggal.toLocaleDateString("id-ID"),
+        noBukti: j.noBukti,
+        keterangan: j.keterangan || j.coaAccount?.name || "Pengeluaran Proyek",
+        coaCode: j.coaAccount?.code || "-",
+        coaName: j.coaAccount?.name || "-",
+        kategoriBeban,
+        nominal,
+        nominalFmt: formatRupiah(nominal),
+        sumberKasBank,
+      };
+    });
+
+    let totalGaji = 0;
+    let totalMaterial = 0;
+    let totalOperasional = 0;
+    let totalLainnya = 0;
+    expenseItems.forEach((it) => {
+      if (it.kategoriBeban === "Gaji & Upah") totalGaji += it.nominal;
+      else if (it.kategoriBeban === "Bahan & Material") totalMaterial += it.nominal;
+      else if (it.kategoriBeban === "Operasional & Transport") totalOperasional += it.nominal;
+      else totalLainnya += it.nominal;
+    });
+
+    let totalPengeluaran = expenseItems.reduce((acc, it) => acc + it.nominal, 0);
+    if (totalPengeluaran === 0 && Number(p.spend) > 0) {
+      totalPengeluaran = Number(p.spend);
+    }
+
+    const expensesSummary: ProjectExpensesSummary = {
+      totalPengeluaran,
+      totalPengeluaranFmt: formatRupiah(totalPengeluaran),
+      totalGaji,
+      totalGajiFmt: formatRupiah(totalGaji),
+      totalMaterial,
+      totalMaterialFmt: formatRupiah(totalMaterial),
+      totalOperasional,
+      totalOperasionalFmt: formatRupiah(totalOperasional),
+      totalLainnya,
+      totalLainnyaFmt: formatRupiah(totalLainnya),
+      labaKotor: totalGross - totalPengeluaran,
+      labaKotorFmt: formatRupiah(totalGross - totalPengeluaran),
+      items: expenseItems,
+    };
+
     const maxPct = isCompleted
       ? 100
       : (contractValue > 0 ? Math.min(100, Math.round((totalGross / contractValue) * 100)) : 0);
@@ -473,6 +600,7 @@ export async function getPiutangData(entityId: string) {
       sisaTagihFmt: formatRupiah(sisaTagih),
       termin: terminItems,
       breakdownSummary,
+      expensesSummary,
     };
   });
 

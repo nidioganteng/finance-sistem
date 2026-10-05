@@ -54,7 +54,13 @@ export default async function DaftarAkunPage({
         }
       />
 
-      <DaftarAkunClient rows={rows} entityId={selectedEntity.id} year={year} canEdit={canManageTransaksi(role)} />
+      <DaftarAkunClient
+        rows={rows}
+        entityId={selectedEntity.id}
+        currentEntityKey={selectedEntity.key}
+        year={year}
+        canEdit={canManageTransaksi(role)}
+      />
     </PageTransition>
   );
 }

@@ -198,7 +198,8 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
     if (!targetEntityId || !targetJenisInputId) continue;
 
-    const prevSaldo = await getRunningSaldo(targetEntityId, targetJenisInputId, rekeningNama);
+    const txYear = new Date(tanggal).getFullYear();
+    const prevSaldo = await getRunningSaldo(targetEntityId, targetJenisInputId, rekeningNama, txYear);
     const newSaldo = prevSaldo + (arahMasuk ? nominal : -nominal);
 
     allOps.push(

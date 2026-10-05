@@ -21,6 +21,7 @@ export type ProjectOption = {
   contractValueFmt?: string;
   maxPercentage?: number;
   terminCount?: number;
+  totalTerminTagih?: number;
 };
 
 type CoaRow = {
@@ -106,7 +107,9 @@ export function JurnalTransaksiClient({
   const maxPctSoFar = selectedProject?.maxPercentage ?? 0;
   const terminCount = selectedProject?.terminCount ?? 0;
   const nextTerminKe = terminCount + 1;
-  const cumulativeBefore = (maxPctSoFar / 100) * contractVal;
+  const cumulativeBefore = selectedProject?.totalTerminTagih !== undefined && selectedProject.totalTerminTagih > 0
+    ? selectedProject.totalTerminTagih
+    : (maxPctSoFar / 100) * contractVal;
   const cumulativeAfter = cumulativeBefore + nominalTermin;
   const newPct = contractVal > 0 ? Math.min(100, Math.round((cumulativeAfter / contractVal) * 100)) : maxPctSoFar;
   const deltaPct = Math.max(0, newPct - maxPctSoFar);

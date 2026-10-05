@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { Pencil, Check, X, Search } from "lucide-react";
+import { Pencil, Check, X, Search, Lock } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";
+import { getCoaOwnerEntityKey, ENTITY_NAMES } from "@/lib/bank-accounts";
 
 type Row = {
   coaId: string;
@@ -61,11 +62,13 @@ function highlightMatch(text: string, query: string) {
 export function DaftarAkunClient({
   rows,
   entityId,
+  currentEntityKey,
   year,
   canEdit,
 }: {
   rows: Row[];
   entityId: string;
+  currentEntityKey?: string;
   year: number;
   canEdit: boolean;
 }) {
@@ -182,18 +185,19 @@ export function DaftarAkunClient({
                 </td>
               </tr>
             ) : (
-              filteredRows.map((r) => (
+            filteredRows.map((r) => {
+              const ownerKey = getCoaOwnerEntityKey(r.code);
+              const isLocked = ownerKey !== null && currentEntityKey !== undefined && ownerKey !== currentEntityKey;
+              const ownerName = ownerKey ? ENTITY_NAMES[ownerKey] ?? ownerKey : null;
+              const lockTitle = `Terkunci: Akun Kas/Bank khusus entitas ${ownerName}. Silakan beralih ke entitas ${ownerName} untuk mengubah saldo awal.`;
+
+              return (
                 <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40">
                   <td className="py-3 px-5 font-mono font-bold text-navy-text text-[13px] whitespace-nowrap">
                     {highlightMatch(r.code, search)}
                   </td>
                   <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
                     {highlightMatch(r.name, search)}
-                    {!r.punyaTransaksi && (
-                      <span className="ml-1.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded whitespace-nowrap">
-                        belum ada transaksi
-                      </span>
-                    )}
                   </td>
                   <td className="py-3 px-3 whitespace-nowrap">
                     <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[r.kategori] ?? "bg-surface-hover text-muted"}`}>
@@ -220,11 +224,26 @@ export function DaftarAkunClient({
                       </form>
                     ) : (
                       <div className="flex items-center justify-end gap-1.5">
-                        <span className="tabular-nums text-[13px] text-muted whitespace-nowrap">{r.saldoAwalFmt}</span>
+                        <span className={`tabular-nums text-[13px] whitespace-nowrap ${isLocked ? "text-muted-faint/70" : "text-muted"}`}>
+                          {r.saldoAwalFmt}
+                        </span>
                         {canEdit && (
-                          <button onClick={() => setEditingId(r.coaId)} className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text" title="Edit saldo awal">
-                            <Pencil size={11} />
-                          </button>
+                          isLocked ? (
+                            <span
+                              className="p-1 text-muted-faint/60 cursor-not-allowed inline-flex items-center justify-center"
+                              title={lockTitle}
+                            >
+                              <Lock size={11} />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setEditingId(r.coaId)}
+                              className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text"
+                              title="Edit saldo awal"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                          )
                         )}
                       </div>
                     )}
@@ -242,7 +261,8 @@ export function DaftarAkunClient({
                     </span>
                   </td>
                 </tr>
-              ))
+              );
+            })
             )}
           </tbody>
         </table>

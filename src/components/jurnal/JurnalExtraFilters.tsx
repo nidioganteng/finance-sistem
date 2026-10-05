@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
 type CoaOption = { code: string; name: string };
+type ProjectOption = { id: string; code: string; name: string };
 
 function genMonthOptions() {
   const opts: { value: string; label: string }[] = [];
@@ -21,13 +22,17 @@ const MONTH_OPTIONS = genMonthOptions();
 
 export function JurnalExtraFilters({
   coaList,
+  projectList = [],
   currentBulan,
   currentAkunCode,
+  currentProjectId = "",
   entityKey,
 }: {
   coaList: CoaOption[];
+  projectList?: ProjectOption[];
   currentBulan: string;
   currentAkunCode: string;
+  currentProjectId?: string;
   entityKey: string;
 }) {
   const router = useRouter();
@@ -76,6 +81,22 @@ export function JurnalExtraFilters({
           </option>
         ))}
       </select>
+
+      {/* Proyek */}
+      {projectList && projectList.length > 0 && (
+        <select
+          value={currentProjectId}
+          onChange={(e) => push({ projectId: e.target.value })}
+          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none max-w-[220px]"
+        >
+          <option value="">Semua Proyek</option>
+          {projectList.map((p) => (
+            <option key={p.id} value={p.id}>
+              [{p.code}] {p.name}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

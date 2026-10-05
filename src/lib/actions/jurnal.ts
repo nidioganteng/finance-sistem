@@ -61,3 +61,76 @@ export async function updateKodeAkunJurnal(transactionId: string, entityId: stri
 
   revalidatePath("/jurnal");
 }
+
+export async function updateProyekJurnal(transactionId: string, entityId: string, newProjectId: string | null) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user.id || !canManageTransaksi(session.user.role)) {
+    throw new Error("Kamu tidak punya akses untuk mengedit proyek transaksi.");
+  }
+
+  const entity = await prisma.entity.findFirst({
+    where: { id: entityId, key: { in: session.user.entityKeys } },
+  });
+  if (!entity) throw new Error("Kamu tidak punya akses ke entitas ini.");
+
+  const transaction = await prisma.transaction.findFirst({
+    where: { id: transactionId, entityId },
+    include: { project: true },
+  });
+  if (!transaction) throw new Error("Transaksi tidak ditemukan di entitas ini.");
+
+  const targetProjectId = newProjectId?.trim() || null;
+  let targetProject = null;
+  if (targetProjectId) {
+    targetProject = await prisma.project.findUnique({
+      where: { id: targetProjectId },
+      select: { id: true, code: true, name: true },
+    });
+    if (!targetProject) throw new Error("Proyek tidak ditemukan.");
+  }
+
+  // Update semua baris transaksi dengan noBukti yang sama di entitas ini
+  await prisma.transaction.updateMany({
+    where: { entityId, noBukti: transaction.noBukti },
+    data: { projectId: targetProjectId },
+  });
+
+  // Update juga transaksi auto-posted jika ada (misal di buku bank entitas lain)
+  await prisma.transaction.updateMany({
+    where: {
+      noBukti: transaction.noBukti,
+      extraFieldsJson: { path: "$.autoPostedFromJurnal", equals: true },
+    },
+    data: { projectId: targetProjectId },
+  });
+
+  // Update juga faktur pendapatan jika ada
+  await prisma.fakturPendapatan.updateMany({
+    where: { noFaktur: transaction.noBukti },
+    data: { projectId: targetProjectId },
+  });
+
+  logActivity(
+    session.user.id,
+    `Update proyek transaksi ${transaction.noBukti} (${entity.name}): ${targetProject ? targetProject.code : "Bukan Proyek"}`,
+    "FINANCIAL_CHANGE",
+    {
+      noBukti: transaction.noBukti,
+      entityId,
+      oldProjectId: transaction.projectId,
+      newProjectId: targetProjectId,
+    }
+  );
+
+  revalidatePath("/jurnal");
+  revalidatePath("/jurnal-transaksi");
+  revalidatePath("/buku-besar");
+  revalidatePath("/kas-kecil");
+  revalidatePath("/kas-besar");
+  revalidatePath("/bank-buku");
+  revalidatePath("/buku-bank");
+  revalidatePath("/pendapatan");
+  revalidatePath("/piutang");
+  revalidatePath("/laporan-keuangan");
+  return { success: true };
+}

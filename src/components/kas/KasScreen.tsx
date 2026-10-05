@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canManageTransaksi } from "@/lib/rbac";
-import { getJenisInput, getCoaOptions, getRunningSaldo, getKasLedger, getSaldoSebelum } from "@/lib/kas";
+import { getJenisInput, getCoaOptions, getRunningSaldo, getKasLedger, getSaldoSebelum, getInitialSaldoAwal } from "@/lib/kas";
 import { getProjectOptions } from "@/lib/piutang";
 import { REKENING_BY_ENTITY, type RekeningOption } from "@/lib/bank-accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -60,15 +60,20 @@ export async function KasScreen({
   const selectedRekeningNama = rekeningOptions.find((r) => r.id === selectedRekeningId)?.nama;
 
   const kasPage = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const currentYear = searchParams.dari
+    ? new Date(searchParams.dari).getFullYear()
+    : searchParams.sampai
+    ? new Date(searchParams.sampai).getFullYear()
+    : new Date().getFullYear();
 
   const [coaOptions, saldo, kasLedger, projectOptions, saldoAwal] = await Promise.all([
     getCoaOptions(),
-    getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama),
-    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama, searchParams.dari, searchParams.sampai, kasPage),
+    getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama, currentYear),
+    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama, searchParams.dari, searchParams.sampai, kasPage, currentYear),
     getProjectOptions(selectedEntity.id),
     searchParams.dari
-      ? getSaldoSebelum(selectedEntity.id, jenisInput.id, searchParams.dari, selectedRekeningNama)
-      : Promise.resolve(0),
+      ? getSaldoSebelum(selectedEntity.id, jenisInput.id, searchParams.dari, selectedRekeningNama, currentYear)
+      : getInitialSaldoAwal(selectedEntity.id, jenisInput.id, selectedRekeningNama, currentYear),
   ]);
 
   const { entries: ledger, totalPages: ledgerTotalPages, page: ledgerPage } = kasLedger;
@@ -106,12 +111,14 @@ export async function KasScreen({
         ledger={ledger}
         rekeningOptions={rekeningOptions}
         selectedRekeningId={selectedRekeningId}
+        selectedRekeningNama={selectedRekeningNama}
         allEntities={entities.map((e) => ({ key: e.key, name: e.name }))}
         projectOptions={projectOptions}
         defaultArahLaporan={defaultArahLaporan}
         bukuBankRekeningOptions={bukuBankRekeningOptions}
         dari={searchParams.dari ?? ""}
         sampai={searchParams.sampai ?? ""}
+        currentYear={currentYear}
       />
       <PaginationNav
         page={ledgerPage}

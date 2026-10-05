@@ -2,12 +2,15 @@
 
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
-import { authOptions } from "@/lib/auth";
+import { authOptions, resolveStaffId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo } from "@/lib/kas";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 import { REKENING_BY_ENTITY, REKENING_COA_CODE } from "@/lib/bank-accounts";
+import { computeNewTerminPercentage } from "@/lib/piutang";
+import { hitungDppDariKwitansi, hitungDppNilaiLain } from "@/lib/pendapatan";
+import { TerminStatus } from "@prisma/client";
 
 type JurnalRow = { coaAccountId: string; debit: number; kredit: number; keterangan: string };
 
@@ -42,6 +45,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
   const entityKey = (formData.get("entityKey") as string | null)?.trim() ?? "";
   const noBukti = (formData.get("noBukti") as string | null)?.trim() ?? "";
   const editNoBukti = (formData.get("editNoBukti") as string | null)?.trim() ?? "";
+  const projectId = (formData.get("projectId") as string | null)?.trim() || null;
 
   if (!tanggal) return { error: "Tanggal wajib diisi." };
   if (!noBukti) return { error: "No. Bukti wajib diisi." };
@@ -106,6 +110,12 @@ export async function saveJurnalTransaksi(formData: FormData) {
         extraFieldsJson: { path: "$.autoPostedFromJurnal", equals: true },
       },
     });
+    await prisma.fakturPendapatan.deleteMany({
+      where: { noFaktur: editNoBukti },
+    });
+    await prisma.termin.deleteMany({
+      where: { name: { contains: `[${editNoBukti}]` } },
+    });
   } else {
     const dup = await prisma.transaction.findFirst({
       where: { entityId: entity.id, noBukti },
@@ -118,7 +128,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
   const coaIds = [...new Set(validRows.map((r) => r.coaAccountId))];
   const coaList = await prisma.coaAccount.findMany({
     where: { id: { in: coaIds } },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, kategori: true, reportType: true },
   });
   const coaMap = new Map(coaList.map((c) => [c.id, c]));
 
@@ -128,6 +138,8 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   type Ops = ReturnType<typeof prisma.transaction.create>;
   const allOps: Ops[] = [];
+  const staffId = await resolveStaffId(session.user.id, session.user.email);
+  const firstKeterangan = validRows[0]?.keterangan?.trim() ?? "";
 
   // Main journal rows
   for (const row of validRows) {
@@ -152,7 +164,8 @@ export async function saveJurnalTransaksi(formData: FormData) {
           debit: row.debit ?? 0,
           kredit: row.kredit ?? 0,
           saldoSetelah: 0,
-          staffId: session.user.id,
+          staffId,
+          projectId: projectId || null,
           ...(extraFieldsJson ? { extraFieldsJson } : {}),
         },
       })
@@ -198,9 +211,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
     if (!targetEntityId || !targetJenisInputId) continue;
 
-    const prevSaldo = await getRunningSaldo(targetEntityId, targetJenisInputId, rekeningNama);
+    const txYear = new Date(tanggal).getFullYear();
+    const prevSaldo = await getRunningSaldo(targetEntityId, targetJenisInputId, rekeningNama, txYear);
     const newSaldo = prevSaldo + (arahMasuk ? nominal : -nominal);
 
+    // Kas/Bank primary entry
     allOps.push(
       prisma.transaction.create({
         data: {
@@ -208,12 +223,13 @@ export async function saveJurnalTransaksi(formData: FormData) {
           jenisInputId: targetJenisInputId,
           tanggal: new Date(tanggal),
           noBukti,
-          keterangan: row.keterangan?.trim() ?? "",
+          keterangan: row.keterangan?.trim() || firstKeterangan,
           coaAccountId: row.coaAccountId,
           debit: arahMasuk ? nominal : 0,
           kredit: arahMasuk ? 0 : nominal,
           saldoSetelah: newSaldo,
-          staffId: session.user.id,
+          staffId,
+          projectId: projectId || null,
           extraFieldsJson: {
             isKasEntry: true,
             autoPostedFromJurnal: true,
@@ -222,16 +238,216 @@ export async function saveJurnalTransaksi(formData: FormData) {
         },
       })
     );
+
+    // Salin baris-baris akun lawan (pendapatan, pajak, beban, dll) ke ledger bank/kas
+    // agar kolom AKUN di Buku Bank menampilkan rincian akun transaksi
+    for (const counterpartRow of validRows) {
+      if (counterpartRow.coaAccountId === row.coaAccountId) continue;
+      const cpCoa = coaMap.get(counterpartRow.coaAccountId);
+      if (cpCoa && (bankCoaMap[cpCoa.code] || kasKecilCodeToEntity[cpCoa.code] || kasBesarCodeToEntity[cpCoa.code])) {
+        continue;
+      }
+      allOps.push(
+        prisma.transaction.create({
+          data: {
+            entityId: targetEntityId,
+            jenisInputId: targetJenisInputId,
+            tanggal: new Date(tanggal),
+            noBukti,
+            keterangan: counterpartRow.keterangan?.trim() || firstKeterangan,
+            coaAccountId: counterpartRow.coaAccountId,
+            debit: counterpartRow.debit ?? 0,
+            kredit: counterpartRow.kredit ?? 0,
+            saldoSetelah: newSaldo,
+            staffId,
+            projectId: projectId || null,
+            extraFieldsJson: {
+              autoPostedFromJurnal: true,
+              ...(rekeningNama ? { rekeningNama } : {}),
+            },
+          },
+        })
+      );
+    }
   }
 
   await prisma.$transaction(allOps);
 
-  const firstKeterangan = validRows[0]?.keterangan?.trim() ?? "";
+  // ── SINKRONISASI KE LAPORAN PENDAPATAN & KONTROL TERMIN ──────────────────
+  const pendapatanRows = validRows.filter((r) => {
+    const c = coaMap.get(r.coaAccountId);
+    return c && (c.kategori === "PENDAPATAN" || c.code.startsWith("4")) && (r.kredit ?? 0) > 0;
+  });
+
+  const pphRows = validRows.filter((r) => {
+    const c = coaMap.get(r.coaAccountId);
+    return c && (c.code === "533" || c.code === "534" || /pph/i.test(c.name)) && (r.debit ?? 0) > 0;
+  });
+
+  const ppnRows = validRows.filter((r) => {
+    const c = coaMap.get(r.coaAccountId);
+    return c && (c.code === "535" || c.code === "536" || /ppn/i.test(c.name));
+  });
+
+  const bankRows = validRows.filter((r) => {
+    const c = coaMap.get(r.coaAccountId);
+    return c && (bankCoaMap[c.code] || (c.reportType === "ARUS_KAS" && /bank|bpd|bri|bni|mdr/i.test(c.name)));
+  });
+
+  const totalPendapatanKwitansi = pendapatanRows.reduce((s, r) => s + (r.kredit ?? 0), 0);
+  const totalPph = pphRows.reduce((s, r) => s + (r.debit ?? 0), 0);
+  const totalPpn = ppnRows.reduce((s, r) => s + ((r.debit ?? 0) || (r.kredit ?? 0)), 0);
+  const bankDebitTotal = bankRows.filter((r) => (r.debit ?? 0) > 0).reduce((s, r) => s + (r.debit ?? 0), 0);
+
+  const firstBankRow = bankRows.find((r) => (r.debit ?? 0) > 0) || bankRows[0];
+  const bankCoa = firstBankRow ? coaMap.get(firstBankRow.coaAccountId) : null;
+  const bankName = bankCoa ? (bankCoaMap[bankCoa.code]?.rekeningNama || bankCoa.name) : "BPD";
+
+  if (totalPendapatanKwitansi > 0 || (projectId && bankDebitTotal > 0) || (totalPph > 0 && bankDebitTotal > 0)) {
+    const project = projectId ? await prisma.project.findUnique({ where: { id: projectId } }) : null;
+
+    // Nilai Kwitansi adalah nilai bruto akun Pendapatan (Kredit akun 400 dsb)
+    const nilaiKwitansi = totalPendapatanKwitansi > 0
+      ? totalPendapatanKwitansi
+      : (bankDebitTotal > 0 ? bankDebitTotal + totalPph : 0);
+
+    // Rumus perpajakan sesuai instruksi:
+    // 1. DPP = 100/111 x Nilai Kwitansi
+    // 2. DPP Nilai Lain = 11/12 x DPP Awal
+    // 3. PPN = 12% x DPP Nilai Lain (atau dari row akun PPN jika terpisah)
+    // 4. Nilai Proyek = Nilai Kwitansi (atau DPP * 111 / 100)
+    // 5. Laba Setelah Pajak = Nilai Proyek - PPN - PPh = DPP - PPh
+    const dpp = hitungDppDariKwitansi(nilaiKwitansi);
+    const dppNilaiLain = hitungDppNilaiLain(dpp);
+    const tarifPpnPersen = 12;
+    const calculatedPpn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
+    const ppn = totalPpn > 0 ? totalPpn : calculatedPpn;
+    const tarifPphPersen = dpp > 0 && totalPph > 0 ? Number(((totalPph / dpp) * 100).toFixed(2)) : 3.5;
+    const pph = totalPph > 0 ? totalPph : Math.round((dpp * tarifPphPersen) / 100);
+    const nilaiProyek = nilaiKwitansi > 0 ? nilaiKwitansi : (totalPpn > 0 ? dpp + totalPpn : Math.round((dpp * 111) / 100));
+    const labaSetelahPajak = Math.round(nilaiProyek - ppn - pph);
+    const nominalDiterima = bankDebitTotal > 0 ? bankDebitTotal : labaSetelahPajak;
+
+    const targetEntityIdForFaktur = project?.entityId ?? entity.id;
+    const txDate = new Date(tanggal);
+
+    const existingFaktur = await prisma.fakturPendapatan.findFirst({
+      where: {
+        noFaktur: noBukti,
+        entityId: targetEntityIdForFaktur,
+      },
+    });
+
+    const fakturData = {
+      entityId: targetEntityIdForFaktur,
+      npwp: "-",
+      noFaktur: noBukti,
+      masaPajak: txDate.getMonth() + 1,
+      tahunPajak: txDate.getFullYear(),
+      namaRekanan: project?.name ?? entity.name,
+      namaJkp: firstKeterangan || (project ? `Jasa Konsultansi ${project.name}` : `Pendapatan ${noBukti}`),
+      dpp,
+      dppNilaiLain,
+      tarifPpnPersen,
+      tarifPphPersen,
+      ppn,
+      pph,
+      nilaiProyek,
+      labaSetelahPajak,
+      kodeJenisProyek: 1,
+      pekerjaanPerusahaan: dpp,
+      pekerjaanYangDipinjam: 0,
+      tanggalTerima: txDate,
+      bank: bankName,
+      nominalDiterima,
+      projectId: projectId || null,
+      createdById: session.user.id,
+    };
+
+    if (existingFaktur) {
+      await prisma.fakturPendapatan.update({
+        where: { id: existingFaktur.id },
+        data: fakturData,
+      });
+    } else {
+      await prisma.fakturPendapatan.create({
+        data: fakturData,
+      });
+    }
+
+    // Update / Tambah Progres Termin di Kontrol Piutang jika ada proyek yang dipilih
+    if (projectId && project) {
+      const projectWithTermins = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          termin: {
+            select: { id: true, name: true, percentage: true, nominal: true, createdAt: true },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+
+      if (projectWithTermins) {
+        const oldTermin = projectWithTermins.termin.find(
+          (t) => t.name.includes(`[${noBukti}]`) || (editNoBukti && t.name.includes(`[${editNoBukti}]`))
+        );
+        if (oldTermin) {
+          await prisma.termin.delete({ where: { id: oldTermin.id } });
+        }
+
+        const remainingTermins = projectWithTermins.termin.filter(
+          (t) => !oldTermin || t.id !== oldTermin.id
+        );
+        const existingPcts = remainingTermins.map((t) => t.percentage);
+        const maxPctSoFar = existingPcts.reduce((max, p) => Math.max(max, p), 0);
+
+        const contractValNum = Number(projectWithTermins.contractValue);
+        const existingCumulativeNominal = remainingTermins.reduce((sum, t, i) => {
+          const prevPct = i === 0 ? 0 : remainingTermins[i - 1].percentage;
+          const nom = t.nominal && Number(t.nominal) > 0
+            ? Number(t.nominal)
+            : ((t.percentage - prevPct) / 100) * contractValNum;
+          return sum + nom;
+        }, 0);
+
+        // Ambil nominal termin dari Pendapatan yang sudah dijumlahkan PPN dll (Kredit Akun Pendapatan)
+        const nominalTermin = nilaiProyek > 0 ? nilaiProyek : (dpp > 0 ? dpp : nominalDiterima);
+        if (nominalTermin > 0) {
+          const newPct = computeNewTerminPercentage(
+            contractValNum,
+            existingPcts,
+            nominalTermin,
+            existingCumulativeNominal
+          );
+          const terminKe = remainingTermins.length + 1;
+          const deltaPct = Math.max(0, newPct - maxPctSoFar);
+
+          await prisma.termin.create({
+            data: {
+              projectId: projectWithTermins.id,
+              name: `Termin ${terminKe} (${deltaPct}% Kontrak) [${noBukti}]`,
+              percentage: newPct,
+              nominal: nominalTermin,
+              status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
+            },
+          });
+
+          if (newPct >= 100) {
+            await prisma.project.update({
+              where: { id: projectWithTermins.id },
+              data: { status: "COMPLETED" },
+            });
+          }
+        }
+      }
+    }
+  }
+
   logActivity(
     session.user.id,
     `${editNoBukti ? "Edit" : "Input"} Jurnal Transaksi – ${noBukti} (${entity.name})${firstKeterangan ? ": " + firstKeterangan : ""}`,
     "FINANCIAL_CHANGE",
-    { entityKey, noBukti, rowCount: validRows.length }
+    { entityKey, noBukti, projectId, rowCount: validRows.length }
   );
 
   revalidatePath("/jurnal-transaksi");
@@ -239,10 +455,14 @@ export async function saveJurnalTransaksi(formData: FormData) {
   revalidatePath("/buku-besar");
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
+  revalidatePath("/bank-buku");
   revalidatePath("/buku-bank");
+  revalidatePath("/pendapatan");
+  revalidatePath("/piutang");
   revalidatePath("/laporan-hutang-piutang");
   revalidatePath("/neraca");
   revalidatePath("/laporan-keuangan");
+  revalidatePath("/laba-rugi");
   return { success: true };
   } catch (e) {
     console.error("[saveJurnalTransaksi]", e);
@@ -271,6 +491,33 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
         extraFieldsJson: { path: "$.autoPostedFromJurnal", equals: true },
       },
     });
+
+    await prisma.fakturPendapatan.deleteMany({
+      where: { noFaktur: firstTx.noBukti },
+    });
+
+    const termins = await prisma.termin.findMany({
+      where: { name: { contains: `[${firstTx.noBukti}]` } },
+      select: { id: true, projectId: true },
+    });
+    if (termins.length > 0) {
+      await prisma.termin.deleteMany({
+        where: { id: { in: termins.map((t) => t.id) } },
+      });
+      for (const t of termins) {
+        const remaining = await prisma.termin.findMany({
+          where: { projectId: t.projectId },
+          select: { percentage: true },
+        });
+        const maxRem = remaining.reduce((max, r) => Math.max(max, r.percentage), 0);
+        if (maxRem < 100) {
+          await prisma.project.update({
+            where: { id: t.projectId },
+            data: { status: "ACTIVE" },
+          });
+        }
+      }
+    }
   }
 
   logActivity(session.user.id, `Hapus Jurnal Transaksi (${txIds.length} baris)`, "FINANCIAL_CHANGE", { txIds });
@@ -279,9 +526,13 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
   revalidatePath("/buku-besar");
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
+  revalidatePath("/bank-buku");
   revalidatePath("/buku-bank");
+  revalidatePath("/pendapatan");
+  revalidatePath("/piutang");
   revalidatePath("/laporan-hutang-piutang");
   revalidatePath("/neraca");
   revalidatePath("/laporan-keuangan");
+  revalidatePath("/laba-rugi");
   return { success: true };
 }

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJenisInputChips, getJurnalRows, getCoaList } from "@/lib/jurnal";
+import { getProjectOptions } from "@/lib/piutang";
 import { canManageTransaksi } from "@/lib/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -18,7 +19,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function JurnalPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; filter?: string; bulan?: string; akunCode?: string; page?: string };
+  searchParams: { entity?: string; filter?: string; bulan?: string; akunCode?: string; projectId?: string; page?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -31,17 +32,19 @@ export default async function JurnalPage({
   const filter = searchParams.filter ?? "semua";
   const bulan = searchParams.bulan ?? "";
   const akunCode = searchParams.akunCode ?? "";
+  const projectId = searchParams.projectId ?? "";
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const [chips, coaList, { rows, totalDebit, totalKredit, isBalanced, totalDebitFmt, totalKreditFmt, totalPages }] =
+  const [chips, coaList, projectOptions, { rows, totalDebit, totalKredit, isBalanced, totalDebitFmt, totalKreditFmt, totalPages }] =
     await Promise.all([
       getJenisInputChips(selectedEntity.id),
       getCoaList(),
-      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined, page),
+      getProjectOptions(selectedEntity.id),
+      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined, page, projectId || undefined),
     ]);
 
   const selisih = Math.abs(totalDebit - totalKredit);
@@ -83,8 +86,10 @@ export default async function JurnalPage({
         <JurnalFilterChips chips={chips} current={filter} entityKey={selectedEntity.key} />
         <JurnalExtraFilters
           coaList={coaList}
+          projectList={projectOptions.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
           currentBulan={bulan}
           currentAkunCode={akunCode}
+          currentProjectId={projectId}
           entityKey={selectedEntity.key}
         />
       </div>
@@ -96,6 +101,7 @@ export default async function JurnalPage({
         totalDebitFmt={totalDebitFmt}
         totalKreditFmt={totalKreditFmt}
         coaOptions={coaList}
+        projectOptions={projectOptions.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
         canEditAkun={canManageTransaksi(role)}
       />
 
@@ -108,6 +114,7 @@ export default async function JurnalPage({
           if (filter && filter !== "semua") params.set("filter", filter);
           if (bulan) params.set("bulan", bulan);
           if (akunCode) params.set("akunCode", akunCode);
+          if (projectId) params.set("projectId", projectId);
           params.set("page", String(p));
           return `/jurnal?${params.toString()}`;
         }}

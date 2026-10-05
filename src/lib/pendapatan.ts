@@ -24,15 +24,37 @@ export interface HitungPajakResult {
   labaSetelahPajak: number;
 }
 
+/**
+ * Menghitung DPP Dasar dari Nilai Kwitansi (Kredit Akun Pendapatan):
+ * DPP = 100 / 111 * Nilai Kwitansi
+ */
+export function hitungDppDariKwitansi(nilaiKwitansi: number): number {
+  if (!nilaiKwitansi || nilaiKwitansi <= 0) return 0;
+  return Math.round((nilaiKwitansi * 100) / 111);
+}
+
+/**
+ * Menghitung DPP Nilai Lain dari DPP Dasar:
+ * DPP Nilai Lain = 11 / 12 * DPP Awal
+ */
+export function hitungDppNilaiLain(dpp: number): number {
+  if (!dpp || dpp <= 0) return 0;
+  return Math.round((dpp * 11) / 12);
+}
+
 export function hitungPajakFaktur(
   dpp: number,
   dppNilaiLain: number,
-  tarifPpnPersen = 11,
-  tarifPphPersen = 3.5
+  tarifPpnPersen = 12,
+  tarifPphPersen = 3.5,
+  nilaiKwitansiManual?: number
 ): HitungPajakResult {
   const ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
   const pph = Math.round((dpp * tarifPphPersen) / 100);
-  const nilaiProyek = Math.round((dpp * 111) / 100);
+  const nilaiProyek =
+    nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0
+      ? nilaiKwitansiManual
+      : (tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100));
   const labaSetelahPajak = Math.round(nilaiProyek - ppn - pph);
 
   return {
@@ -616,7 +638,10 @@ export async function getLaporanPendapatanData(
       const contractValue = Number(p.contractValue);
       const termins = p.termin.map((t, i) => {
         const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
-        const nominal = ((t.percentage - prevPct) / 100) * contractValue;
+        const nominal =
+          t.nominal && Number(t.nominal) > 0
+            ? Number(t.nominal)
+            : ((t.percentage - prevPct) / 100) * contractValue;
         return {
           id: t.id,
           name: t.name,

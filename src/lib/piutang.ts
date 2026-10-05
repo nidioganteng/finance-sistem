@@ -1,5 +1,7 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
+import { hitungDppDariKwitansi, hitungDppNilaiLain } from "./pendapatan";
+import { TerminStatus } from "@prisma/client";
 
 // ── Piutang/Hutang antar entitas ───────────────────────────────────────────
 // COA 111-115 = piutang ke counterparty tertentu; 311-315 = hutang ke counterparty
@@ -22,6 +24,99 @@ export const PIUTANG_COA: Record<string, string> = {
 };
 export const HUTANG_COA: Record<string, string> = {
   kencana: "311", gaharu: "312", tataring: "313", ciptaAsri: "314", umum: "315",
+};
+
+export type TerminBreakdown = {
+  noBukti: string | null;
+  tanggalTerimaFmt: string | null;
+  bank: string | null;
+  gross: number;
+  grossFmt: string;
+  dpp: number;
+  dppFmt: string;
+  dppNilaiLain: number;
+  dppNilaiLainFmt: string;
+  ppn: number;
+  ppnFmt: string;
+  tarifPpnPersen: number;
+  pph: number;
+  pphFmt: string;
+  tarifPphPersen: number;
+  pphItems: Array<{
+    name: string;
+    amount: number;
+    amountFmt: string;
+  }>;
+  netBank: number;
+  netBankFmt: string;
+  jurnalRows: Array<{
+    coaCode: string;
+    coaName: string;
+    debit: number;
+    kredit: number;
+    debitFmt: string;
+    kreditFmt: string;
+  }>;
+};
+
+export type TerminItem = {
+  id: string;
+  name: string;
+  percentage?: number;
+  percentageDelta?: number;
+  nominal: number;
+  nominalFmt: string;
+  status: TerminStatus;
+  auditedAt: string | null;
+  auditedByName: string | null;
+  breakdown: TerminBreakdown;
+};
+
+export type ProjectBreakdownSummary = {
+  totalGross: number;
+  totalGrossFmt: string;
+  totalDpp: number;
+  totalDppFmt: string;
+  totalDppNilaiLain: number;
+  totalDppNilaiLainFmt: string;
+  totalPpn: number;
+  totalPpnFmt: string;
+  totalPph: number;
+  totalPphFmt: string;
+  totalNetBank: number;
+  totalNetBankFmt: string;
+  sisaKontrak: number;
+  sisaKontrakFmt: string;
+};
+
+export type ProjectExpenseItem = {
+  id: string;
+  tanggal: string;
+  tanggalFmt: string;
+  noBukti: string;
+  keterangan: string;
+  coaCode: string;
+  coaName: string;
+  kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya";
+  nominal: number;
+  nominalFmt: string;
+  sumberKasBank: string;
+};
+
+export type ProjectExpensesSummary = {
+  totalPengeluaran: number;
+  totalPengeluaranFmt: string;
+  totalGaji: number;
+  totalGajiFmt: string;
+  totalMaterial: number;
+  totalMaterialFmt: string;
+  totalOperasional: number;
+  totalOperasionalFmt: string;
+  totalLainnya: number;
+  totalLainnyaFmt: string;
+  labaKotor: number;
+  labaKotorFmt: string;
+  items: ProjectExpenseItem[];
 };
 
 export type InterEntityBalance = {
@@ -130,7 +225,7 @@ export async function getProjectOptions(currentEntityId?: string) {
       entity: { select: { id: true, key: true, name: true } },
       contractValue: true,
       termin: {
-        select: { id: true, name: true, percentage: true },
+        select: { id: true, name: true, percentage: true, nominal: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -138,7 +233,16 @@ export async function getProjectOptions(currentEntityId?: string) {
   });
   const mapped = projects.map((p) => {
     const contractValueNum = Number(p.contractValue);
-    const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
+    const sumNominal = p.termin.reduce((sum, t, i) => {
+      const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+      const nom = t.nominal && Number(t.nominal) > 0
+        ? Number(t.nominal)
+        : ((t.percentage - prevPct) / 100) * contractValueNum;
+      return sum + nom;
+    }, 0);
+    const maxPct = contractValueNum > 0
+      ? Math.min(100, Math.round((sumNominal / contractValueNum) * 100))
+      : p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
     return {
       id: p.id,
       code: p.code,
@@ -150,6 +254,7 @@ export async function getProjectOptions(currentEntityId?: string) {
       contractValueFmt: formatRupiah(contractValueNum),
       maxPercentage: maxPct,
       terminCount: p.termin.length,
+      totalTerminTagih: sumNominal,
     };
   });
 
@@ -174,11 +279,14 @@ export async function getProjectOptions(currentEntityId?: string) {
 export function computeNewTerminPercentage(
   contractValue: number,
   existingTerminPercentages: number[],
-  nominalMasuk: number
+  nominalMasuk: number,
+  existingCumulativeNominal?: number
 ): number {
   if (contractValue <= 0) return 0;
-  const maxPctSoFar = existingTerminPercentages.reduce((max, p) => Math.max(max, p), 0);
-  const cumulativeBefore = (maxPctSoFar / 100) * contractValue;
+  const cumulativeBefore =
+    existingCumulativeNominal !== undefined && existingCumulativeNominal > 0
+      ? existingCumulativeNominal
+      : (existingTerminPercentages.reduce((max, p) => Math.max(max, p), 0) / 100) * contractValue;
   const cumulativeAfter = cumulativeBefore + nominalMasuk;
   return Math.min(100, Math.round((cumulativeAfter / contractValue) * 100));
 }
@@ -191,6 +299,13 @@ export async function getPiutangData(entityId: string) {
         termin: {
           include: { auditedBy: { select: { name: true } } },
           orderBy: { createdAt: "asc" },
+        },
+        fakturPendapatan: {
+          orderBy: { tanggalTerima: "asc" },
+        },
+        jurnal: {
+          include: { coaAccount: true, jenisInput: true },
+          orderBy: { tanggal: "desc" },
         },
       },
       orderBy: { createdAt: "asc" },
@@ -210,10 +325,258 @@ export async function getPiutangData(entityId: string) {
     const isCancelled = p.status === "CANCELLED";
     const isCompleted = p.status === "COMPLETED";
 
-    // Progress tertagih = persentase termin tertinggi × nilai kontrak
-    const maxPct = isCompleted ? 100 : p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
-    const terminTagih = (maxPct / 100) * contractValue;
-    const sisaTagih = isCancelled ? 0 : Math.max(0, contractValue - terminTagih);
+    const terminItems = p.termin.map((t, i) => {
+      const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
+      const deltaPct = Math.max(0, t.percentage - prevPct);
+      const nominalTermin =
+        t.nominal && Number(t.nominal) > 0
+          ? Number(t.nominal)
+          : ((t.percentage - prevPct) / 100) * contractValue;
+
+      // Ekstrak noBukti dari nama termin, contoh: [pdppt]
+      const noBuktiMatch = t.name.match(/\[(.*?)\]/);
+      const noBukti = noBuktiMatch ? noBuktiMatch[1] : null;
+
+      // Cari faktur terkait proyek & noBukti
+      const matchedFaktur = p.fakturPendapatan.find(
+        (f) => (noBukti && f.noFaktur === noBukti) || Number(f.nilaiProyek) === nominalTermin
+      );
+
+      // Cari transaksi jurnal terkait noBukti
+      const matchedJurnals = p.jurnal.filter(
+        (j) => noBukti && j.noBukti === noBukti
+      );
+
+      let gross = nominalTermin;
+      let dpp = hitungDppDariKwitansi(gross);
+      let dppNilaiLain = hitungDppNilaiLain(dpp);
+      let tarifPpn = 12;
+      let ppn = Math.round((dppNilaiLain * tarifPpn) / 100);
+      let tarifPph = 3.5;
+      let pph = Math.round((dpp * tarifPph) / 100);
+      let netBank = Math.max(0, gross - ppn - pph);
+      let bankName = "BPD";
+      let tanggalFmt = t.createdAt.toLocaleDateString("id-ID");
+
+      if (matchedFaktur) {
+        gross = Number(matchedFaktur.nilaiProyek) || nominalTermin;
+        dpp = Number(matchedFaktur.dpp);
+        dppNilaiLain = Number(matchedFaktur.dppNilaiLain);
+        tarifPpn = Number(matchedFaktur.tarifPpnPersen);
+        tarifPph = Number(matchedFaktur.tarifPphPersen);
+        ppn = Number(matchedFaktur.ppn);
+        pph = Number(matchedFaktur.pph);
+        netBank = Number(matchedFaktur.nominalDiterima);
+        bankName = matchedFaktur.bank;
+        tanggalFmt = matchedFaktur.tanggalTerima.toLocaleDateString("id-ID");
+      } else if (matchedJurnals.length > 0) {
+        const pphDebit = matchedJurnals
+          .filter((j) => j.coaAccount && /pph/i.test(j.coaAccount.name))
+          .reduce((sum, j) => sum + Number(j.debit), 0);
+        const ppnVal = matchedJurnals
+          .filter((j) => j.coaAccount && /ppn/i.test(j.coaAccount.name))
+          .reduce((sum, j) => sum + Number(j.debit || j.kredit), 0);
+        const bankDebit = matchedJurnals
+          .filter((j) => j.coaAccount && /bank|bpd|bri|bni|mdr/i.test(j.coaAccount.name))
+          .reduce((sum, j) => sum + Number(j.debit), 0);
+
+        if (pphDebit > 0) pph = pphDebit;
+        if (ppnVal > 0) ppn = ppnVal;
+        if (bankDebit > 0) netBank = bankDebit;
+      }
+
+      const pphDebitRows = matchedJurnals.filter(
+        (j) => j.coaAccount && /pph/i.test(j.coaAccount.name) && Number(j.debit) > 0
+      );
+      const pphItems =
+        pphDebitRows.length > 0
+          ? pphDebitRows.map((j) => ({
+              name: j.coaAccount?.name || "PPh",
+              amount: Number(j.debit),
+              amountFmt: formatRupiah(Number(j.debit)),
+            }))
+          : pph > 0
+          ? [
+              {
+                name: `Potongan PPh (${tarifPph}%)`,
+                amount: pph,
+                amountFmt: formatRupiah(pph),
+              },
+            ]
+          : [];
+
+      const jurnalRows = matchedJurnals.map((j) => ({
+        coaCode: j.coaAccount?.code || "-",
+        coaName: j.coaAccount?.name || "-",
+        debit: Number(j.debit),
+        kredit: Number(j.kredit),
+        debitFmt: formatRupiah(Number(j.debit)),
+        kreditFmt: formatRupiah(Number(j.kredit)),
+      }));
+
+      const breakdown: TerminBreakdown = {
+        noBukti,
+        tanggalTerimaFmt: tanggalFmt,
+        bank: bankName,
+        gross,
+        grossFmt: formatRupiah(gross),
+        dpp,
+        dppFmt: formatRupiah(dpp),
+        dppNilaiLain,
+        dppNilaiLainFmt: formatRupiah(dppNilaiLain),
+        ppn,
+        ppnFmt: formatRupiah(ppn),
+        tarifPpnPersen: tarifPpn,
+        pph,
+        pphFmt: formatRupiah(pph),
+        tarifPphPersen: tarifPph,
+        pphItems,
+        netBank,
+        netBankFmt: formatRupiah(netBank),
+        jurnalRows,
+      };
+
+      return {
+        id: t.id,
+        name: t.name,
+        percentage: t.percentage,
+        percentageDelta: deltaPct,
+        nominal: gross,
+        nominalFmt: formatRupiah(gross),
+        status: t.status,
+        auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
+        auditedByName: t.auditedBy?.name ?? null,
+        breakdown,
+      };
+    });
+
+    const totalGross = terminItems.reduce((sum, t) => sum + t.breakdown.gross, 0);
+    const totalDpp = terminItems.reduce((sum, t) => sum + t.breakdown.dpp, 0);
+    const totalDppNilaiLain = terminItems.reduce((sum, t) => sum + t.breakdown.dppNilaiLain, 0);
+    const totalPpn = terminItems.reduce((sum, t) => sum + t.breakdown.ppn, 0);
+    const totalPph = terminItems.reduce((sum, t) => sum + t.breakdown.pph, 0);
+    const totalNetBank = terminItems.reduce((sum, t) => sum + t.breakdown.netBank, 0);
+    const sisaKontrak = isCancelled ? 0 : Math.max(0, contractValue - totalGross);
+
+    const breakdownSummary: ProjectBreakdownSummary = {
+      totalGross,
+      totalGrossFmt: formatRupiah(totalGross),
+      totalDpp,
+      totalDppFmt: formatRupiah(totalDpp),
+      totalDppNilaiLain,
+      totalDppNilaiLainFmt: formatRupiah(totalDppNilaiLain),
+      totalPpn,
+      totalPpnFmt: formatRupiah(totalPpn),
+      totalPph,
+      totalPphFmt: formatRupiah(totalPph),
+      totalNetBank,
+      totalNetBankFmt: formatRupiah(totalNetBank),
+      sisaKontrak,
+      sisaKontrakFmt: formatRupiah(sisaKontrak),
+    };
+
+    // 1. Kumpulkan noBukti yang merupakan pendapatan termin (ada akun kategori PENDAPATAN atau kredit ke 400)
+    const incomeNoBuktis = new Set<string>();
+    p.jurnal.forEach((j) => {
+      if (
+        j.noBukti &&
+        (j.coaAccount?.kategori === "PENDAPATAN" ||
+          j.coaAccount?.code === "400" ||
+          /pendapatan/i.test(j.coaAccount?.name ?? ""))
+      ) {
+        incomeNoBuktis.add(j.noBukti);
+      }
+    });
+    p.termin.forEach((t) => {
+      const m = t.name.match(/\[(.*?)\]/);
+      if (m && m[1]) incomeNoBuktis.add(m[1]);
+    });
+
+    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, dll.)
+    const expenseRows = p.jurnal.filter((j) => {
+      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) return false;
+      const isBeban =
+        j.coaAccount?.kategori === "BEBAN" ||
+        j.coaAccount?.code?.startsWith("5") ||
+        j.coaAccount?.code?.startsWith("6");
+      if (isBeban && Number(j.debit) > 0) return true;
+      if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
+        return true;
+      }
+      return false;
+    });
+
+    const expenseItems: ProjectExpenseItem[] = expenseRows.map((j) => {
+      const nominal = Number(j.debit);
+      const txt = `${j.coaAccount?.name || ""} ${j.keterangan || ""}`.toLowerCase();
+      let kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya" = "Lainnya";
+
+      if (/gaji|upah|mandor|tukang|honor|tenaga ahli/i.test(txt)) {
+        kategoriBeban = "Gaji & Upah";
+      } else if (/bahan|material|perlengkapan|semen|pasir|besi|batu|kayu|cat|baut|alat/i.test(txt)) {
+        kategoriBeban = "Bahan & Material";
+      } else if (/transport|perjalanan|bensin|bbm|solar|konsumsi|makan|listrik|telepon|pdam|survey|sewa|akomodasi/i.test(txt)) {
+        kategoriBeban = "Operasional & Transport";
+      }
+
+      // Cari baris pasangan dengan noBukti yang sama yang memiliki kredit > 0 (sumber kas/bank)
+      const counterpart = p.jurnal.find(
+        (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
+      );
+      const sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
+
+      return {
+        id: j.id,
+        tanggal: j.tanggal.toISOString(),
+        tanggalFmt: j.tanggal.toLocaleDateString("id-ID"),
+        noBukti: j.noBukti,
+        keterangan: j.keterangan || j.coaAccount?.name || "Pengeluaran Proyek",
+        coaCode: j.coaAccount?.code || "-",
+        coaName: j.coaAccount?.name || "-",
+        kategoriBeban,
+        nominal,
+        nominalFmt: formatRupiah(nominal),
+        sumberKasBank,
+      };
+    });
+
+    let totalGaji = 0;
+    let totalMaterial = 0;
+    let totalOperasional = 0;
+    let totalLainnya = 0;
+    expenseItems.forEach((it) => {
+      if (it.kategoriBeban === "Gaji & Upah") totalGaji += it.nominal;
+      else if (it.kategoriBeban === "Bahan & Material") totalMaterial += it.nominal;
+      else if (it.kategoriBeban === "Operasional & Transport") totalOperasional += it.nominal;
+      else totalLainnya += it.nominal;
+    });
+
+    let totalPengeluaran = expenseItems.reduce((acc, it) => acc + it.nominal, 0);
+    if (totalPengeluaran === 0 && Number(p.spend) > 0) {
+      totalPengeluaran = Number(p.spend);
+    }
+
+    const expensesSummary: ProjectExpensesSummary = {
+      totalPengeluaran,
+      totalPengeluaranFmt: formatRupiah(totalPengeluaran),
+      totalGaji,
+      totalGajiFmt: formatRupiah(totalGaji),
+      totalMaterial,
+      totalMaterialFmt: formatRupiah(totalMaterial),
+      totalOperasional,
+      totalOperasionalFmt: formatRupiah(totalOperasional),
+      totalLainnya,
+      totalLainnyaFmt: formatRupiah(totalLainnya),
+      labaKotor: totalGross - totalPengeluaran,
+      labaKotorFmt: formatRupiah(totalGross - totalPengeluaran),
+      items: expenseItems,
+    };
+
+    const maxPct = isCompleted
+      ? 100
+      : (contractValue > 0 ? Math.min(100, Math.round((totalGross / contractValue) * 100)) : 0);
+    const terminTagih = isCompleted ? contractValue : totalGross;
+    const sisaTagih = sisaKontrak;
 
     // "Total Nilai Kontrak Aktif" cuma menjumlah proyek yang masih aktif
     if (!isCancelled && !isCompleted) {
@@ -235,21 +598,9 @@ export async function getPiutangData(entityId: string) {
       terminTagihFmt: formatRupiah(terminTagih),
       sisaTagih,
       sisaTagihFmt: formatRupiah(sisaTagih),
-      termin: p.termin.map((t, i) => {
-        const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
-        const deltaPct = Math.max(0, t.percentage - prevPct);
-        const nominalTermin = ((t.percentage - prevPct) / 100) * contractValue;
-        return {
-          id: t.id,
-          name: t.name,
-          percentage: t.percentage,
-          percentageDelta: deltaPct,
-          nominalFmt: formatRupiah(nominalTermin),
-          status: t.status,
-          auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
-          auditedByName: t.auditedBy?.name ?? null,
-        };
-      }),
+      termin: terminItems,
+      breakdownSummary,
+      expensesSummary,
     };
   });
 

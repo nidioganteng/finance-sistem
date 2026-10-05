@@ -62,6 +62,8 @@ export function KasScreenClient({
   saldoAwal = 0,
   totalMasuk = 0,
   totalKeluar = 0,
+  selectedRekeningNama,
+  currentYear,
 }: {
   entityKey: string;
   jenisInputKey: string;
@@ -72,6 +74,7 @@ export function KasScreenClient({
   ledger: LedgerRow[];
   rekeningOptions?: RekeningOption[];
   selectedRekeningId?: string;
+  selectedRekeningNama?: string;
   allEntities?: { key: string; name: string }[];
   projectOptions?: ProjectOption[];
   defaultArahLaporan?: string[];
@@ -81,6 +84,7 @@ export function KasScreenClient({
   saldoAwal?: number;
   totalMasuk?: number;
   totalKeluar?: number;
+  currentYear?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -205,7 +209,18 @@ export function KasScreenClient({
           { label: "Saldo Akhir", value: saldoAwal + totalMasuk - totalKeluar, color: "text-navy-text" },
         ].map((s) => (
           <div key={s.label} className="bg-surface-card border border-border-soft rounded-[14px] px-4 py-3">
-            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wide mb-1">{s.label}</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wide">{s.label}</p>
+              {s.label === "Saldo Awal" && (
+                <a
+                  href={`/daftar-akun?entity=${entityKey}&year=${currentYear ?? new Date().getFullYear()}`}
+                  className="text-[10px] font-bold text-brand hover:underline"
+                  title="Atur Saldo Awal di Daftar Akun"
+                >
+                  Atur di COA
+                </a>
+              )}
+            </div>
             <p className={`text-[15px] font-extrabold tabular-nums ${s.color}`}>{formatRupiah(s.value)}</p>
           </div>
         ))}
@@ -323,131 +338,189 @@ export function KasScreenClient({
           </thead>
           <tbody>
             {ledger.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-6 text-center text-sm text-muted">
-                  Belum ada transaksi.
-                </td>
-              </tr>
-            ) : (
-              [...ledger].sort((a, b) => {
-                const diff = new Date(a.tanggalRaw).getTime() - new Date(b.tanggalRaw).getTime();
-                return sortAsc ? diff : -diff;
-              }).map((r, idx) => {
-                const shown = r.akunTags.slice(0, 2);
-                const rest = r.akunTags.length - shown.length;
-                const expanded = expandedIdx === idx;
-
-                const isCrossingFrom = !!r.crossingFromEntityKey;
-                const sourceEntityName = isCrossingFrom
-                  ? (allEntities.find((e) => e.key === r.crossingFromEntityKey)?.name ?? r.crossingFromEntityKey)
-                  : null;
-
-                return (
-                  <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
-                    <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
-                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
-                      {r.keterangan}
-                      {r.project && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
-                          {r.project.code}
-                        </span>
-                      )}
-                      {r.rekening && (
-                        <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
-                          {r.rekening}
-                        </span>
-                      )}
-                      {/* Crossing destination badge — transaksi masuk dari entitas lain */}
-                      {isCrossingFrom && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
-                          <ArrowRightLeft size={9} />
-                          dari {sourceEntityName}
-                        </span>
-                      )}
-                      {/* Crossing source badges — transaksi dikirim ke entitas lain */}
-                      {!isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
-                          <ArrowRightLeft size={9} />
-                          → {(r.crossingEntityKeys ?? [])
-                            .map((k) => allEntities.find((e) => e.key === k)?.name ?? k)
-                            .join(", ")}
-                        </span>
-                      )}
+              <>
+                {saldoAwal !== 0 && (
+                  <tr className="border-b border-surface-subtle bg-surface-subtle/50">
+                    <td className="py-2.5 px-1.5 text-[12.5px] font-semibold text-muted whitespace-nowrap italic">
+                      {dari ? `Per ${dari}` : `Awal ${currentYear ?? new Date().getFullYear()}`}
                     </td>
-                    <td className="py-2.5 px-1.5">
-                      <div className="flex flex-col gap-1">
-                        {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                          <div key={i} className="flex flex-col">
-                            <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md whitespace-nowrap">
-                              {cr.coaName}
-                            </span>
-                            {cr.itemDescription && (
-                              <span className="text-[10px] text-muted px-1 mt-0.5 italic">{cr.itemDescription}</span>
-                            )}
-                          </div>
-                        ))}
-                        {!expanded && r.coaRows.length > 2 && (
-                          <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left whitespace-nowrap">
-                            +{r.coaRows.length - 2} lagi
-                          </button>
-                        )}
-                      </div>
+                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-semibold text-muted italic">
+                      Saldo Awal {selectedRekeningNama ? `(${selectedRekeningNama})` : ""}
                     </td>
-                    {/* MASUK — per baris akun */}
-                    <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
-                      {r.coaRows.length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                            <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
-                              {r.masuk > 0 ? formatRupiah(cr.nominal) : "—"}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[13px] font-bold text-status-green tabular-nums whitespace-nowrap">{r.masukFmt}</span>
-                      )}
+                    <td className="py-2.5 px-1.5"></td>
+                    <td className="py-2.5 px-1.5 text-right whitespace-nowrap text-muted-faint text-[12px]">—</td>
+                    <td className="py-2.5 px-1.5 text-right whitespace-nowrap text-muted-faint text-[12px]">—</td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">
+                      {formatRupiah(saldoAwal)}
                     </td>
-                    {/* KELUAR — per baris akun */}
-                    <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
-                      {r.coaRows.length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                            <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
-                              {r.keluar > 0 ? formatRupiah(cr.nominal) : "—"}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[13px] font-bold text-status-red tabular-nums whitespace-nowrap">{r.keluarFmt}</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">{r.saldoFmt}</td>
-                    <td className="py-2.5 px-1.5 text-right">
-                      {isCrossingFrom ? (
-                        <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>
-                      ) : (
-                        <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => openEdit(r)}
-                            className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-stronger"
-                            title="Edit"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            onClick={() => confirmDelete(r)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red"
-                            title="Hapus"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
+                    <td className="py-2.5 px-1.5 text-right"></td>
                   </tr>
-                );
-              })
+                )}
+                <tr>
+                  <td colSpan={8} className="py-6 text-center text-sm text-muted">
+                    {saldoAwal !== 0 ? "Belum ada transaksi mutasi untuk periode ini." : "Belum ada transaksi."}
+                  </td>
+                </tr>
+              </>
+            ) : (
+              <>
+                {sortAsc && saldoAwal !== 0 && (
+                  <tr className="border-b border-surface-subtle bg-surface-subtle/40">
+                    <td className="py-2.5 px-1.5 text-[12px] font-semibold text-muted whitespace-nowrap italic">
+                      {dari ? `Per ${dari}` : `Awal ${currentYear ?? new Date().getFullYear()}`}
+                    </td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-1.5 text-[12.5px] font-semibold text-muted italic">
+                      Saldo Awal {selectedRekeningNama ? `(${selectedRekeningNama})` : ""}
+                    </td>
+                    <td className="py-2.5 px-1.5"></td>
+                    <td className="py-2.5 px-1.5 text-right whitespace-nowrap text-muted-faint text-[12px]">—</td>
+                    <td className="py-2.5 px-1.5 text-right whitespace-nowrap text-muted-faint text-[12px]">—</td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">
+                      {formatRupiah(saldoAwal)}
+                    </td>
+                    <td className="py-2.5 px-1.5 text-right"></td>
+                  </tr>
+                )}
+                {[...ledger].sort((a, b) => {
+                  const diff = new Date(a.tanggalRaw).getTime() - new Date(b.tanggalRaw).getTime();
+                  return sortAsc ? diff : -diff;
+                }).map((r, idx) => {
+                  const shown = r.akunTags.slice(0, 2);
+                  const rest = r.akunTags.length - shown.length;
+                  const expanded = expandedIdx === idx;
+
+                  const isCrossingFrom = !!r.crossingFromEntityKey;
+                  const sourceEntityName = isCrossingFrom
+                    ? (allEntities.find((e) => e.key === r.crossingFromEntityKey)?.name ?? r.crossingFromEntityKey)
+                    : null;
+
+                  return (
+                    <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
+                      <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
+                      <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
+                      <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
+                        {r.keterangan}
+                        {r.project && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
+                            {r.project.code}
+                          </span>
+                        )}
+                        {r.rekening && (
+                          <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
+                            {r.rekening}
+                          </span>
+                        )}
+                        {/* Crossing destination badge — transaksi masuk dari entitas lain */}
+                        {isCrossingFrom && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
+                            <ArrowRightLeft size={9} />
+                            dari {sourceEntityName}
+                          </span>
+                        )}
+                        {/* Crossing source badges — transaksi dikirim ke entitas lain */}
+                        {!isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
+                            <ArrowRightLeft size={9} />
+                            → {(r.crossingEntityKeys ?? [])
+                              .map((k) => allEntities.find((e) => e.key === k)?.name ?? k)
+                              .join(", ")}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-1.5">
+                        <div className="flex flex-col gap-1">
+                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                            <div key={i} className="flex flex-col">
+                              <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md whitespace-nowrap">
+                                {cr.coaName}
+                              </span>
+                              {cr.itemDescription && (
+                                <span className="text-[10px] text-muted px-1 mt-0.5 italic">{cr.itemDescription}</span>
+                              )}
+                            </div>
+                          ))}
+                          {!expanded && r.coaRows.length > 2 && (
+                            <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left whitespace-nowrap">
+                              +{r.coaRows.length - 2} lagi
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      {/* MASUK — per baris akun */}
+                      <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
+                        {r.coaRows.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                              <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
+                                {r.masuk > 0 ? formatRupiah(cr.nominal) : "—"}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[13px] font-bold text-status-green tabular-nums whitespace-nowrap">{r.masukFmt}</span>
+                        )}
+                      </td>
+                      {/* KELUAR — per baris akun */}
+                      <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
+                        {r.coaRows.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
+                              <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
+                                {r.keluar > 0 ? formatRupiah(cr.nominal) : "—"}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[13px] font-bold text-status-red tabular-nums whitespace-nowrap">{r.keluarFmt}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">{r.saldoFmt}</td>
+                      <td className="py-2.5 px-1.5 text-right">
+                        {isCrossingFrom ? (
+                          <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>
+                        ) : (
+                          <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => openEdit(r)}
+                              className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-stronger"
+                              title="Edit"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              onClick={() => confirmDelete(r)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/15 text-status-red"
+                              title="Hapus"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!sortAsc && saldoAwal !== 0 && (
+                  <tr className="border-b border-surface-subtle bg-surface-subtle/40">
+                    <td className="py-2.5 px-1.5 text-[12px] font-semibold text-muted whitespace-nowrap italic">
+                      {dari ? `Per ${dari}` : `Awal ${currentYear ?? new Date().getFullYear()}`}
+                    </td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-1.5 text-[12.5px] font-semibold text-muted italic">
+                      Saldo Awal {selectedRekeningNama ? `(${selectedRekeningNama})` : ""}
+                    </td>
+                    <td className="py-2.5 px-1.5"></td>
+                    <td className="py-2.5 px-1.5 text-right whitespace-nowrap text-muted-faint text-[12px]">—</td>
+                    <td className="py-2.5 px-1.5 text-right whitespace-nowrap text-muted-faint text-[12px]">—</td>
+                    <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">
+                      {formatRupiah(saldoAwal)}
+                    </td>
+                    <td className="py-2.5 px-1.5 text-right"></td>
+                  </tr>
+                )}
+              </>
             )}
           </tbody>
         </table>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Pencil, Check, X } from "lucide-react";
-import { updateKodeAkunJurnal } from "@/lib/actions/jurnal";
+import { updateKodeAkunJurnal, updateProyekJurnal } from "@/lib/actions/jurnal";
 import { CoaCombobox } from "@/components/kas/CoaCombobox";
 
 type JurnalRow = {
@@ -10,6 +10,9 @@ type JurnalRow = {
   tanggal: string;
   noBukti: string;
   keterangan: string;
+  projectId?: string | null;
+  projectCode?: string | null;
+  projectName?: string | null;
   sumberBg: string;
   sumberColor: string;
   sumberLabel: string;
@@ -38,6 +41,7 @@ export function JurnalTable({
   totalKreditFmt,
   canEditAkun,
   coaOptions,
+  projectOptions = [],
 }: {
   rows: JurnalRow[];
   entityId: string;
@@ -46,11 +50,32 @@ export function JurnalTable({
   totalKreditFmt: string;
   canEditAkun: boolean;
   coaOptions: { code: string; name: string }[];
+  projectOptions?: { id: string; code: string; name: string }[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCode, setEditCode] = useState("");
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editProjectId, setEditProjectId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function startEditProject(r: JurnalRow) {
+    setError(null);
+    setEditProjectId(r.projectId ?? "");
+    setEditingProjectId(r.id);
+  }
+
+  function handleSaveProject(id: string) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateProyekJurnal(id, entityId, editProjectId || null);
+        setEditingProjectId(null);
+      } catch (e: any) {
+        setError(e.message);
+      }
+    });
+  }
 
   // CoaCombobox butuh field "id" — di sini kode akun itu sendiri yang jadi id,
   // karena tujuan akhirnya memang milih salah satu kode yang sudah terdaftar.
@@ -86,6 +111,7 @@ export function JurnalTable({
             <td className="py-2 px-1.5 whitespace-nowrap">TANGGAL</td>
             <td className="py-2 px-1.5 whitespace-nowrap">NO. BUKTI</td>
             <td className="py-2 px-1.5">SUMBER</td>
+            <td className="py-2 px-1.5 whitespace-nowrap">PROYEK</td>
             <td className="py-2 px-1.5">KETERANGAN</td>
             <td className="py-2 px-1.5 whitespace-nowrap">KODE AKUN</td>
             <td className="py-2 px-1.5">NAMA AKUN</td>
@@ -97,7 +123,7 @@ export function JurnalTable({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="py-8 text-center text-sm text-muted">
+              <td colSpan={10} className="py-8 text-center text-sm text-muted">
                 Belum ada transaksi untuk filter yang dipilih.
               </td>
             </tr>
@@ -116,6 +142,63 @@ export function JurnalTable({
                   >
                     {r.sumberLabel}
                   </span>
+                </td>
+                <td className="py-2.5 px-1.5 whitespace-nowrap">
+                  {editingProjectId === r.id ? (
+                    <div className="flex items-center gap-1 min-w-[190px]">
+                      <select
+                        value={editProjectId}
+                        onChange={(e) => setEditProjectId(e.target.value)}
+                        className="h-7 px-1.5 text-[11.5px] rounded-[7px] border border-border-soft bg-surface-input text-navy-text focus:outline-none focus:border-brand flex-1 truncate"
+                      >
+                        <option value="">— Bukan Proyek —</option>
+                        {projectOptions.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.code}] {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveProject(r.id)}
+                        disabled={isPending}
+                        className="p-1 rounded hover:bg-surface-hover text-status-green disabled:opacity-40 flex-none"
+                        title="Simpan"
+                      >
+                        <Check size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingProjectId(null)}
+                        className="p-1 rounded hover:bg-surface-hover text-muted-stronger flex-none"
+                        title="Batal"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      {r.projectCode ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10.5px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md"
+                          title={r.projectName ? `${r.projectCode} — ${r.projectName}` : r.projectCode}
+                        >
+                          {r.projectCode}
+                        </span>
+                      ) : (
+                        <span className="text-muted-faint text-[12px]">—</span>
+                      )}
+                      {canEditAkun && (
+                        <button
+                          onClick={() => startEditProject(r)}
+                          className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text"
+                          title="Pilih / ubah kode proyek"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </td>
                 <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px]">
                   {r.isKasEntry ? (
@@ -195,7 +278,7 @@ export function JurnalTable({
         {rows.length > 0 && (
           <tfoot>
             <tr className={`border-t-2 ${isBalanced ? "border-border" : "border-red-300"}`}>
-              <td colSpan={6} className="py-3.5 px-1.5 text-[13px] font-extrabold text-navy-text">
+              <td colSpan={7} className="py-3.5 px-1.5 text-[13px] font-extrabold text-navy-text">
                 Total Periode Berjalan
                 {!isBalanced && (
                   <span className="ml-2 text-[11px] font-bold text-red-500 normal-case">

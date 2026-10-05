@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { Pencil, Check, X, Search, Lock, ArrowLeftRight } from "lucide-react";
+import { Pencil, Check, X, Search, Lock } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";
-import { getCoaOwnerEntityKey, ENTITY_NAMES, getIntercompanyMirror, isSelfIntercompanyAccount } from "@/lib/bank-accounts";
+import { getCoaOwnerEntityKey, ENTITY_NAMES, isSelfIntercompanyAccount } from "@/lib/bank-accounts";
 
 type Row = {
   coaId: string;
@@ -191,7 +191,6 @@ export function DaftarAkunClient({
               const isSelfIntercompany = currentEntityKey !== undefined && isSelfIntercompanyAccount(currentEntityKey, r.code);
               const isLocked = isKasBankLocked || isSelfIntercompany;
 
-              const mirror = currentEntityKey ? getIntercompanyMirror(currentEntityKey, r.code) : null;
               const ownerName = ownerKey ? ENTITY_NAMES[ownerKey] ?? ownerKey : null;
               const lockTitle = isSelfIntercompany
                 ? "Terkunci: Akun lawan yang digunakan oleh entitas rekanan untuk mencatat hutang/piutang ke entitas ini."
@@ -229,15 +228,6 @@ export function DaftarAkunClient({
                           title={`Akun Kas/Bank ${ownerName}`}
                         >
                           {ownerName}
-                        </span>
-                      )}
-                      {!isLocked && mirror && (
-                        <span
-                          className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
-                          title={`Otomatis sinkron ke ${mirror.targetCoaCode} (${mirror.targetCoaNameSuggestion}) di entitas ${mirror.targetEntityName}`}
-                        >
-                          <ArrowLeftRight size={9} />
-                          Auto-sync: {mirror.targetCoaNameSuggestion} ({mirror.targetEntityName})
                         </span>
                       )}
                       {!r.punyaTransaksi && (

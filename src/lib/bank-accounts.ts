@@ -44,3 +44,29 @@ export function getRekeningNama(entityKey: string, rekeningId: string): string |
 export function isValidRekening(entityKey: string, rekeningId: string): boolean {
   return REKENING_BY_ENTITY[entityKey]?.some((r) => r.id === rekeningId) ?? false;
 }
+
+export type BankCoaMatch = { rekeningId: string; entityKey: string; rekeningNama: string };
+
+export function getBankCoaMap(): Record<string, BankCoaMatch> {
+  const map: Record<string, BankCoaMatch> = {};
+  for (const [entityKey, rekenings] of Object.entries(REKENING_BY_ENTITY)) {
+    for (const rekening of rekenings) {
+      const code = REKENING_COA_CODE[rekening.id];
+      if (code) map[code] = { rekeningId: rekening.id, entityKey, rekeningNama: rekening.nama };
+    }
+  }
+  return map;
+}
+
+export function getRekeningCoaCode(rekeningIdOrNama: string): string | undefined {
+  if (REKENING_COA_CODE[rekeningIdOrNama]) return REKENING_COA_CODE[rekeningIdOrNama];
+  for (const options of Object.values(REKENING_BY_ENTITY)) {
+    const found = options.find(
+      (r) => r.nama.toLowerCase() === rekeningIdOrNama.toLowerCase() || r.id === rekeningIdOrNama
+    );
+    if (found && REKENING_COA_CODE[found.id]) {
+      return REKENING_COA_CODE[found.id];
+    }
+  }
+  return undefined;
+}

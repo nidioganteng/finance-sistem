@@ -2,21 +2,25 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil } from "lucide-react";
+import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil, Briefcase, TrendingUp } from "lucide-react";
 import { saveJurnalTransaksi, deleteJurnalTransaksi } from "@/lib/actions/jurnal-transaksi";
 import { PaginationNav } from "@/components/shared/PaginationNav";
 import { CoaCombobox } from "@/components/shared/CoaCombobox";
 import { formatRupiah } from "@/lib/dashboard-data";
 import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
 
-type CoaOption = { id: string; code: string; name: string };
+type CoaOption = { id: string; code: string; name: string; kategori?: string };
 export type ProjectOption = {
   id: string;
   code: string;
   name: string;
+  entityId?: string;
   entityKey?: string;
   entityName?: string;
+  contractValue?: number;
   contractValueFmt?: string;
+  maxPercentage?: number;
+  terminCount?: number;
 };
 
 type CoaRow = {
@@ -76,8 +80,63 @@ export function JurnalTransaksiClient({
   const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && validRowCount >= 1 && !isPending;
 
   const selectedProject = projectOptions?.find((p) => p.id === projectId);
+  const isOtherEntity = selectedProject?.entityKey && selectedProject.entityKey !== entityKey;
   const currentEntityProjects = (projectOptions ?? []).filter((p) => !p.entityKey || p.entityKey === entityKey);
   const otherEntityProjects = (projectOptions ?? []).filter((p) => p.entityKey && p.entityKey !== entityKey);
+
+  // Hitung nominal uang masuk / termin dari baris yang diisi:
+  // 1. Prioritas pendapatan (kredit akun kategori PENDAPATAN atau kode 4xx)
+  // 2. Prioritas bank/kas (debit akun kas/bank)
+  // 3. Fallback: total kredit atau total debit
+  const pendapatanRows = coaRows.filter((r) => {
+    const c = coa.find((acc) => acc.id === r.coaAccountId);
+    return r.arah === "kredit" && (c?.kategori === "PENDAPATAN" || c?.code.startsWith("4"));
+  });
+  const totalPendapatan = pendapatanRows.reduce((sum, r) => sum + parseNum(r.nominalRaw), 0);
+
+  const bankRows = coaRows.filter((r) => {
+    const c = coa.find((acc) => acc.id === r.coaAccountId);
+    return r.arah === "debit" && (/^(11|12|13|14|21|22|23|24|31|32|41|51)$/.test(c?.code ?? "") || /bank|bpd|bri|bni|mdr/i.test(c?.name ?? ""));
+  });
+  const totalBank = bankRows.reduce((sum, r) => sum + parseNum(r.nominalRaw), 0);
+
+  const nominalTermin = totalPendapatan > 0 ? totalPendapatan : (totalBank > 0 ? totalBank : (totalKredit > 0 ? totalKredit : totalDebit));
+
+  const contractVal = selectedProject?.contractValue ?? 0;
+  const maxPctSoFar = selectedProject?.maxPercentage ?? 0;
+  const terminCount = selectedProject?.terminCount ?? 0;
+  const nextTerminKe = terminCount + 1;
+  const cumulativeBefore = (maxPctSoFar / 100) * contractVal;
+  const cumulativeAfter = cumulativeBefore + nominalTermin;
+  const newPct = contractVal > 0 ? Math.min(100, Math.round((cumulativeAfter / contractVal) * 100)) : maxPctSoFar;
+  const deltaPct = Math.max(0, newPct - maxPctSoFar);
+
+  const autoKeterangan = selectedProject
+    ? `Pendapatan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`
+    : "";
+
+  function handleProjectChange(newProjectId: string) {
+    setProjectId(newProjectId);
+    if (!newProjectId) return;
+    const sel = projectOptions.find((p) => p.id === newProjectId);
+    if (!sel) return;
+    const nextKe = (sel.terminCount ?? 0) + 1;
+    const autoKet = `Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`;
+    setCoaRows((prev) => {
+      if (prev.length > 0 && (!prev[0].keterangan.trim() || prev[0].keterangan.startsWith("Pendapatan Termin"))) {
+        const [first, ...rest] = prev;
+        return [{ ...first, keterangan: autoKet }, ...rest];
+      }
+      return prev;
+    });
+  }
+
+  function applyAutoKeterangan() {
+    if (!autoKeterangan) return;
+    setCoaRows((prev) =>
+      prev.map((r, i) => (i === 0 || !r.keterangan.trim() ? { ...r, keterangan: autoKeterangan } : r))
+    );
+  }
 
   function resetForm() {
     setNoBukti(""); setTanggal(todayStr()); setProjectId("");
@@ -234,8 +293,8 @@ export function JurnalTransaksiClient({
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Header: No. Bukti + Tanggal + Proyek */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+            {/* Header: No. Bukti + Tanggal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
                 <input type="text" value={noBukti} onChange={(e) => setNoBukti(e.target.value)}
@@ -247,41 +306,148 @@ export function JurnalTransaksiClient({
                 <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
                   className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest flex items-center justify-between">
-                  <span>Kode Proyek (Opsional)</span>
-                  {selectedProject && (
-                    <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 px-1.5 py-0.5 rounded">
-                      {selectedProject.code}
+            </div>
+
+            {/* Integrasi Kode Proyek Sidamon & Simulasi Termin */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
+                  <Briefcase size={12} className="text-muted-faint" />
+                  Proyek Terkait (Sidamon)
+                  {isOtherEntity && (
+                    <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
+                      Lintas Entitas
                     </span>
                   )}
                 </label>
-                <select
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  className="h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
-                >
-                  <option value="">— Bukan transaksi proyek —</option>
-                  {currentEntityProjects.length > 0 && (
-                    <optgroup label="Proyek Entitas Ini">
-                      {currentEntityProjects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          [{p.code}] {p.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {otherEntityProjects.length > 0 && (
-                    <optgroup label="Proyek Entitas Lain">
-                      {otherEntityProjects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          [{p.code}] {p.name} ({p.entityName ?? p.entityKey})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
+                {selectedProject && (
+                  <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
+                    Termin Ke-{nextTerminKe}
+                  </span>
+                )}
               </div>
+
+              <select
+                value={projectId}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
+              >
+                <option value="">— Bukan transaksi proyek —</option>
+                {currentEntityProjects.length > 0 && (
+                  <optgroup label="Proyek Entitas Ini">
+                    {currentEntityProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.code}] {p.name} · Kontrak: {p.contractValueFmt ?? "-"} · Progres: {p.maxPercentage ?? 0}%
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherEntityProjects.length > 0 && (
+                  <optgroup label="Proyek Entitas Lain (Lintas Entitas)">
+                    {otherEntityProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.code}] {p.name} ({p.entityName ?? p.entityKey}) · Kontrak: {p.contractValueFmt ?? "-"}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+
+              {!selectedProject ? (
+                <p className="text-[10.5px] text-muted-faint mt-1">
+                  Opsional. Hubungkan transaksi ke proyek Sidamon untuk sinkronisasi termin otomatis ke Kontrol Piutang & Laporan Pendapatan.
+                </p>
+              ) : (
+                <div className="mt-2.5 rounded-[12px] border border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-950/10 p-3.5 flex flex-col gap-3">
+                  {/* Top Header Row of Project Info */}
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-[12px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold font-mono text-[11.5px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        {selectedProject.code}
+                      </span>
+                      <span className="font-semibold text-navy-text">
+                        {selectedProject.name}
+                      </span>
+                      {selectedProject.entityName && (
+                        <span className="text-[10px] font-bold text-muted-faint bg-surface-card px-1.5 py-0.5 rounded border border-border-subtle">
+                          {selectedProject.entityName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-muted-faint text-[11px]">
+                      Nilai Kontrak: <span className="font-bold text-navy-text">{selectedProject.contractValueFmt ?? `Rp ${contractVal.toLocaleString("id-ID")}`}</span>
+                    </div>
+                  </div>
+
+                  {/* Termin Simulation Box */}
+                  {nominalTermin === 0 ? (
+                    <div className="text-[11.5px] text-muted-strong bg-surface-card border border-border-subtle rounded-[9px] p-2.5">
+                      Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun di bawah untuk melihat simulasi termin ke-{nextTerminKe}.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2.5 bg-surface-card border border-border-subtle rounded-[10px] p-3">
+                      <div className="flex items-center justify-between text-[11.5px] font-semibold">
+                        <span className="flex items-center gap-1.5 text-navy-text">
+                          <TrendingUp size={13} className="text-emerald-500" />
+                          Simulasi Progres Termin:
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-faint">{maxPctSoFar}%</span>
+                          <span className="text-muted-faint">→</span>
+                          <span className="text-status-green font-bold text-[12.5px]">{newPct}%</span>
+                          <span className="text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded">
+                            +{deltaPct}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visual 2-color Progress Bar */}
+                      <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-status-green transition-all"
+                          style={{ width: `${Math.min(maxPctSoFar, 100)}%` }}
+                          title={`Progres sebelumnya: ${maxPctSoFar}%`}
+                        />
+                        <div
+                          className="h-full bg-blue-500 transition-all"
+                          style={{ width: `${Math.min(deltaPct, 100 - maxPctSoFar)}%` }}
+                          title={`Penambahan transaksi ini: +${deltaPct}%`}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-[10.5px] pt-2 border-t border-border-subtle">
+                        <div>
+                          <span className="text-muted-faint block">Sebelumnya</span>
+                          <span className="font-bold text-navy-text">Rp {Math.round(cumulativeBefore).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-faint block">Termin {nextTerminKe}</span>
+                          <span className="font-bold text-status-green">+Rp {Math.round(nominalTermin).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-faint block">Sisa Kontrak</span>
+                          <span className="font-bold text-muted-stronger">Rp {Math.round(Math.max(0, contractVal - cumulativeAfter)).toLocaleString("id-ID")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {autoKeterangan && (
+                    <div className="flex items-center justify-between gap-2 pt-1 text-[11px]">
+                      <span className="text-muted-faint truncate">
+                        Format Keterangan: <span className="font-mono text-navy-text font-medium">{autoKeterangan}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={applyAutoKeterangan}
+                        className="text-[10.5px] font-bold text-brand hover:underline shrink-0"
+                      >
+                        Terapkan ke baris
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Tabel baris COA */}

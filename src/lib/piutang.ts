@@ -1,5 +1,7 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
+import { hitungDppDariKwitansi, hitungDppNilaiLain } from "./pendapatan";
+import { TerminStatus } from "@prisma/client";
 
 // ── Piutang/Hutang antar entitas ───────────────────────────────────────────
 // COA 111-115 = piutang ke counterparty tertentu; 311-315 = hutang ke counterparty
@@ -22,6 +24,69 @@ export const PIUTANG_COA: Record<string, string> = {
 };
 export const HUTANG_COA: Record<string, string> = {
   kencana: "311", gaharu: "312", tataring: "313", ciptaAsri: "314", umum: "315",
+};
+
+export type TerminBreakdown = {
+  noBukti: string | null;
+  tanggalTerimaFmt: string | null;
+  bank: string | null;
+  gross: number;
+  grossFmt: string;
+  dpp: number;
+  dppFmt: string;
+  dppNilaiLain: number;
+  dppNilaiLainFmt: string;
+  ppn: number;
+  ppnFmt: string;
+  tarifPpnPersen: number;
+  pph: number;
+  pphFmt: string;
+  tarifPphPersen: number;
+  pphItems: Array<{
+    name: string;
+    amount: number;
+    amountFmt: string;
+  }>;
+  netBank: number;
+  netBankFmt: string;
+  jurnalRows: Array<{
+    coaCode: string;
+    coaName: string;
+    debit: number;
+    kredit: number;
+    debitFmt: string;
+    kreditFmt: string;
+  }>;
+};
+
+export type TerminItem = {
+  id: string;
+  name: string;
+  percentage?: number;
+  percentageDelta?: number;
+  nominal: number;
+  nominalFmt: string;
+  status: TerminStatus;
+  auditedAt: string | null;
+  auditedByName: string | null;
+  breakdown: TerminBreakdown;
+};
+
+export type ProjectBreakdownSummary = {
+  totalGross: number;
+  totalGrossFmt: string;
+  totalDpp: number;
+  totalDppFmt: string;
+  totalDppNilaiLain: number;
+  totalDppNilaiLainFmt: string;
+  totalPpn: number;
+  totalPpnFmt: string;
+  totalPph: number;
+  totalPphFmt: string;
+  totalNetBank: number;
+  totalNetBankFmt: string;
+  sisaKontrak: number;
+  sisaKontrakFmt: string;
 };
 
 export type InterEntityBalance = {
@@ -205,6 +270,13 @@ export async function getPiutangData(entityId: string) {
           include: { auditedBy: { select: { name: true } } },
           orderBy: { createdAt: "asc" },
         },
+        fakturPendapatan: {
+          orderBy: { tanggalTerima: "asc" },
+        },
+        jurnal: {
+          include: { coaAccount: true },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -230,25 +302,154 @@ export async function getPiutangData(entityId: string) {
         t.nominal && Number(t.nominal) > 0
           ? Number(t.nominal)
           : ((t.percentage - prevPct) / 100) * contractValue;
+
+      // Ekstrak noBukti dari nama termin, contoh: [pdppt]
+      const noBuktiMatch = t.name.match(/\[(.*?)\]/);
+      const noBukti = noBuktiMatch ? noBuktiMatch[1] : null;
+
+      // Cari faktur terkait proyek & noBukti
+      const matchedFaktur = p.fakturPendapatan.find(
+        (f) => (noBukti && f.noFaktur === noBukti) || Number(f.nilaiProyek) === nominalTermin
+      );
+
+      // Cari transaksi jurnal terkait noBukti
+      const matchedJurnals = p.jurnal.filter(
+        (j) => noBukti && j.noBukti === noBukti
+      );
+
+      let gross = nominalTermin;
+      let dpp = hitungDppDariKwitansi(gross);
+      let dppNilaiLain = hitungDppNilaiLain(dpp);
+      let tarifPpn = 12;
+      let ppn = Math.round((dppNilaiLain * tarifPpn) / 100);
+      let tarifPph = 3.5;
+      let pph = Math.round((dpp * tarifPph) / 100);
+      let netBank = Math.max(0, gross - ppn - pph);
+      let bankName = "BPD";
+      let tanggalFmt = t.createdAt.toLocaleDateString("id-ID");
+
+      if (matchedFaktur) {
+        gross = Number(matchedFaktur.nilaiProyek) || nominalTermin;
+        dpp = Number(matchedFaktur.dpp);
+        dppNilaiLain = Number(matchedFaktur.dppNilaiLain);
+        tarifPpn = Number(matchedFaktur.tarifPpnPersen);
+        tarifPph = Number(matchedFaktur.tarifPphPersen);
+        ppn = Number(matchedFaktur.ppn);
+        pph = Number(matchedFaktur.pph);
+        netBank = Number(matchedFaktur.nominalDiterima);
+        bankName = matchedFaktur.bank;
+        tanggalFmt = matchedFaktur.tanggalTerima.toLocaleDateString("id-ID");
+      } else if (matchedJurnals.length > 0) {
+        const pphDebit = matchedJurnals
+          .filter((j) => j.coaAccount && /pph/i.test(j.coaAccount.name))
+          .reduce((sum, j) => sum + Number(j.debit), 0);
+        const ppnVal = matchedJurnals
+          .filter((j) => j.coaAccount && /ppn/i.test(j.coaAccount.name))
+          .reduce((sum, j) => sum + Number(j.debit || j.kredit), 0);
+        const bankDebit = matchedJurnals
+          .filter((j) => j.coaAccount && /bank|bpd|bri|bni|mdr/i.test(j.coaAccount.name))
+          .reduce((sum, j) => sum + Number(j.debit), 0);
+
+        if (pphDebit > 0) pph = pphDebit;
+        if (ppnVal > 0) ppn = ppnVal;
+        if (bankDebit > 0) netBank = bankDebit;
+      }
+
+      const pphDebitRows = matchedJurnals.filter(
+        (j) => j.coaAccount && /pph/i.test(j.coaAccount.name) && Number(j.debit) > 0
+      );
+      const pphItems =
+        pphDebitRows.length > 0
+          ? pphDebitRows.map((j) => ({
+              name: j.coaAccount?.name || "PPh",
+              amount: Number(j.debit),
+              amountFmt: formatRupiah(Number(j.debit)),
+            }))
+          : pph > 0
+          ? [
+              {
+                name: `Potongan PPh (${tarifPph}%)`,
+                amount: pph,
+                amountFmt: formatRupiah(pph),
+              },
+            ]
+          : [];
+
+      const jurnalRows = matchedJurnals.map((j) => ({
+        coaCode: j.coaAccount?.code || "-",
+        coaName: j.coaAccount?.name || "-",
+        debit: Number(j.debit),
+        kredit: Number(j.kredit),
+        debitFmt: formatRupiah(Number(j.debit)),
+        kreditFmt: formatRupiah(Number(j.kredit)),
+      }));
+
+      const breakdown: TerminBreakdown = {
+        noBukti,
+        tanggalTerimaFmt: tanggalFmt,
+        bank: bankName,
+        gross,
+        grossFmt: formatRupiah(gross),
+        dpp,
+        dppFmt: formatRupiah(dpp),
+        dppNilaiLain,
+        dppNilaiLainFmt: formatRupiah(dppNilaiLain),
+        ppn,
+        ppnFmt: formatRupiah(ppn),
+        tarifPpnPersen: tarifPpn,
+        pph,
+        pphFmt: formatRupiah(pph),
+        tarifPphPersen: tarifPph,
+        pphItems,
+        netBank,
+        netBankFmt: formatRupiah(netBank),
+        jurnalRows,
+      };
+
       return {
         id: t.id,
         name: t.name,
         percentage: t.percentage,
         percentageDelta: deltaPct,
-        nominal: nominalTermin,
-        nominalFmt: formatRupiah(nominalTermin),
+        nominal: gross,
+        nominalFmt: formatRupiah(gross),
         status: t.status,
         auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
         auditedByName: t.auditedBy?.name ?? null,
+        breakdown,
       };
     });
 
-    const sumNominalTermin = terminItems.reduce((sum, t) => sum + t.nominal, 0);
+    const totalGross = terminItems.reduce((sum, t) => sum + t.breakdown.gross, 0);
+    const totalDpp = terminItems.reduce((sum, t) => sum + t.breakdown.dpp, 0);
+    const totalDppNilaiLain = terminItems.reduce((sum, t) => sum + t.breakdown.dppNilaiLain, 0);
+    const totalPpn = terminItems.reduce((sum, t) => sum + t.breakdown.ppn, 0);
+    const totalPph = terminItems.reduce((sum, t) => sum + t.breakdown.pph, 0);
+    const totalNetBank = terminItems.reduce((sum, t) => sum + t.breakdown.netBank, 0);
+    const sisaKontrak = isCancelled ? 0 : Math.max(0, contractValue - totalGross);
+
+    const breakdownSummary: ProjectBreakdownSummary = {
+      totalGross,
+      totalGrossFmt: formatRupiah(totalGross),
+      totalDpp,
+      totalDppFmt: formatRupiah(totalDpp),
+      totalDppNilaiLain,
+      totalDppNilaiLainFmt: formatRupiah(totalDppNilaiLain),
+      totalPpn,
+      totalPpnFmt: formatRupiah(totalPpn),
+      totalPph,
+      totalPphFmt: formatRupiah(totalPph),
+      totalNetBank,
+      totalNetBankFmt: formatRupiah(totalNetBank),
+      sisaKontrak,
+      sisaKontrakFmt: formatRupiah(sisaKontrak),
+    };
+
     const maxPct = isCompleted
       ? 100
-      : (contractValue > 0 ? Math.min(100, Math.round((sumNominalTermin / contractValue) * 100)) : 0);
-    const terminTagih = isCompleted ? contractValue : sumNominalTermin;
-    const sisaTagih = isCancelled ? 0 : Math.max(0, contractValue - terminTagih);
+      : (contractValue > 0 ? Math.min(100, Math.round((totalGross / contractValue) * 100)) : 0);
+    const terminTagih = isCompleted ? contractValue : totalGross;
+    const sisaTagih = sisaKontrak;
 
     // "Total Nilai Kontrak Aktif" cuma menjumlah proyek yang masih aktif
     if (!isCancelled && !isCompleted) {
@@ -271,6 +472,7 @@ export async function getPiutangData(entityId: string) {
       sisaTagih,
       sisaTagihFmt: formatRupiah(sisaTagih),
       termin: terminItems,
+      breakdownSummary,
     };
   });
 

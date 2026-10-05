@@ -10,6 +10,14 @@ import { formatRupiah } from "@/lib/dashboard-data";
 import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
 
 type CoaOption = { id: string; code: string; name: string };
+export type ProjectOption = {
+  id: string;
+  code: string;
+  name: string;
+  entityKey?: string;
+  entityName?: string;
+  contractValueFmt?: string;
+};
 
 type CoaRow = {
   uid: string;
@@ -30,11 +38,12 @@ function fmtNum(raw: string) {
 }
 
 export function JurnalTransaksiClient({
-  entityKey, coa, history, page, totalPages, dari = "", sampai = "",
+  entityKey, coa, history, projectOptions = [], page, totalPages, dari = "", sampai = "",
 }: {
   entityKey: string;
   coa: CoaOption[];
   history: JurnalTransaksiGroup[];
+  projectOptions?: ProjectOption[];
   page: number;
   totalPages: number;
   dari?: string;
@@ -55,6 +64,7 @@ export function JurnalTransaksiClient({
 
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
+  const [projectId, setProjectId] = useState("");
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -65,8 +75,12 @@ export function JurnalTransaksiClient({
   const validRowCount = coaRows.filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0).length;
   const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && validRowCount >= 1 && !isPending;
 
+  const selectedProject = projectOptions?.find((p) => p.id === projectId);
+  const currentEntityProjects = (projectOptions ?? []).filter((p) => !p.entityKey || p.entityKey === entityKey);
+  const otherEntityProjects = (projectOptions ?? []).filter((p) => p.entityKey && p.entityKey !== entityKey);
+
   function resetForm() {
-    setNoBukti(""); setTanggal(todayStr());
+    setNoBukti(""); setTanggal(todayStr()); setProjectId("");
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -76,6 +90,7 @@ export function JurnalTransaksiClient({
     setEditingGroup(group);
     setNoBukti(group.noBukti);
     setTanggal(group.tanggalRaw.slice(0, 10));
+    setProjectId(group.projectId ?? "");
     setCoaRows(group.rows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
@@ -113,6 +128,7 @@ export function JurnalTransaksiClient({
     fd.set("entityKey", entityKey);
     fd.set("noBukti", noBukti);
     fd.set("tanggal", tanggal);
+    if (projectId) fd.set("projectId", projectId);
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
@@ -218,8 +234,8 @@ export function JurnalTransaksiClient({
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Header: No. Bukti + Tanggal */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
+            {/* Header: No. Bukti + Tanggal + Proyek */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
                 <input type="text" value={noBukti} onChange={(e) => setNoBukti(e.target.value)}
@@ -230,6 +246,41 @@ export function JurnalTransaksiClient({
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">Tanggal</label>
                 <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
                   className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest flex items-center justify-between">
+                  <span>Kode Proyek (Opsional)</span>
+                  {selectedProject && (
+                    <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 px-1.5 py-0.5 rounded">
+                      {selectedProject.code}
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
+                >
+                  <option value="">— Bukan transaksi proyek —</option>
+                  {currentEntityProjects.length > 0 && (
+                    <optgroup label="Proyek Entitas Ini">
+                      {currentEntityProjects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          [{p.code}] {p.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherEntityProjects.length > 0 && (
+                    <optgroup label="Proyek Entitas Lain">
+                      {otherEntityProjects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          [{p.code}] {p.name} ({p.entityName ?? p.entityKey})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
               </div>
             </div>
 
@@ -373,6 +424,7 @@ export function JurnalTransaksiClient({
                 </button>
               </td>
               <td className="py-2 px-1.5">NO. BUKTI</td>
+              <td className="py-2 px-1.5 whitespace-nowrap">PROYEK</td>
               <td className="py-2 px-1.5">AKUN</td>
               <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5 text-right text-blue-500">DEBIT</td>
@@ -382,7 +434,7 @@ export function JurnalTransaksiClient({
           </thead>
           <tbody>
             {sortedHistory.length === 0 ? (
-              <tr><td colSpan={7} className="py-10 text-center text-[13px] text-muted">Belum ada entri jurnal.</td></tr>
+              <tr><td colSpan={8} className="py-10 text-center text-[13px] text-muted">Belum ada entri jurnal.</td></tr>
             ) : (
               sortedHistory.map((group) =>
                 group.rows.map((row, rowIdx) => (
@@ -392,9 +444,25 @@ export function JurnalTransaksiClient({
                       <>
                         <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
                         <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{group.noBukti}</td>
+                        <td className="py-2.5 px-1.5 whitespace-nowrap">
+                          {group.project ? (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10.5px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md"
+                              title={group.project.name}
+                            >
+                              {group.project.code}
+                            </span>
+                          ) : (
+                            <span className="text-muted-faint text-[12px]">—</span>
+                          )}
+                        </td>
                       </>
                     ) : (
-                      <><td className="py-2.5 px-1.5" /><td className="py-2.5 px-1.5" /></>
+                      <>
+                        <td className="py-2.5 px-1.5" />
+                        <td className="py-2.5 px-1.5" />
+                        <td className="py-2.5 px-1.5" />
+                      </>
                     )}
                     <td className="py-2.5 px-1.5 text-[12.5px] text-muted-stronger">
                       <span className="font-mono text-[11px] text-muted mr-1.5">{row.coaCode}</span>{row.coaName}

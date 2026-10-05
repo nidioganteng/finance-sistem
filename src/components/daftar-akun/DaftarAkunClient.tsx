@@ -3,7 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import { Pencil, Check, X, Search, Lock } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";
-import { getCoaOwnerEntityKey, ENTITY_NAMES, isSelfIntercompanyAccount } from "@/lib/bank-accounts";
+import { getCoaOwnerEntityKey, ENTITY_NAMES } from "@/lib/bank-accounts";
 
 type Row = {
   coaId: string;
@@ -187,14 +187,9 @@ export function DaftarAkunClient({
             ) : (
             filteredRows.map((r) => {
               const ownerKey = getCoaOwnerEntityKey(r.code);
-              const isKasBankLocked = ownerKey !== null && currentEntityKey !== undefined && ownerKey !== currentEntityKey;
-              const isSelfIntercompany = currentEntityKey !== undefined && isSelfIntercompanyAccount(currentEntityKey, r.code);
-              const isLocked = isKasBankLocked || isSelfIntercompany;
-
+              const isLocked = ownerKey !== null && currentEntityKey !== undefined && ownerKey !== currentEntityKey;
               const ownerName = ownerKey ? ENTITY_NAMES[ownerKey] ?? ownerKey : null;
-              const lockTitle = isSelfIntercompany
-                ? "Terkunci: Akun lawan yang digunakan oleh entitas rekanan untuk mencatat hutang/piutang ke entitas ini."
-                : `Terkunci: Akun Kas/Bank khusus entitas ${ownerName}. Silakan beralih ke entitas ${ownerName} untuk mengubah saldo awal.`;
+              const lockTitle = `Terkunci: Akun Kas/Bank khusus entitas ${ownerName}. Silakan beralih ke entitas ${ownerName} untuk mengubah saldo awal.`;
 
               return (
                 <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40">
@@ -204,22 +199,13 @@ export function DaftarAkunClient({
                   <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span>{highlightMatch(r.name, search)}</span>
-                      {isKasBankLocked && ownerName && (
+                      {isLocked && ownerName && (
                         <span
                           className="text-[10px] font-semibold text-muted-faint bg-surface-hover border border-border-soft px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
                           title={lockTitle}
                         >
                           <Lock size={9} />
                           Khusus {ownerName}
-                        </span>
-                      )}
-                      {isSelfIntercompany && (
-                        <span
-                          className="text-[10px] font-semibold text-muted-faint bg-surface-hover border border-border-soft px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
-                          title={lockTitle}
-                        >
-                          <Lock size={9} />
-                          Khusus Entitas Rekanan
                         </span>
                       )}
                       {!isLocked && ownerKey && ownerName && (

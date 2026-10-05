@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { Pencil, Check, X, Search, Lock } from "lucide-react";
+import { Pencil, Check, X, Search, Lock, ArrowLeftRight } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";
-import { getCoaOwnerEntityKey, ENTITY_NAMES } from "@/lib/bank-accounts";
+import { getCoaOwnerEntityKey, ENTITY_NAMES, getIntercompanyMirror, isSelfIntercompanyAccount } from "@/lib/bank-accounts";
 
 type Row = {
   coaId: string;
@@ -187,8 +187,15 @@ export function DaftarAkunClient({
             ) : (
             filteredRows.map((r) => {
               const ownerKey = getCoaOwnerEntityKey(r.code);
-              const isLocked = ownerKey !== null && currentEntityKey !== undefined && ownerKey !== currentEntityKey;
+              const isKasBankLocked = ownerKey !== null && currentEntityKey !== undefined && ownerKey !== currentEntityKey;
+              const isSelfIntercompany = currentEntityKey !== undefined && isSelfIntercompanyAccount(currentEntityKey, r.code);
+              const isLocked = isKasBankLocked || isSelfIntercompany;
+
+              const mirror = currentEntityKey ? getIntercompanyMirror(currentEntityKey, r.code) : null;
               const ownerName = ownerKey ? ENTITY_NAMES[ownerKey] ?? ownerKey : null;
+              const lockTitle = isSelfIntercompany
+                ? "Terkunci: Akun lawan yang digunakan oleh entitas rekanan untuk mencatat hutang/piutang ke entitas ini."
+                : `Terkunci: Akun Kas/Bank khusus entitas ${ownerName}. Silakan beralih ke entitas ${ownerName} untuk mengubah saldo awal.`;
 
               return (
                 <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40">
@@ -198,13 +205,22 @@ export function DaftarAkunClient({
                   <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span>{highlightMatch(r.name, search)}</span>
-                      {isLocked && ownerName && (
+                      {isKasBankLocked && ownerName && (
                         <span
                           className="text-[10px] font-semibold text-muted-faint bg-surface-hover border border-border-soft px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
-                          title={`Akun Kas/Bank khusus entitas ${ownerName}`}
+                          title={lockTitle}
                         >
                           <Lock size={9} />
                           Khusus {ownerName}
+                        </span>
+                      )}
+                      {isSelfIntercompany && (
+                        <span
+                          className="text-[10px] font-semibold text-muted-faint bg-surface-hover border border-border-soft px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
+                          title={lockTitle}
+                        >
+                          <Lock size={9} />
+                          Khusus Entitas Rekanan
                         </span>
                       )}
                       {!isLocked && ownerKey && ownerName && (
@@ -213,6 +229,15 @@ export function DaftarAkunClient({
                           title={`Akun Kas/Bank ${ownerName}`}
                         >
                           {ownerName}
+                        </span>
+                      )}
+                      {!isLocked && mirror && (
+                        <span
+                          className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
+                          title={`Otomatis sinkron ke ${mirror.targetCoaCode} (${mirror.targetCoaNameSuggestion}) di entitas ${mirror.targetEntityName}`}
+                        >
+                          <ArrowLeftRight size={9} />
+                          Auto-sync: {mirror.targetCoaNameSuggestion} ({mirror.targetEntityName})
                         </span>
                       )}
                       {!r.punyaTransaksi && (
@@ -254,7 +279,7 @@ export function DaftarAkunClient({
                           isLocked ? (
                             <span
                               className="p-1 text-muted-faint/60 cursor-not-allowed inline-flex items-center justify-center"
-                              title={`Terkunci: Akun Kas/Bank khusus entitas ${ownerName}. Silakan beralih ke entitas ${ownerName} untuk mengubah saldo awal.`}
+                              title={lockTitle}
                             >
                               <Lock size={11} />
                             </span>

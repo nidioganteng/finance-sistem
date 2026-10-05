@@ -70,3 +70,43 @@ export function getRekeningCoaCode(rekeningIdOrNama: string): string | undefined
   }
   return undefined;
 }
+
+export const ENTITY_NAMES: Record<string, string> = {
+  kencana: "Kencana",
+  gaharu: "Gaharu",
+  tataring: "Tataring",
+  ciptaAsri: "Cipta Asri",
+  umum: "Umum",
+};
+
+export const KAS_BESAR_COA: Record<string, string> = {
+  kencana: "110",
+  gaharu: "120",
+  tataring: "130",
+  ciptaAsri: "140",
+};
+
+export const KAS_KECIL_COA: Record<string, string> = {
+  kencana: "1100",
+  gaharu: "1200",
+  tataring: "1300",
+  ciptaAsri: "1400",
+  umum: "1500",
+};
+
+// Mengembalikan entityKey jika akun COA tersebut adalah Kas / Bank yang eksklusif milik entitas tertentu.
+// Mengembalikan null untuk akun operasional umum, modal, beban, serta hutang & piutang antar entitas (agar bisa diedit oleh semua entitas).
+export function getCoaOwnerEntityKey(coaCode: string): string | null {
+  for (const [entityKey, code] of Object.entries(KAS_BESAR_COA)) {
+    if (code === coaCode) return entityKey;
+  }
+  for (const [entityKey, code] of Object.entries(KAS_KECIL_COA)) {
+    if (code === coaCode) return entityKey;
+  }
+  const bankMap = getBankCoaMap();
+  if (bankMap[coaCode]) {
+    return bankMap[coaCode].entityKey;
+  }
+  if (coaCode === "150") return "umum";
+  return null;
+}

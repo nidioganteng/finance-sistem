@@ -381,7 +381,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
         where: { id: projectId },
         include: {
           termin: {
-            select: { id: true, name: true, percentage: true, createdAt: true },
+            select: { id: true, name: true, percentage: true, nominal: true, createdAt: true },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -401,12 +401,23 @@ export async function saveJurnalTransaksi(formData: FormData) {
         const existingPcts = remainingTermins.map((t) => t.percentage);
         const maxPctSoFar = existingPcts.reduce((max, p) => Math.max(max, p), 0);
 
+        const contractValNum = Number(projectWithTermins.contractValue);
+        const existingCumulativeNominal = remainingTermins.reduce((sum, t, i) => {
+          const prevPct = i === 0 ? 0 : remainingTermins[i - 1].percentage;
+          const nom = t.nominal && Number(t.nominal) > 0
+            ? Number(t.nominal)
+            : ((t.percentage - prevPct) / 100) * contractValNum;
+          return sum + nom;
+        }, 0);
+
+        // Ambil nominal termin dari Pendapatan yang sudah dijumlahkan PPN dll (Kredit Akun Pendapatan)
         const nominalTermin = nilaiProyek > 0 ? nilaiProyek : (dpp > 0 ? dpp : nominalDiterima);
         if (nominalTermin > 0) {
           const newPct = computeNewTerminPercentage(
-            Number(projectWithTermins.contractValue),
+            contractValNum,
             existingPcts,
-            nominalTermin
+            nominalTermin,
+            existingCumulativeNominal
           );
           const terminKe = remainingTermins.length + 1;
           const deltaPct = Math.max(0, newPct - maxPctSoFar);
@@ -416,6 +427,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
               projectId: projectWithTermins.id,
               name: `Termin ${terminKe} (${deltaPct}% Kontrak) [${noBukti}]`,
               percentage: newPct,
+              nominal: nominalTermin,
               status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
             },
           });

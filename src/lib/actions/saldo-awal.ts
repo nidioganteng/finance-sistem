@@ -37,4 +37,10 @@ export async function upsertSaldoAwal(entityId: string, coaAccountId: string, ye
 
   revalidatePath("/daftar-akun");
   revalidatePath("/buku-besar");
+  revalidatePath("/bank-buku");
+  revalidatePath("/kas-kecil");
+  revalidatePath("/kas-besar");
+  revalidatePath("/dashboard");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-keuangan");
 }

@@ -197,31 +197,7 @@ export function DaftarAkunClient({
                     {highlightMatch(r.code, search)}
                   </td>
                   <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span>{highlightMatch(r.name, search)}</span>
-                      {isLocked && ownerName && (
-                        <span
-                          className="text-[10px] font-semibold text-muted-faint bg-surface-hover border border-border-soft px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
-                          title={lockTitle}
-                        >
-                          <Lock size={9} />
-                          Khusus {ownerName}
-                        </span>
-                      )}
-                      {!isLocked && ownerKey && ownerName && (
-                        <span
-                          className="text-[10px] font-semibold text-brand bg-brand/10 border border-brand/20 px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1"
-                          title={`Akun Kas/Bank ${ownerName}`}
-                        >
-                          {ownerName}
-                        </span>
-                      )}
-                      {!r.punyaTransaksi && (
-                        <span className="ml-0.5 text-[10px] font-bold text-muted-faint bg-surface-hover px-1.5 py-0.5 rounded whitespace-nowrap">
-                          belum ada transaksi
-                        </span>
-                      )}
-                    </div>
+                    {highlightMatch(r.name, search)}
                   </td>
                   <td className="py-3 px-3 whitespace-nowrap">
                     <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[r.kategori] ?? "bg-surface-hover text-muted"}`}>

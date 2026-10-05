@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
+import { getRekeningCoaCode } from "./bank-accounts";
 
 export const ENTITY_PREFIX: Record<string, string> = {
   gaharu: "GH",
@@ -17,6 +18,21 @@ export const ENTITY_PREFIX_UMUM: Record<string, string> = {
   umum: "UU",
 };
 
+export const KAS_KECIL_COA: Record<string, string> = {
+  kencana: "1100",
+  gaharu: "1200",
+  tataring: "1300",
+  ciptaAsri: "1400",
+  umum: "1500",
+};
+
+export const KAS_BESAR_COA: Record<string, string> = {
+  kencana: "110",
+  gaharu: "120",
+  tataring: "130",
+  ciptaAsri: "140",
+};
+
 export async function getJenisInput(key: string) {
   return prisma.jenisInputTransaksi.findUnique({ where: { key } });
 }
@@ -26,37 +42,90 @@ export async function getCoaOptions() {
   return accounts.sort((a, b) => parseInt(a.code) - parseInt(b.code));
 }
 
-// rekeningNama dipakai untuk Buku Bank agar saldo dihitung per rekening, bukan per entity
-export async function getRunningSaldo(entityId: string, jenisInputId: string, rekeningNama?: string) {
-  if (rekeningNama) {
-    const rows = await prisma.transaction.findMany({
-      where: {
-        entityId,
-        jenisInputId,
-        extraFieldsJson: { path: "$.isKasEntry", equals: true },
-      },
-      orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
-      take: 50,
-    });
-    const match = rows.find((e) => (e.extraFieldsJson as Record<string, unknown> | null)?.rekeningNama === rekeningNama);
-    return match ? Number(match.saldoSetelah) : 0;
+// Ambil Saldo Awal akun kas/bank dari tabel SaldoAwal (yang diisi di Daftar Akun)
+export async function getInitialSaldoAwal(
+  entityId: string,
+  jenisInputKeyOrId: string,
+  rekeningNamaOrId?: string,
+  year = new Date().getFullYear()
+): Promise<number> {
+  let coaCode: string | undefined;
+
+  if (rekeningNamaOrId) {
+    coaCode = getRekeningCoaCode(rekeningNamaOrId);
   }
 
-  const last = await prisma.transaction.findFirst({
+  const entity = await prisma.entity.findUnique({ where: { id: entityId }, select: { key: true } });
+  if (!coaCode && entity) {
+    const jenisInput = await prisma.jenisInputTransaksi.findFirst({
+      where: { OR: [{ id: jenisInputKeyOrId }, { key: jenisInputKeyOrId }] },
+      select: { key: true },
+    });
+    if (jenisInput?.key === "kasKecil") {
+      coaCode = KAS_KECIL_COA[entity.key];
+    } else if (jenisInput?.key === "kasBesar") {
+      coaCode = KAS_BESAR_COA[entity.key];
+    }
+  }
+
+  if (!coaCode) return 0;
+
+  const coa = await prisma.coaAccount.findUnique({
+    where: { code: coaCode },
+    select: { id: true },
+  });
+  if (!coa) return 0;
+
+  const sa = await prisma.saldoAwal.findUnique({
+    where: {
+      entityId_coaAccountId_year: {
+        entityId,
+        coaAccountId: coa.id,
+        year,
+      },
+    },
+    select: { nominal: true },
+  });
+
+  return sa ? Number(sa.nominal) : 0;
+}
+
+// rekeningNama dipakai untuk Buku Bank agar saldo dihitung per rekening, bukan per entity
+export async function getRunningSaldo(
+  entityId: string,
+  jenisInputId: string,
+  rekeningNama?: string,
+  year?: number
+) {
+  const currentYear = year ?? new Date().getFullYear();
+  const initialSaldoAwal = await getInitialSaldoAwal(entityId, jenisInputId, rekeningNama, currentYear);
+
+  const rows = await prisma.transaction.findMany({
     where: {
       entityId,
       jenisInputId,
       extraFieldsJson: { path: "$.isKasEntry", equals: true },
     },
-    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
+    select: {
+      debit: true,
+      kredit: true,
+      saldoSetelah: true,
+      extraFieldsJson: true,
+    },
   });
-  if (last) return Number(last.saldoSetelah);
 
-  const fallback = await prisma.transaction.findFirst({
-    where: { entityId, jenisInputId },
-    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
-  });
-  return fallback ? Number(fallback.saldoSetelah) : 0;
+  const filtered = rekeningNama
+    ? rows.filter((e) => (e.extraFieldsJson as Record<string, unknown> | null)?.rekeningNama === rekeningNama)
+    : rows;
+
+  if (filtered.length === 0) {
+    return initialSaldoAwal;
+  }
+
+  const totalMasuk = filtered.reduce((s, r) => s + Number(r.debit), 0);
+  const totalKeluar = filtered.reduce((s, r) => s + Number(r.kredit), 0);
+
+  return initialSaldoAwal + totalMasuk - totalKeluar;
 }
 
 // Ledger dikelompokkan per noBukti.
@@ -68,7 +137,11 @@ export async function getSaldoSebelum(
   jenisInputId: string,
   sebelum: string,
   rekeningNama?: string,
+  year?: number
 ): Promise<number> {
+  const currentYear = year ?? new Date(sebelum).getFullYear();
+  const initialSaldoAwal = await getInitialSaldoAwal(entityId, jenisInputId, rekeningNama, currentYear);
+
   const rows = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -76,14 +149,21 @@ export async function getSaldoSebelum(
       tanggal: { lt: new Date(sebelum) },
       extraFieldsJson: { path: "$.isKasEntry", equals: true },
     },
-    orderBy: [{ tanggal: "desc" }, { createdAt: "desc" }],
-    take: 10,
+    select: {
+      debit: true,
+      kredit: true,
+      extraFieldsJson: true,
+    },
   });
-  if (rekeningNama) {
-    const match = rows.find((r) => (r.extraFieldsJson as Record<string, unknown>)?.rekeningNama === rekeningNama);
-    return match ? Number(match.saldoSetelah) : 0;
-  }
-  return rows.length > 0 ? Number(rows[0].saldoSetelah) : 0;
+
+  const filtered = rekeningNama
+    ? rows.filter((r) => (r.extraFieldsJson as Record<string, unknown> | null)?.rekeningNama === rekeningNama)
+    : rows;
+
+  const totalMasuk = filtered.reduce((s, r) => s + Number(r.debit), 0);
+  const totalKeluar = filtered.reduce((s, r) => s + Number(r.kredit), 0);
+
+  return initialSaldoAwal + totalMasuk - totalKeluar;
 }
 
 const KAS_PAGE_SIZE = 25;
@@ -95,7 +175,16 @@ export async function getKasLedger(
   dari?: string,
   sampai?: string,
   page = 1,
+  year?: number
 ) {
+  const currentYear =
+    year ??
+    (dari ? new Date(dari).getFullYear() : sampai ? new Date(sampai).getFullYear() : new Date().getFullYear());
+
+  const startingBalance = dari
+    ? await getSaldoSebelum(entityId, jenisInputId, dari, rekeningNama, currentYear)
+    : await getInitialSaldoAwal(entityId, jenisInputId, rekeningNama, currentYear);
+
   const tanggalFilter =
     dari || sampai
       ? {
@@ -104,8 +193,7 @@ export async function getKasLedger(
         }
       : undefined;
 
-  // Fetch all rows first (needed for group-by-noBukti logic),
-  // then paginate the resulting groups.
+  // Urutkan asc terlebih dahulu agar kalkulasi saldo akumulatif per baris tepat
   const rows = await prisma.transaction.findMany({
     where: {
       entityId,
@@ -116,7 +204,7 @@ export async function getKasLedger(
       coaAccount: true,
       project: { select: { id: true, code: true, name: true } },
     },
-    orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ tanggal: "asc" }, { noBukti: "asc" }, { createdAt: "asc" }],
     take: 2000,
   });
 
@@ -154,7 +242,7 @@ export async function getKasLedger(
         akunTags: [],
         masuk: 0,
         keluar: 0,
-        saldo: Number(r.saldoSetelah),
+        saldo: 0,
         hasKasEntry: false,
         allTxIds: [],
         coaRows: [],
@@ -174,7 +262,6 @@ export async function getKasLedger(
       g.hasKasEntry = true;
       g.masuk = Number(r.debit);
       g.keluar = Number(r.kredit);
-      g.saldo = Number(r.saldoSetelah);
       if (extra?.rekeningNama) g.rekening = String(extra.rekeningNama);
       // crossing source side — new multi-entity format
       if (Array.isArray(extra?.crossingEntityKeys)) {
@@ -195,7 +282,6 @@ export async function getKasLedger(
       if (!extra && !g.hasKasEntry) {
         g.masuk += Number(r.debit);
         g.keluar += Number(r.kredit);
-        g.saldo = Number(r.saldoSetelah);
       }
     }
   }
@@ -206,10 +292,20 @@ export async function getKasLedger(
     ? allGroups.filter((g) => !g.hasKasEntry || g.rekening === rekeningNama)
     : allGroups;
 
-  const totalGroups = filtered.length;
+  // Akumulasikan saldo secara kronologis mulai dari startingBalance (yang menyertakan Saldo Awal)
+  let running = startingBalance;
+  for (const g of filtered) {
+    running += g.masuk - g.keluar;
+    g.saldo = running;
+  }
+
+  // Tampilkan secara descending (transaksi terbaru di atas)
+  const displayGroups = [...filtered].reverse();
+
+  const totalGroups = displayGroups.length;
   const totalPages = Math.max(1, Math.ceil(totalGroups / KAS_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
-  const paginated = filtered.slice((safePage - 1) * KAS_PAGE_SIZE, safePage * KAS_PAGE_SIZE);
+  const paginated = displayGroups.slice((safePage - 1) * KAS_PAGE_SIZE, safePage * KAS_PAGE_SIZE);
 
   return {
     totalCount: totalGroups,
@@ -236,3 +332,4 @@ export async function getKasLedger(
     })),
   };
 }
+

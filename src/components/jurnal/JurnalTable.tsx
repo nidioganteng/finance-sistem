@@ -10,6 +10,8 @@ type JurnalRow = {
   tanggal: string;
   noBukti: string;
   keterangan: string;
+  projectCode?: string | null;
+  projectName?: string | null;
   sumberBg: string;
   sumberColor: string;
   sumberLabel: string;
@@ -86,6 +88,7 @@ export function JurnalTable({
             <td className="py-2 px-1.5 whitespace-nowrap">TANGGAL</td>
             <td className="py-2 px-1.5 whitespace-nowrap">NO. BUKTI</td>
             <td className="py-2 px-1.5">SUMBER</td>
+            <td className="py-2 px-1.5 whitespace-nowrap">PROYEK</td>
             <td className="py-2 px-1.5">KETERANGAN</td>
             <td className="py-2 px-1.5 whitespace-nowrap">KODE AKUN</td>
             <td className="py-2 px-1.5">NAMA AKUN</td>
@@ -97,7 +100,7 @@ export function JurnalTable({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="py-8 text-center text-sm text-muted">
+              <td colSpan={10} className="py-8 text-center text-sm text-muted">
                 Belum ada transaksi untuk filter yang dipilih.
               </td>
             </tr>
@@ -116,6 +119,18 @@ export function JurnalTable({
                   >
                     {r.sumberLabel}
                   </span>
+                </td>
+                <td className="py-2.5 px-1.5 whitespace-nowrap">
+                  {r.projectCode ? (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10.5px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md"
+                      title={r.projectName ?? undefined}
+                    >
+                      {r.projectCode}
+                    </span>
+                  ) : (
+                    <span className="text-muted-faint text-[12px]">—</span>
+                  )}
                 </td>
                 <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px]">
                   {r.isKasEntry ? (
@@ -195,7 +210,7 @@ export function JurnalTable({
         {rows.length > 0 && (
           <tfoot>
             <tr className={`border-t-2 ${isBalanced ? "border-border" : "border-red-300"}`}>
-              <td colSpan={6} className="py-3.5 px-1.5 text-[13px] font-extrabold text-navy-text">
+              <td colSpan={7} className="py-3.5 px-1.5 text-[13px] font-extrabold text-navy-text">
                 Total Periode Berjalan
                 {!isBalanced && (
                   <span className="ml-2 text-[11px] font-bold text-red-500 normal-case">

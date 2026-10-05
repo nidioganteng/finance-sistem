@@ -675,7 +675,6 @@ export function LaporanPendapatanClient({
                   <th className="p-3">No. Faktur / NPWP</th>
                   <th className="p-3">Rekanan & Uraian JKP</th>
                   <th className="p-3 text-center">Masa</th>
-                  <th className="p-3">Tgl Terima / Bank</th>
                   <th className="p-3 text-right">DPP</th>
                   <th className="p-3 text-right">DPP Nilai Lain</th>
                   <th className="p-3 text-right">PPN</th>
@@ -687,6 +686,7 @@ export function LaporanPendapatanClient({
                     Laba Stlh Pajak
                   </th>
                   <th className="p-3 text-right">Dana Cair</th>
+                  <th className="p-3">Tgl Terima / Bank</th>
                   <th className="p-3 text-center">Jenis</th>
                   {canEdit && <th className="p-3 text-center w-20">Aksi</th>}
                 </tr>
@@ -749,12 +749,6 @@ export function LaporanPendapatanClient({
                           {f.namaBulan}
                         </span>
                       </td>
-                      <td className="p-3">
-                        <div className="font-mono text-xs">{f.tanggalTerima}</div>
-                        <div className="text-[11px] font-semibold text-blue-600">
-                          {f.bank}
-                        </div>
-                      </td>
                       <td className="p-3 text-right font-mono">{f.dppFmt}</td>
                       <td className="p-3 text-right font-mono text-navy-soft">
                         {f.dppNilaiLainFmt}
@@ -779,6 +773,12 @@ export function LaporanPendapatanClient({
                       </td>
                       <td className="p-3 text-right font-mono font-medium">
                         {f.nominalDiterimaFmt}
+                      </td>
+                      <td className="p-3">
+                        <div className="font-mono text-xs">{f.tanggalTerima}</div>
+                        <div className="text-[11px] font-semibold text-blue-600">
+                          {f.bank}
+                        </div>
                       </td>
                       <td className="p-3 text-center">
                         <span
@@ -826,7 +826,7 @@ export function LaporanPendapatanClient({
               {/* Footer Total */}
               <tfoot className="bg-slate-100 font-bold text-navy-text border-t-2 border-slate-300">
                 <tr>
-                  <td colSpan={6} className="p-3 text-center uppercase tracking-wider">
+                  <td colSpan={5} className="p-3 text-center uppercase tracking-wider">
                     Total Periode ({data.totalPeriod.jumlahFaktur} Faktur)
                   </td>
                   <td className="p-3 text-right font-mono">
@@ -850,7 +850,7 @@ export function LaporanPendapatanClient({
                   <td className="p-3 text-right font-mono">
                     {data.totalPeriod.nominalDiterimaFmt}
                   </td>
-                  <td colSpan={canEdit ? 2 : 1}></td>
+                  <td colSpan={canEdit ? 3 : 2}></td>
                 </tr>
               </tfoot>
             </table>

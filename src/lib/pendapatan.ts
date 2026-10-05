@@ -638,7 +638,10 @@ export async function getLaporanPendapatanData(
       const contractValue = Number(p.contractValue);
       const termins = p.termin.map((t, i) => {
         const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
-        const nominal = ((t.percentage - prevPct) / 100) * contractValue;
+        const nominal =
+          t.nominal && Number(t.nominal) > 0
+            ? Number(t.nominal)
+            : ((t.percentage - prevPct) / 100) * contractValue;
         return {
           id: t.id,
           name: t.name,

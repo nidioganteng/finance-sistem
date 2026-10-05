@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
-import { getRekeningCoaCode } from "./bank-accounts";
+import { getRekeningCoaCode, KAS_BESAR_COA, KAS_KECIL_COA } from "./bank-accounts";
+
+export { KAS_BESAR_COA, KAS_KECIL_COA };
 
 export const ENTITY_PREFIX: Record<string, string> = {
   gaharu: "GH",
@@ -16,21 +18,6 @@ export const ENTITY_PREFIX_UMUM: Record<string, string> = {
   tataring: "UT",
   ciptaAsri: "UC",
   umum: "UU",
-};
-
-export const KAS_KECIL_COA: Record<string, string> = {
-  kencana: "1100",
-  gaharu: "1200",
-  tataring: "1300",
-  ciptaAsri: "1400",
-  umum: "1500",
-};
-
-export const KAS_BESAR_COA: Record<string, string> = {
-  kencana: "110",
-  gaharu: "120",
-  tataring: "130",
-  ciptaAsri: "140",
 };
 
 export async function getJenisInput(key: string) {

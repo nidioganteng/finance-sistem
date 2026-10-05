@@ -2,7 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
-import { authOptions } from "@/lib/auth";
+import { authOptions, resolveStaffId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo } from "@/lib/kas";
 import { canManageTransaksi } from "@/lib/rbac";
@@ -128,6 +128,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   type Ops = ReturnType<typeof prisma.transaction.create>;
   const allOps: Ops[] = [];
+  const staffId = await resolveStaffId(session.user.id, session.user.email);
 
   // Main journal rows
   for (const row of validRows) {
@@ -152,7 +153,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           debit: row.debit ?? 0,
           kredit: row.kredit ?? 0,
           saldoSetelah: 0,
-          staffId: session.user.id,
+          staffId,
           ...(extraFieldsJson ? { extraFieldsJson } : {}),
         },
       })
@@ -214,7 +215,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           debit: arahMasuk ? nominal : 0,
           kredit: arahMasuk ? 0 : nominal,
           saldoSetelah: newSaldo,
-          staffId: session.user.id,
+          staffId,
           extraFieldsJson: {
             isKasEntry: true,
             autoPostedFromJurnal: true,

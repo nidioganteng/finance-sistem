@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJurnalTransaksiHistory } from "@/lib/jurnal-transaksi";
+import { getProjectOptions } from "@/lib/piutang";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
@@ -31,12 +32,13 @@ export default async function JurnalTransaksiPage({
 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 
-  const [coaAccounts, { groups, totalPages }] = await Promise.all([
+  const [coaAccounts, { groups, totalPages }, projectOptions] = await Promise.all([
     prisma.coaAccount.findMany({
       select: { id: true, code: true, name: true },
       orderBy: { urutan: "asc" },
     }),
     getJurnalTransaksiHistory(selectedEntity.id, page, searchParams.dari, searchParams.sampai),
+    getProjectOptions(selectedEntity.id),
   ]);
 
   const coa = coaAccounts.map((c) => ({ id: c.id, code: c.code, name: c.name }));
@@ -63,6 +65,7 @@ export default async function JurnalTransaksiPage({
         entityKey={selectedEntity.key}
         coa={coa}
         history={groups}
+        projectOptions={projectOptions}
         page={page}
         totalPages={totalPages}
         dari={searchParams.dari ?? ""}

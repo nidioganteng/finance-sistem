@@ -104,6 +104,12 @@ export async function updateProyekJurnal(transactionId: string, entityId: string
     data: { projectId: targetProjectId },
   });
 
+  // Update juga faktur pendapatan jika ada
+  await prisma.fakturPendapatan.updateMany({
+    where: { noFaktur: transaction.noBukti },
+    data: { projectId: targetProjectId },
+  });
+
   logActivity(
     session.user.id,
     `Update proyek transaksi ${transaction.noBukti} (${entity.name}): ${targetProject ? targetProject.code : "Bukan Proyek"}`,
@@ -121,6 +127,10 @@ export async function updateProyekJurnal(transactionId: string, entityId: string
   revalidatePath("/buku-besar");
   revalidatePath("/kas-kecil");
   revalidatePath("/kas-besar");
+  revalidatePath("/bank-buku");
   revalidatePath("/buku-bank");
+  revalidatePath("/pendapatan");
+  revalidatePath("/piutang");
+  revalidatePath("/laporan-keuangan");
   return { success: true };
 }

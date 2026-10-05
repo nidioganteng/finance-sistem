@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { TerminStatus } from "@prisma/client";
-import { authOptions } from "@/lib/auth";
+import { authOptions, resolveStaffId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/actions/log";
 import { canManageTransaksi } from "@/lib/rbac";
@@ -98,6 +98,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
     const counterpartyNewSaldo = counterpartyPrevSaldo - nom; // keluar
 
     const tanggalDate = new Date(input.tanggal);
+    const staffId = await resolveStaffId(session.user.id, session.user.email);
 
     const ops = [
       // Current entity - kasEntry (masuk: Dr. Kas)
@@ -109,7 +110,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: currentNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: currentKasCoaId,
           debit: nom,
           kredit: 0,
@@ -125,7 +126,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: currentNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: currentPiutangCoa.id,
           debit: 0,
           kredit: nom,
@@ -140,7 +141,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: counterpartyNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: counterpartyKasCoaId,
           debit: 0,
           kredit: nom,
@@ -156,7 +157,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: counterpartyNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: counterpartyHutangCoa.id,
           debit: nom,
           kredit: 0,
@@ -202,6 +203,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
     const counterpartyNewSaldo = counterpartyPrevSaldo + nom; // masuk
 
     const tanggalDate = new Date(input.tanggal);
+    const staffId = await resolveStaffId(session.user.id, session.user.email);
 
     const ops = [
       // Current entity - kasEntry (keluar: Cr. Kas)
@@ -213,7 +215,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: currentNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: currentKasCoaId,
           debit: 0,
           kredit: nom,
@@ -229,7 +231,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: currentNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: currentHutangCoa.id,
           debit: nom,
           kredit: 0,
@@ -244,7 +246,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: counterpartyNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: counterpartyKasCoaId,
           debit: nom,
           kredit: 0,
@@ -260,7 +262,7 @@ export async function createPelunasan(input: CreatePelunasanInput): Promise<{ er
           noBukti: input.noBukti,
           keterangan: input.keterangan,
           saldoSetelah: counterpartyNewSaldo,
-          staffId: session.user.id,
+          staffId,
           coaAccountId: counterpartyPiutangCoa.id,
           debit: 0,
           kredit: nom,

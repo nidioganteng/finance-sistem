@@ -113,6 +113,7 @@ model Termin {
   projectId  String
   name       String
   percentage Int
+  nominal    Decimal?     @default(0) @db.Decimal(18, 2)
   status     TerminStatus @default(ON_TRACK)
   auditedAt  DateTime?
   auditedById String?

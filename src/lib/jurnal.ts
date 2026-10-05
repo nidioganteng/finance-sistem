@@ -28,6 +28,7 @@ export async function getJurnalRows(
   bulan?: string,    // format "YYYY-MM"
   akunCode?: string, // filter by code akun (bisa match KAS & BANK)
   page = 1,
+  projectId?: string,
 ) {
   // Bangun filter tanggal dari bulan jika ada
   let tanggalFilter: { gte?: Date; lt?: Date } | undefined;
@@ -49,6 +50,7 @@ export async function getJurnalRows(
     ...(filterKey && filterKey !== "semua" ? { jenisInput: { key: filterKey } } : {}),
     ...(tanggalFilter ? { tanggal: tanggalFilter } : {}),
     ...(akunCode ? { coaAccount: { code: akunCode } } : {}),
+    ...(projectId ? { projectId } : {}),
     ...(excludeIds.length > 0 ? { NOT: { id: { in: excludeIds } } } : {}),
   };
 
@@ -111,6 +113,13 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
   umum: "Umum",
 };
 
+  const projectByNoBukti = new Map<string, { id: string; code: string; name: string }>();
+  for (const r of allRows) {
+    if (r.project) {
+      projectByNoBukti.set(r.noBukti, { id: r.project.id, code: r.project.code, name: r.project.name });
+    }
+  }
+
   return {
     rows: allRows.map((r) => {
       let style = SUMBER_STYLE[r.jenisInput.key] ?? { bg: "#ede9fe", color: "#6d28d9", label: r.jenisInput.nama };
@@ -143,6 +152,11 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
           typeof extra?.rekeningNama === "string" ? extra.rekeningNama : "Rekening Bank";
       }
 
+      const proj = r.project ? { id: r.project.id, code: r.project.code, name: r.project.name } : projectByNoBukti.get(r.noBukti);
+      const projectId = proj?.id ?? r.projectId ?? null;
+      const projectCode = proj?.code ?? null;
+      const projectName = proj?.name ?? null;
+
       const debit = Number(r.debit);
       const kredit = Number(r.kredit);
 
@@ -153,6 +167,9 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
         tanggal: r.tanggal.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
         noBukti: r.noBukti,
         keterangan: r.keterangan,
+        projectId,
+        projectCode,
+        projectName,
         sumberBg: style.bg,
         sumberColor: style.color,
         sumberLabel: style.label,

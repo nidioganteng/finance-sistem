@@ -9,6 +9,7 @@ import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 import { REKENING_BY_ENTITY, REKENING_COA_CODE } from "@/lib/bank-accounts";
 import { computeNewTerminPercentage } from "@/lib/piutang";
+import { hitungDppDariKwitansi, hitungDppNilaiLain } from "@/lib/pendapatan";
 import { TerminStatus } from "@prisma/client";
 
 type JurnalRow = { coaAccountId: string; debit: number; kredit: number; keterangan: string };
@@ -293,7 +294,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
     return c && (bankCoaMap[c.code] || (c.reportType === "ARUS_KAS" && /bank|bpd|bri|bni|mdr/i.test(c.name)));
   });
 
-  const totalDpp = pendapatanRows.reduce((s, r) => s + (r.kredit ?? 0), 0);
+  const totalPendapatanKwitansi = pendapatanRows.reduce((s, r) => s + (r.kredit ?? 0), 0);
   const totalPph = pphRows.reduce((s, r) => s + (r.debit ?? 0), 0);
   const totalPpn = ppnRows.reduce((s, r) => s + ((r.debit ?? 0) || (r.kredit ?? 0)), 0);
   const bankDebitTotal = bankRows.filter((r) => (r.debit ?? 0) > 0).reduce((s, r) => s + (r.debit ?? 0), 0);
@@ -302,15 +303,30 @@ export async function saveJurnalTransaksi(formData: FormData) {
   const bankCoa = firstBankRow ? coaMap.get(firstBankRow.coaAccountId) : null;
   const bankName = bankCoa ? (bankCoaMap[bankCoa.code]?.rekeningNama || bankCoa.name) : "BPD";
 
-  if (totalDpp > 0 || (projectId && bankDebitTotal > 0) || (totalPph > 0 && bankDebitTotal > 0)) {
+  if (totalPendapatanKwitansi > 0 || (projectId && bankDebitTotal > 0) || (totalPph > 0 && bankDebitTotal > 0)) {
     const project = projectId ? await prisma.project.findUnique({ where: { id: projectId } }) : null;
-    const nominalDiterima = bankDebitTotal > 0 ? bankDebitTotal : Math.max(0, totalDpp - totalPph + totalPpn);
-    const dpp = totalDpp > 0 ? totalDpp : (nominalDiterima > 0 ? nominalDiterima + totalPph - totalPpn : 0);
 
+    // Nilai Kwitansi adalah nilai bruto akun Pendapatan (Kredit akun 400 dsb)
+    const nilaiKwitansi = totalPendapatanKwitansi > 0
+      ? totalPendapatanKwitansi
+      : (bankDebitTotal > 0 ? bankDebitTotal + totalPph : 0);
+
+    // Rumus perpajakan sesuai instruksi:
+    // 1. DPP = 100/111 x Nilai Kwitansi
+    // 2. DPP Nilai Lain = 11/12 x DPP Awal
+    // 3. PPN = 12% x DPP Nilai Lain (atau dari row akun PPN jika terpisah)
+    // 4. Nilai Proyek = Nilai Kwitansi (atau DPP * 111 / 100)
+    // 5. Laba Setelah Pajak = Nilai Proyek - PPN - PPh = DPP - PPh
+    const dpp = hitungDppDariKwitansi(nilaiKwitansi);
+    const dppNilaiLain = hitungDppNilaiLain(dpp);
+    const tarifPpnPersen = 12;
+    const calculatedPpn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
+    const ppn = totalPpn > 0 ? totalPpn : calculatedPpn;
     const tarifPphPersen = dpp > 0 && totalPph > 0 ? Number(((totalPph / dpp) * 100).toFixed(2)) : 3.5;
-    const tarifPpnPersen = dpp > 0 && totalPpn > 0 ? Number(((totalPpn / dpp) * 100).toFixed(2)) : (totalPpn > 0 ? 11 : 0);
-    const nilaiProyek = totalPpn > 0 ? dpp + totalPpn : dpp;
-    const labaSetelahPajak = dpp - totalPph;
+    const pph = totalPph > 0 ? totalPph : Math.round((dpp * tarifPphPersen) / 100);
+    const nilaiProyek = nilaiKwitansi > 0 ? nilaiKwitansi : (totalPpn > 0 ? dpp + totalPpn : Math.round((dpp * 111) / 100));
+    const labaSetelahPajak = Math.round(nilaiProyek - ppn - pph);
+    const nominalDiterima = bankDebitTotal > 0 ? bankDebitTotal : labaSetelahPajak;
 
     const targetEntityIdForFaktur = project?.entityId ?? entity.id;
     const txDate = new Date(tanggal);
@@ -331,11 +347,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
       namaRekanan: project?.name ?? entity.name,
       namaJkp: firstKeterangan || (project ? `Jasa Konsultansi ${project.name}` : `Pendapatan ${noBukti}`),
       dpp,
-      dppNilaiLain: dpp,
+      dppNilaiLain,
       tarifPpnPersen,
       tarifPphPersen,
-      ppn: totalPpn,
-      pph: totalPph,
+      ppn,
+      pph,
       nilaiProyek,
       labaSetelahPajak,
       kodeJenisProyek: 1,
@@ -385,7 +401,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
         const existingPcts = remainingTermins.map((t) => t.percentage);
         const maxPctSoFar = existingPcts.reduce((max, p) => Math.max(max, p), 0);
 
-        const nominalTermin = dpp > 0 ? dpp : nominalDiterima;
+        const nominalTermin = nilaiProyek > 0 ? nilaiProyek : (dpp > 0 ? dpp : nominalDiterima);
         if (nominalTermin > 0) {
           const newPct = computeNewTerminPercentage(
             Number(projectWithTermins.contractValue),

@@ -197,15 +197,47 @@ export async function getUnreadNotificationCount(role: Role) {
   return prisma.notifikasi.count({ where: { targetRole: role, read: false } });
 }
 
-// Warning piutang cuma muncul untuk proyek aktif yang progres pembayarannya
-// masih di bawah 80% DAN sudah lewat batas kontrak (deadline) — proyek yang
-// progresnya rendah tapi belum jatuh tempo tidak dianggap bermasalah.
-export async function getGrupPiutangMetrics() {
+export type OverdueProjectAlert = {
+  id: string;
+  code: string;
+  name: string;
+  entityKey: string;
+  entityName: string;
+  contractValue: number;
+  contractValueFmt: string;
+  deadline: Date;
+  deadlineFmt: string;
+  daysOverdue: number;
+  maxPercentage: number;
+  terminTagih: number;
+  terminTagihFmt: string;
+  sisaPiutang: number;
+  sisaPiutangFmt: string;
+};
+
+export type PiutangMetricsResult = {
+  terminPerluPerhatian: number;
+  totalPiutangBelumTertagih: number;
+  overdueProjects: OverdueProjectAlert[];
+};
+
+// Warning termin cuma muncul untuk proyek aktif yang progres pembayarannya
+// masih di bawah 80% DAN sudah lewat batas kontrak (deadline)
+export async function getGrupPiutangMetrics(entityKeys?: string[]): Promise<PiutangMetricsResult> {
+  const whereClause: { status: "ACTIVE"; entity?: { key: { in: string[] } } } = { status: "ACTIVE" };
+  if (entityKeys && entityKeys.length > 0) {
+    whereClause.entity = { key: { in: entityKeys } };
+  }
+
   const projects = await prisma.project.findMany({
-    where: { status: "ACTIVE" },
+    where: whereClause,
     select: {
+      id: true,
+      code: true,
+      name: true,
       contractValue: true,
       deadline: true,
+      entity: { select: { key: true, name: true } },
       termin: { select: { percentage: true } },
     },
   });
@@ -213,17 +245,41 @@ export async function getGrupPiutangMetrics() {
   const now = new Date();
   let terminPerluPerhatian = 0;
   let totalPiutangBelumTertagih = 0;
+  const overdueProjects: OverdueProjectAlert[] = [];
 
   for (const p of projects) {
     const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
     const isOverdue = p.deadline < now;
     if (maxPct < 80 && isOverdue) {
       terminPerluPerhatian += 1;
-      totalPiutangBelumTertagih += Number(p.contractValue) * (1 - maxPct / 100);
+      const val = Number(p.contractValue);
+      const sisa = val * (1 - maxPct / 100);
+      const cair = val * (maxPct / 100);
+      totalPiutangBelumTertagih += sisa;
+      const daysOverdue = Math.max(1, Math.floor((now.getTime() - p.deadline.getTime()) / (1000 * 60 * 60 * 24)));
+      overdueProjects.push({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        entityKey: p.entity.key,
+        entityName: p.entity.name,
+        contractValue: val,
+        contractValueFmt: formatRupiah(val),
+        deadline: p.deadline,
+        deadlineFmt: p.deadline.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+        daysOverdue,
+        maxPercentage: maxPct,
+        terminTagih: cair,
+        terminTagihFmt: formatRupiah(cair),
+        sisaPiutang: sisa,
+        sisaPiutangFmt: formatRupiah(sisa),
+      });
     }
   }
 
-  return { terminPerluPerhatian, totalPiutangBelumTertagih };
+  overdueProjects.sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  return { terminPerluPerhatian, totalPiutangBelumTertagih, overdueProjects };
 }
 
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];

@@ -46,8 +46,8 @@ export async function updateCOA(id: string, formData: FormData) {
 
 export async function deleteCOA(id: string) {
   const session = await getServerSession(authOptions);
-  if (session?.user.role !== "MANAJER_KEUANGAN" && session?.user.role !== "SUPER_ADMIN") {
-    throw new Error("Hanya Manajer Keuangan atau Super Admin yang bisa menghapus akun COA.");
+  if (session?.user.role !== "MANAJER_KEUANGAN" && session?.user.role !== "SUPER_ADMIN" && session?.user.role !== "STAF_KEUANGAN") {
+    throw new Error("Akses ditolak.");
   }
   const count = await prisma.transaction.count({ where: { coaAccountId: id } });
   if (count > 0) throw new Error("COA ini masih digunakan oleh " + count + " transaksi dan tidak bisa dihapus.");

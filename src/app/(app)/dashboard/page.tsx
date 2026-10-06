@@ -24,9 +24,9 @@ import {
   BarChart3,
   AlertTriangle,
   CalendarClock,
-  Sparkles,
 } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { Sparkles } from "lucide-react";
 
 export default async function DashboardPage({
   searchParams,
@@ -104,23 +104,18 @@ export default async function DashboardPage({
 
   const welcomeBanner = (
     <div className="relative overflow-hidden rounded-[20px]" style={{ background: "linear-gradient(135deg, #0f1e3d 0%, #1a2f5a 60%, #1e3a6e 100%)" }}>
-      {/* Dot pattern */}
       <div className="absolute inset-0 pointer-events-none"
         style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
       />
-      {/* Glow accent */}
       <div className="absolute -top-10 -right-10 w-52 h-52 rounded-full pointer-events-none"
         style={{ background: "radial-gradient(circle, rgba(99,130,255,0.18) 0%, transparent 70%)" }}
       />
-
       <div className="relative z-10 px-7 py-6 flex items-center justify-between gap-6">
         <div className="min-w-0">
-          {/* Date */}
           <div className="flex items-center gap-1.5 mb-3">
             <CalendarClock size={12} className="flex-none" style={{ color: "rgba(255,255,255,0.45)" }} />
             <span className="text-[11.5px] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>{dateLabel}</span>
           </div>
-          {/* Greeting */}
           <div className="flex items-center gap-2.5 mb-2">
             <h2 className="text-[22px] font-extrabold text-white leading-tight">{greeting}, {name}</h2>
             <Sparkles size={16} style={{ color: "rgba(180,200,255,0.8)", flexShrink: 0 }} />
@@ -133,8 +128,6 @@ export default async function DashboardPage({
             </span>
           </div>
         </div>
-
-        {/* Right avatar */}
         <div className="flex-none hidden sm:flex w-14 h-14 rounded-2xl items-center justify-center"
           style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none">

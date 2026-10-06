@@ -677,7 +677,7 @@ export function LaporanPendapatanClient({
                   <th className="p-3 text-center">Masa</th>
                   <th className="p-3 text-right">DPP</th>
                   <th className="p-3 text-right">DPP Nilai Lain</th>
-                  <th className="p-3 text-right">PPN</th>
+                  <th className="p-3 text-right">PPN (12%)</th>
                   <th className="p-3 text-right">PPh (3.5%)</th>
                   <th className="p-3 text-right font-bold text-blue-700 bg-blue-50/50">
                     Nilai Proyek (111%)
@@ -753,17 +753,17 @@ export function LaporanPendapatanClient({
                       <td className="p-3 text-right font-mono text-navy-soft">
                         {f.dppNilaiLainFmt}
                       </td>
-                      <td className="p-3 text-right font-mono text-purple-700">
-                        <div>{f.ppnFmt}</div>
-                        <span className="text-[10px] text-navy-soft">
-                          {f.tarifPpnPersen}%
-                        </span>
+                      <td className="p-3 text-right font-mono text-purple-700" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
+                        {f.ppnFmt}
+                        {f.tarifPpnPersen !== 12 && (
+                          <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPpnPersen}%)</span>
+                        )}
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-700">
-                        <div>{f.pphFmt}</div>
-                        <span className="text-[10px] text-navy-soft">
-                          {f.tarifPphPersen}%
-                        </span>
+                      <td className="p-3 text-right font-mono text-amber-700" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
+                        {f.pphFmt}
+                        {f.tarifPphPersen !== 3.5 && (
+                          <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPphPersen}%)</span>
+                        )}
                       </td>
                       <td className="p-3 text-right font-mono font-bold text-blue-700 bg-blue-50/30">
                         {f.nilaiProyekFmt}
@@ -892,7 +892,7 @@ export function LaporanPendapatanClient({
                   <th className="p-3 text-center">Jml Faktur</th>
                   <th className="p-3 text-right">Total DPP</th>
                   <th className="p-3 text-right">Total DPP Nilai Lain</th>
-                  <th className="p-3 text-right">Total PPN</th>
+                  <th className="p-3 text-right">Total PPN (12%)</th>
                   <th className="p-3 text-right">Total PPh (3.5%)</th>
                   <th className="p-3 text-right font-bold text-blue-700 bg-blue-50/50">
                     Nilai Proyek (111%)

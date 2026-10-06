@@ -16,13 +16,13 @@ export default async function PiutangPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  if (role === "SUPER_ADMIN" || role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") {
+  if (role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") {
     redirect("/dashboard");
   }
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
+  const selectedEntity = entities.find((e) => e.key === selectedKey) ?? entities[0];
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;

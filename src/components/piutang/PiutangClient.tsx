@@ -90,7 +90,7 @@ export function PiutangClient({
   } | null>(null);
   const [activeProjectTabs, setActiveProjectTabs] = useState<Record<string, "pengeluaran" | "termin" | "pajak">>({});
 
-  const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN";
+  const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN" || userRole === "SUPER_ADMIN";
   const overdueProjectsCount = projectList.filter((p) => p.isOverdue).length;
 
   function toggleExpand(id: string) {

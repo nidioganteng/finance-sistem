@@ -484,7 +484,7 @@ export function KasTransactionForm({
                   <optgroup label="Proyek Entitas Ini">
                     {currentEntityProjects.map((p) => (
                       <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name} · Kontrak: {p.contractValueFmt ?? "-"} · Progres: {p.maxPercentage ?? 0}%
+                        [{p.code}] {p.name}
                       </option>
                     ))}
                   </optgroup>
@@ -493,7 +493,7 @@ export function KasTransactionForm({
                   <optgroup label="Proyek Entitas Lain (Lintas Entitas)">
                     {otherEntityProjects.map((p) => (
                       <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name} ({p.entityName ?? p.entityKey}) · Kontrak: {p.contractValueFmt ?? "-"}
+                        [{p.code}] {p.name} ({p.entityName ?? p.entityKey})
                       </option>
                     ))}
                   </optgroup>
@@ -727,7 +727,7 @@ export function KasTransactionForm({
               <div key={r.id} className="bg-surface-subtle/60 border border-border-soft rounded-[12px] p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-muted-faint w-4 flex-none">{idx + 1}</span>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <CoaCombobox
                       value={r.coaAccountId}
                       onChange={(id) => updateRow(r.id, { coaAccountId: id })}
@@ -738,15 +738,15 @@ export function KasTransactionForm({
                     value={r.nominal ? formatRupiahInput(r.nominal) : ""}
                     onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
                     placeholder="0"
-                    className="w-[140px] flex-none px-3 py-2 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-right font-mono text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand/60"
+                    className="w-[150px] flex-none px-3 py-2 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-right font-mono text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand/60"
                   />
                   <button
                     type="button"
                     onClick={() => removeRow(r.id)}
                     disabled={rows.length === 1}
-                    className="text-muted-faint hover:text-status-red transition-colors disabled:opacity-20 flex-none"
+                    className="p-1 rounded text-muted-faint hover:text-status-red hover:bg-surface-hover transition-colors disabled:opacity-20 flex-none"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
                 <div className="pl-6">

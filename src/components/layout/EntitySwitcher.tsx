@@ -22,7 +22,7 @@ function EntityLogo({ entityKey, name, size = 20 }: { entityKey: string; name: s
     </span>
   );
   return (
-    <span className="flex-none rounded-md bg-white border border-border-soft overflow-hidden flex items-center justify-center" style={{ width: size, height: size }}>
+    <span className="flex-none rounded-md bg-white dark:bg-surface-card border border-border-soft overflow-hidden flex items-center justify-center" style={{ width: size, height: size }}>
       <Image src={logo} alt={name} width={size} height={size} className="object-contain w-full h-full p-[2px]" />
     </span>
   );

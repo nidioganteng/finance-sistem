@@ -4,18 +4,20 @@ export type NavSubItem = {
   label: string;
   href: string;
   version?: "internal" | "umum";
+  children?: { label: string; href: string; version?: "internal" | "umum" }[];
 };
 
 export type NavItem = {
   label: string;
   href: string;
-  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings2" | "clipboardList" | "penLine";
+  icon: "grid" | "fileText" | "history" | "bell" | "listChecks" | "bookOpen" | "receipt" | "landmark" | "users" | "walletCards" | "trendingUp" | "scale" | "wallet" | "banknote" | "building2" | "scrollText" | "table2" | "handCoins" | "folderOpen" | "settings" | "settings2" | "clipboardList" | "penLine" | "layers";
   subItems?: NavSubItem[];
 };
 
 type NavSection = {
   title: string;
   items: NavItem[];
+  collapsible?: boolean;
 };
 
 // Struktur ini disalin persis dari sidebar tiap role di mockup
@@ -56,20 +58,36 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
     {
       title: "Operasional",
       items: [
-        { label: "Kas Kecil", href: "/kas-kecil", icon: "wallet" },
-        { label: "Kas Besar", href: "/kas-besar", icon: "banknote" },
-        { label: "Entry Jurnal", href: "/jurnal-transaksi", icon: "penLine" },
-        { label: "Buku Bank", href: "/bank-buku", icon: "building2" },
-        { label: "Jurnal Umum", href: "/jurnal", icon: "scrollText" },
-        { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
-        { label: "Daftar Akun", href: "/daftar-akun", icon: "table2" },
-        { label: "Aktiva Tetap", href: "/aktiva-tetap", icon: "clipboardList" },
-        { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
+        {
+          label: "Transaksi",
+          href: "/operasional-transaksi",
+          icon: "penLine",
+          subItems: [
+            { label: "Kas Kecil", href: "/kas-kecil" },
+            { label: "Kas Besar", href: "/kas-besar" },
+            { label: "Buku Bank", href: "/bank-buku" },
+            { label: "Entry Jurnal", href: "/jurnal-transaksi" },
+            { label: "Aktiva Tetap", href: "/aktiva-tetap" },
+          ],
+        },
+        {
+          label: "Monitoring",
+          href: "/operasional-monitoring",
+          icon: "fileText",
+          subItems: [
+            { label: "Jurnal Umum", href: "/jurnal" },
+            { label: "Buku Besar", href: "/buku-besar" },
+            { label: "Daftar Akun", href: "/daftar-akun" },
+            { label: "Kontrol Termin", href: "/piutang" },
+          ],
+        },
       ],
     },
     {
       title: "Laporan",
+      collapsible: true,
       items: [
+        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         {
           label: "Laporan Keuangan",
           href: "/laporan",
@@ -79,16 +97,16 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
           ],
         },
-        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
       ],
     },
     {
       title: "Pengaturan",
+      collapsible: true,
       items: [
-        { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
+        { label: "Bagan Akun", href: "/coa", icon: "landmark" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
-        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "settings2" },
+        { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
         { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },
@@ -104,20 +122,36 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
     {
       title: "Operasional",
       items: [
-        { label: "Kas Kecil", href: "/kas-kecil", icon: "wallet" },
-        { label: "Kas Besar", href: "/kas-besar", icon: "banknote" },
-        { label: "Entry Jurnal", href: "/jurnal-transaksi", icon: "penLine" },
-        { label: "Buku Bank", href: "/bank-buku", icon: "building2" },
-        { label: "Jurnal Umum", href: "/jurnal", icon: "scrollText" },
-        { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
-        { label: "Daftar Akun", href: "/daftar-akun", icon: "table2" },
-        { label: "Aktiva Tetap", href: "/aktiva-tetap", icon: "clipboardList" },
-        { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
+        {
+          label: "Transaksi",
+          href: "/operasional-transaksi",
+          icon: "penLine",
+          subItems: [
+            { label: "Kas Kecil", href: "/kas-kecil" },
+            { label: "Kas Besar", href: "/kas-besar" },
+            { label: "Buku Bank", href: "/bank-buku" },
+            { label: "Entry Jurnal", href: "/jurnal-transaksi" },
+            { label: "Aktiva Tetap", href: "/aktiva-tetap" },
+          ],
+        },
+        {
+          label: "Monitoring",
+          href: "/operasional-monitoring",
+          icon: "fileText",
+          subItems: [
+            { label: "Jurnal Umum", href: "/jurnal" },
+            { label: "Buku Besar", href: "/buku-besar" },
+            { label: "Daftar Akun", href: "/daftar-akun" },
+            { label: "Kontrol Termin", href: "/piutang" },
+          ],
+        },
       ],
     },
     {
       title: "Laporan",
+      collapsible: true,
       items: [
+        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         {
           label: "Laporan Keuangan",
           href: "/laporan",
@@ -127,16 +161,16 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
           ],
         },
-        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
       ],
     },
     {
       title: "Pengaturan",
+      collapsible: true,
       items: [
-        { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
+        { label: "Bagan Akun", href: "/coa", icon: "landmark" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
-        { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "settings2" },
+        { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
         { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },

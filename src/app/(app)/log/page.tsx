@@ -18,7 +18,7 @@ export default async function LogPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
+  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const tab = searchParams.tab === "financial" ? "financial" : searchParams.tab === "user" ? "user" : "all";
   const category = tab === "financial" ? "FINANCIAL_CHANGE" : tab === "user" ? "USER_ACTIVITY" : undefined;

@@ -41,6 +41,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         },
         { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
+        { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
@@ -115,6 +116,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "grid" },
+        { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
     },
     {
@@ -166,9 +168,10 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Pengaturan",
       collapsible: true,
       items: [
-        { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
+        { label: "Bagan Akun", href: "/coa", icon: "landmark" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
-        { label: "Kelola Jenis Input", href: "/jenis-input", icon: "settings2" },
+        { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
+        { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },
   ],

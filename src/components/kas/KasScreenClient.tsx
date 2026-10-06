@@ -157,7 +157,7 @@ export function KasScreenClient({
             className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
             onClick={() => setEditingRow(null)}
           />
-          <div className="relative w-full max-w-2xl my-auto">
+          <div className="relative w-full max-w-3xl my-auto">
             <KasTransactionForm
               entityKey={entityKey}
               jenisInputKey={jenisInputKey}

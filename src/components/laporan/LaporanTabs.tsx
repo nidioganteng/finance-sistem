@@ -13,7 +13,7 @@ export function LaporanTabs({ currentTab }: { currentTab: string }) {
     { key: "laba-rugi", label: "Laba Rugi" },
     { key: "neraca", label: "Neraca" },
     { key: "arus-kas", label: "Arus Kas" },
-    { key: "piutang", label: "Piutang" },
+    { key: "piutang", label: "Kontrol Termin" },
     { key: "utang-aset", label: "Utang & Aset" },
     { key: "komparasi", label: "Komparasi" },
   ];

@@ -104,20 +104,20 @@ function AuthForm() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
-            <Image src="/logo-entitas/logo-simatra.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
+            <Image src="/logo-entitas/logo-simatra-dark.png" alt="Logo" width={56} height={56} className="object-contain drop-shadow-md" />
             <h1 className="text-3xl font-black tracking-tight text-white">
               SIMATRA<span className="text-[#158ed4]">.</span>
             </h1>
           </div>
 
           <h2 className="text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-white mb-6">
-            Sistem Keuangan <br />
+            Enterprise <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#158ed4] to-cyan-400">
-              Grup Terpadu
+              Financial Management
             </span>
           </h2>
           <p className="text-lg text-slate-300 max-w-md leading-relaxed border-l-4 border-[#158ed4] pl-4">
-            Platform pengelolaan keuangan internal Gaharu Sempana Group — real-time, akurat, dan aman.
+            Sistem Informasi Manajemen Transaksi Akuntansi kelola transaksi keuangan, pencatatan akuntansi, arus kas, dan pelaporan secara terintegrasi dalam satu sistem yang terstruktur dan transparan.
           </p>
         </div>
 
@@ -141,7 +141,7 @@ function AuthForm() {
         <div className="w-full max-w-md">
           {/* Mobile branding */}
           <div className="md:hidden text-center mb-10">
-            <Image src="/logo-entitas/logo-simatra.png" alt="Logo" width={72} height={72} className="object-contain mx-auto mb-4 drop-shadow-lg" />
+            <Image src="/logo-entitas/logo-simatra-dark.png" alt="Logo" width={72} height={72} className="object-contain mx-auto mb-4 drop-shadow-lg" />
             <h1 className="text-2xl font-black tracking-tight text-white mb-1">
               SIMATRA<span className="text-[#158ed4]">.</span>
             </h1>

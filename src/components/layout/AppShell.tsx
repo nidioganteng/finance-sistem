@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Role } from "@prisma/client";
 import { Sidebar } from "./Sidebar";
@@ -16,6 +17,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
 
   // Tutup sidebar saat resize ke desktop
   useEffect(() => {
@@ -89,8 +91,19 @@ export function AppShell({
           </div>
         </div>
 
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7 pb-16 flex flex-col gap-5">
-          {children}
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7 pb-16 flex flex-col gap-5 overflow-hidden">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              className="flex flex-col gap-5 flex-1"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

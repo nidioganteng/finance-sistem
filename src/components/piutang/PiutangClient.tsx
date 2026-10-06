@@ -561,14 +561,14 @@ export function PiutangClient({
                                             <>
                                               <div className="rounded-xl border border-border overflow-hidden">
                                                 <div className="overflow-x-auto">
-                                                  <table className="w-full text-left text-xs">
+                                                  <table className="w-full min-w-[760px] text-left text-xs">
                                                     <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                                                       <tr>
-                                                        <th className="py-2.5 px-3.5 w-1/4">Termin & Bukti Bayar</th>
-                                                        <th className="py-2.5 px-3.5 text-right w-1/6">Kwitansi Bruto</th>
-                                                        <th className="py-2.5 px-3.5 text-right w-1/4">(-) Potongan Pajak</th>
-                                                        <th className="py-2.5 px-3.5 text-right w-1/6">(=) Net Masuk Bank</th>
-                                                        <th className="py-2.5 px-3.5 text-right w-1/6">Status & Aksi</th>
+                                                        <th className="py-2.5 px-3.5">Termin & Bukti Bayar</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Kwitansi Bruto</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(-) Potongan Pajak</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(=) Net Masuk Bank</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px]">Status & Aksi</th>
                                                       </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-border bg-surface-card">
@@ -633,40 +633,25 @@ export function PiutangClient({
                                                             </td>
 
                                                             {/* Kolom 5: Status & Aksi */}
-                                                            <td className="py-3 px-3.5 text-right">
-                                                              <div className="flex flex-col items-end gap-1.5">
-                                                                <div className="flex items-center gap-1.5">
-                                                                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${STATUS_BADGE[t.status]}`}>
-                                                                    {STATUS_LABEL[t.status]}
-                                                                  </span>
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                                                              <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                                                {isManajer && t.status !== "ON_TRACK" && (
                                                                   <button
                                                                     type="button"
                                                                     onClick={(e) => {
                                                                       e.stopPropagation();
-                                                                      setSelectedTerminForModal({ project: p, termin: t });
+                                                                      handleAudit(t.id);
                                                                     }}
-                                                                    className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                                    title="Lihat rincian lengkap formula perpajakan & jurnal akuntansi termin ini"
+                                                                    disabled={isPending}
+                                                                    className="px-2 py-1 rounded-lg bg-navy text-white text-[10.5px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap hover:bg-navy-light transition-colors shadow-2xs"
+                                                                    title="Tandai termin telah diaudit"
                                                                   >
-                                                                    <FileText size={11} /> Breakdown Pajak
+                                                                    <CheckCircle size={10} /> Audit
                                                                   </button>
-                                                                </div>
+                                                                )}
 
-                                                                {isManajer && (
-                                                                  <div className="flex items-center gap-1 mt-0.5">
-                                                                    {t.status !== "ON_TRACK" && (
-                                                                      <button
-                                                                        type="button"
-                                                                        onClick={(e) => {
-                                                                          e.stopPropagation();
-                                                                          handleAudit(t.id);
-                                                                        }}
-                                                                        disabled={isPending}
-                                                                        className="px-2 py-0.5 rounded-md bg-navy text-white text-[10.5px] font-semibold flex items-center gap-1 cursor-pointer"
-                                                                      >
-                                                                        <CheckCircle size={10} /> Audit
-                                                                      </button>
-                                                                    )}
+                                                                {isManajer ? (
+                                                                  <div className="relative inline-flex items-center">
                                                                     <select
                                                                       value={t.status}
                                                                       onClick={(e) => e.stopPropagation()}
@@ -674,14 +659,32 @@ export function PiutangClient({
                                                                         handleStatusChange(t.id, e.target.value as TerminStatus)
                                                                       }
                                                                       disabled={isPending}
-                                                                      className="px-1.5 py-0.5 rounded border border-border text-[10.5px] bg-surface-input text-navy-text"
+                                                                      className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-lg border border-border/80 cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
+                                                                      title="Klik untuk mengubah status termin"
                                                                     >
-                                                                      <option value="ON_TRACK">On Track</option>
-                                                                      <option value="AT_RISK">At Risk</option>
-                                                                      <option value="NEEDS_AUDIT">Perlu Audit</option>
+                                                                      <option value="ON_TRACK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">On Track</option>
+                                                                      <option value="AT_RISK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">At Risk</option>
+                                                                      <option value="NEEDS_AUDIT" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Perlu Audit</option>
                                                                     </select>
+                                                                    <ChevronDown size={11} className="absolute right-1.5 pointer-events-none text-current opacity-70" />
                                                                   </div>
+                                                                ) : (
+                                                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg whitespace-nowrap ${STATUS_BADGE[t.status]}`}>
+                                                                    {STATUS_LABEL[t.status]}
+                                                                  </span>
                                                                 )}
+
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedTerminForModal({ project: p, termin: t });
+                                                                  }}
+                                                                  className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                                                  title="Lihat rincian lengkap formula perpajakan & jurnal akuntansi termin ini"
+                                                                >
+                                                                  <FileText size={11} /> Breakdown Pajak
+                                                                </button>
                                                               </div>
                                                             </td>
                                                           </tr>

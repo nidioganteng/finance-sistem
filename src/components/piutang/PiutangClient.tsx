@@ -405,232 +405,341 @@ export function PiutangClient({
                                   </button>
                                 </div>
 
-                                {/* 4 Kartu Ringkasan Finansial Utama */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                                  {/* 1. Nilai Kontrak */}
-                                  <div className="p-4 rounded-xl bg-surface-subtle/80 border border-border-subtle hover:border-border transition-all">
-                                    <div className="flex items-center justify-between text-muted-faint mb-1.5">
-                                      <span className="text-[11px] font-bold uppercase tracking-wider">Nilai Kontrak Proyek</span>
-                                      <FileText size={16} className="text-muted-faint" />
+                                {/* 1. Strip Ringkasan Finansial Utama (Clean Horizontal Metric Ribbon) */}
+                                <div className="bg-surface-subtle/60 rounded-xl border border-border p-3 sm:p-4">
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                                    {/* Nilai Kontrak */}
+                                    <div className="sm:px-3 first:pl-0">
+                                      <span className="text-[11px] font-semibold text-muted-faint uppercase block tracking-wider">
+                                        Nilai Kontrak
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-navy-text block mt-0.5">
+                                        {p.contractValueFmt}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        Pagu Total SPK
+                                      </span>
                                     </div>
-                                    <div className="text-lg font-bold font-mono text-navy-text tracking-tight">
-                                      {p.contractValueFmt}
-                                    </div>
-                                    <div className="text-[11px] text-muted-faint mt-1">
-                                      Pagu Total Kontrak SPK
-                                    </div>
-                                  </div>
 
-                                  {/* 2. Termin Cair (Kas Masuk) */}
-                                  <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/50">
-                                    <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 mb-1.5">
-                                      <span className="text-[11px] font-bold uppercase tracking-wider">Termin Cair (Kas Masuk)</span>
-                                      <TrendingUp size={16} className="text-emerald-600 dark:text-emerald-400" />
+                                    {/* Termin Cair */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase block tracking-wider">
+                                        Termin Cair (Masuk)
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300 block mt-0.5">
+                                        {p.terminTagihFmt}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        {p.maxPercentage}% · {p.termin.length} termin
+                                      </span>
                                     </div>
-                                    <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300 tracking-tight">
-                                      {p.terminTagihFmt}
-                                    </div>
-                                    <div className="text-[11px] text-emerald-700/90 dark:text-emerald-400/90 mt-1 flex items-center justify-between">
-                                      <span>{p.maxPercentage}% dari Kontrak</span>
-                                      <span className="font-semibold">{p.termin.length} Termin</span>
-                                    </div>
-                                  </div>
 
-                                  {/* 3. Realisasi Biaya Proyek */}
-                                  <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-800/50">
-                                    <div className="flex items-center justify-between text-rose-800 dark:text-rose-300 mb-1.5">
-                                      <span className="text-[11px] font-bold uppercase tracking-wider">Realisasi Biaya Proyek</span>
-                                      <Wallet size={16} className="text-rose-600 dark:text-rose-400" />
+                                    {/* Realisasi Biaya */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase block tracking-wider">
+                                        Realisasi Biaya
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-rose-700 dark:text-rose-300 block mt-0.5">
+                                        {p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        {p.expensesSummary?.items.length ?? 0} transaksi riil
+                                      </span>
                                     </div>
-                                    <div className="text-lg font-bold font-mono text-rose-700 dark:text-rose-300 tracking-tight">
-                                      {p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}
-                                    </div>
-                                    <div className="text-[11px] text-rose-700/90 dark:text-rose-400/90 mt-1 flex items-center justify-between">
-                                      <span>Pengeluaran Riil</span>
-                                      <span className="font-semibold">{p.expensesSummary?.items.length ?? 0} Transaksi</span>
-                                    </div>
-                                  </div>
 
-                                  {/* 4. Laba Kas Berjalan */}
-                                  {(() => {
-                                    const laba = p.expensesSummary?.labaKotor ?? (p.terminTagih - (p.expensesSummary?.totalPengeluaran ?? 0));
-                                    const isProfit = laba >= 0;
-                                    return (
-                                      <div className={`p-4 rounded-xl border ${
-                                        isProfit
-                                          ? "bg-indigo-50/60 dark:bg-indigo-950/20 border-indigo-200/70 dark:border-indigo-800/50"
-                                          : "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200/70 dark:border-amber-800/50"
+                                    {/* Laba Kas Berjalan */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-navy-text uppercase block tracking-wider">
+                                        Laba Kas Berjalan
+                                      </span>
+                                      <span className={`text-base sm:text-lg font-bold font-mono block mt-0.5 ${
+                                        (p.expensesSummary?.labaKotor ?? 0) >= 0
+                                          ? "text-emerald-700 dark:text-emerald-300"
+                                          : "text-rose-700 dark:text-rose-300"
                                       }`}>
-                                        <div className={`flex items-center justify-between mb-1.5 ${
-                                          isProfit ? "text-indigo-800 dark:text-indigo-300" : "text-amber-800 dark:text-amber-300"
-                                        }`}>
-                                          <span className="text-[11px] font-bold uppercase tracking-wider">Laba Kas Berjalan</span>
-                                          <Calculator size={16} className={isProfit ? "text-indigo-600 dark:text-indigo-400" : "text-amber-600 dark:text-amber-400"} />
-                                        </div>
-                                        <div className={`text-lg font-bold font-mono tracking-tight ${
-                                          isProfit ? "text-indigo-700 dark:text-indigo-300" : "text-amber-700 dark:text-amber-300"
-                                        }`}>
-                                          {p.expensesSummary?.labaKotorFmt ?? formatRupiah(laba)}
-                                        </div>
-                                        <div className="text-[11px] text-muted-faint mt-1 flex items-center justify-between">
-                                          <span>Sisa Piutang:</span>
-                                          <span className="font-mono font-semibold text-status-red">{p.sisaTagihFmt}</span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
+                                        {p.expensesSummary?.labaKotorFmt ?? "Rp 0"}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        Kas Masuk - Biaya Riil
+                                      </span>
+                                    </div>
 
-                                {/* Visual Alur Kas Proyek (Cashflow Bar) */}
-                                <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border-subtle">
-                                  <div className="flex items-center justify-between text-xs mb-1.5">
-                                    <span className="font-semibold text-navy-text flex items-center gap-1.5">
-                                      <TrendingUp size={13} className="text-brand" />
-                                      Alur Finansial Proyek (Biaya Riil vs Termin Cair vs Pagu Kontrak)
-                                    </span>
-                                    <span className="text-muted-faint font-mono text-[11px]">
-                                      Total Pagu: {p.contractValueFmt}
-                                    </span>
-                                  </div>
-                                  <div className="h-3 w-full bg-surface-hover rounded-full overflow-hidden flex">
-                                    {p.contractValue > 0 && (p.expensesSummary?.totalPengeluaran ?? 0) > 0 && (
-                                      <div
-                                        className="h-full bg-rose-500 transition-all"
-                                        style={{ width: `${Math.min(((p.expensesSummary?.totalPengeluaran ?? 0) / p.contractValue) * 100, 100)}%` }}
-                                        title={`Realisasi Biaya: ${p.expensesSummary?.totalPengeluaranFmt}`}
-                                      />
-                                    )}
-                                    {p.contractValue > 0 && (p.expensesSummary?.labaKotor ?? 0) > 0 && (
-                                      <div
-                                        className="h-full bg-emerald-500 transition-all"
-                                        style={{ width: `${Math.min(((p.expensesSummary?.labaKotor ?? 0) / p.contractValue) * 100, 100)}%` }}
-                                        title={`Surplus Kas: ${p.expensesSummary?.labaKotorFmt}`}
-                                      />
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-4 text-[11px] text-muted mt-2 flex-wrap">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                                      <span>Biaya Riil: <strong className="font-mono text-rose-600 dark:text-rose-400">{p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}</strong></span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                                      <span>Termin Cair: <strong className="font-mono text-emerald-600 dark:text-emerald-400">{p.terminTagihFmt}</strong></span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="w-2.5 h-2.5 rounded-full bg-surface-hover border border-border inline-block" />
-                                      <span>Sisa Kontrak Belum Cair: <strong className="font-mono text-muted-stronger">{p.sisaTagihFmt}</strong></span>
+                                    {/* Sisa Piutang */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-status-red uppercase block tracking-wider">
+                                        Sisa Belum Cair
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-status-red block mt-0.5">
+                                        {p.sisaTagihFmt}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        Sisa pagu kontrak
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Tab Switcher Rincian */}
+                                {/* 2. Tab Switcher (Hanya 2 Tab Bersih) */}
                                 {(() => {
                                   const currentTab =
                                     activeProjectTabs[p.id] ??
-                                    (p.expensesSummary?.items.length > 0 ? "pengeluaran" : "termin");
+                                    (p.termin.length > 0 ? "termin" : "pengeluaran");
 
                                   return (
                                     <div className="space-y-4">
-                                      <div className="flex items-center gap-2 border-b border-border pb-2 flex-wrap">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "pengeluaran" }))
-                                          }
-                                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-                                            currentTab === "pengeluaran"
-                                              ? "bg-rose-600 text-white shadow-xs"
-                                              : "text-muted-stronger hover:bg-surface-hover"
-                                          }`}
-                                        >
-                                          <Wallet size={14} />
-                                          Detail Pengeluaran Biaya
-                                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                            currentTab === "pengeluaran"
-                                              ? "bg-rose-800 text-rose-100"
-                                              : "bg-surface-subtle text-muted"
-                                          }`}>
-                                            {p.expensesSummary?.items.length ?? 0}
-                                          </span>
-                                        </button>
-
+                                      <div className="flex items-center gap-2 border-b border-border pb-2">
                                         <button
                                           type="button"
                                           onClick={() =>
                                             setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "termin" }))
                                           }
-                                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                                          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
                                             currentTab === "termin"
-                                              ? "bg-emerald-600 text-white shadow-xs"
+                                              ? "bg-navy text-white shadow-xs"
                                               : "text-muted-stronger hover:bg-surface-hover"
                                           }`}
                                         >
                                           <Receipt size={14} />
-                                          Riwayat Penagihan Termin
-                                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                            currentTab === "termin"
-                                              ? "bg-emerald-800 text-emerald-100"
-                                              : "bg-surface-subtle text-muted"
-                                          }`}>
-                                            {p.termin.length}
-                                          </span>
+                                          Riwayat Penagihan Termin ({p.termin.length})
                                         </button>
 
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "pajak" }))
+                                            setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "pengeluaran" }))
                                           }
-                                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-                                            currentTab === "pajak"
-                                              ? "bg-indigo-600 text-white shadow-xs"
+                                          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                                            currentTab === "pengeluaran"
+                                              ? "bg-navy text-white shadow-xs"
                                               : "text-muted-stronger hover:bg-surface-hover"
                                           }`}
                                         >
-                                          <Calculator size={14} />
-                                          Rekapitulasi Pajak & Bank
+                                          <Wallet size={14} />
+                                          Realisasi Pengeluaran Biaya ({p.expensesSummary?.items.length ?? 0})
                                         </button>
                                       </div>
 
-                                      {/* TAB 1: DETAIL PENGELUARAN PROYEK */}
+                                      {/* TAB 1: RIWAYAT TERMIN & KAS MASUK */}
+                                      {currentTab === "termin" && (
+                                        <div className="space-y-3.5">
+                                          {p.termin.length > 0 ? (
+                                            <>
+                                              <div className="rounded-xl border border-border overflow-hidden">
+                                                <div className="overflow-x-auto">
+                                                  <table className="w-full text-left text-xs">
+                                                    <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                                                      <tr>
+                                                        <th className="py-2.5 px-3.5 w-1/4">Termin & Bukti Bayar</th>
+                                                        <th className="py-2.5 px-3.5 text-right w-1/6">Kwitansi Bruto</th>
+                                                        <th className="py-2.5 px-3.5 text-right w-1/4">(-) Potongan Pajak</th>
+                                                        <th className="py-2.5 px-3.5 text-right w-1/6">(=) Net Masuk Bank</th>
+                                                        <th className="py-2.5 px-3.5 text-right w-1/6">Status & Aksi</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-border bg-surface-card">
+                                                      {p.termin.map((t) => {
+                                                        const totalPajak = (t.breakdown?.ppn ?? 0) + (t.breakdown?.pph ?? 0);
+                                                        return (
+                                                          <tr key={t.id} className="hover:bg-surface-hover/30 transition-colors">
+                                                            {/* Kolom 1: Termin & Dokumen */}
+                                                            <td className="py-3 px-3.5">
+                                                              <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-navy-text text-sm">{t.name}</span>
+                                                                {t.percentage !== undefined && (
+                                                                  <span className="text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                                    +{t.percentageDelta ?? t.percentage}% (Pagu {t.percentage}%)
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-1 flex items-center gap-2 flex-wrap">
+                                                                <span>No. Bukti: <strong className="text-navy-text font-mono">{t.breakdown?.noBukti || "-"}</strong></span>
+                                                                <span>·</span>
+                                                                <span>Bank: <strong className="text-navy-text">{t.breakdown?.bank || "-"}</strong></span>
+                                                                <span>·</span>
+                                                                <span>Tgl: {t.breakdown?.tanggalTerimaFmt || "-"}</span>
+                                                                {t.auditedAt && (
+                                                                  <span className="text-emerald-700 dark:text-emerald-400 font-medium">· Diaudit</span>
+                                                                )}
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 2: Bruto Kwitansi */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="font-mono font-bold text-navy-text text-sm">
+                                                                {t.nominalFmt}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                                Nilai tagihan bruto
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 3: Potongan Pajak */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="font-mono font-semibold text-amber-700 dark:text-amber-300 text-sm">
+                                                                {formatRupiah(totalPajak)}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                                {t.breakdown ? (
+                                                                  <span>PPN: {t.breakdown.ppnFmt} · PPh: {t.breakdown.pphFmt}</span>
+                                                                ) : (
+                                                                  <span>PPN & PPh</span>
+                                                                )}
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 4: Net Masuk Bank */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
+                                                                {t.breakdown?.netBankFmt || t.nominalFmt}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                                {t.breakdown?.bank ? `Masuk ke ${t.breakdown.bank}` : "Bersih rekening bank"}
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 5: Status & Aksi */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="flex flex-col items-end gap-1.5">
+                                                                <div className="flex items-center gap-1.5">
+                                                                  <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${STATUS_BADGE[t.status]}`}>
+                                                                    {STATUS_LABEL[t.status]}
+                                                                  </span>
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                      e.stopPropagation();
+                                                                      setSelectedTerminForModal({ project: p, termin: t });
+                                                                    }}
+                                                                    className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                                    title="Lihat rincian lengkap formula perpajakan & jurnal akuntansi termin ini"
+                                                                  >
+                                                                    <FileText size={11} /> Breakdown Pajak
+                                                                  </button>
+                                                                </div>
+
+                                                                {isManajer && (
+                                                                  <div className="flex items-center gap-1 mt-0.5">
+                                                                    {t.status !== "ON_TRACK" && (
+                                                                      <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                          e.stopPropagation();
+                                                                          handleAudit(t.id);
+                                                                        }}
+                                                                        disabled={isPending}
+                                                                        className="px-2 py-0.5 rounded-md bg-navy text-white text-[10.5px] font-semibold flex items-center gap-1 cursor-pointer"
+                                                                      >
+                                                                        <CheckCircle size={10} /> Audit
+                                                                      </button>
+                                                                    )}
+                                                                    <select
+                                                                      value={t.status}
+                                                                      onClick={(e) => e.stopPropagation()}
+                                                                      onChange={(e) =>
+                                                                        handleStatusChange(t.id, e.target.value as TerminStatus)
+                                                                      }
+                                                                      disabled={isPending}
+                                                                      className="px-1.5 py-0.5 rounded border border-border text-[10.5px] bg-surface-input text-navy-text"
+                                                                    >
+                                                                      <option value="ON_TRACK">On Track</option>
+                                                                      <option value="AT_RISK">At Risk</option>
+                                                                      <option value="NEEDS_AUDIT">Perlu Audit</option>
+                                                                    </select>
+                                                                  </div>
+                                                                )}
+                                                              </div>
+                                                            </td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                    <tfoot className="bg-surface-subtle font-bold border-t border-border text-xs">
+                                                      <tr>
+                                                        <td className="py-3 px-3.5 text-navy-text font-bold">
+                                                          Total Termin Cair ({p.termin.length} Termin):
+                                                        </td>
+                                                        <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm">
+                                                          {p.breakdownSummary?.totalGrossFmt ?? p.terminTagihFmt}
+                                                        </td>
+                                                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 text-sm">
+                                                          {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
+                                                        </td>
+                                                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 text-sm">
+                                                          {p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}
+                                                        </td>
+                                                        <td className="py-3 px-3.5" />
+                                                      </tr>
+                                                    </tfoot>
+                                                  </table>
+                                                </div>
+                                              </div>
+
+                                              {/* Strip Ringkasan Perpajakan Termin Proyek */}
+                                              <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border flex items-center justify-between gap-4 flex-wrap text-xs">
+                                                <div className="flex items-center gap-2 text-muted-stronger font-semibold">
+                                                  <Calculator size={14} className="text-brand" />
+                                                  <span>Rekapitulasi Pajak Termin:</span>
+                                                </div>
+                                                <div className="flex items-center gap-4 sm:gap-6 flex-wrap text-xs font-mono">
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">DPP:</span>
+                                                    <strong className="text-navy-text">{p.breakdownSummary?.totalDppFmt ?? "Rp 0"}</strong>
+                                                    {(p.breakdownSummary?.totalDppNilaiLain ?? 0) > 0 && (
+                                                      <span className="text-[10px] text-muted-faint font-sans ml-1">(Nilai Lain: {p.breakdownSummary?.totalDppNilaiLainFmt})</span>
+                                                    )}
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">PPN 11%/12%:</span>
+                                                    <strong className="text-amber-700 dark:text-amber-300">{p.breakdownSummary?.totalPpnFmt ?? "Rp 0"}</strong>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">PPh Final Konstruksi:</span>
+                                                    <strong className="text-purple-700 dark:text-purple-300">{p.breakdownSummary?.totalPphFmt ?? "Rp 0"}</strong>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">Net Diterima Bank:</span>
+                                                    <strong className="text-emerald-700 dark:text-emerald-300">{p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}</strong>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <div className="p-6 rounded-xl border border-dashed border-border bg-surface-subtle/30 text-center text-xs text-muted-faint">
+                                              Belum ada termin penagihan yang terbit untuk proyek ini.
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* TAB 2: DETAIL PENGELUARAN PROYEK */}
                                       {currentTab === "pengeluaran" && (
                                         <div className="space-y-3.5">
-                                          {/* Mini summary badges per kategori pengeluaran */}
-                                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                            <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
-                                              <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300 text-xs font-semibold">
-                                                <ShoppingBag size={14} /> Bahan & Material
-                                              </div>
-                                              <div className="text-sm font-bold font-mono text-blue-900 dark:text-blue-100 mt-1">
-                                                {p.expensesSummary?.totalMaterialFmt ?? "Rp 0"}
-                                              </div>
+                                          {/* Mini summary strip kategori pengeluaran */}
+                                          <div className="p-3 rounded-xl bg-surface-subtle/50 border border-border flex items-center justify-between gap-3 flex-wrap text-xs">
+                                            <div className="flex items-center gap-2 font-semibold text-navy-text">
+                                              <Wallet size={14} className="text-rose-600" />
+                                              <span>Total Pengeluaran: <strong className="font-mono text-status-red text-sm">{p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}</strong></span>
                                             </div>
-
-                                            <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-                                              <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 text-xs font-semibold">
-                                                <Users size={14} /> Gaji & Upah Tukang
+                                            <div className="flex items-center gap-4 flex-wrap text-[11.5px]">
+                                              <div className="flex items-center gap-1.5">
+                                                <ShoppingBag size={12} className="text-blue-600" />
+                                                <span className="text-muted-faint">Material:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalMaterialFmt ?? "Rp 0"}</strong>
                                               </div>
-                                              <div className="text-sm font-bold font-mono text-amber-900 dark:text-amber-100 mt-1">
-                                                {p.expensesSummary?.totalGajiFmt ?? "Rp 0"}
+                                              <div className="flex items-center gap-1.5">
+                                                <Users size={12} className="text-amber-600" />
+                                                <span className="text-muted-faint">Upah:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalGajiFmt ?? "Rp 0"}</strong>
                                               </div>
-                                            </div>
-
-                                            <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
-                                              <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-                                                <Truck size={14} /> Operasional & Transport
+                                              <div className="flex items-center gap-1.5">
+                                                <Truck size={12} className="text-emerald-600" />
+                                                <span className="text-muted-faint">Operasional:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalOperasionalFmt ?? "Rp 0"}</strong>
                                               </div>
-                                              <div className="text-sm font-bold font-mono text-emerald-900 dark:text-emerald-100 mt-1">
-                                                {p.expensesSummary?.totalOperasionalFmt ?? "Rp 0"}
-                                              </div>
-                                            </div>
-
-                                            <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40">
-                                              <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 text-xs font-semibold">
-                                                <FileText size={14} /> Beban Lain-lain
-                                              </div>
-                                              <div className="text-sm font-bold font-mono text-purple-900 dark:text-purple-100 mt-1">
-                                                {p.expensesSummary?.totalLainnyaFmt ?? "Rp 0"}
+                                              <div className="flex items-center gap-1.5">
+                                                <FileText size={12} className="text-purple-600" />
+                                                <span className="text-muted-faint">Lainnya:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalLainnyaFmt ?? "Rp 0"}</strong>
                                               </div>
                                             </div>
                                           </div>
@@ -642,18 +751,18 @@ export function PiutangClient({
                                                 <table className="w-full text-left text-xs">
                                                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                                                     <tr>
-                                                      <th className="py-2.5 px-3">Tanggal</th>
-                                                      <th className="py-2.5 px-3">No. Bukti</th>
-                                                      <th className="py-2.5 px-3">Keterangan Pengeluaran</th>
-                                                      <th className="py-2.5 px-3">Kategori & Akun Beban</th>
-                                                      <th className="py-2.5 px-3">Sumber Kas/Bank</th>
-                                                      <th className="py-2.5 px-3 text-right">Nominal</th>
+                                                      <th className="py-2.5 px-3.5 w-28">Tanggal</th>
+                                                      <th className="py-2.5 px-3 w-28">No. Bukti</th>
+                                                      <th className="py-2.5 px-3">Uraian Pengeluaran</th>
+                                                      <th className="py-2.5 px-3 w-56">Kategori & Akun Beban</th>
+                                                      <th className="py-2.5 px-3 w-36">Sumber Kas/Bank</th>
+                                                      <th className="py-2.5 px-3.5 text-right w-36">Nominal</th>
                                                     </tr>
                                                   </thead>
                                                   <tbody className="divide-y divide-border bg-surface-card">
                                                     {p.expensesSummary.items.map((exp) => (
-                                                      <tr key={exp.id} className="hover:bg-surface-hover/40 transition-colors">
-                                                        <td className="py-2.5 px-3 text-muted-stronger whitespace-nowrap font-medium">
+                                                      <tr key={exp.id} className="hover:bg-surface-hover/30 transition-colors">
+                                                        <td className="py-2.5 px-3.5 text-muted-stronger whitespace-nowrap font-medium">
                                                           {exp.tanggalFmt}
                                                         </td>
                                                         <td className="py-2.5 px-3 font-mono font-semibold text-navy-text whitespace-nowrap">
@@ -663,7 +772,7 @@ export function PiutangClient({
                                                           {exp.keterangan}
                                                         </td>
                                                         <td className="py-2.5 px-3 whitespace-nowrap">
-                                                          <span className={`inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-md border mr-1.5 ${
+                                                          <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border mr-1.5 ${
                                                             exp.kategoriBeban === "Gaji & Upah"
                                                               ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
                                                               : exp.kategoriBeban === "Bahan & Material"
@@ -683,7 +792,7 @@ export function PiutangClient({
                                                             {exp.sumberKasBank}
                                                           </span>
                                                         </td>
-                                                        <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-status-red whitespace-nowrap text-sm">
+                                                        <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-status-red whitespace-nowrap text-sm">
                                                           {exp.nominalFmt}
                                                         </td>
                                                       </tr>
@@ -691,10 +800,10 @@ export function PiutangClient({
                                                   </tbody>
                                                   <tfoot className="bg-surface-subtle font-bold border-t border-border text-xs">
                                                     <tr>
-                                                      <td colSpan={5} className="py-3 px-3 text-right text-muted-stronger">
+                                                      <td colSpan={5} className="py-3 px-3.5 text-right text-muted-stronger font-bold">
                                                         Total Realisasi Pengeluaran:
                                                       </td>
-                                                      <td className="py-3 px-3 text-right font-mono text-status-red tabular-nums text-sm font-bold">
+                                                      <td className="py-3 px-3.5 text-right font-mono text-status-red tabular-nums text-sm font-bold">
                                                         {p.expensesSummary.totalPengeluaranFmt}
                                                       </td>
                                                     </tr>
@@ -710,218 +819,6 @@ export function PiutangClient({
                                               </p>
                                             </div>
                                           )}
-                                        </div>
-                                      )}
-
-                                      {/* TAB 2: PROGRES PENAGIHAN TERMIN */}
-                                      {currentTab === "termin" && (
-                                        <div className="space-y-3">
-                                          {p.termin.length > 0 ? (
-                                            <div className="rounded-xl border border-border overflow-hidden">
-                                              <div className="overflow-x-auto">
-                                                <table className="w-full text-left text-xs">
-                                                  <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
-                                                    <tr>
-                                                      <th className="py-2.5 px-3">Termin & Kwitansi</th>
-                                                      <th className="py-2.5 px-3 text-right">Bruto Kwitansi</th>
-                                                      <th className="py-2.5 px-3 text-right">Potongan Pajak</th>
-                                                      <th className="py-2.5 px-3 text-right">Net Masuk Bank</th>
-                                                      <th className="py-2.5 px-3 text-center">Progres Kontrak</th>
-                                                      <th className="py-2.5 px-3 text-center">Status</th>
-                                                      <th className="py-2.5 px-3 text-right">Aksi & Rincian</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody className="divide-y divide-border bg-surface-card">
-                                                    {p.termin.map((t) => {
-                                                      const totalPajak = (t.breakdown?.ppn ?? 0) + (t.breakdown?.pph ?? 0);
-                                                      return (
-                                                        <tr key={t.id} className="hover:bg-surface-hover/40 transition-colors">
-                                                          <td className="py-2.5 px-3">
-                                                            <div className="font-bold text-navy-text flex items-center gap-1.5 flex-wrap">
-                                                              <span>{t.name}</span>
-                                                              {t.breakdown?.noBukti && (
-                                                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                                                                  {t.breakdown.noBukti}
-                                                                </span>
-                                                              )}
-                                                              {t.breakdown?.bank && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-subtle text-muted-stronger border border-border">
-                                                                  {t.breakdown.bank}
-                                                                </span>
-                                                              )}
-                                                            </div>
-                                                            <div className="text-[11px] text-muted-faint mt-0.5">
-                                                              Tgl: {t.breakdown?.tanggalTerimaFmt || "-"}
-                                                              {t.auditedAt && ` · Diaudit: ${t.auditedAt} (${t.auditedByName})`}
-                                                            </div>
-                                                          </td>
-                                                          <td className="py-2.5 px-3 text-right font-mono font-bold text-navy-text tabular-nums whitespace-nowrap text-sm">
-                                                            {t.nominalFmt}
-                                                          </td>
-                                                          <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap">
-                                                            <div className="font-mono font-semibold text-amber-700 dark:text-amber-300">
-                                                              {formatRupiah(totalPajak)}
-                                                            </div>
-                                                            {t.breakdown && (
-                                                              <div className="text-[10px] text-muted-faint">
-                                                                PPN: {t.breakdown.ppnFmt} · PPh: {t.breakdown.pphFmt}
-                                                              </div>
-                                                            )}
-                                                          </td>
-                                                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 tabular-nums whitespace-nowrap text-sm">
-                                                            {t.breakdown?.netBankFmt || t.nominalFmt}
-                                                          </td>
-                                                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                                                            {t.percentage !== undefined && (
-                                                              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                                                +{t.percentageDelta ?? t.percentage}% (Kumulatif: {t.percentage}%)
-                                                              </span>
-                                                            )}
-                                                          </td>
-                                                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                                                            <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-md ${STATUS_BADGE[t.status]}`}>
-                                                              {STATUS_LABEL[t.status]}
-                                                            </span>
-                                                          </td>
-                                                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                                            <div className="flex items-center gap-1.5 justify-end">
-                                                              <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                  e.stopPropagation();
-                                                                  setSelectedTerminForModal({ project: p, termin: t });
-                                                                }}
-                                                                className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                                                title="Lihat rincian lengkap DPP, PPN, PPh & Jurnal Termin ini"
-                                                              >
-                                                                <FileText size={12} /> Breakdown Pajak
-                                                              </button>
-                                                              {isManajer && (
-                                                                <>
-                                                                  {t.status !== "ON_TRACK" && (
-                                                                    <button
-                                                                      type="button"
-                                                                      onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleAudit(t.id);
-                                                                      }}
-                                                                      disabled={isPending}
-                                                                      className="px-2 py-1 rounded-lg bg-navy text-white text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer"
-                                                                    >
-                                                                      <CheckCircle size={10} /> Audit
-                                                                    </button>
-                                                                  )}
-                                                                  <select
-                                                                    value={t.status}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    onChange={(e) =>
-                                                                      handleStatusChange(t.id, e.target.value as TerminStatus)
-                                                                    }
-                                                                    disabled={isPending}
-                                                                    className="px-2 py-1 rounded-lg border border-border text-[11px] bg-surface-input text-navy-text"
-                                                                  >
-                                                                    <option value="ON_TRACK">On Track</option>
-                                                                    <option value="AT_RISK">At Risk</option>
-                                                                    <option value="NEEDS_AUDIT">Perlu Audit</option>
-                                                                  </select>
-                                                                </>
-                                                              )}
-                                                            </div>
-                                                          </td>
-                                                        </tr>
-                                                      );
-                                                    })}
-                                                  </tbody>
-                                                  <tfoot className="bg-surface-subtle font-bold border-t border-border text-xs">
-                                                    <tr>
-                                                      <td className="py-3 px-3 text-muted-stronger">
-                                                        Total Termin Diterima ({p.termin.length} Termin):
-                                                      </td>
-                                                      <td className="py-3 px-3 text-right font-mono text-navy-text tabular-nums text-sm">
-                                                        {p.breakdownSummary?.totalGrossFmt ?? p.terminTagihFmt}
-                                                      </td>
-                                                      <td className="py-3 px-3 text-right font-mono text-amber-700 dark:text-amber-300 tabular-nums text-sm">
-                                                        {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
-                                                      </td>
-                                                      <td className="py-3 px-3 text-right font-mono text-emerald-700 dark:text-emerald-300 tabular-nums text-sm">
-                                                        {p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}
-                                                      </td>
-                                                      <td colSpan={3} />
-                                                    </tr>
-                                                  </tfoot>
-                                                </table>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div className="p-6 rounded-xl border border-dashed border-border bg-surface-subtle/30 text-center text-xs text-muted-faint">
-                                              Belum ada termin penagihan yang terbit untuk proyek ini.
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
-
-                                      {/* TAB 3: RINCIAN PAJAK & BANK */}
-                                      {currentTab === "pajak" && (
-                                        <div className="space-y-4">
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                            <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
-                                              <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block uppercase">
-                                                Pendapatan Bruto (Kwitansi)
-                                              </span>
-                                              <span className="text-base font-bold font-mono text-emerald-900 dark:text-emerald-100 block mt-1">
-                                                {p.breakdownSummary?.totalGrossFmt ?? p.terminTagihFmt}
-                                              </span>
-                                              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400 block mt-0.5">
-                                                {p.maxPercentage}% dari Kontrak ({p.contractValueFmt})
-                                              </span>
-                                            </div>
-
-                                            <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
-                                              <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 block uppercase">
-                                                Dasar Pengenaan Pajak (DPP)
-                                              </span>
-                                              <span className="text-base font-bold font-mono text-blue-900 dark:text-blue-100 block mt-1">
-                                                {p.breakdownSummary?.totalDppFmt ?? "Rp 0"}
-                                              </span>
-                                              <span className="text-[11px] text-blue-700/80 dark:text-blue-400 block mt-0.5">
-                                                DPP Nilai Lain: {p.breakdownSummary?.totalDppNilaiLainFmt ?? "Rp 0"}
-                                              </span>
-                                            </div>
-
-                                            <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-                                              <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 block uppercase">
-                                                Pajak Terutang & Dipotong
-                                              </span>
-                                              <span className="text-base font-bold font-mono text-amber-900 dark:text-amber-100 block mt-1">
-                                                {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
-                                              </span>
-                                              <span className="text-[11px] text-amber-700/80 dark:text-amber-400 block mt-0.5">
-                                                PPN: {p.breakdownSummary?.totalPpnFmt ?? "Rp 0"} · PPh: {p.breakdownSummary?.totalPphFmt ?? "Rp 0"}
-                                              </span>
-                                            </div>
-
-                                            <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
-                                              <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 block uppercase">
-                                                Bersih Masuk Rekening Bank
-                                              </span>
-                                              <span className="text-base font-bold font-mono text-indigo-900 dark:text-indigo-100 block mt-1">
-                                                {p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}
-                                              </span>
-                                              <span className="text-[11px] text-indigo-700/80 dark:text-indigo-400 block mt-0.5">
-                                                Netto Realisasi Kas Diterima
-                                              </span>
-                                            </div>
-                                          </div>
-
-                                          <div className="p-3.5 rounded-xl bg-surface-subtle border border-border text-xs text-muted-stronger flex items-start gap-2.5">
-                                            <Calculator size={16} className="text-brand shrink-0 mt-0.5" />
-                                            <div>
-                                              <span className="font-semibold text-navy-text">Standar Akuntansi & Perpajakan Konstruksi:</span>
-                                              <p className="mt-0.5 text-muted-faint leading-relaxed">
-                                                Setiap kwitansi termin memuat DPP (100/111 atau DPP Nilai Lain), PPN 11%/12% terutang, serta potongan PPh Final Jasa Konstruksi (misal 1,75% s.d 2,65%). Sisa bersih disalurkan langsung ke akun Kas/Bank entitas.
-                                              </p>
-                                            </div>
-                                          </div>
                                         </div>
                                       )}
                                     </div>

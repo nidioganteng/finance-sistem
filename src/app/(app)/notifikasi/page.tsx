@@ -12,7 +12,6 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function NotifikasiPage({ searchParams }: { searchParams: { filter?: string; page?: string } }) {
   const session = await getServerSession(authOptions);
   const role = session!.user.role;
-  if (role === "STAF_KEUANGAN") redirect("/dashboard");
   const filter = searchParams.filter ?? "semua";
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 

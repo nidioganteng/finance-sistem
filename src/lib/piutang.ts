@@ -119,6 +119,37 @@ export type ProjectExpensesSummary = {
   items: ProjectExpenseItem[];
 };
 
+export type ProjectItem = {
+  id: string;
+  code: string;
+  name: string;
+  entityName?: string;
+  entityKey?: string;
+  contractValue: number;
+  contractValueFmt: string;
+  deadlineFmt: string;
+  isOverdue: boolean;
+  status: "ACTIVE" | "CANCELLED" | "COMPLETED";
+  maxPercentage: number;
+  terminTagih: number;
+  terminTagihFmt: string;
+  sisaTagih: number;
+  sisaTagihFmt: string;
+  termin: TerminItem[];
+  breakdownSummary: ProjectBreakdownSummary;
+  expensesSummary: ProjectExpensesSummary;
+};
+
+export type PiutangSummary = {
+  totalKontrak: number;
+  totalKontrakFmt: string;
+  totalTerminTagih: number;
+  totalTerminTagihFmt: string;
+  sisaPiutang: number;
+  sisaPiutangFmt: string;
+  jumlahProyek: number;
+};
+
 export type InterEntityBalance = {
   type: "piutang" | "hutang";
   coaCode: string;
@@ -291,11 +322,13 @@ export function computeNewTerminPercentage(
   return Math.min(100, Math.round((cumulativeAfter / contractValue) * 100));
 }
 
-export async function getPiutangData(entityId: string) {
+export async function getPiutangData(entityId: string | string[]) {
+  const ids = Array.isArray(entityId) ? entityId : [entityId];
   const [projects, loadingDockList] = await Promise.all([
     prisma.project.findMany({
-      where: { entityId, status: { in: ["ACTIVE", "CANCELLED", "COMPLETED"] } },
+      where: { entityId: { in: ids }, status: { in: ["ACTIVE", "CANCELLED", "COMPLETED"] } },
       include: {
+        entity: { select: { id: true, key: true, name: true } },
         termin: {
           include: { auditedBy: { select: { name: true } } },
           orderBy: { createdAt: "asc" },
@@ -311,7 +344,7 @@ export async function getPiutangData(entityId: string) {
       orderBy: { createdAt: "asc" },
     }),
     prisma.loadingDockTransaksi.findMany({
-      where: { entityId },
+      where: { entityId: { in: ids } },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -588,6 +621,8 @@ export async function getPiutangData(entityId: string) {
       id: p.id,
       code: p.code,
       name: p.name,
+      entityName: p.entity?.name,
+      entityKey: p.entity?.key,
       contractValue,
       contractValueFmt: formatRupiah(contractValue),
       deadlineFmt: p.deadline.toLocaleDateString("id-ID"),

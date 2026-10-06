@@ -612,8 +612,8 @@ export async function getLaporanHutangPiutangEntityData(
       cp = counterparties.find((c) => c.key === fromKey);
       accountType = "HUTANG";
 
-      // Lewati baris BEBAN jika bukan akun hutang/piutang standar (hanya baris kewajiban/hutang yang ditampilkan)
-      if (extra.crossingRole === "BEBAN" && !isStandardHutang && !isStandardPiutang) {
+      // Lewati baris alokasi (debit) dari crossing entry: hanya baris kewajiban/hutang (kredit) yang dicatat sebagai mutasi hutang
+      if (extra.crossingRole !== "HUTANG" && Number(t.debit) > 0) {
         continue;
       }
 
@@ -657,7 +657,7 @@ export async function getLaporanHutangPiutangEntityData(
       const cpRows = matchedRows.filter((r) => r.entity.key === cp!.key);
       const expenseRows = cpRows.filter((r) => {
         const rx = r.extraFieldsJson as Record<string, unknown> | null;
-        if (rx?.crossingRole === "BEBAN") return true;
+        if (rx?.crossingRole === "BEBAN" || rx?.crossingRole === "PIUTANG") return true;
         return Number(r.debit) > 0 && r.coaAccount?.code !== cp!.hutangCode;
       });
 
@@ -673,7 +673,7 @@ export async function getLaporanHutangPiutangEntityData(
           nominal: nom,
           nominalFmt: formatStandardRupiah(nom),
           keterangan: er.keterangan || t.keterangan,
-          role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
+          role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.crossingRole === "PIUTANG" ? "PIUTANG" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
         });
       }
 
@@ -703,7 +703,7 @@ export async function getLaporanHutangPiutangEntityData(
       const selfRows = matchedRows.filter((r) => r.entity.key === entity.key && r.id !== t.id);
       const expenseRows = selfRows.filter((r) => {
         const rx = r.extraFieldsJson as Record<string, unknown> | null;
-        if (rx?.crossingRole === "BEBAN") return true;
+        if (rx?.crossingRole === "BEBAN" || rx?.crossingRole === "PIUTANG") return true;
         return Number(r.debit) > 0 && r.coaAccount?.code !== cp!.hutangCode;
       });
 
@@ -719,7 +719,7 @@ export async function getLaporanHutangPiutangEntityData(
           nominal: nom,
           nominalFmt: formatStandardRupiah(nom),
           keterangan: er.keterangan || t.keterangan,
-          role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
+          role: erExtra?.crossingRole === "BEBAN" ? "BEBAN" : erExtra?.crossingRole === "PIUTANG" ? "PIUTANG" : erExtra?.isKasEntry ? "KAS" : "LAINNYA",
         });
       }
       if (alokasiPenggunaan.length === 0) {

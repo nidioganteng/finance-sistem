@@ -103,8 +103,7 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
 }
 
 async function resolveCrossingDebitCoa(
-  primaryRowCoaId: string | undefined,
-  hasProject = false
+  primaryRowCoaId: string | undefined
 ): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
   const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
   if (!coa) return null;
@@ -114,17 +113,6 @@ async function resolveCrossingDebitCoa(
       coaAccountId: coa.id,
       role: "BEBAN",
     };
-  }
-
-  // Jika transaksi ini terkait pembayaran proyek lintas entitas (misal Gaharu bayarin proyek Kencana),
-  // di entitas tujuan (Kencana) dicatat sebagai Beban Proyek (COA 630 Biaya Lainnya / 528 By Umum)
-  if (hasProject) {
-    const bebanProyek =
-      (await prisma.coaAccount.findUnique({ where: { code: "630" } })) ??
-      (await prisma.coaAccount.findUnique({ where: { code: "528" } }));
-    if (bebanProyek) {
-      return { coaAccountId: bebanProyek.id, role: "BEBAN" };
-    }
   }
 
   return {
@@ -300,7 +288,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId, !!input.projectId);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId);
 
       if (debitTarget) {
         ops.push(
@@ -581,7 +569,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace, !!input.projectId);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace);
 
       if (debitTarget) {
         ops.push(

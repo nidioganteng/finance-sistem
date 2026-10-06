@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
-import { getPiutangData, getInterEntityBalances } from "@/lib/piutang";
+import { getPiutangData } from "@/lib/piutang";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { PiutangClient } from "@/components/piutang/PiutangClient";
@@ -16,28 +16,25 @@ export default async function PiutangPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  if (role === "SUPER_ADMIN" || role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") {
+  if (role === "MANAGER_ADMIN" || role === "ADMIN_SIDAMON") {
     redirect("/dashboard");
   }
 
   const entities = await getAccessibleEntities(entityKeys);
   const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
+  const selectedEntity = entities.find((e) => e.key === selectedKey) ?? entities[0];
 
   if (!selectedEntity) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const [data, interEntityBalances] = await Promise.all([
-    getPiutangData(selectedEntity.id),
-    getInterEntityBalances(selectedEntity.id),
-  ]);
+  const data = await getPiutangData(selectedEntity.id);
 
   return (
     <PageTransition>
       <PageHeader
-        title={`Kontrol Piutang & Termin – ${selectedEntity.name}`}
-        subtitle="Kelola status termin proyek"
+        title={`Kontrol Termin – ${selectedEntity.name}`}
+        subtitle="Kelola status termin dan pengeluaran proyek"
         rightSlot={
           <EntitySwitcher
             entities={entities.map((e) => ({ key: e.key, name: e.name }))}
@@ -52,8 +49,6 @@ export default async function PiutangPage({
         loadingDockList={data.loadingDockList}
         userRole={role}
         isUmumEntity={selectedEntity.isUmum}
-        interEntityBalances={interEntityBalances}
-        currentEntityKey={selectedKey}
       />
     </PageTransition>
   );

@@ -148,7 +148,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
       ? {
           isCrossingEntry: true,
           ...preservedCrossingInfo,
-          crossingRole: isKredit ? "HUTANG" : "BEBAN",
+          crossingRole: isKredit ? "HUTANG" : (coaMap.get(row.coaAccountId)?.kategori === "BEBAN" ? "BEBAN" : "PIUTANG"),
         }
       : undefined;
 

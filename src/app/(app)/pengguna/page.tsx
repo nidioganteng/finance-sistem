@@ -9,14 +9,14 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function PenggunaPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN") redirect("/dashboard");
+  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const [users, allEntities] = await Promise.all([getUserList(), getAllEntities()]);
 
-  // Manager Keuangan tidak boleh melihat atau mengedit akun Super Admin
-  const visibleUsers = role === "MANAJER_KEUANGAN"
-    ? users.filter((u) => u.role !== "SUPER_ADMIN")
-    : users;
+  // Manajer Keuangan dan Staf Keuangan tidak boleh melihat atau mengedit akun Super Admin
+  const visibleUsers = role === "SUPER_ADMIN"
+    ? users
+    : users.filter((u) => u.role !== "SUPER_ADMIN");
 
   return (
     <PageTransition>

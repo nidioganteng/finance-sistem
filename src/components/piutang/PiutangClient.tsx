@@ -2,16 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
-import { auditTermin, updateTerminStatus, cancelProject, completeProject, createPelunasan, type CreatePelunasanInput } from "@/lib/actions/piutang";
-import { generateNoBukti } from "@/lib/actions/kas";
+import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";
 import {
+  AlertTriangle,
   CheckCircle,
   ChevronDown,
   ChevronRight,
   Ban,
   CheckSquare,
-  ArrowDownCircle,
-  ArrowUpCircle,
   X,
   FileText,
   Receipt,
@@ -22,6 +20,11 @@ import {
   Users,
   Truck,
   TrendingUp,
+  ChevronUp,
+  Layers,
+  Calendar,
+  PlayCircle,
+  RotateCcw,
 } from "lucide-react";
 import { formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
 import type {
@@ -29,49 +32,12 @@ import type {
   ProjectBreakdownSummary,
   ProjectExpenseItem,
   ProjectExpensesSummary,
+  ProjectItem,
+  TerminItem,
+  PiutangSummary,
 } from "@/lib/piutang";
 
-type TerminItem = {
-  id: string;
-  name: string;
-  percentage?: number;
-  percentageDelta?: number;
-  nominal: number;
-  nominalFmt: string;
-  status: TerminStatus;
-  auditedAt: string | null;
-  auditedByName: string | null;
-  breakdown: TerminBreakdown;
-};
-
-type ProjectItem = {
-  id: string;
-  code: string;
-  name: string;
-  contractValue: number;
-  contractValueFmt: string;
-  deadlineFmt: string;
-  isOverdue: boolean;
-  status: "ACTIVE" | "CANCELLED" | "COMPLETED";
-  maxPercentage: number;
-  terminTagih: number;
-  terminTagihFmt: string;
-  sisaTagih: number;
-  sisaTagihFmt: string;
-  termin: TerminItem[];
-  breakdownSummary: ProjectBreakdownSummary;
-  expensesSummary: ProjectExpensesSummary;
-};
-
-type Summary = {
-  totalKontrak: number;
-  totalKontrakFmt: string;
-  totalTerminTagih: number;
-  totalTerminTagihFmt: string;
-  sisaPiutang: number;
-  sisaPiutangFmt: string;
-  jumlahProyek: number;
-};
+type Summary = PiutangSummary;
 
 type DockItem = {
   id: string;
@@ -79,16 +45,6 @@ type DockItem = {
   totalFmt: string;
   status: string;
   createdAt: string;
-};
-
-type InterEntityBalance = {
-  type: "piutang" | "hutang";
-  coaCode: string;
-  coaId: string;
-  counterpartyEntityKey: string;
-  counterpartyEntityName: string;
-  netAmount: number;
-  netAmountFmt: string;
 };
 
 const STATUS_BADGE: Record<TerminStatus, string> = {
@@ -107,105 +63,47 @@ const DOCK_STATUS_LABEL: Record<string, string> = {
   DIALOKASI:        "Dialokasi",
 };
 
-type PelunasanModalState = {
-  balance: InterEntityBalance;
-} | null;
-
-function formatInputNominal(n: number): string {
-  return Math.round(n).toString();
-}
-
 export function PiutangClient({
   projectList,
   summary,
-  loadingDockList,
-  userRole,
-  isUmumEntity,
-  interEntityBalances,
-  currentEntityKey,
+  loadingDockList = [],
+  userRole = "",
+  isUmumEntity = false,
+  showTabs = true,
+  isGrup = false,
 }: {
   projectList: ProjectItem[];
   summary: Summary;
-  loadingDockList: DockItem[];
-  userRole: string;
-  isUmumEntity: boolean;
-  interEntityBalances: InterEntityBalance[];
-  currentEntityKey: string;
+  loadingDockList?: DockItem[];
+  userRole?: string;
+  isUmumEntity?: boolean;
+  showTabs?: boolean;
+  isGrup?: boolean;
 }) {
-  const [tab, setTab] = useState<"termin" | "dock">("termin");
+  const [tab, setTab] = useState<"berjalan" | "selesai" | "dock">("berjalan");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set()
   );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [pelunasanModal, setPelunasanModal] = useState<PelunasanModalState>(null);
-  const [pelunasanForm, setPelunasanForm] = useState({
-    tanggal: new Date().toISOString().slice(0, 10),
-    noBukti: "",
-    keterangan: "",
-    nominal: "",
-    jenisKasSumber: "kasKecil" as "kasKecil" | "kasBesar",
-    jenisKasTujuan: "kasKecil" as "kasKecil" | "kasBesar",
-  });
-  const [pelunasanError, setPelunasanError] = useState<string | null>(null);
-  const [pelunasanPending, startPelunasanTransition] = useTransition();
   const [selectedTerminForModal, setSelectedTerminForModal] = useState<{
     project: ProjectItem;
     termin: TerminItem;
   } | null>(null);
   const [activeProjectTabs, setActiveProjectTabs] = useState<Record<string, "pengeluaran" | "termin" | "pajak">>({});
 
-  const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN";
+  const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN" || userRole === "SUPER_ADMIN";
 
-  function openPelunasanModal(balance: InterEntityBalance) {
-    const today = new Date().toISOString().slice(0, 10);
-    setPelunasanModal({ balance });
-    setPelunasanForm({
-      tanggal: today,
-      noBukti: "",
-      keterangan: `Pelunasan ${balance.type === "piutang" ? "piutang dari" : "hutang ke"} ${balance.counterpartyEntityName}`,
-      nominal: formatInputNominal(balance.netAmount),
-      jenisKasSumber: "kasKecil",
-      jenisKasTujuan: "kasKecil",
-    });
-    setPelunasanError(null);
-    generateNoBukti(currentEntityKey, today).then((nb) =>
-      setPelunasanForm((f) => ({ ...f, noBukti: f.noBukti || nb }))
-    ).catch(() => {});
-  }
+  const runningProjects = projectList.filter((p) => p.status === "ACTIVE");
+  const completedProjects = projectList.filter((p) => p.status === "COMPLETED" || p.status === "CANCELLED");
+  const overdueProjectsCount = runningProjects.filter((p) => p.isOverdue).length;
 
-  function closePelunasanModal() {
-    setPelunasanModal(null);
-    setPelunasanError(null);
-  }
+  const totalCompletedKontrak = completedProjects.reduce((sum, p) => sum + p.contractValue, 0);
+  const totalCompletedTermin = completedProjects.reduce((sum, p) => sum + p.terminTagih, 0);
+  const totalCompletedKontrakFmt = formatRupiah(totalCompletedKontrak);
+  const totalCompletedTerminFmt = formatRupiah(totalCompletedTermin);
 
-  function handlePelunasanSubmit() {
-    if (!pelunasanModal) return;
-    const nominal = parseFloat(pelunasanForm.nominal.replace(/[^0-9.]/g, ""));
-    if (isNaN(nominal) || nominal <= 0) {
-      setPelunasanError("Nominal tidak valid.");
-      return;
-    }
-    const payload: CreatePelunasanInput = {
-      currentEntityKey,
-      balanceType: pelunasanModal.balance.type,
-      counterpartyEntityKey: pelunasanModal.balance.counterpartyEntityKey,
-      tanggal: pelunasanForm.tanggal,
-      noBukti: pelunasanForm.noBukti.trim(),
-      keterangan: pelunasanForm.keterangan.trim(),
-      nominal,
-      jenisKasSumber: pelunasanForm.jenisKasSumber,
-      jenisKasTujuan: pelunasanModal.balance.type === "piutang" ? pelunasanForm.jenisKasTujuan : undefined,
-    };
-    startPelunasanTransition(async () => {
-      const result = await createPelunasan(payload);
-      if (result.error) {
-        setPelunasanError(result.error);
-      } else {
-        closePelunasanModal();
-      }
-    });
-  }
+  const displayedProjects = tab === "berjalan" ? runningProjects : completedProjects;
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -232,7 +130,7 @@ export function PiutangClient({
   }
 
   function handleCompleteProject(id: string, code: string) {
-    if (!confirm(`Tandai proyek ${code} sebagai selesai? Proyek akan hilang dari daftar ini, namun transaksi di jurnal tetap tercatat.`)) return;
+    if (!confirm(`Tandai proyek ${code} sebagai selesai? Proyek akan dipindahkan ke tab Proyek Selesai, namun transaksi di jurnal tetap tercatat.`)) return;
     startTransition(async () => {
       try {
         await completeProject(id);
@@ -243,10 +141,21 @@ export function PiutangClient({
   }
 
   function handleCancelProject(id: string, code: string) {
-    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dianggap selesai.`)) return;
+    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dipindahkan ke tab Proyek Selesai.`)) return;
     startTransition(async () => {
       try {
         await cancelProject(id);
+      } catch (e: unknown) {
+        setError((e as Error).message);
+      }
+    });
+  }
+
+  function handleReopenProject(id: string, code: string) {
+    if (!confirm(`Kembalikan proyek ${code} ke daftar Proyek Berjalan?`)) return;
+    startTransition(async () => {
+      try {
+        await reopenProject(id);
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -260,69 +169,158 @@ export function PiutangClient({
       )}
 
       {/* ── Tab nav ── */}
-      <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
-        <button
-          onClick={() => setTab("termin")}
-          className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
-            tab === "termin" ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
-          }`}
-        >
-          Daftar Termin
-        </button>
-        {isUmumEntity && (
+      {showTabs && (
+        <div className="flex items-center gap-1.5 p-1 bg-surface-subtle rounded-xl w-fit border border-border/60">
           <button
-            onClick={() => setTab("dock")}
-            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
-              tab === "dock" ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
+            onClick={() => setTab("berjalan")}
+            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              tab === "berjalan"
+                ? "bg-navy text-white shadow-xs"
+                : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
             }`}
           >
-            Loading Dock
+            <PlayCircle size={15} />
+            <span>Proyek Berjalan</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              tab === "berjalan" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
+            }`}>
+              {runningProjects.length}
+            </span>
           </button>
-        )}
-      </div>
 
-      {/* ── Tab: Daftar Termin ── */}
-      {tab === "termin" && (
+          <button
+            onClick={() => setTab("selesai")}
+            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              tab === "selesai"
+                ? "bg-navy text-white shadow-xs"
+                : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
+            }`}
+          >
+            <CheckCircle size={15} />
+            <span>Proyek Selesai</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              tab === "selesai" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
+            }`}>
+              {completedProjects.length}
+            </span>
+          </button>
+
+          {isUmumEntity && (
+            <button
+              onClick={() => setTab("dock")}
+              className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                tab === "dock"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
+              }`}
+            >
+              <Truck size={15} />
+              <span>Loading Dock</span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                tab === "dock" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
+              }`}>
+                {loadingDockList.length}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: Proyek Berjalan & Proyek Selesai ── */}
+      {(tab === "berjalan" || tab === "selesai") && (
         <>
-          {/* Kartu ringkasan */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                Total Nilai Kontrak Aktif
+          {tab === "berjalan" && (
+            <>
+              {/* Alert jika ada proyek yang lewat tanggal kontrak & termin < 80% */}
+              {overdueProjectsCount > 0 && (
+                <div className="flex items-start sm:items-center gap-3 p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <AlertTriangle size={17} />
+                  </div>
+                  <div className="text-xs flex-1">
+                    <span className="font-bold text-sm block sm:inline">Perhatian: {overdueProjectsCount} Proyek Melewati Batas Kontrak! </span>
+                    <span className="text-muted-stronger">Progres termin masih di bawah 80% meskipun tanggal kontrak telah terlewati. Harap tindak lanjuti penagihan termin.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Kartu ringkasan Proyek Berjalan */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                  <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                    Total Nilai Kontrak Aktif
+                  </div>
+                  <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
+                    {summary.totalKontrakFmt}
+                  </div>
+                  <div className="text-[12px] text-muted mt-0.5 truncate">{runningProjects.length} proyek berjalan</div>
+                </div>
+                <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                  <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                    Total Termin Tertagih
+                  </div>
+                  <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
+                    {summary.totalTerminTagihFmt}
+                  </div>
+                  <div className="text-[12px] text-muted mt-0.5 truncate">
+                    {summary.totalKontrak > 0
+                      ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
+                      : "—"}
+                  </div>
+                </div>
+                <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                  <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                    Sisa Piutang Belum Tertagih
+                  </div>
+                  <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
+                    {summary.sisaPiutangFmt}
+                  </div>
+                  <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
+                </div>
               </div>
-              <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
-                {summary.totalKontrakFmt}
+            </>
+          )}
+
+          {tab === "selesai" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                  Total Proyek Selesai
+                </div>
+                <div className="text-[19px] sm:text-[21px] font-extrabold text-navy-text truncate">
+                  {completedProjects.length} Proyek
+                </div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">
+                  {completedProjects.filter((p) => p.status === "COMPLETED").length} Selesai · {completedProjects.filter((p) => p.status === "CANCELLED").length} Dibatalkan
+                </div>
               </div>
-              <div className="text-[12px] text-muted mt-0.5 truncate">{summary.jumlahProyek} proyek</div>
+              <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                  Total Nilai Kontrak Selesai
+                </div>
+                <div className={`${getMetricValueFontSize(totalCompletedKontrakFmt)} text-navy-text truncate`} title={totalCompletedKontrakFmt}>
+                  {totalCompletedKontrakFmt}
+                </div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">Akumulasi kontrak rampung</div>
+              </div>
+              <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                  Total Realisasi Termin Selesai
+                </div>
+                <div className={`${getMetricValueFontSize(totalCompletedTerminFmt)} text-status-green truncate`} title={totalCompletedTerminFmt}>
+                  {totalCompletedTerminFmt}
+                </div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">100% tuntas dicairkan</div>
+              </div>
             </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                Total Termin Tertagih
-              </div>
-              <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
-                {summary.totalTerminTagihFmt}
-              </div>
-              <div className="text-[12px] text-muted mt-0.5 truncate">
-                {summary.totalKontrak > 0
-                  ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
-                  : "—"}
-              </div>
-            </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                Sisa Piutang Belum Tertagih
-              </div>
-              <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
-                {summary.sisaPiutangFmt}
-              </div>
-              <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
-            </div>
-          </div>
+          )}
 
           {/* Tabel proyek dengan termin expandable */}
-          {projectList.length === 0 ? (
+          {displayedProjects.length === 0 ? (
             <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center text-sm text-muted">
-              Belum ada proyek untuk entitas ini.
+              {tab === "berjalan"
+                ? "Belum ada proyek yang sedang berjalan untuk entitas ini."
+                : "Belum ada proyek yang berstatus selesai untuk entitas ini."}
             </div>
           ) : (
             <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
@@ -339,12 +337,12 @@ export function PiutangClient({
                     </th>
                     <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Progress</th>
                     <th className="py-3 px-5 text-[11px] font-bold text-muted-faint uppercase text-right">
-                      Sisa Piutang
+                      {tab === "berjalan" ? "Sisa Piutang" : "Tindakan"}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {projectList.map((p) => {
+                  {displayedProjects.map((p) => {
                     const isExpanded = expandedIds.has(p.id);
                     return (
                       <>
@@ -360,8 +358,18 @@ export function PiutangClient({
                               : <ChevronRight size={14} />}
                           </td>
                           <td className="py-3 px-3">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <div className="font-bold text-navy-text text-[13px]">{p.code}</div>
+                              {p.entityName && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
+                                  {p.entityName}
+                                </span>
+                              )}
+                              {p.isOverdue && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                  <AlertTriangle size={10} /> Perlu Diwaspadai
+                                </span>
+                              )}
                               {p.status === "CANCELLED" && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-hover text-muted-faint">
                                   Dibatalkan
@@ -411,7 +419,11 @@ export function PiutangClient({
                                   <div className="w-28 h-2 bg-surface-hover rounded-full overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all ${
-                                        p.maxPercentage >= 80 || p.status === "COMPLETED"
+                                        p.status === "COMPLETED"
+                                          ? "bg-status-green"
+                                          : p.isOverdue
+                                          ? "bg-rose-500"
+                                          : p.maxPercentage >= 80
                                           ? "bg-status-green"
                                           : p.maxPercentage >= 50
                                           ? "bg-brand"
@@ -420,12 +432,21 @@ export function PiutangClient({
                                       style={{ width: `${Math.min(p.maxPercentage, 100)}%` }}
                                     />
                                   </div>
-                                  <span className={`text-[12.5px] font-bold ${p.status === "COMPLETED" ? "text-status-green" : "text-muted-stronger"}`}>
+                                  <span className={`text-[12.5px] font-bold ${
+                                    p.status === "COMPLETED"
+                                      ? "text-status-green"
+                                      : p.isOverdue
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : "text-muted-stronger"
+                                  }`}>
                                     {p.maxPercentage}%
                                   </span>
                                 </div>
-                                <div className={`text-[11px] mt-1 ${p.isOverdue ? "text-status-red font-semibold" : "text-muted-faint"}`}>
-                                  {p.status === "COMPLETED" ? "Kontrak selesai 100%" : `Batas kontrak: ${p.deadlineFmt}${p.isOverdue ? " · Lewat tempo" : ""}`}
+                                <div className={`text-[11px] mt-1 flex items-center gap-1 ${p.isOverdue ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-muted-faint"}`}>
+                                  {p.isOverdue && <AlertTriangle size={11} className="shrink-0" />}
+                                  <span>
+                                    {p.status === "COMPLETED" ? "Kontrak selesai 100%" : `Batas kontrak: ${p.deadlineFmt}${p.isOverdue ? " · Lewat tempo (< 80%)" : ""}`}
+                                  </span>
                                 </div>
                               </>
                             )}
@@ -442,7 +463,7 @@ export function PiutangClient({
                                     handleCompleteProject(p.id, p.code);
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-green-300 dark:border-green-600 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-green-300 dark:border-green-600 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer"
                                 >
                                   <CheckSquare size={11} /> Tandai Selesai
                                 </button>
@@ -452,9 +473,24 @@ export function PiutangClient({
                                     handleCancelProject(p.id, p.code);
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover cursor-pointer"
                                 >
                                   <Ban size={11} /> Batalkan Proyek
+                                </button>
+                              </div>
+                            )}
+                            {isManajer && p.status !== "ACTIVE" && (
+                              <div className="mt-1.5 flex flex-col items-end gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReopenProject(p.id, p.code);
+                                  }}
+                                  disabled={isPending}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-blue-300 dark:border-blue-600 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 cursor-pointer"
+                                  title="Kembalikan proyek ini ke daftar Proyek Berjalan"
+                                >
+                                  <RotateCcw size={11} /> Buka Kembali
                                 </button>
                               </div>
                             )}
@@ -463,193 +499,446 @@ export function PiutangClient({
 
                         {/* Panel Lengkap Rincian Proyek (Pengeluaran, Termin, Pajak) */}
                         {isExpanded && (
-                          <tr className="bg-surface-subtle/20 border-b border-surface-subtle">
-                            <td className="py-2.5 px-5" />
-                            <td colSpan={5} className="py-2.5 px-3 pr-5">
-                              <div className="rounded-2xl border border-border-soft bg-surface-card p-4 shadow-sm space-y-3.5 my-1">
-                                {/* Header Ringkasan Finansial Proyek (4 Kartu) */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                  {/* 1. Nilai Kontrak */}
-                                  <div className="p-2.5 rounded-xl bg-surface-subtle/80 border border-border-subtle">
-                                    <span className="text-[10.5px] font-semibold text-muted-faint block">
-                                      Nilai Kontrak Proyek
-                                    </span>
-                                    <span className="text-sm font-bold font-mono text-navy-text block mt-0.5">
-                                      {p.contractValueFmt}
-                                    </span>
-                                    <span className="text-[10px] text-muted-faint block mt-0.5">
-                                      Pagu Total Kontrak ({p.code})
-                                    </span>
+                          <tr className="border-b border-surface-subtle">
+                            <td colSpan={6} className="p-3 sm:p-5 bg-surface-subtle/40">
+                              <div className="rounded-2xl border border-border bg-surface-card p-5 sm:p-6 shadow-md space-y-6">
+                                {/* Header Rincian Proyek */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-xl bg-navy text-white shadow-xs">
+                                      <Layers size={20} />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-base font-bold text-navy-text tracking-tight">
+                                          {p.code} — {p.name}
+                                        </h4>
+                                        {p.entityName && (
+                                          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+                                            {p.entityName}
+                                          </span>
+                                        )}
+                                        <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                                          p.status === "COMPLETED"
+                                            ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                                            : p.status === "CANCELLED"
+                                            ? "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                                            : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                        }`}>
+                                          {p.status === "COMPLETED" ? "Proyek Selesai" : p.status === "CANCELLED" ? "Dibatalkan" : "Proyek Aktif"}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-muted-faint mt-1 flex items-center gap-1.5 flex-wrap">
+                                        <Calendar size={13} />
+                                        <span>Batas Waktu Kontrak: <strong className="text-navy-text">{p.deadlineFmt}</strong></span>
+                                        {p.isOverdue && p.status === "ACTIVE" && (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                            <AlertTriangle size={11} /> Melewati Jatuh Tempo (Termin &lt; 80%)
+                                          </span>
+                                        )}
+                                      </p>
+                                    </div>
                                   </div>
 
-                                  {/* 2. Termin Tertagih (Pendapatan Masuk) */}
-                                  <div className="p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
-                                    <span className="text-[10.5px] font-semibold text-emerald-800 dark:text-emerald-300 block">
-                                      Pendapatan (Termin Tertagih)
-                                    </span>
-                                    <span className="text-sm font-bold font-mono text-emerald-900 dark:text-emerald-200 block mt-0.5">
-                                      {p.terminTagihFmt}
-                                    </span>
-                                    <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400 block mt-0.5">
-                                      {p.maxPercentage}% dari Nilai Kontrak
-                                    </span>
-                                  </div>
-
-                                  {/* 3. Total Pengeluaran Proyek (Realisasi Biaya) */}
-                                  <div className="p-2.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-800/40">
-                                    <span className="text-[10.5px] font-semibold text-rose-800 dark:text-rose-300 block">
-                                      Total Pengeluaran Proyek
-                                    </span>
-                                    <span className="text-sm font-bold font-mono text-rose-900 dark:text-rose-200 block mt-0.5">
-                                      {p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}
-                                    </span>
-                                    <span className="text-[10px] text-rose-700/80 dark:text-rose-400 block mt-0.5">
-                                      {p.expensesSummary?.items.length ?? 0} transaksi biaya riil
-                                    </span>
-                                  </div>
-
-                                  {/* 4. Laba Berjalan & Sisa Kontrak */}
-                                  <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
-                                    <span className="text-[10.5px] font-semibold text-indigo-800 dark:text-indigo-300 block">
-                                      Laba Berjalan / Sisa Kontrak
-                                    </span>
-                                    <span className="text-sm font-bold font-mono text-indigo-900 dark:text-indigo-200 block mt-0.5">
-                                      {p.expensesSummary?.labaKotorFmt ?? "Rp 0"}
-                                    </span>
-                                    <span className="text-[10px] text-indigo-700/80 dark:text-indigo-400 block mt-0.5">
-                                      Sisa Piutang: {p.breakdownSummary?.sisaKontrakFmt ?? p.sisaTagihFmt}
-                                    </span>
+                                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                                    {isManajer && p.status !== "ACTIVE" && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReopenProject(p.id, p.code);
+                                        }}
+                                        disabled={isPending}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                                        title="Kembalikan proyek ini ke daftar Proyek Berjalan"
+                                      >
+                                        <RotateCcw size={13} /> Buka Kembali Proyek
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleExpand(p.id);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold text-muted-stronger transition-colors cursor-pointer"
+                                    >
+                                      <ChevronUp size={14} /> Tutup Detail
+                                    </button>
                                   </div>
                                 </div>
 
-                                {/* Tab Navigation Switcher */}
+                                {/* 1. Strip Ringkasan Finansial Utama (Clean Horizontal Metric Ribbon) */}
+                                <div className="bg-surface-subtle/60 rounded-xl border border-border p-3 sm:p-4">
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                                    {/* Nilai Kontrak */}
+                                    <div className="sm:px-3 first:pl-0">
+                                      <span className="text-[11px] font-semibold text-muted-faint uppercase block tracking-wider">
+                                        Nilai Kontrak
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-navy-text block mt-0.5">
+                                        {p.contractValueFmt}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        Pagu Total SPK
+                                      </span>
+                                    </div>
+
+                                    {/* Termin Cair */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase block tracking-wider">
+                                        Termin Cair (Masuk)
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300 block mt-0.5">
+                                        {p.terminTagihFmt}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        {p.maxPercentage}% · {p.termin.length} termin
+                                      </span>
+                                    </div>
+
+                                    {/* Realisasi Biaya */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase block tracking-wider">
+                                        Realisasi Biaya
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-rose-700 dark:text-rose-300 block mt-0.5">
+                                        {p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        {p.expensesSummary?.items.length ?? 0} transaksi riil
+                                      </span>
+                                    </div>
+
+                                    {/* Laba Kas Berjalan */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-navy-text uppercase block tracking-wider">
+                                        Laba Kas Berjalan
+                                      </span>
+                                      <span className={`text-base sm:text-lg font-bold font-mono block mt-0.5 ${
+                                        (p.expensesSummary?.labaKotor ?? 0) >= 0
+                                          ? "text-emerald-700 dark:text-emerald-300"
+                                          : "text-rose-700 dark:text-rose-300"
+                                      }`}>
+                                        {p.expensesSummary?.labaKotorFmt ?? "Rp 0"}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        Kas Masuk - Biaya Riil
+                                      </span>
+                                    </div>
+
+                                    {/* Sisa Piutang */}
+                                    <div className="sm:px-3 pt-2 sm:pt-0">
+                                      <span className="text-[11px] font-semibold text-status-red uppercase block tracking-wider">
+                                        Sisa Belum Cair
+                                      </span>
+                                      <span className="text-base sm:text-lg font-bold font-mono text-status-red block mt-0.5">
+                                        {p.sisaTagihFmt}
+                                      </span>
+                                      <span className="text-[11px] text-muted-faint block mt-0.5">
+                                        Sisa pagu kontrak
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* 2. Tab Switcher (Hanya 2 Tab Bersih) */}
                                 {(() => {
                                   const currentTab =
                                     activeProjectTabs[p.id] ??
-                                    (p.expensesSummary?.items.length > 0 ? "pengeluaran" : "termin");
+                                    (p.termin.length > 0 ? "termin" : "pengeluaran");
 
                                   return (
-                                    <div className="space-y-3">
-                                      <div className="flex items-center gap-1.5 border-b border-border-soft pb-2">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "pengeluaran" }))
-                                          }
-                                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                            currentTab === "pengeluaran"
-                                              ? "bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-700 shadow-xs"
-                                              : "text-muted-faint hover:text-navy-text hover:bg-surface-hover"
-                                          }`}
-                                        >
-                                          <Wallet size={13} />
-                                          Detail Pengeluaran Proyek
-                                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-rose-200/70 dark:bg-rose-800/60 text-rose-900 dark:text-rose-100">
-                                            {p.expensesSummary?.items.length ?? 0}
-                                          </span>
-                                        </button>
-
+                                    <div className="space-y-4">
+                                      <div className="flex items-center gap-2 border-b border-border pb-2">
                                         <button
                                           type="button"
                                           onClick={() =>
                                             setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "termin" }))
                                           }
-                                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
                                             currentTab === "termin"
-                                              ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 shadow-xs"
-                                              : "text-muted-faint hover:text-navy-text hover:bg-surface-hover"
+                                              ? "bg-navy text-white shadow-xs"
+                                              : "text-muted-stronger hover:bg-surface-hover"
                                           }`}
                                         >
-                                          <Receipt size={13} />
-                                          Progres Penagihan Termin
-                                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-200/70 dark:bg-emerald-800/60 text-emerald-900 dark:text-emerald-100">
-                                            {p.termin.length}
-                                          </span>
+                                          <Receipt size={14} />
+                                          Riwayat Penagihan Termin ({p.termin.length})
                                         </button>
 
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "pajak" }))
+                                            setActiveProjectTabs((prev) => ({ ...prev, [p.id]: "pengeluaran" }))
                                           }
-                                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                            currentTab === "pajak"
-                                              ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700 shadow-xs"
-                                              : "text-muted-faint hover:text-navy-text hover:bg-surface-hover"
+                                          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                                            currentTab === "pengeluaran"
+                                              ? "bg-navy text-white shadow-xs"
+                                              : "text-muted-stronger hover:bg-surface-hover"
                                           }`}
                                         >
-                                          <Calculator size={13} />
-                                          Rincian Pajak & Bank
+                                          <Wallet size={14} />
+                                          Realisasi Pengeluaran Biaya ({p.expensesSummary?.items.length ?? 0})
                                         </button>
                                       </div>
 
-                                      {/* TAB 1: PENGELUARAN PROYEK */}
+                                      {/* TAB 1: RIWAYAT TERMIN & KAS MASUK */}
+                                      {currentTab === "termin" && (
+                                        <div className="space-y-3.5">
+                                          {p.termin.length > 0 ? (
+                                            <>
+                                              <div className="rounded-xl border border-border overflow-hidden">
+                                                <div className="overflow-x-auto">
+                                                  <table className="w-full min-w-[760px] text-left text-xs">
+                                                    <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                                                      <tr>
+                                                        <th className="py-2.5 px-3.5">Termin & Bukti Bayar</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Kwitansi Bruto</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(-) Potongan Pajak</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(=) Net Masuk Bank</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px]">Status & Aksi</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-border bg-surface-card">
+                                                      {p.termin.map((t) => {
+                                                        const totalPajak = (t.breakdown?.ppn ?? 0) + (t.breakdown?.pph ?? 0);
+                                                        return (
+                                                          <tr key={t.id} className="hover:bg-surface-hover/30 transition-colors">
+                                                            {/* Kolom 1: Termin & Dokumen */}
+                                                            <td className="py-3 px-3.5">
+                                                              <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-bold text-navy-text text-sm">{t.name}</span>
+                                                                {t.percentage !== undefined && (
+                                                                  <span className="text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                                    +{t.percentageDelta ?? t.percentage}% (Pagu {t.percentage}%)
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-1 flex items-center gap-2 flex-wrap">
+                                                                <span>No. Bukti: <strong className="text-navy-text font-mono">{t.breakdown?.noBukti || "-"}</strong></span>
+                                                                <span>·</span>
+                                                                <span>Bank: <strong className="text-navy-text">{t.breakdown?.bank || "-"}</strong></span>
+                                                                <span>·</span>
+                                                                <span>Tgl: {t.breakdown?.tanggalTerimaFmt || "-"}</span>
+                                                                {t.auditedAt && (
+                                                                  <span className="text-emerald-700 dark:text-emerald-400 font-medium">· Diaudit</span>
+                                                                )}
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 2: Bruto Kwitansi */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="font-mono font-bold text-navy-text text-sm">
+                                                                {t.nominalFmt}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                                Nilai tagihan bruto
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 3: Potongan Pajak */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="font-mono font-semibold text-amber-700 dark:text-amber-300 text-sm">
+                                                                {formatRupiah(totalPajak)}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                                {t.breakdown ? (
+                                                                  <span>PPN: {t.breakdown.ppnFmt} · PPh: {t.breakdown.pphFmt}</span>
+                                                                ) : (
+                                                                  <span>PPN & PPh</span>
+                                                                )}
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 4: Net Masuk Bank */}
+                                                            <td className="py-3 px-3.5 text-right">
+                                                              <div className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
+                                                                {t.breakdown?.netBankFmt || t.nominalFmt}
+                                                              </div>
+                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                                {t.breakdown?.bank ? `Masuk ke ${t.breakdown.bank}` : "Bersih rekening bank"}
+                                                              </div>
+                                                            </td>
+
+                                                            {/* Kolom 5: Status & Aksi */}
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                                                              <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                                                {isManajer && t.status !== "ON_TRACK" && (
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                      e.stopPropagation();
+                                                                      handleAudit(t.id);
+                                                                    }}
+                                                                    disabled={isPending}
+                                                                    className="px-2 py-1 rounded-lg bg-navy text-white text-[10.5px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap hover:bg-navy-light transition-colors shadow-2xs"
+                                                                    title="Tandai termin telah diaudit"
+                                                                  >
+                                                                    <CheckCircle size={10} /> Audit
+                                                                  </button>
+                                                                )}
+
+                                                                {isManajer ? (
+                                                                  <div className="relative inline-flex items-center">
+                                                                    <select
+                                                                      value={t.status}
+                                                                      onClick={(e) => e.stopPropagation()}
+                                                                      onChange={(e) =>
+                                                                        handleStatusChange(t.id, e.target.value as TerminStatus)
+                                                                      }
+                                                                      disabled={isPending}
+                                                                      className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-lg border border-border/80 cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
+                                                                      title="Klik untuk mengubah status termin"
+                                                                    >
+                                                                      <option value="ON_TRACK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">On Track</option>
+                                                                      <option value="AT_RISK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">At Risk</option>
+                                                                      <option value="NEEDS_AUDIT" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Perlu Audit</option>
+                                                                    </select>
+                                                                    <ChevronDown size={11} className="absolute right-1.5 pointer-events-none text-current opacity-70" />
+                                                                  </div>
+                                                                ) : (
+                                                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg whitespace-nowrap ${STATUS_BADGE[t.status]}`}>
+                                                                    {STATUS_LABEL[t.status]}
+                                                                  </span>
+                                                                )}
+
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedTerminForModal({ project: p, termin: t });
+                                                                  }}
+                                                                  className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                                                  title="Lihat rincian lengkap formula perpajakan & jurnal akuntansi termin ini"
+                                                                >
+                                                                  <FileText size={11} /> Breakdown Pajak
+                                                                </button>
+                                                              </div>
+                                                            </td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                    <tfoot className="bg-surface-subtle font-bold border-t border-border text-xs">
+                                                      <tr>
+                                                        <td className="py-3 px-3.5 text-navy-text font-bold">
+                                                          Total Termin Cair ({p.termin.length} Termin):
+                                                        </td>
+                                                        <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm">
+                                                          {p.breakdownSummary?.totalGrossFmt ?? p.terminTagihFmt}
+                                                        </td>
+                                                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 text-sm">
+                                                          {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
+                                                        </td>
+                                                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 text-sm">
+                                                          {p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}
+                                                        </td>
+                                                        <td className="py-3 px-3.5" />
+                                                      </tr>
+                                                    </tfoot>
+                                                  </table>
+                                                </div>
+                                              </div>
+
+                                              {/* Strip Ringkasan Perpajakan Termin Proyek */}
+                                              <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border flex items-center justify-between gap-4 flex-wrap text-xs">
+                                                <div className="flex items-center gap-2 text-muted-stronger font-semibold">
+                                                  <Calculator size={14} className="text-brand" />
+                                                  <span>Rekapitulasi Pajak Termin:</span>
+                                                </div>
+                                                <div className="flex items-center gap-4 sm:gap-6 flex-wrap text-xs font-mono">
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">DPP:</span>
+                                                    <strong className="text-navy-text">{p.breakdownSummary?.totalDppFmt ?? "Rp 0"}</strong>
+                                                    {(p.breakdownSummary?.totalDppNilaiLain ?? 0) > 0 && (
+                                                      <span className="text-[10px] text-muted-faint font-sans ml-1">(Nilai Lain: {p.breakdownSummary?.totalDppNilaiLainFmt})</span>
+                                                    )}
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">PPN 11%/12%:</span>
+                                                    <strong className="text-amber-700 dark:text-amber-300">{p.breakdownSummary?.totalPpnFmt ?? "Rp 0"}</strong>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">PPh Final Konstruksi:</span>
+                                                    <strong className="text-purple-700 dark:text-purple-300">{p.breakdownSummary?.totalPphFmt ?? "Rp 0"}</strong>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-muted-faint font-sans text-[11px] mr-1.5">Net Diterima Bank:</span>
+                                                    <strong className="text-emerald-700 dark:text-emerald-300">{p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}</strong>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <div className="p-6 rounded-xl border border-dashed border-border bg-surface-subtle/30 text-center text-xs text-muted-faint">
+                                              Belum ada termin penagihan yang terbit untuk proyek ini.
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* TAB 2: DETAIL PENGELUARAN PROYEK */}
                                       {currentTab === "pengeluaran" && (
-                                        <div className="space-y-2.5">
-                                          {/* Mini summary badges per kategori */}
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <div className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/40 text-[11px] flex items-center gap-1.5">
-                                              <ShoppingBag size={12} className="text-blue-600 dark:text-blue-400" />
-                                              <span className="text-muted-faint">Bahan & Material:</span>
-                                              <span className="font-mono font-bold text-blue-900 dark:text-blue-200">
-                                                {p.expensesSummary?.totalMaterialFmt ?? "Rp 0"}
-                                              </span>
+                                        <div className="space-y-3.5">
+                                          {/* Mini summary strip kategori pengeluaran */}
+                                          <div className="p-3 rounded-xl bg-surface-subtle/50 border border-border flex items-center justify-between gap-3 flex-wrap text-xs">
+                                            <div className="flex items-center gap-2 font-semibold text-navy-text">
+                                              <Wallet size={14} className="text-rose-600" />
+                                              <span>Total Pengeluaran: <strong className="font-mono text-status-red text-sm">{p.expensesSummary?.totalPengeluaranFmt ?? "Rp 0"}</strong></span>
                                             </div>
-
-                                            <div className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 text-[11px] flex items-center gap-1.5">
-                                              <Users size={12} className="text-amber-600 dark:text-amber-400" />
-                                              <span className="text-muted-faint">Gaji & Upah:</span>
-                                              <span className="font-mono font-bold text-amber-900 dark:text-amber-200">
-                                                {p.expensesSummary?.totalGajiFmt ?? "Rp 0"}
-                                              </span>
-                                            </div>
-
-                                            <div className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 text-[11px] flex items-center gap-1.5">
-                                              <Truck size={12} className="text-emerald-600 dark:text-emerald-400" />
-                                              <span className="text-muted-faint">Operasional:</span>
-                                              <span className="font-mono font-bold text-emerald-900 dark:text-emerald-200">
-                                                {p.expensesSummary?.totalOperasionalFmt ?? "Rp 0"}
-                                              </span>
-                                            </div>
-
-                                            <div className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-800/40 text-[11px] flex items-center gap-1.5">
-                                              <FileText size={12} className="text-purple-600 dark:text-purple-400" />
-                                              <span className="text-muted-faint">Lainnya:</span>
-                                              <span className="font-mono font-bold text-purple-900 dark:text-purple-200">
-                                                {p.expensesSummary?.totalLainnyaFmt ?? "Rp 0"}
-                                              </span>
+                                            <div className="flex items-center gap-4 flex-wrap text-[11.5px]">
+                                              <div className="flex items-center gap-1.5">
+                                                <ShoppingBag size={12} className="text-blue-600" />
+                                                <span className="text-muted-faint">Material:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalMaterialFmt ?? "Rp 0"}</strong>
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
+                                                <Users size={12} className="text-amber-600" />
+                                                <span className="text-muted-faint">Upah:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalGajiFmt ?? "Rp 0"}</strong>
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
+                                                <Truck size={12} className="text-emerald-600" />
+                                                <span className="text-muted-faint">Operasional:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalOperasionalFmt ?? "Rp 0"}</strong>
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
+                                                <FileText size={12} className="text-purple-600" />
+                                                <span className="text-muted-faint">Lainnya:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalLainnyaFmt ?? "Rp 0"}</strong>
+                                              </div>
                                             </div>
                                           </div>
 
-                                          {/* Tabel Pengeluaran */}
+                                          {/* Tabel Pengeluaran Proyek */}
                                           {p.expensesSummary?.items && p.expensesSummary.items.length > 0 ? (
                                             <div className="rounded-xl border border-border overflow-hidden">
-                                              <table className="w-full text-left text-xs">
-                                                <thead className="bg-surface-subtle border-b border-border text-muted-stronger">
-                                                  <tr>
-                                                    <th className="py-2 px-3">Tanggal</th>
-                                                    <th className="py-2 px-3">No. Bukti</th>
-                                                    <th className="py-2 px-3">Keterangan Pengeluaran</th>
-                                                    <th className="py-2 px-3">Kategori & Akun Beban</th>
-                                                    <th className="py-2 px-3">Sumber Kas/Bank</th>
-                                                    <th className="py-2 px-3 text-right">Nominal</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-border-subtle bg-surface-card">
-                                                  {p.expensesSummary.items.map((exp) => (
-                                                    <tr key={exp.id} className="hover:bg-surface-hover/30">
-                                                      <td className="py-2 px-3 text-muted-stronger whitespace-nowrap">
-                                                        {exp.tanggalFmt}
-                                                      </td>
-                                                      <td className="py-2 px-3 font-mono font-semibold text-navy-text whitespace-nowrap">
-                                                        {exp.noBukti}
-                                                      </td>
-                                                      <td className="py-2 px-3 text-navy-text font-medium">
-                                                        {exp.keterangan}
-                                                      </td>
-                                                      <td className="py-2 px-3 whitespace-nowrap">
-                                                        <span
-                                                          className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border mr-1.5 ${
+                                              <div className="overflow-x-auto">
+                                                <table className="w-full text-left text-xs">
+                                                  <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                                                    <tr>
+                                                      <th className="py-2.5 px-3.5 w-28">Tanggal</th>
+                                                      <th className="py-2.5 px-3 w-28">No. Bukti</th>
+                                                      <th className="py-2.5 px-3">Uraian Pengeluaran</th>
+                                                      <th className="py-2.5 px-3 w-56">Kategori & Akun Beban</th>
+                                                      <th className="py-2.5 px-3 w-36">Sumber Kas/Bank</th>
+                                                      <th className="py-2.5 px-3.5 text-right w-36">Nominal</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody className="divide-y divide-border bg-surface-card">
+                                                    {p.expensesSummary.items.map((exp) => (
+                                                      <tr key={exp.id} className="hover:bg-surface-hover/30 transition-colors">
+                                                        <td className="py-2.5 px-3.5 text-muted-stronger whitespace-nowrap font-medium">
+                                                          {exp.tanggalFmt}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 font-mono font-semibold text-navy-text whitespace-nowrap">
+                                                          {exp.noBukti}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-navy-text font-medium max-w-xs break-words">
+                                                          {exp.keterangan}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 whitespace-nowrap">
+                                                          <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border mr-1.5 ${
                                                             exp.kategoriBeban === "Gaji & Upah"
                                                               ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
                                                               : exp.kategoriBeban === "Bahan & Material"
@@ -657,219 +946,64 @@ export function PiutangClient({
                                                               : exp.kategoriBeban === "Operasional & Transport"
                                                               ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
                                                               : "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
-                                                          }`}
-                                                        >
-                                                          {exp.kategoriBeban}
-                                                        </span>
-                                                        <span className="text-[11px] text-muted-faint font-mono">
-                                                          {exp.coaCode} · {exp.coaName}
-                                                        </span>
+                                                          }`}>
+                                                            {exp.kategoriBeban}
+                                                          </span>
+                                                          <span className="text-[11px] text-muted-faint font-mono">
+                                                            {exp.coaCode} · {exp.coaName}
+                                                          </span>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 whitespace-nowrap">
+                                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-surface-subtle text-muted-stronger border border-border">
+                                                            {exp.sumberKasBank}
+                                                          </span>
+                                                        </td>
+                                                        <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-status-red whitespace-nowrap text-sm">
+                                                          {exp.nominalFmt}
+                                                        </td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                  <tfoot className="bg-surface-subtle font-bold border-t border-border text-xs">
+                                                    <tr>
+                                                      <td colSpan={5} className="py-3 px-3.5 text-right text-muted-stronger font-bold">
+                                                        Total Realisasi Pengeluaran:
                                                       </td>
-                                                      <td className="py-2 px-3 whitespace-nowrap">
-                                                        <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-surface-subtle text-muted-faint border border-border-subtle">
-                                                          {exp.sumberKasBank}
-                                                        </span>
-                                                      </td>
-                                                      <td className="py-2 px-3 text-right font-mono font-bold tabular-nums text-status-red whitespace-nowrap">
-                                                        {exp.nominalFmt}
+                                                      <td className="py-3 px-3.5 text-right font-mono text-status-red tabular-nums text-sm font-bold">
+                                                        {p.expensesSummary.totalPengeluaranFmt}
                                                       </td>
                                                     </tr>
-                                                  ))}
-                                                </tbody>
-                                                <tfoot className="bg-surface-subtle font-bold border-t border-border text-xs">
-                                                  <tr>
-                                                    <td colSpan={5} className="py-2 px-3 text-right text-muted-stronger">
-                                                      Total Pengeluaran Proyek:
-                                                    </td>
-                                                    <td className="py-2 px-3 text-right font-mono text-status-red tabular-nums">
-                                                      {p.expensesSummary.totalPengeluaranFmt}
-                                                    </td>
-                                                  </tr>
-                                                </tfoot>
-                                              </table>
-                                            </div>
-                                          ) : (
-                                            <div className="p-4 rounded-xl border border-dashed border-border bg-surface-subtle/30 text-center text-xs text-muted-faint">
-                                              Belum ada catatan pengeluaran khusus untuk proyek ini.
-                                              <div className="mt-1 text-[11px] text-muted-faint">
-                                                Setiap pengeluaran (pembelian bahan/semen, gaji tukang, dll.) yang dicatat dengan memilih kode proyek <span className="font-semibold text-navy-text">{p.code}</span> pada Entry Jurnal atau Kas akan otomatis muncul di sini.
+                                                  </tfoot>
+                                                </table>
                                               </div>
                                             </div>
-                                          )}
-                                        </div>
-                                      )}
-
-                                      {/* TAB 2: PROGRES PENAGIHAN TERMIN */}
-                                      {currentTab === "termin" && (
-                                        <div className="space-y-2">
-                                          {p.termin.length > 0 ? (
-                                            <div className="rounded-xl border border-border overflow-hidden">
-                                              <table className="w-full text-left text-xs">
-                                                <thead className="bg-surface-subtle border-b border-border text-muted-stronger">
-                                                  <tr>
-                                                    <th className="py-2 px-3">Termin</th>
-                                                    <th className="py-2 px-3 text-right">Bruto Kwitansi</th>
-                                                    <th className="py-2 px-3">Progres Kontrak</th>
-                                                    <th className="py-2 px-3">Status</th>
-                                                    <th className="py-2 px-3 text-right">Aksi & Rincian</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-border-subtle bg-surface-card">
-                                                  {p.termin.map((t) => (
-                                                    <tr key={t.id} className="hover:bg-surface-hover/30">
-                                                      <td className="py-2 px-3">
-                                                        <div className="font-bold text-navy-text flex items-center gap-1.5">
-                                                          {t.name}
-                                                          {t.breakdown?.noBukti && (
-                                                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                                              {t.breakdown.noBukti}
-                                                            </span>
-                                                          )}
-                                                          {t.breakdown?.bank && (
-                                                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-subtle text-muted-faint border border-border-subtle">
-                                                              {t.breakdown.bank}
-                                                            </span>
-                                                          )}
-                                                        </div>
-                                                        <div className="text-[10.5px] text-muted-faint mt-0.5">
-                                                          Tgl: {t.breakdown?.tanggalTerimaFmt || "-"}
-                                                          {t.auditedAt && ` · Diaudit ${t.auditedAt} (${t.auditedByName})`}
-                                                        </div>
-                                                      </td>
-                                                      <td className="py-2 px-3 text-right font-mono font-bold text-status-green tabular-nums whitespace-nowrap">
-                                                        {t.nominalFmt}
-                                                        {t.breakdown && (
-                                                          <div className="text-[10px] text-muted-faint font-normal">
-                                                            DPP: {t.breakdown.dppFmt} · Net: {t.breakdown.netBankFmt}
-                                                          </div>
-                                                        )}
-                                                      </td>
-                                                      <td className="py-2 px-3">
-                                                        {t.percentage !== undefined && (
-                                                          <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-status-green bg-green-50 dark:bg-green-950/40 px-2 py-0.5 rounded border border-green-200 dark:border-green-800">
-                                                            +{t.percentageDelta ?? t.percentage}% ({t.percentage}% Kontrak)
-                                                          </span>
-                                                        )}
-                                                      </td>
-                                                      <td className="py-2 px-3">
-                                                        <span
-                                                          className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${STATUS_BADGE[t.status]}`}
-                                                        >
-                                                          {STATUS_LABEL[t.status]}
-                                                        </span>
-                                                      </td>
-                                                      <td className="py-2 px-3 text-right">
-                                                        <div className="flex items-center gap-1.5 justify-end">
-                                                          <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              setSelectedTerminForModal({ project: p, termin: t });
-                                                            }}
-                                                            className="px-2 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 flex items-center gap-1 cursor-pointer transition-colors"
-                                                            title="Lihat rincian lengkap perpajakan & jurnal termin ini"
-                                                          >
-                                                            <FileText size={11} /> Breakdown Pajak
-                                                          </button>
-                                                          {isManajer && (
-                                                            <>
-                                                              {t.status !== "ON_TRACK" && (
-                                                                <button
-                                                                  onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleAudit(t.id);
-                                                                  }}
-                                                                  disabled={isPending}
-                                                                  className="px-2 py-1 rounded-lg bg-navy text-white text-[11px] font-semibold flex items-center gap-1"
-                                                                >
-                                                                  <CheckCircle size={10} /> Audit
-                                                                </button>
-                                                              )}
-                                                              <select
-                                                                value={t.status}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                onChange={(e) =>
-                                                                  handleStatusChange(t.id, e.target.value as TerminStatus)
-                                                                }
-                                                                disabled={isPending}
-                                                                className="px-2 py-1 rounded-lg border border-border text-[11px] bg-surface-input text-navy-text"
-                                                              >
-                                                                <option value="ON_TRACK">On Track</option>
-                                                                <option value="AT_RISK">At Risk</option>
-                                                                <option value="NEEDS_AUDIT">Perlu Audit</option>
-                                                              </select>
-                                                            </>
-                                                          )}
-                                                        </div>
-                                                      </td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
-                                            </div>
                                           ) : (
-                                            <div className="p-4 rounded-xl border border-dashed border-border bg-surface-subtle/30 text-center text-xs text-muted-faint">
-                                              Belum ada termin penagihan yang terbit untuk proyek ini.
+                                            <div className="p-6 rounded-xl border border-dashed border-border bg-surface-subtle/30 text-center text-xs text-muted-faint space-y-1">
+                                              <p className="font-semibold text-muted-stronger">Belum ada catatan pengeluaran khusus untuk proyek ini.</p>
+                                              <p className="text-[11px]">
+                                                Setiap pengeluaran (pembelian semen/material, upah tukang, vendor) yang dialokasikan ke kode proyek <strong className="text-navy-text">{p.code}</strong> pada Entry Jurnal atau Transaksi Kas akan otomatis terakumulasi di sini.
+                                              </p>
                                             </div>
                                           )}
-                                        </div>
-                                      )}
-
-                                      {/* TAB 3: RINCIAN PAJAK & BANK */}
-                                      {currentTab === "pajak" && (
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                          <div className="p-2.5 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
-                                            <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 block">
-                                              Pendapatan Bruto (Termin Tertagih)
-                                            </span>
-                                            <span className="text-sm font-bold font-mono text-emerald-900 dark:text-emerald-200 block mt-0.5">
-                                              {p.breakdownSummary?.totalGrossFmt ?? "Rp 0"}
-                                            </span>
-                                            <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400 block mt-0.5">
-                                              {p.maxPercentage}% dari Kontrak ({p.contractValueFmt})
-                                            </span>
-                                          </div>
-
-                                          <div className="p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
-                                            <span className="text-[10px] font-semibold text-blue-800 dark:text-blue-300 block">
-                                              DPP Dasar (100/111)
-                                            </span>
-                                            <span className="text-sm font-bold font-mono text-blue-900 dark:text-blue-200 block mt-0.5">
-                                              {p.breakdownSummary?.totalDppFmt ?? "Rp 0"}
-                                            </span>
-                                            <span className="text-[10px] text-blue-700/80 dark:text-blue-400 block mt-0.5">
-                                              DPP Nilai Lain: {p.breakdownSummary?.totalDppNilaiLainFmt ?? "Rp 0"}
-                                            </span>
-                                          </div>
-
-                                          <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-                                            <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 block">
-                                              Pajak Terutang & Dipotong
-                                            </span>
-                                            <span className="text-sm font-bold font-mono text-amber-900 dark:text-amber-200 block mt-0.5">
-                                              {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
-                                            </span>
-                                            <span className="text-[10px] text-amber-700/80 dark:text-amber-400 block mt-0.5">
-                                              PPN: {p.breakdownSummary?.totalPpnFmt ?? "Rp 0"} · PPh: {p.breakdownSummary?.totalPphFmt ?? "Rp 0"}
-                                            </span>
-                                          </div>
-
-                                          <div className="p-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
-                                            <span className="text-[10px] font-semibold text-indigo-800 dark:text-indigo-300 block">
-                                              Bersih Masuk Rekening (Bank)
-                                            </span>
-                                            <span className="text-sm font-bold font-mono text-indigo-900 dark:text-indigo-200 block mt-0.5">
-                                              {p.breakdownSummary?.totalNetBankFmt ?? "Rp 0"}
-                                            </span>
-                                            <span className="text-[10px] text-indigo-700/80 dark:text-indigo-400 block mt-0.5">
-                                              Netto Realisasi Kas Diterima
-                                            </span>
-                                          </div>
                                         </div>
                                       )}
                                     </div>
                                   );
                                 })()}
+
+                                {/* Tombol Tutup di Bawah Detail */}
+                                <div className="pt-2 flex justify-end border-t border-border">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleExpand(p.id);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold text-muted-stronger transition-colors cursor-pointer"
+                                  >
+                                    <ChevronUp size={14} /> Tutup Detail Proyek {p.code}
+                                  </button>
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -923,217 +1057,7 @@ export function PiutangClient({
         </div>
       )}
 
-      {/* ── Saldo Piutang/Hutang Antar Entitas ── */}
-      {interEntityBalances.length > 0 && (
-        <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-          <div className="px-6 py-4 border-b border-surface-hover">
-            <div className="text-[13px] font-bold text-navy-text">Saldo Piutang / Hutang Antar Entitas</div>
-            <div className="text-[12px] text-muted mt-0.5">Saldo bersih berdasarkan transaksi yang dicatat pada akun piutang/hutang antar perusahaan</div>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-hover text-left">
-                <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Jenis</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Pihak</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Kode COA</th>
-                <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">
-                  Saldo Bersih
-                </th>
-                {isManajer && (
-                  <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">
-                    Aksi
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {interEntityBalances.map((b) => (
-                <tr
-                  key={`${b.type}-${b.coaCode}`}
-                  className="border-b border-surface-subtle hover:bg-surface-hover/30"
-                >
-                  <td className="py-3 px-6">
-                    {b.type === "piutang" ? (
-                      <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-status-green">
-                        <ArrowDownCircle size={13} />
-                        Piutang
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-status-red">
-                        <ArrowUpCircle size={13} />
-                        Hutang
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-[13px] font-semibold text-navy-text">
-                    {b.counterpartyEntityName}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-surface-hover text-muted-stronger">
-                      {b.coaCode}
-                    </span>
-                  </td>
-                  <td className={`py-3 px-3 text-right tabular-nums text-[13px] font-bold ${
-                    b.type === "piutang" ? "text-status-green" : "text-status-red"
-                  }`}>
-                    {b.netAmountFmt}
-                  </td>
-                  {isManajer && (
-                    <td className="py-3 px-6 text-right">
-                      <button
-                        onClick={() => openPelunasanModal(b)}
-                        disabled={isPending || pelunasanPending}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-navy text-white text-[11.5px] font-semibold hover:bg-navy/90 transition-colors"
-                      >
-                        Lunasi
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* ── Modal Pelunasan ── */}
-      {pelunasanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xl w-full max-w-md mx-4">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft">
-              <div>
-                <div className="text-[14px] font-bold text-navy-text">
-                  Catat Pelunasan {pelunasanModal.balance.type === "piutang" ? "Piutang" : "Hutang"}
-                </div>
-                <div className="text-[12px] text-muted mt-0.5">
-                  {pelunasanModal.balance.type === "piutang" ? "Terima dari" : "Bayar ke"}{" "}
-                  <span className="font-semibold text-navy-text">{pelunasanModal.balance.counterpartyEntityName}</span>
-                  {" · "}COA {pelunasanModal.balance.coaCode}
-                </div>
-              </div>
-              <button
-                onClick={closePelunasanModal}
-                className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-faint"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Form body */}
-            <div className="px-6 py-5 flex flex-col gap-4">
-              {pelunasanError && (
-                <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-[13px]">
-                  {pelunasanError}
-                </div>
-              )}
-
-              {/* Tanggal */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-muted-stronger">Tanggal</label>
-                <input
-                  type="date"
-                  value={pelunasanForm.tanggal}
-                  onChange={(e) => setPelunasanForm((f) => ({ ...f, tanggal: e.target.value }))}
-                  className="px-3 py-2 rounded-xl border border-border bg-surface-input text-navy-text text-[13px]"
-                />
-              </div>
-
-              {/* No. Bukti */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-muted-stronger">No. Bukti</label>
-                <input
-                  type="text"
-                  placeholder="Mis. KC/09241"
-                  value={pelunasanForm.noBukti}
-                  onChange={(e) => setPelunasanForm((f) => ({ ...f, noBukti: e.target.value }))}
-                  className="px-3 py-2 rounded-xl border border-border bg-surface-input text-navy-text text-[13px] placeholder:text-muted-faint"
-                />
-              </div>
-
-              {/* Keterangan */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-muted-stronger">Keterangan</label>
-                <input
-                  type="text"
-                  value={pelunasanForm.keterangan}
-                  onChange={(e) => setPelunasanForm((f) => ({ ...f, keterangan: e.target.value }))}
-                  className="px-3 py-2 rounded-xl border border-border bg-surface-input text-navy-text text-[13px]"
-                />
-              </div>
-
-              {/* Nominal */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-muted-stronger">
-                  Nominal
-                  <span className="ml-1.5 text-muted-faint font-normal">(pre-isi dari saldo bersih)</span>
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={pelunasanForm.nominal}
-                  onChange={(e) => setPelunasanForm((f) => ({ ...f, nominal: e.target.value }))}
-                  className="px-3 py-2 rounded-xl border border-border bg-surface-input text-navy-text text-[13px]"
-                />
-              </div>
-
-              {/* Jenis Kas Sumber */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-semibold text-muted-stronger">
-                  {pelunasanModal.balance.type === "piutang" ? "Kas Penerima (entitas ini)" : "Kas Pembayar (entitas ini)"}
-                </label>
-                <select
-                  value={pelunasanForm.jenisKasSumber}
-                  onChange={(e) =>
-                    setPelunasanForm((f) => ({ ...f, jenisKasSumber: e.target.value as "kasKecil" | "kasBesar" }))
-                  }
-                  className="px-3 py-2 rounded-xl border border-border bg-surface-input text-navy-text text-[13px]"
-                >
-                  <option value="kasKecil">Kas Kecil</option>
-                  <option value="kasBesar">Kas Besar</option>
-                </select>
-              </div>
-
-              {/* Jenis Kas Tujuan — hanya untuk pelunasan piutang */}
-              {pelunasanModal.balance.type === "piutang" && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[12px] font-semibold text-muted-stronger">
-                    Kas Pembayar ({pelunasanModal.balance.counterpartyEntityName})
-                  </label>
-                  <select
-                    value={pelunasanForm.jenisKasTujuan}
-                    onChange={(e) =>
-                      setPelunasanForm((f) => ({ ...f, jenisKasTujuan: e.target.value as "kasKecil" | "kasBesar" }))
-                    }
-                    className="px-3 py-2 rounded-xl border border-border bg-surface-input text-navy-text text-[13px]"
-                  >
-                    <option value="kasKecil">Kas Kecil</option>
-                    <option value="kasBesar">Kas Besar</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border-soft">
-              <button
-                onClick={closePelunasanModal}
-                disabled={pelunasanPending}
-                className="px-4 py-2 rounded-xl border border-border text-[13px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handlePelunasanSubmit}
-                disabled={pelunasanPending}
-                className="px-5 py-2 rounded-xl bg-navy text-white text-[13px] font-semibold hover:bg-navy/90 transition-colors disabled:opacity-60"
-              >
-                {pelunasanPending ? "Menyimpan..." : "Simpan Pelunasan"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Detail Breakdown Termin Tertagih */}
       {selectedTerminForModal && (

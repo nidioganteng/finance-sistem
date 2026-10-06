@@ -16,6 +16,7 @@ import { UserBadge, NotifBell } from "@/components/layout/UserBadge";
 import { EntityCard, EntityCardCompact } from "@/components/dashboard/EntityCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { EntityFinancialSummary } from "@/components/dashboard/EntityFinancialSummary";
+import { TerminWaspadaAlert } from "@/components/dashboard/TerminWaspadaAlert";
 import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import {
   TrendingUp,
@@ -63,7 +64,7 @@ export default async function DashboardPage({
 
   const [unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData] = await Promise.all([
     getUnreadNotificationCount(role),
-    showingGrup ? getGrupPiutangMetrics() : Promise.resolve(null),
+    targetEntityKeys.length > 0 ? getGrupPiutangMetrics(targetEntityKeys) : Promise.resolve(null),
     targetEntityKeys.length > 0
       ? Promise.all(chartYears.map((y) => getMonthlyChartData(targetEntityKeys, y)))
       : Promise.resolve([]),
@@ -230,16 +231,16 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div className={`rounded-[16px] border p-4 ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-50 dark:bg-yellow-500/15 border-yellow-200 dark:border-yellow-500/30" : "bg-surface-card border-border"}`}>
+            <div className={`rounded-[16px] border p-4 ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30" : "bg-surface-card border-border"}`}>
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-yellow-100 dark:bg-yellow-500/20" : "bg-slate-50 dark:bg-slate-500/15"}`}>
-                  <AlertTriangle size={16} className={(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-600 dark:text-yellow-500" : "text-slate-400 dark:text-slate-500"} />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "bg-amber-100 dark:bg-amber-500/20" : "bg-slate-50 dark:bg-slate-500/15"}`}>
+                  <AlertTriangle size={16} className={(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-amber-600 dark:text-amber-500" : "text-slate-400 dark:text-slate-500"} />
                 </div>
-                <span className="text-[11.5px] font-semibold text-muted">Piutang Perlu Perhatian</span>
+                <span className="text-[11.5px] font-semibold text-muted">Termin Perlu Diwaspadai</span>
               </div>
-              <div className={`text-[22px] font-extrabold tabular-nums ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-yellow-700 dark:text-yellow-400" : "text-navy-text"}`}>
+              <div className={`text-[22px] font-extrabold tabular-nums ${(piutangMetrics?.terminPerluPerhatian ?? 0) > 0 ? "text-amber-700 dark:text-amber-400" : "text-navy-text"}`}>
                 {piutangMetrics?.terminPerluPerhatian ?? 0}
-                <span className="text-[13px] font-semibold ml-1 text-muted">termin</span>
+                <span className="text-[13px] font-semibold ml-1 text-muted">proyek</span>
               </div>
             </div>
 
@@ -250,7 +251,7 @@ export default async function DashboardPage({
                 <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
                   <CalendarClock size={16} className="text-purple-500 dark:text-purple-400" />
                 </div>
-                <span className="text-[11.5px] font-semibold text-muted">Total Piutang Belum Tertagih</span>
+                <span className="text-[11.5px] font-semibold text-muted">Sisa Termin Belum Cair</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
                 {formatMiliar(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
@@ -265,6 +266,11 @@ export default async function DashboardPage({
               </div>
             </div>
           </div>
+
+          {/* Alert Termin Perlu Diwaspadai */}
+          {piutangMetrics && piutangMetrics.overdueProjects.length > 0 && (
+            <TerminWaspadaAlert projects={piutangMetrics.overdueProjects} />
+          )}
 
           {/* Entity cards compact — semua entitas 1 baris */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -303,6 +309,11 @@ export default async function DashboardPage({
         </>
       ) : selectedEntity ? (
         <>
+          {/* Alert Termin Perlu Diwaspadai untuk Entitas Ini */}
+          {piutangMetrics && piutangMetrics.overdueProjects.length > 0 && (
+            <TerminWaspadaAlert projects={piutangMetrics.overdueProjects} />
+          )}
+
           <EntityCard
             entityKey={selectedEntity.key}
             name={selectedEntity.name}

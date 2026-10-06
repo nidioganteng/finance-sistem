@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject } from "@/lib/actions/piutang";
 import {
+  AlertTriangle,
   CheckCircle,
   ChevronDown,
   ChevronRight,
@@ -90,6 +91,7 @@ export function PiutangClient({
   const [activeProjectTabs, setActiveProjectTabs] = useState<Record<string, "pengeluaran" | "termin" | "pajak">>({});
 
   const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN";
+  const overdueProjectsCount = projectList.filter((p) => p.isOverdue).length;
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -170,6 +172,19 @@ export function PiutangClient({
       {/* ── Tab: Daftar Termin ── */}
       {tab === "termin" && (
         <>
+          {/* Alert jika ada proyek yang lewat tanggal kontrak & termin < 80% */}
+          {overdueProjectsCount > 0 && (
+            <div className="flex items-start sm:items-center gap-3 p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-xs">
+              <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                <AlertTriangle size={17} />
+              </div>
+              <div className="text-xs flex-1">
+                <span className="font-bold text-sm block sm:inline">Perhatian: {overdueProjectsCount} Proyek Melewati Batas Kontrak! </span>
+                <span className="text-muted-stronger">Progres termin masih di bawah 80% meskipun tanggal kontrak telah terlewati. Harap tindak lanjuti penagihan termin.</span>
+              </div>
+            </div>
+          )}
+
           {/* Kartu ringkasan */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
@@ -253,6 +268,11 @@ export function PiutangClient({
                                   {p.entityName}
                                 </span>
                               )}
+                              {p.isOverdue && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                  <AlertTriangle size={10} /> Perlu Diwaspadai
+                                </span>
+                              )}
                               {p.status === "CANCELLED" && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-hover text-muted-faint">
                                   Dibatalkan
@@ -302,7 +322,11 @@ export function PiutangClient({
                                   <div className="w-28 h-2 bg-surface-hover rounded-full overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all ${
-                                        p.maxPercentage >= 80 || p.status === "COMPLETED"
+                                        p.status === "COMPLETED"
+                                          ? "bg-status-green"
+                                          : p.isOverdue
+                                          ? "bg-rose-500"
+                                          : p.maxPercentage >= 80
                                           ? "bg-status-green"
                                           : p.maxPercentage >= 50
                                           ? "bg-brand"
@@ -311,12 +335,21 @@ export function PiutangClient({
                                       style={{ width: `${Math.min(p.maxPercentage, 100)}%` }}
                                     />
                                   </div>
-                                  <span className={`text-[12.5px] font-bold ${p.status === "COMPLETED" ? "text-status-green" : "text-muted-stronger"}`}>
+                                  <span className={`text-[12.5px] font-bold ${
+                                    p.status === "COMPLETED"
+                                      ? "text-status-green"
+                                      : p.isOverdue
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : "text-muted-stronger"
+                                  }`}>
                                     {p.maxPercentage}%
                                   </span>
                                 </div>
-                                <div className={`text-[11px] mt-1 ${p.isOverdue ? "text-status-red font-semibold" : "text-muted-faint"}`}>
-                                  {p.status === "COMPLETED" ? "Kontrak selesai 100%" : `Batas kontrak: ${p.deadlineFmt}${p.isOverdue ? " · Lewat tempo" : ""}`}
+                                <div className={`text-[11px] mt-1 flex items-center gap-1 ${p.isOverdue ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-muted-faint"}`}>
+                                  {p.isOverdue && <AlertTriangle size={11} className="shrink-0" />}
+                                  <span>
+                                    {p.status === "COMPLETED" ? "Kontrak selesai 100%" : `Batas kontrak: ${p.deadlineFmt}${p.isOverdue ? " · Lewat tempo (< 80%)" : ""}`}
+                                  </span>
                                 </div>
                               </>
                             )}
@@ -383,11 +416,13 @@ export function PiutangClient({
                                           {p.status === "COMPLETED" ? "Proyek Selesai" : p.status === "CANCELLED" ? "Dibatalkan" : "Proyek Aktif"}
                                         </span>
                                       </div>
-                                      <p className="text-xs text-muted-faint mt-1 flex items-center gap-1.5">
+                                      <p className="text-xs text-muted-faint mt-1 flex items-center gap-1.5 flex-wrap">
                                         <Calendar size={13} />
                                         <span>Batas Waktu Kontrak: <strong className="text-navy-text">{p.deadlineFmt}</strong></span>
                                         {p.isOverdue && p.status === "ACTIVE" && (
-                                          <span className="text-status-red font-semibold">· Melewati Jatuh Tempo</span>
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                            <AlertTriangle size={11} /> Melewati Jatuh Tempo (Termin &lt; 80%)
+                                          </span>
                                         )}
                                       </p>
                                     </div>

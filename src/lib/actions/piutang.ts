@@ -321,8 +321,8 @@ export async function updateTerminStatus(terminId: string, status: TerminStatus)
 export async function completeProject(projectId: string) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
-  if (session.user.role !== "MANAJER_KEUANGAN" && session.user.role !== "SUPER_ADMIN") {
-    throw new Error("Hanya Manajer Keuangan yang bisa menyelesaikan proyek.");
+  if (session.user.role !== "MANAJER_KEUANGAN" && session.user.role !== "SUPER_ADMIN" && session.user.role !== "STAF_KEUANGAN") {
+    throw new Error("Akses ditolak.");
   }
 
   const project = await prisma.project.findUnique({ where: { id: projectId }, select: { code: true, name: true } });
@@ -338,8 +338,8 @@ export async function completeProject(projectId: string) {
 export async function cancelProject(projectId: string) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Belum login.");
-  if (session.user.role !== "MANAJER_KEUANGAN") {
-    throw new Error("Hanya Manajer Keuangan yang bisa membatalkan proyek.");
+  if (session.user.role !== "MANAJER_KEUANGAN" && session.user.role !== "SUPER_ADMIN" && session.user.role !== "STAF_KEUANGAN") {
+    throw new Error("Akses ditolak.");
   }
 
   const project = await prisma.project.findUnique({ where: { id: projectId }, select: { code: true, name: true } });

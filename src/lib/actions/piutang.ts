@@ -352,3 +352,19 @@ export async function cancelProject(projectId: string) {
   revalidatePath("/piutang");
   revalidatePath("/dashboard");
 }
+
+// Mengaktifkan kembali proyek yang selesai ke status ACTIVE
+export async function reopenProject(projectId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Belum login.");
+  if (session.user.role !== "MANAJER_KEUANGAN" && session.user.role !== "SUPER_ADMIN" && session.user.role !== "STAF_KEUANGAN") {
+    throw new Error("Akses ditolak.");
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { code: true, name: true } });
+  await prisma.project.update({ where: { id: projectId }, data: { status: "ACTIVE" } });
+
+  logActivity(session.user.id, `Aktifkan kembali proyek ${project?.code ?? projectId} – ${project?.name ?? ""}`, "FINANCIAL_CHANGE", { projectId });
+  revalidatePath("/piutang");
+  revalidatePath("/dashboard");
+}

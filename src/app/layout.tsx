@@ -5,6 +5,9 @@ import { SessionProvider } from "@/components/SessionProvider";
 export const metadata: Metadata = {
   title: "Sistem Data Keuangan - Gaharu Sempana Group",
   description: "Sistem data keuangan internal Gaharu Sempana Group",
+  icons: {
+    icon: "/logo-entitas/logo-simatra-dark.png",
+  },
 };
 
 // Dijalankan sebelum paint pertama supaya tema gelap langsung aktif di semua

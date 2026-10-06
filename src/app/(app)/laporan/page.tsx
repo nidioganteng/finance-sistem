@@ -28,7 +28,7 @@ import {
   getLaporanJurnalData,
   getLaporanBankData,
 } from "@/lib/laporan-keuangan";
-import { getLaporanPiutangData } from "@/lib/laporan-piutang";
+import { getPiutangData } from "@/lib/piutang";
 import { getLaporanUtangAsetData } from "@/lib/laporan-utang-aset";
 import { PiutangView } from "@/components/laporan/PiutangView";
 import { UtangAsetView } from "@/components/laporan/UtangAsetView";
@@ -103,7 +103,7 @@ export default async function LaporanPage({
   let bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null = null;
   let arusKasCombined: any = null;
   let arusKasPresisiData: Awaited<ReturnType<typeof getArusKasPresisiData>> | null = null;
-  let piutangData: Awaited<ReturnType<typeof getLaporanPiutangData>> | null = null;
+  let piutangData: Awaited<ReturnType<typeof getPiutangData>> | null = null;
   let utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null = null;
   let taxData: Awaited<ReturnType<typeof getLaporanPajakData>> | null = null;
 
@@ -181,7 +181,7 @@ export default async function LaporanPage({
       kenaikanBersihKas: laporan.kenaikanBersihKas,
     };
   } else if (tab === "piutang") {
-    piutangData = await getLaporanPiutangData(entityIds);
+    piutangData = await getPiutangData(entityIds);
   } else if (tab === "utang-aset") {
     utangAsetData = await getLaporanUtangAsetData(entityIds, currentYear);
   }
@@ -505,7 +505,12 @@ export default async function LaporanPage({
       )}
 
       {tab === "piutang" && piutangData && (
-        <PiutangView data={piutangData} />
+        <PiutangView
+          projectList={piutangData.projectList}
+          summary={piutangData.summary}
+          userRole={role}
+          isGrup={!selectedEntity}
+        />
       )}
 
       {tab === "utang-aset" && utangAsetData && (

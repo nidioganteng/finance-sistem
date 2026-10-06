@@ -17,7 +17,7 @@ const LABELS_MANAJER: Partial<Record<NotifikasiType, string>> = {
 };
 
 export function getNotifTypeLabels(role: Role) {
-  return role === "MANAJER_KEUANGAN" ? LABELS_MANAJER : LABELS_CEO;
+  return role === "MANAJER_KEUANGAN" || role === "STAF_KEUANGAN" ? LABELS_MANAJER : LABELS_CEO;
 }
 
 export function getNotifFilterOptions(role: Role) {

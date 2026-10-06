@@ -134,7 +134,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-[260px] flex-none bg-surface-card border-r border-border-soft flex flex-col p-4 pt-5 sticky top-0 h-screen">
+    <aside className="w-[280px] flex-none bg-surface-card border-r border-border-soft flex flex-col p-4 pt-5 sticky top-0 h-screen">
       {/* Brand row */}
       <div className="flex items-center gap-2.5 px-2 pb-6">
         <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-brand to-brand-soft flex items-center justify-center flex-none">

@@ -81,7 +81,7 @@ export default async function LaporanPage({
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
+  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
 
   const entities = await getAccessibleEntities(entityKeys);
   const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";

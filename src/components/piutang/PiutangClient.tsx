@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { TerminStatus } from "@prisma/client";
-import { auditTermin, updateTerminStatus, cancelProject, completeProject } from "@/lib/actions/piutang";
+import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";
 import {
   AlertTriangle,
   CheckCircle,
@@ -23,6 +23,8 @@ import {
   ChevronUp,
   Layers,
   Calendar,
+  PlayCircle,
+  RotateCcw,
 } from "lucide-react";
 import { formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
 import type {
@@ -78,7 +80,7 @@ export function PiutangClient({
   showTabs?: boolean;
   isGrup?: boolean;
 }) {
-  const [tab, setTab] = useState<"termin" | "dock">("termin");
+  const [tab, setTab] = useState<"berjalan" | "selesai" | "dock">("berjalan");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -91,7 +93,17 @@ export function PiutangClient({
   const [activeProjectTabs, setActiveProjectTabs] = useState<Record<string, "pengeluaran" | "termin" | "pajak">>({});
 
   const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN" || userRole === "SUPER_ADMIN";
-  const overdueProjectsCount = projectList.filter((p) => p.isOverdue).length;
+
+  const runningProjects = projectList.filter((p) => p.status === "ACTIVE");
+  const completedProjects = projectList.filter((p) => p.status === "COMPLETED" || p.status === "CANCELLED");
+  const overdueProjectsCount = runningProjects.filter((p) => p.isOverdue).length;
+
+  const totalCompletedKontrak = completedProjects.reduce((sum, p) => sum + p.contractValue, 0);
+  const totalCompletedTermin = completedProjects.reduce((sum, p) => sum + p.terminTagih, 0);
+  const totalCompletedKontrakFmt = formatRupiah(totalCompletedKontrak);
+  const totalCompletedTerminFmt = formatRupiah(totalCompletedTermin);
+
+  const displayedProjects = tab === "berjalan" ? runningProjects : completedProjects;
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -118,7 +130,7 @@ export function PiutangClient({
   }
 
   function handleCompleteProject(id: string, code: string) {
-    if (!confirm(`Tandai proyek ${code} sebagai selesai? Proyek akan hilang dari daftar ini, namun transaksi di jurnal tetap tercatat.`)) return;
+    if (!confirm(`Tandai proyek ${code} sebagai selesai? Proyek akan dipindahkan ke tab Proyek Selesai, namun transaksi di jurnal tetap tercatat.`)) return;
     startTransition(async () => {
       try {
         await completeProject(id);
@@ -129,10 +141,21 @@ export function PiutangClient({
   }
 
   function handleCancelProject(id: string, code: string) {
-    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dianggap selesai.`)) return;
+    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dipindahkan ke tab Proyek Selesai.`)) return;
     startTransition(async () => {
       try {
         await cancelProject(id);
+      } catch (e: unknown) {
+        setError((e as Error).message);
+      }
+    });
+  }
+
+  function handleReopenProject(id: string, code: string) {
+    if (!confirm(`Kembalikan proyek ${code} ke daftar Proyek Berjalan?`)) return;
+    startTransition(async () => {
+      try {
+        await reopenProject(id);
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -147,83 +170,157 @@ export function PiutangClient({
 
       {/* ── Tab nav ── */}
       {showTabs && (
-        <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
+        <div className="flex items-center gap-1.5 p-1 bg-surface-subtle rounded-xl w-fit border border-border/60">
           <button
-            onClick={() => setTab("termin")}
-            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
-              tab === "termin" ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
+            onClick={() => setTab("berjalan")}
+            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              tab === "berjalan"
+                ? "bg-navy text-white shadow-xs"
+                : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
             }`}
           >
-            Kontrol Termin
+            <PlayCircle size={15} />
+            <span>Proyek Berjalan</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              tab === "berjalan" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
+            }`}>
+              {runningProjects.length}
+            </span>
           </button>
+
+          <button
+            onClick={() => setTab("selesai")}
+            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              tab === "selesai"
+                ? "bg-navy text-white shadow-xs"
+                : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
+            }`}
+          >
+            <CheckCircle size={15} />
+            <span>Proyek Selesai</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              tab === "selesai" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
+            }`}>
+              {completedProjects.length}
+            </span>
+          </button>
+
           {isUmumEntity && (
             <button
               onClick={() => setTab("dock")}
-              className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
-                tab === "dock" ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
+              className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                tab === "dock"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
               }`}
             >
-              Loading Dock
+              <Truck size={15} />
+              <span>Loading Dock</span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                tab === "dock" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
+              }`}>
+                {loadingDockList.length}
+              </span>
             </button>
           )}
         </div>
       )}
 
-      {/* ── Tab: Daftar Termin ── */}
-      {tab === "termin" && (
+      {/* ── Tab: Proyek Berjalan & Proyek Selesai ── */}
+      {(tab === "berjalan" || tab === "selesai") && (
         <>
-          {/* Alert jika ada proyek yang lewat tanggal kontrak & termin < 80% */}
-          {overdueProjectsCount > 0 && (
-            <div className="flex items-start sm:items-center gap-3 p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-xs">
-              <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                <AlertTriangle size={17} />
+          {tab === "berjalan" && (
+            <>
+              {/* Alert jika ada proyek yang lewat tanggal kontrak & termin < 80% */}
+              {overdueProjectsCount > 0 && (
+                <div className="flex items-start sm:items-center gap-3 p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <AlertTriangle size={17} />
+                  </div>
+                  <div className="text-xs flex-1">
+                    <span className="font-bold text-sm block sm:inline">Perhatian: {overdueProjectsCount} Proyek Melewati Batas Kontrak! </span>
+                    <span className="text-muted-stronger">Progres termin masih di bawah 80% meskipun tanggal kontrak telah terlewati. Harap tindak lanjuti penagihan termin.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Kartu ringkasan Proyek Berjalan */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                  <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                    Total Nilai Kontrak Aktif
+                  </div>
+                  <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
+                    {summary.totalKontrakFmt}
+                  </div>
+                  <div className="text-[12px] text-muted mt-0.5 truncate">{runningProjects.length} proyek berjalan</div>
+                </div>
+                <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                  <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                    Total Termin Tertagih
+                  </div>
+                  <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
+                    {summary.totalTerminTagihFmt}
+                  </div>
+                  <div className="text-[12px] text-muted mt-0.5 truncate">
+                    {summary.totalKontrak > 0
+                      ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
+                      : "—"}
+                  </div>
+                </div>
+                <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                  <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                    Sisa Piutang Belum Tertagih
+                  </div>
+                  <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
+                    {summary.sisaPiutangFmt}
+                  </div>
+                  <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
+                </div>
               </div>
-              <div className="text-xs flex-1">
-                <span className="font-bold text-sm block sm:inline">Perhatian: {overdueProjectsCount} Proyek Melewati Batas Kontrak! </span>
-                <span className="text-muted-stronger">Progres termin masih di bawah 80% meskipun tanggal kontrak telah terlewati. Harap tindak lanjuti penagihan termin.</span>
+            </>
+          )}
+
+          {tab === "selesai" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                  Total Proyek Selesai
+                </div>
+                <div className="text-[19px] sm:text-[21px] font-extrabold text-navy-text truncate">
+                  {completedProjects.length} Proyek
+                </div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">
+                  {completedProjects.filter((p) => p.status === "COMPLETED").length} Selesai · {completedProjects.filter((p) => p.status === "CANCELLED").length} Dibatalkan
+                </div>
+              </div>
+              <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                  Total Nilai Kontrak Selesai
+                </div>
+                <div className={`${getMetricValueFontSize(totalCompletedKontrakFmt)} text-navy-text truncate`} title={totalCompletedKontrakFmt}>
+                  {totalCompletedKontrakFmt}
+                </div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">Akumulasi kontrak rampung</div>
+              </div>
+              <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
+                <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
+                  Total Realisasi Termin Selesai
+                </div>
+                <div className={`${getMetricValueFontSize(totalCompletedTerminFmt)} text-status-green truncate`} title={totalCompletedTerminFmt}>
+                  {totalCompletedTerminFmt}
+                </div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">100% tuntas dicairkan</div>
               </div>
             </div>
           )}
 
-          {/* Kartu ringkasan */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                Total Nilai Kontrak Aktif
-              </div>
-              <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
-                {summary.totalKontrakFmt}
-              </div>
-              <div className="text-[12px] text-muted mt-0.5 truncate">{summary.jumlahProyek} proyek</div>
-            </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                Total Termin Tertagih
-              </div>
-              <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
-                {summary.totalTerminTagihFmt}
-              </div>
-              <div className="text-[12px] text-muted mt-0.5 truncate">
-                {summary.totalKontrak > 0
-                  ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
-                  : "—"}
-              </div>
-            </div>
-            <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
-              <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                Sisa Piutang Belum Tertagih
-              </div>
-              <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
-                {summary.sisaPiutangFmt}
-              </div>
-              <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
-            </div>
-          </div>
-
           {/* Tabel proyek dengan termin expandable */}
-          {projectList.length === 0 ? (
+          {displayedProjects.length === 0 ? (
             <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center text-sm text-muted">
-              Belum ada proyek untuk entitas ini.
+              {tab === "berjalan"
+                ? "Belum ada proyek yang sedang berjalan untuk entitas ini."
+                : "Belum ada proyek yang berstatus selesai untuk entitas ini."}
             </div>
           ) : (
             <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
@@ -240,12 +337,12 @@ export function PiutangClient({
                     </th>
                     <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Progress</th>
                     <th className="py-3 px-5 text-[11px] font-bold text-muted-faint uppercase text-right">
-                      Sisa Piutang
+                      {tab === "berjalan" ? "Sisa Piutang" : "Tindakan"}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {projectList.map((p) => {
+                  {displayedProjects.map((p) => {
                     const isExpanded = expandedIds.has(p.id);
                     return (
                       <>
@@ -366,7 +463,7 @@ export function PiutangClient({
                                     handleCompleteProject(p.id, p.code);
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-green-300 dark:border-green-600 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-green-300 dark:border-green-600 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer"
                                 >
                                   <CheckSquare size={11} /> Tandai Selesai
                                 </button>
@@ -376,9 +473,24 @@ export function PiutangClient({
                                     handleCancelProject(p.id, p.code);
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover cursor-pointer"
                                 >
                                   <Ban size={11} /> Batalkan Proyek
+                                </button>
+                              </div>
+                            )}
+                            {isManajer && p.status !== "ACTIVE" && (
+                              <div className="mt-1.5 flex flex-col items-end gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReopenProject(p.id, p.code);
+                                  }}
+                                  disabled={isPending}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-blue-300 dark:border-blue-600 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 cursor-pointer"
+                                  title="Kembalikan proyek ini ke daftar Proyek Berjalan"
+                                >
+                                  <RotateCcw size={11} /> Buka Kembali
                                 </button>
                               </div>
                             )}
@@ -428,16 +540,32 @@ export function PiutangClient({
                                     </div>
                                   </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleExpand(p.id);
-                                    }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold text-muted-stronger transition-colors cursor-pointer self-start sm:self-auto"
-                                  >
-                                    <ChevronUp size={14} /> Tutup Detail
-                                  </button>
+                                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                                    {isManajer && p.status !== "ACTIVE" && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReopenProject(p.id, p.code);
+                                        }}
+                                        disabled={isPending}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                                        title="Kembalikan proyek ini ke daftar Proyek Berjalan"
+                                      >
+                                        <RotateCcw size={13} /> Buka Kembali Proyek
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleExpand(p.id);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold text-muted-stronger transition-colors cursor-pointer"
+                                    >
+                                      <ChevronUp size={14} /> Tutup Detail
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {/* 1. Strip Ringkasan Finansial Utama (Clean Horizontal Metric Ribbon) */}

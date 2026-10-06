@@ -18,7 +18,7 @@ function EntityAvatar({ entityKey, name, colorHex, size = "md" }: { entityKey: s
   const rounded = size === "lg" ? "rounded-2xl" : "rounded-xl";
   if (logo) {
     return (
-      <div className={`${dim} ${rounded} bg-white flex items-center justify-center flex-none shadow-sm overflow-hidden border border-border-soft`}>
+      <div className={`${dim} ${rounded} bg-white dark:bg-surface-card flex items-center justify-center flex-none shadow-sm overflow-hidden border border-border-soft`}>
         <Image src={logo} alt={name} width={36} height={36} className="object-contain w-full h-full p-0.5" />
       </div>
     );
@@ -217,7 +217,7 @@ export function EntityCard({
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {/* Logo on white bg */}
-            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center flex-none shadow-md overflow-hidden">
+            <div className="w-12 h-12 rounded-xl bg-white dark:bg-surface-card flex items-center justify-center flex-none shadow-md overflow-hidden border border-border-soft">
               {ENTITY_LOGO[entityKey]
                 ? <img src={ENTITY_LOGO[entityKey]} alt={name} className="w-full h-full object-contain p-0.5" />
                 : <span className="text-[18px] font-extrabold" style={{ color: colorHex }}>{name[0]}</span>

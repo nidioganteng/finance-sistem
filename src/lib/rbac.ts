@@ -39,6 +39,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         },
         { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
+        { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
@@ -97,6 +98,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "grid" },
+        { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
     },
     {
@@ -110,26 +112,32 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Buku Besar", href: "/buku-besar", icon: "bookOpen" },
         { label: "Daftar Akun", href: "/daftar-akun", icon: "table2" },
         { label: "Aktiva Tetap", href: "/aktiva-tetap", icon: "clipboardList" },
-        {
-          label: "Laporan Keuangan",
-          href: "/laporan-keuangan",
-          icon: "fileText",
-          subItems: [
-            { label: "Laporan Internal", href: "/laporan-keuangan?version=internal", version: "internal" },
-            { label: "Laporan Umum", href: "/laporan-keuangan?version=umum", version: "umum" },
-          ],
-        },
-        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
-        { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
         { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
       ],
     },
     {
-      title: "Lainnya",
+      title: "Laporan",
+      items: [
+        {
+          label: "Laporan Keuangan",
+          href: "/laporan",
+          icon: "fileText",
+          subItems: [
+            { label: "Laporan Internal", href: "/laporan?version=internal", version: "internal" },
+            { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
+          ],
+        },
+        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
+        { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
+      ],
+    },
+    {
+      title: "Pengaturan",
       items: [
         { label: "Bagan Akun", href: "/coa", icon: "listChecks" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
         { label: "Kelola Jenis Input Transaksi", href: "/jenis-input", icon: "settings2" },
+        { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },
   ],

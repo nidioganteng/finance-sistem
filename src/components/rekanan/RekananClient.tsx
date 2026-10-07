@@ -446,7 +446,7 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-navy-text">
-                    {editingRekanan ? "Edit Master Rekanan" : "Tambah Rekanan Baru"}
+                    {editingRekanan ? "Edit Rekanan" : "Tambah Rekanan Baru"}
                   </h3>
                   <p className="text-xs text-navy-soft">
                     Data tersimpan terpusat dan akan otomatis muncul saat pengetikan NPWP/NIK.

@@ -42,7 +42,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
         { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
-        { label: "Master Rekanan", href: "/rekanan", icon: "users" },
+        { label: "Rekanan", href: "/rekanan", icon: "users" },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
       ],
@@ -106,7 +106,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       collapsible: true,
       items: [
         { label: "Bagan Akun", href: "/coa", icon: "landmark" },
-        { label: "Master Rekanan", href: "/rekanan", icon: "users" },
+        { label: "Rekanan", href: "/rekanan", icon: "users" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
         { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
         { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
@@ -171,7 +171,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       collapsible: true,
       items: [
         { label: "Bagan Akun", href: "/coa", icon: "landmark" },
-        { label: "Master Rekanan", href: "/rekanan", icon: "users" },
+        { label: "Rekanan", href: "/rekanan", icon: "users" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
         { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
         { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },

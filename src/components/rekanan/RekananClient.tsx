@@ -68,7 +68,19 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
   const [deletingRekanan, setDeletingRekanan] = useState<RekananItem | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    nama: string;
+    npwp: string;
+    nik: string;
+    tipe: RekananTipe;
+    kategori: string;
+    alamat: string;
+    telepon: string;
+    email: string;
+    namaBank: string;
+    noRekening: string;
+    atasNamaBank: string;
+  }>({
     nama: "",
     npwp: "",
     nik: "",

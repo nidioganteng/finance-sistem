@@ -45,7 +45,7 @@ export type RekananItem = {
 /**
  * Normalisasi format NPWP atau NIK (menghilangkan titik, strip, spasi)
  */
-export function cleanIdentityNumber(val: string): string {
+function cleanIdentityNumber(val: string): string {
   return val.replace(/[\s.\-_/]/g, "").trim();
 }
 

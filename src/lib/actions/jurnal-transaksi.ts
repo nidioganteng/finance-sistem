@@ -8,7 +8,7 @@ import { getRunningSaldo } from "@/lib/kas";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 import { REKENING_BY_ENTITY, REKENING_COA_CODE } from "@/lib/bank-accounts";
-import { computeNewTerminPercentage } from "@/lib/piutang";
+import { computeNewTerminPercentage, syncProjectSpend } from "@/lib/piutang";
 import { hitungDppDariKwitansi, hitungDppNilaiLain } from "@/lib/pendapatan";
 import { TerminStatus } from "@prisma/client";
 
@@ -441,6 +441,10 @@ export async function saveJurnalTransaksi(formData: FormData) {
         }
       }
     }
+
+    if (projectId) {
+      await syncProjectSpend(projectId);
+    }
   }
 
   logActivity(
@@ -482,6 +486,12 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
     select: { noBukti: true },
   });
 
+  const affectedProjects = await prisma.transaction.findMany({
+    where: { id: { in: txIds } },
+    select: { projectId: true },
+  });
+  const projectIdsToSync = [...new Set(affectedProjects.map((p) => p.projectId).filter(Boolean))] as string[];
+
   await prisma.transaction.deleteMany({ where: { id: { in: txIds } } });
 
   if (firstTx?.noBukti) {
@@ -505,6 +515,9 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
         where: { id: { in: termins.map((t) => t.id) } },
       });
       for (const t of termins) {
+        if (t.projectId && !projectIdsToSync.includes(t.projectId)) {
+          projectIdsToSync.push(t.projectId);
+        }
         const remaining = await prisma.termin.findMany({
           where: { projectId: t.projectId },
           select: { percentage: true },
@@ -518,6 +531,10 @@ export async function deleteJurnalTransaksi(txIds: string[]) {
         }
       }
     }
+  }
+
+  for (const pId of projectIdsToSync) {
+    await syncProjectSpend(pId);
   }
 
   logActivity(session.user.id, `Hapus Jurnal Transaksi (${txIds.length} baris)`, "FINANCIAL_CHANGE", { txIds });

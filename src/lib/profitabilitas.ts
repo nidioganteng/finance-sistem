@@ -4,18 +4,60 @@ import { formatRupiah } from "./dashboard-data";
 export async function getProfitabilitasData(entityId: string) {
   const projects = await prisma.project.findMany({
     where: { entityId },
-    include: { termin: { orderBy: { createdAt: "desc" }, take: 1 } },
+    include: {
+      termin: { orderBy: { createdAt: "desc" }, take: 1 },
+      jurnal: { include: { coaAccount: true } },
+    },
     orderBy: { code: "asc" },
   });
 
-  const totalKontrak = projects.reduce((s, p) => s + Number(p.contractValue), 0);
-  const totalTerpakai = projects.reduce((s, p) => s + Number(p.spend), 0);
+  const projectSpends = projects.map((p) => {
+    let spendFromJurnal = 0;
+    if (p.jurnal && p.jurnal.length > 0) {
+      const incomeNoBuktis = new Set<string>();
+      p.jurnal.forEach((j) => {
+        if (
+          j.noBukti &&
+          (j.coaAccount?.kategori === "PENDAPATAN" ||
+            j.coaAccount?.code === "400" ||
+            /pendapatan/i.test(j.coaAccount?.name ?? ""))
+        ) {
+          incomeNoBuktis.add(j.noBukti);
+        }
+      });
+
+      for (const j of p.jurnal) {
+        if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
+          const isTaxDeduction =
+            Number(j.debit) > 0 &&
+            (j.coaAccount?.kategori === "BEBAN" ||
+              /pph|pajak|ppn|bupot/i.test(j.coaAccount?.name ?? "") ||
+              /pph|pajak|ppn|potongan/i.test(j.keterangan ?? ""));
+          if (isTaxDeduction) spendFromJurnal += Number(j.debit);
+        } else {
+          const isBeban =
+            j.coaAccount?.kategori === "BEBAN" ||
+            j.coaAccount?.code?.startsWith("5") ||
+            j.coaAccount?.code?.startsWith("6");
+          if (isBeban && Number(j.debit) > 0) {
+            spendFromJurnal += Number(j.debit);
+          } else if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
+            spendFromJurnal += Number(j.debit);
+          }
+        }
+      }
+    }
+    const terpakai = spendFromJurnal > 0 ? spendFromJurnal : Number(p.spend);
+    return { p, terpakai };
+  });
+
+  const totalKontrak = projectSpends.reduce((s, { p }) => s + Number(p.contractValue), 0);
+  const totalTerpakai = projectSpends.reduce((s, { terpakai }) => s + terpakai, 0);
   const totalLaba = totalKontrak - totalTerpakai;
 
   return {
-    projects: projects.map((p) => {
+    projects: projectSpends.map(({ p, terpakai }) => {
       const kontrak = Number(p.contractValue);
-      const terpakai = Number(p.spend);
       const laba = kontrak - terpakai;
       const margin = kontrak > 0 ? (laba / kontrak) * 100 : 0;
       const latestTermin = p.termin[0];

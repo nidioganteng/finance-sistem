@@ -7,7 +7,7 @@ import { authOptions, resolveStaffId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo, ENTITY_PREFIX, ENTITY_PREFIX_UMUM } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE, REKENING_BY_ENTITY } from "@/lib/bank-accounts";
-import { computeNewTerminPercentage } from "@/lib/piutang";
+import { computeNewTerminPercentage, syncProjectSpend } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
@@ -376,6 +376,10 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
     }
   }
 
+  if (input.projectId) {
+    await syncProjectSpend(input.projectId);
+  }
+
   logActivity(session.user.id, `Input transaksi ${jenisInput.nama} – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 
   revalidatePath(input.pagePath);
@@ -397,6 +401,12 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
   if (!canManageTransaksi(session.user.role)) return { error: "Kamu tidak punya akses untuk menghapus transaksi." };
   if (txIds.length === 0) return { error: "Tidak ada transaksi untuk dihapus." };
 
+  const affectedProjects = await prisma.transaction.findMany({
+    where: { id: { in: txIds } },
+    select: { projectId: true },
+  });
+  const projectIdsToSync = [...new Set(affectedProjects.map((p) => p.projectId).filter(Boolean))] as string[];
+
   // Find crossingGroupIds from the source transactions
   const sourceTxs = await prisma.transaction.findMany({
     where: { id: { in: txIds } },
@@ -416,6 +426,10 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
   ];
 
   await prisma.$transaction(deleteOps);
+
+  for (const pId of projectIdsToSync) {
+    await syncProjectSpend(pId);
+  }
 
   logActivity(session.user.id, `Hapus transaksi (${txIds.length} baris)`, "FINANCIAL_CHANGE", { txIds });
 
@@ -623,6 +637,10 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
   const crossingOps = crossingOpsNested.flat();
 
   await prisma.$transaction([...akunRows, kasEntry, ...crossingOps]);
+
+  if (input.projectId) {
+    await syncProjectSpend(input.projectId);
+  }
 
   logActivity(session.user.id, `Edit transaksi – ${input.noBukti} (${entity.name})`, "FINANCIAL_CHANGE", { entityKey: input.entityKey, noBukti: input.noBukti, total, arah: input.arah, keterangan: input.keterangan });
 

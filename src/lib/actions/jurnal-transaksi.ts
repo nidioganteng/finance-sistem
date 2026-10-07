@@ -229,7 +229,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           kredit: arahMasuk ? 0 : nominal,
           saldoSetelah: newSaldo,
           staffId,
-          projectId: projectId || null,
+          projectId: null,
           extraFieldsJson: {
             isKasEntry: true,
             autoPostedFromJurnal: true,
@@ -260,7 +260,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
             kredit: counterpartRow.kredit ?? 0,
             saldoSetelah: newSaldo,
             staffId,
-            projectId: projectId || null,
+            projectId: null,
             extraFieldsJson: {
               autoPostedFromJurnal: true,
               ...(rekeningNama ? { rekeningNama } : {}),

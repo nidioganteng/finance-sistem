@@ -331,27 +331,31 @@ model FakturPendapatan {
   dppNilaiLain          Decimal  @db.Decimal(18, 2)
   tarifPpnPersen        Decimal  @db.Decimal(5, 2) @default(11.00)
   tarifPphPersen        Decimal  @db.Decimal(5, 2) @default(3.50)
-  ppn                   Decimal  @db.Decimal(18, 2)
-  pph                   Decimal  @db.Decimal(18, 2)
-  nilaiProyek           Decimal  @db.Decimal(18, 2)
-  labaSetelahPajak      Decimal  @db.Decimal(18, 2)
-  kodeJenisProyek       Int      @default(1) // 1 = Perencanaan, 2 = Pengawasan
-  pekerjaanPerusahaan   Decimal  @default(0.00) @db.Decimal(18, 2)
-  pekerjaanYangDipinjam Decimal  @default(0.00) @db.Decimal(18, 2)
-  tanggalTerima         DateTime // Tanggal uang benar-benar diterima di bank
-  bank                  String   // Rekening tujuan pembayaran (BPD/BRI/MDR/BNI)
-  nominalDiterima       Decimal  @db.Decimal(18, 2)
-  projectId             String?  // Relasi opsional ke Kontrol Piutang & Termin Proyek
-  bankTransactionId     String?  // Relasi opsional ke transaksi Bank Buku
+  ppn                   Decimal   @default(0.00) @db.Decimal(18, 2)
+  pph                   Decimal   @default(0.00) @db.Decimal(18, 2)
+  nilaiProyek           Decimal   @db.Decimal(18, 2)
+  labaSetelahPajak      Decimal   @db.Decimal(18, 2)
+  kodeJenisProyek       Int       @default(1) // 1 = Perencanaan, 2 = Pengawasan
+  pekerjaanPerusahaan   Decimal   @default(0.00) @db.Decimal(18, 2)
+  pekerjaanYangDipinjam Decimal   @default(0.00) @db.Decimal(18, 2)
+  tanggalTerima         DateTime? // Tanggal uang benar-benar diterima di bank (kosong saat awal terbit)
+  bank                  String?   // Rekening tujuan pembayaran (BPD/BRI/MDR/BNI, kosong saat awal terbit)
+  nominalDiterima       Decimal   @default(0.00) @db.Decimal(18, 2)
+  ceklisPpn             Boolean   @default(false)
+  ceklisPph             Boolean   @default(false)
+  ceklisBuktiPotong     Boolean   @default(false)
+  projectId             String?   // Relasi opsional ke Kontrol Piutang & Termin Proyek
+  bankTransactionId     String?   // Relasi opsional ke transaksi Bank Buku
   createdById           String
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   entity    Entity   @relation(fields: [entityId], references: [id])
   project   Project? @relation(fields: [projectId], references: [id])
   createdBy User     @relation("FakturPendapatanCreator", fields: [createdById], references: [id])
 
   @@index([entityId, tahunPajak, masaPajak])
+  @@index([noFaktur])
 }
 
 model RekonsiliasiPajakBulanan {

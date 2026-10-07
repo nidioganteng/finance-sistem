@@ -97,7 +97,7 @@ export type ProjectExpenseItem = {
   keterangan: string;
   coaCode: string;
   coaName: string;
-  kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya";
+  kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Pajak Proyek" | "Lainnya";
   nominal: number;
   nominalFmt: string;
   sumberKasBank: string;
@@ -112,6 +112,8 @@ export type ProjectExpensesSummary = {
   totalMaterialFmt: string;
   totalOperasional: number;
   totalOperasionalFmt: string;
+  totalPajak: number;
+  totalPajakFmt: string;
   totalLainnya: number;
   totalLainnyaFmt: string;
   labaKotor: number;
@@ -391,7 +393,55 @@ export async function getPiutangData(entityId: string | string[]) {
       let bankName = "BPD";
       let tanggalFmt = t.createdAt.toLocaleDateString("id-ID");
 
-      if (matchedFaktur) {
+      if (matchedJurnals.length > 0) {
+        // Realisasi Eksklusif dari Entry Jurnal Umum (Issue 85: Anti-Double Counting)
+        const incomeRows = matchedJurnals.filter(
+          (j) =>
+            j.coaAccount &&
+            (j.coaAccount.kategori === "PENDAPATAN" ||
+              /pendapatan/i.test(j.coaAccount.name) ||
+              j.coaAccount.code === "400") &&
+            Number(j.kredit) > 0
+        );
+        const pphDebitRows = matchedJurnals.filter(
+          (j) => j.coaAccount && /pph|pajak/i.test(j.coaAccount.name) && Number(j.debit) > 0
+        );
+        const ppnRows = matchedJurnals.filter(
+          (j) => j.coaAccount && /ppn/i.test(j.coaAccount.name) && Number(j.debit || j.kredit) > 0
+        );
+        const bankDebitRows = matchedJurnals.filter(
+          (j) => j.coaAccount && /bank|kas|bpd|bri|bni|mdr/i.test(j.coaAccount.name) && Number(j.debit) > 0
+        );
+
+        const totalIncomeJurnal = incomeRows.reduce((sum, j) => sum + Number(j.kredit), 0);
+        if (totalIncomeJurnal > 0) gross = totalIncomeJurnal;
+
+        const pphDebit = pphDebitRows.reduce((sum, j) => sum + Number(j.debit), 0);
+        if (pphDebit > 0) pph = pphDebit;
+
+        const ppnVal = ppnRows.reduce((sum, j) => sum + Number(j.debit || j.kredit), 0);
+        if (ppnVal > 0) ppn = ppnVal;
+
+        const bankDebit = bankDebitRows.reduce((sum, j) => sum + Number(j.debit), 0);
+        if (bankDebit > 0) netBank = bankDebit;
+
+        if (bankDebitRows.length > 0 && bankDebitRows[0].coaAccount) {
+          bankName = bankDebitRows[0].coaAccount.name;
+        }
+        if (matchedJurnals[0]?.tanggal) {
+          tanggalFmt = matchedJurnals[0].tanggal.toLocaleDateString("id-ID");
+        }
+
+        if (matchedFaktur) {
+          dpp = Number(matchedFaktur.dpp) || hitungDppDariKwitansi(gross);
+          dppNilaiLain = Number(matchedFaktur.dppNilaiLain) || hitungDppNilaiLain(dpp);
+          tarifPpn = Number(matchedFaktur.tarifPpnPersen);
+          tarifPph = Number(matchedFaktur.tarifPphPersen);
+        } else {
+          dpp = hitungDppDariKwitansi(gross);
+          dppNilaiLain = hitungDppNilaiLain(dpp);
+        }
+      } else if (matchedFaktur) {
         gross = Number(matchedFaktur.nilaiProyek) || nominalTermin;
         dpp = Number(matchedFaktur.dpp);
         dppNilaiLain = Number(matchedFaktur.dppNilaiLain);
@@ -402,29 +452,15 @@ export async function getPiutangData(entityId: string | string[]) {
         netBank = Number(matchedFaktur.nominalDiterima);
         bankName = matchedFaktur.bank || "-";
         tanggalFmt = matchedFaktur.tanggalTerima ? matchedFaktur.tanggalTerima.toLocaleDateString("id-ID") : "-";
-      } else if (matchedJurnals.length > 0) {
-        const pphDebit = matchedJurnals
-          .filter((j) => j.coaAccount && /pph/i.test(j.coaAccount.name))
-          .reduce((sum, j) => sum + Number(j.debit), 0);
-        const ppnVal = matchedJurnals
-          .filter((j) => j.coaAccount && /ppn/i.test(j.coaAccount.name))
-          .reduce((sum, j) => sum + Number(j.debit || j.kredit), 0);
-        const bankDebit = matchedJurnals
-          .filter((j) => j.coaAccount && /bank|bpd|bri|bni|mdr/i.test(j.coaAccount.name))
-          .reduce((sum, j) => sum + Number(j.debit), 0);
-
-        if (pphDebit > 0) pph = pphDebit;
-        if (ppnVal > 0) ppn = ppnVal;
-        if (bankDebit > 0) netBank = bankDebit;
       }
 
       const pphDebitRows = matchedJurnals.filter(
-        (j) => j.coaAccount && /pph/i.test(j.coaAccount.name) && Number(j.debit) > 0
+        (j) => j.coaAccount && /pph|pajak/i.test(j.coaAccount.name) && Number(j.debit) > 0
       );
       const pphItems =
         pphDebitRows.length > 0
           ? pphDebitRows.map((j) => ({
-              name: j.coaAccount?.name || "PPh",
+              name: j.coaAccount?.name || "Potongan PPh Proyek",
               amount: Number(j.debit),
               amountFmt: formatRupiah(Number(j.debit)),
             }))
@@ -525,9 +561,20 @@ export async function getPiutangData(entityId: string | string[]) {
       if (m && m[1]) incomeNoBuktis.add(m[1]);
     });
 
-    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, dll.)
+    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, Pajak Proyek, dll.)
     const expenseRows = p.jurnal.filter((j) => {
-      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) return false;
+      // Jika transaksi ini merupakan penerimaan termin:
+      // Hanya sertakan potongan pajak proyek (PPh/PPN/Pajak), abaikan kas/bank masuk atau piutang.
+      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
+        const isTaxDeduction =
+          Number(j.debit) > 0 &&
+          (j.coaAccount?.kategori === "BEBAN" ||
+            /pph|pajak|ppn|bupot/i.test(j.coaAccount?.name ?? "") ||
+            /pph|pajak|ppn|potongan/i.test(j.keterangan ?? ""));
+        return isTaxDeduction;
+      }
+
+      // Untuk transaksi non-pendapatan termin:
       const isBeban =
         j.coaAccount?.kategori === "BEBAN" ||
         j.coaAccount?.code?.startsWith("5") ||
@@ -542,9 +589,11 @@ export async function getPiutangData(entityId: string | string[]) {
     const expenseItems: ProjectExpenseItem[] = expenseRows.map((j) => {
       const nominal = Number(j.debit);
       const txt = `${j.coaAccount?.name || ""} ${j.keterangan || ""}`.toLowerCase();
-      let kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya" = "Lainnya";
+      let kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Pajak Proyek" | "Lainnya" = "Lainnya";
 
-      if (/gaji|upah|mandor|tukang|honor|tenaga ahli/i.test(txt)) {
+      if (/pajak|pph|ppn|potongan pph|bupot/i.test(txt)) {
+        kategoriBeban = "Pajak Proyek";
+      } else if (/gaji|upah|mandor|tukang|honor|tenaga ahli/i.test(txt)) {
         kategoriBeban = "Gaji & Upah";
       } else if (/bahan|material|perlengkapan|semen|pasir|besi|batu|kayu|cat|baut|alat/i.test(txt)) {
         kategoriBeban = "Bahan & Material";
@@ -556,13 +605,20 @@ export async function getPiutangData(entityId: string | string[]) {
       const counterpart = p.jurnal.find(
         (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
       );
-      const sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
+      let sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
+      if (
+        counterpart &&
+        (counterpart.coaAccount?.kategori === "PENDAPATAN" ||
+          /pendapatan/i.test(counterpart.coaAccount?.name ?? ""))
+      ) {
+        sumberKasBank = "Potongan Penerimaan Termin";
+      }
 
       return {
         id: j.id,
         tanggal: j.tanggal.toISOString(),
         tanggalFmt: j.tanggal.toLocaleDateString("id-ID"),
-        noBukti: j.noBukti,
+        noBukti: j.noBukti || "-",
         keterangan: j.keterangan || j.coaAccount?.name || "Pengeluaran Proyek",
         coaCode: j.coaAccount?.code || "-",
         coaName: j.coaAccount?.name || "-",
@@ -576,11 +632,13 @@ export async function getPiutangData(entityId: string | string[]) {
     let totalGaji = 0;
     let totalMaterial = 0;
     let totalOperasional = 0;
+    let totalPajak = 0;
     let totalLainnya = 0;
     expenseItems.forEach((it) => {
       if (it.kategoriBeban === "Gaji & Upah") totalGaji += it.nominal;
       else if (it.kategoriBeban === "Bahan & Material") totalMaterial += it.nominal;
       else if (it.kategoriBeban === "Operasional & Transport") totalOperasional += it.nominal;
+      else if (it.kategoriBeban === "Pajak Proyek") totalPajak += it.nominal;
       else totalLainnya += it.nominal;
     });
 
@@ -598,6 +656,8 @@ export async function getPiutangData(entityId: string | string[]) {
       totalMaterialFmt: formatRupiah(totalMaterial),
       totalOperasional,
       totalOperasionalFmt: formatRupiah(totalOperasional),
+      totalPajak,
+      totalPajakFmt: formatRupiah(totalPajak),
       totalLainnya,
       totalLainnyaFmt: formatRupiah(totalLainnya),
       labaKotor: totalGross - totalPengeluaran,
@@ -660,4 +720,61 @@ export async function getPiutangData(entityId: string | string[]) {
       createdAt: d.createdAt.toLocaleDateString("id-ID"),
     })),
   };
+}
+
+/**
+ * Sinkronisasi kolom `spend` pada model Project dengan data Jurnal Umum.
+ * Menghitung akumulasi pengeluaran riil termasuk potongan pajak proyek (Issue 85).
+ */
+export async function syncProjectSpend(projectId: string): Promise<number> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      jurnal: {
+        include: { coaAccount: true },
+      },
+    },
+  });
+  if (!project) return 0;
+
+  const incomeNoBuktis = new Set<string>();
+  project.jurnal.forEach((j) => {
+    if (
+      j.noBukti &&
+      (j.coaAccount?.kategori === "PENDAPATAN" ||
+        j.coaAccount?.code === "400" ||
+        /pendapatan/i.test(j.coaAccount?.name ?? ""))
+    ) {
+      incomeNoBuktis.add(j.noBukti);
+    }
+  });
+
+  let totalSpend = 0;
+  for (const j of project.jurnal) {
+    if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
+      const isTaxDeduction =
+        Number(j.debit) > 0 &&
+        (j.coaAccount?.kategori === "BEBAN" ||
+          /pph|pajak|ppn|bupot/i.test(j.coaAccount?.name ?? "") ||
+          /pph|pajak|ppn|potongan/i.test(j.keterangan ?? ""));
+      if (isTaxDeduction) totalSpend += Number(j.debit);
+    } else {
+      const isBeban =
+        j.coaAccount?.kategori === "BEBAN" ||
+        j.coaAccount?.code?.startsWith("5") ||
+        j.coaAccount?.code?.startsWith("6");
+      if (isBeban && Number(j.debit) > 0) {
+        totalSpend += Number(j.debit);
+      } else if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
+        totalSpend += Number(j.debit);
+      }
+    }
+  }
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { spend: totalSpend },
+  });
+
+  return totalSpend;
 }

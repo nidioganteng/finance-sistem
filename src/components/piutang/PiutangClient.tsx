@@ -48,9 +48,9 @@ type DockItem = {
 };
 
 const STATUS_BADGE: Record<TerminStatus, string> = {
-  ON_TRACK:    "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
-  AT_RISK:     "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
-  NEEDS_AUDIT: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
+  ON_TRACK:    "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+  AT_RISK:     "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+  NEEDS_AUDIT: "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
 };
 const STATUS_LABEL: Record<TerminStatus, string> = {
   ON_TRACK:    "On Track",
@@ -707,7 +707,9 @@ export function PiutangClient({
                                                             {/* Kolom 1: Termin & Dokumen */}
                                                             <td className="py-3 px-3.5">
                                                               <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="font-bold text-navy-text text-sm">{t.name}</span>
+                                                                <span className="font-bold text-navy-text text-sm">
+                                                                  {t.name.replace(/\s*\[.*?\]\s*$/, "")}
+                                                                </span>
                                                                 {t.percentage !== undefined && (
                                                                   <span className="text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                                                     +{t.percentageDelta ?? t.percentage}% (Pagu {t.percentage}%)
@@ -762,7 +764,7 @@ export function PiutangClient({
 
                                                             {/* Kolom 5: Status & Aksi */}
                                                             <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                                                              <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                                              <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
                                                                 {isManajer && t.status !== "ON_TRACK" && (
                                                                   <button
                                                                     type="button"
@@ -771,10 +773,11 @@ export function PiutangClient({
                                                                       handleAudit(t.id);
                                                                     }}
                                                                     disabled={isPending}
-                                                                    className="px-2 py-1 rounded-lg bg-navy text-white text-[10.5px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap hover:bg-navy-light transition-colors shadow-2xs"
-                                                                    title="Tandai termin telah diaudit"
+                                                                    className="h-7 px-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap transition-colors shadow-2xs"
+                                                                    title="Verifikasi dan tandai termin telah diaudit (status kembali ke On Track)"
                                                                   >
-                                                                    <CheckCircle size={10} /> Audit
+                                                                    <CheckCircle size={12} className="text-emerald-600 dark:text-emerald-400" />
+                                                                    <span>Audit</span>
                                                                   </button>
                                                                 )}
 
@@ -787,7 +790,7 @@ export function PiutangClient({
                                                                         handleStatusChange(t.id, e.target.value as TerminStatus)
                                                                       }
                                                                       disabled={isPending}
-                                                                      className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-lg border border-border/80 cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
+                                                                      className={`h-7 text-[11px] font-bold pl-2.5 pr-6 py-0.5 rounded-lg border cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
                                                                       title="Klik untuk mengubah status termin"
                                                                     >
                                                                       <option value="ON_TRACK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">On Track</option>
@@ -797,7 +800,7 @@ export function PiutangClient({
                                                                     <ChevronDown size={11} className="absolute right-1.5 pointer-events-none text-current opacity-70" />
                                                                   </div>
                                                                 ) : (
-                                                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg whitespace-nowrap ${STATUS_BADGE[t.status]}`}>
+                                                                  <span className={`h-7 inline-flex items-center text-[11px] font-bold px-2.5 rounded-lg whitespace-nowrap border ${STATUS_BADGE[t.status]}`}>
                                                                     {STATUS_LABEL[t.status]}
                                                                   </span>
                                                                 )}
@@ -808,10 +811,11 @@ export function PiutangClient({
                                                                     e.stopPropagation();
                                                                     setSelectedTerminForModal({ project: p, termin: t });
                                                                   }}
-                                                                  className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                                                  className="h-7 px-2.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                                                                   title="Lihat rincian lengkap formula perpajakan & jurnal akuntansi termin ini"
                                                                 >
-                                                                  <FileText size={11} /> Breakdown Pajak
+                                                                  <FileText size={12} />
+                                                                  <span>Breakdown Pajak</span>
                                                                 </button>
                                                               </div>
                                                             </td>
@@ -1084,7 +1088,7 @@ export function PiutangClient({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-navy-text">
-                    Rincian Termin & Perpajakan ({selectedTerminForModal.termin.name})
+                    Rincian Termin & Perpajakan ({selectedTerminForModal.termin.name.replace(/\s*\[.*?\]\s*$/, "")})
                   </h3>
                   <p className="text-xs text-muted-faint">
                     Proyek: <span className="font-semibold text-muted-stronger">{selectedTerminForModal.project.code}</span> – {selectedTerminForModal.project.name}

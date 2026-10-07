@@ -1402,8 +1402,8 @@ export function LaporanPendapatanClient({
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
-                      namaRekanan: prev.namaRekanan || (p ? p.name : ""),
-                      namaJkp: prev.namaJkp || (p ? `Jasa Konsultansi ${p.name}` : ""),
+                      namaRekanan: prev.namaRekanan,
+                      namaJkp: p ? p.name : prev.namaJkp,
                     }));
                   }}
                   className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"

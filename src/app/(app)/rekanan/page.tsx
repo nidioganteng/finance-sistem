@@ -8,7 +8,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 import { RekananClient } from "@/components/rekanan/RekananClient";
 
 export const metadata = {
-  title: "Master Data Rekanan | SIMATRA",
+  title: "Rekanan | SIMATRA",
   description: "Database terpusat identitas Rekanan, Vendor, Klien, dan Tenaga Ahli",
 };
 
@@ -29,7 +29,7 @@ export default async function RekananPage() {
   return (
     <PageTransition>
       <PageHeader
-        title="Master Data Rekanan"
+        title="Rekanan"
         subtitle="Database terpusat Vendor, Klien, dan Tenaga Ahli untuk pengisian otomatis transaksi"
       />
       <div className="p-4 md:p-6 space-y-6">

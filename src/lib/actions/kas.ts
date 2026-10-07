@@ -247,7 +247,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
             projectId: input.projectId,
             name: `Termin ${terminKe} (${deltaPct}% Kontrak)`,
             percentage: newPct,
-            status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
+            status: TerminStatus.ON_TRACK,
           },
         })
       );

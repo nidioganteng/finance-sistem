@@ -903,6 +903,11 @@ export function PiutangClient({
                                                 <strong className="font-mono text-navy-text">{p.expensesSummary?.totalOperasionalFmt ?? "Rp 0"}</strong>
                                               </div>
                                               <div className="flex items-center gap-1.5">
+                                                <Receipt size={12} className="text-rose-600" />
+                                                <span className="text-muted-faint">Pajak:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalPajakFmt ?? "Rp 0"}</strong>
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
                                                 <FileText size={12} className="text-purple-600" />
                                                 <span className="text-muted-faint">Lainnya:</span>
                                                 <strong className="font-mono text-navy-text">{p.expensesSummary?.totalLainnyaFmt ?? "Rp 0"}</strong>
@@ -945,6 +950,8 @@ export function PiutangClient({
                                                               ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
                                                               : exp.kategoriBeban === "Operasional & Transport"
                                                               ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                                              : exp.kategoriBeban === "Pajak Proyek"
+                                                              ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
                                                               : "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
                                                           }`}>
                                                             {exp.kategoriBeban}

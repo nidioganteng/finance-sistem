@@ -23,9 +23,12 @@ export type FakturPendapatanInput = {
   kodeJenisProyek?: number; // 1 = Perencanaan, 2 = Pengawasan
   pekerjaanPerusahaan?: number;
   pekerjaanYangDipinjam?: number;
-  tanggalTerima: string; // YYYY-MM-DD
-  bank: string;
-  nominalDiterima: number;
+  tanggalTerima?: string | null; // YYYY-MM-DD or null (opsional jika belum cair)
+  bank?: string | null; // Rekening tujuan (opsional jika belum cair)
+  nominalDiterima?: number;
+  ceklisPpn?: boolean;
+  ceklisPph?: boolean;
+  ceklisBuktiPotong?: boolean;
   projectId?: string | null;
   bankTransactionId?: string | null;
 };
@@ -68,8 +71,6 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
   if (!data.namaRekanan.trim()) return { error: "Nama rekanan wajib diisi." };
   if (!data.namaJkp.trim()) return { error: "Uraian JKP wajib diisi." };
   if (data.masaPajak < 1 || data.masaPajak > 12) return { error: "Masa pajak harus antara bulan 1-12." };
-  if (!data.tanggalTerima) return { error: "Tanggal terima uang wajib diisi." };
-  if (!data.bank.trim()) return { error: "Rekening Bank tujuan wajib diisi." };
 
   const tarifPpn = data.tarifPpnPersen ?? 11;
   const tarifPph = data.tarifPphPersen ?? 3.5;
@@ -81,7 +82,7 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
       npwp: data.npwp.trim(),
       noFaktur: data.noFaktur.trim(),
       masaPajak: data.masaPajak,
-      tahunPajak: data.tahunPajak || new Date(data.tanggalTerima).getFullYear(),
+      tahunPajak: data.tahunPajak || (data.tanggalTerima ? new Date(data.tanggalTerima).getFullYear() : new Date().getFullYear()),
       namaRekanan: data.namaRekanan.trim(),
       namaJkp: data.namaJkp.trim(),
       dpp: data.dpp,
@@ -95,9 +96,12 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
       kodeJenisProyek: data.kodeJenisProyek ?? 1,
       pekerjaanPerusahaan: data.pekerjaanPerusahaan ?? 0,
       pekerjaanYangDipinjam: data.pekerjaanYangDipinjam ?? 0,
-      tanggalTerima: new Date(data.tanggalTerima),
-      bank: data.bank.trim(),
-      nominalDiterima: data.nominalDiterima,
+      tanggalTerima: data.tanggalTerima ? new Date(data.tanggalTerima) : null,
+      bank: data.bank?.trim() ? data.bank.trim() : null,
+      nominalDiterima: data.nominalDiterima ?? 0,
+      ceklisPpn: Boolean(data.ceklisPpn),
+      ceklisPph: Boolean(data.ceklisPph),
+      ceklisBuktiPotong: Boolean(data.ceklisBuktiPotong),
       projectId: data.projectId || null,
       bankTransactionId: data.bankTransactionId || null,
       createdById: session.user.id,
@@ -177,9 +181,12 @@ export async function updateFakturPendapatanAction(
       ...(data.kodeJenisProyek !== undefined ? { kodeJenisProyek: data.kodeJenisProyek } : {}),
       ...(data.pekerjaanPerusahaan !== undefined ? { pekerjaanPerusahaan: data.pekerjaanPerusahaan } : {}),
       ...(data.pekerjaanYangDipinjam !== undefined ? { pekerjaanYangDipinjam: data.pekerjaanYangDipinjam } : {}),
-      ...(data.tanggalTerima ? { tanggalTerima: new Date(data.tanggalTerima) } : {}),
-      ...(data.bank ? { bank: data.bank.trim() } : {}),
+      ...(data.tanggalTerima !== undefined ? { tanggalTerima: data.tanggalTerima ? new Date(data.tanggalTerima) : null } : {}),
+      ...(data.bank !== undefined ? { bank: data.bank?.trim() ? data.bank.trim() : null } : {}),
       ...(data.nominalDiterima !== undefined ? { nominalDiterima: data.nominalDiterima } : {}),
+      ...(data.ceklisPpn !== undefined ? { ceklisPpn: Boolean(data.ceklisPpn) } : {}),
+      ...(data.ceklisPph !== undefined ? { ceklisPph: Boolean(data.ceklisPph) } : {}),
+      ...(data.ceklisBuktiPotong !== undefined ? { ceklisBuktiPotong: Boolean(data.ceklisBuktiPotong) } : {}),
       ...(data.projectId !== undefined ? { projectId: data.projectId || null } : {}),
       ...(data.bankTransactionId !== undefined ? { bankTransactionId: data.bankTransactionId || null } : {}),
     },
@@ -195,6 +202,55 @@ export async function updateFakturPendapatanAction(
       entityId: existing.entityId,
       nilaiProyek: calculated.nilaiProyek,
     }
+  );
+
+  revalidatePendapatanPaths();
+  return { success: true };
+}
+
+export async function toggleCeklisDokumenFakturAction(
+  id: string,
+  field: "ppn" | "pph" | "buktiPotong",
+  value: boolean
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { error: "Belum login." };
+  }
+  if (!canManageTransaksi(session.user.role) && session.user.role !== "SUPER_ADMIN") {
+    return { error: "Kamu tidak punya akses untuk mengubah status dokumen fisik." };
+  }
+
+  const existing = await prisma.fakturPendapatan.findUnique({
+    where: { id },
+    include: { entity: true },
+  });
+  if (!existing) return { error: "Data faktur tidak ditemukan." };
+
+  if (
+    session.user.role !== "SUPER_ADMIN" &&
+    !session.user.entityKeys.includes(existing.entity.key)
+  ) {
+    return { error: "Kamu tidak punya akses ke entitas ini." };
+  }
+
+  const fieldKey =
+    field === "ppn"
+      ? "ceklisPpn"
+      : field === "pph"
+      ? "ceklisPph"
+      : "ceklisBuktiPotong";
+
+  await prisma.fakturPendapatan.update({
+    where: { id },
+    data: { [fieldKey]: value },
+  });
+
+  logActivity(
+    session.user.id,
+    `Ceklis fisik ${field.toUpperCase()} faktur ${existing.noFaktur}: ${value ? "Sudah Diterima" : "Belum Diterima"}`,
+    "FINANCIAL_CHANGE",
+    { fakturId: id, field, value }
   );
 
   revalidatePendapatanPaths();

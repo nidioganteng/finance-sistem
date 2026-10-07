@@ -360,6 +360,11 @@ export async function getPiutangData(entityId: string | string[]) {
     const isCancelled = p.status === "CANCELLED";
     const isCompleted = p.status === "COMPLETED";
 
+    // Filter transaksi jurnal proyek agar tidak menduplikasi baris mirror autoPostedFromJurnal (Issue 85)
+    const projectJurnal = p.jurnal.filter(
+      (j) => !(j.extraFieldsJson && (j.extraFieldsJson as Record<string, unknown>).autoPostedFromJurnal === true)
+    );
+
     const terminItems = p.termin.map((t, i) => {
       const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
       const deltaPct = Math.max(0, t.percentage - prevPct);
@@ -377,8 +382,8 @@ export async function getPiutangData(entityId: string | string[]) {
         (f) => (noBukti && f.noFaktur === noBukti) || Number(f.nilaiProyek) === nominalTermin
       );
 
-      // Cari transaksi jurnal terkait noBukti
-      const matchedJurnals = p.jurnal.filter(
+      // Cari transaksi jurnal terkait noBukti (tanpa baris duplikat auto-posted)
+      const matchedJurnals = projectJurnal.filter(
         (j) => noBukti && j.noBukti === noBukti
       );
 
@@ -546,7 +551,7 @@ export async function getPiutangData(entityId: string | string[]) {
 
     // 1. Kumpulkan noBukti yang merupakan pendapatan termin (ada akun kategori PENDAPATAN atau kredit ke 400)
     const incomeNoBuktis = new Set<string>();
-    p.jurnal.forEach((j) => {
+    projectJurnal.forEach((j) => {
       if (
         j.noBukti &&
         (j.coaAccount?.kategori === "PENDAPATAN" ||
@@ -562,7 +567,7 @@ export async function getPiutangData(entityId: string | string[]) {
     });
 
     // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, Pajak Proyek, dll.)
-    const expenseRows = p.jurnal.filter((j) => {
+    const expenseRows = projectJurnal.filter((j) => {
       // Jika transaksi ini merupakan penerimaan termin:
       // Hanya sertakan potongan pajak proyek (PPh/PPN/Pajak), abaikan kas/bank masuk atau piutang.
       if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
@@ -602,7 +607,7 @@ export async function getPiutangData(entityId: string | string[]) {
       }
 
       // Cari baris pasangan dengan noBukti yang sama yang memiliki kredit > 0 (sumber kas/bank)
-      const counterpart = p.jurnal.find(
+      const counterpart = projectJurnal.find(
         (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
       );
       let sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
@@ -737,8 +742,12 @@ export async function syncProjectSpend(projectId: string): Promise<number> {
   });
   if (!project) return 0;
 
+  const projectJurnal = project.jurnal.filter(
+    (j) => !(j.extraFieldsJson && (j.extraFieldsJson as Record<string, unknown>).autoPostedFromJurnal === true)
+  );
+
   const incomeNoBuktis = new Set<string>();
-  project.jurnal.forEach((j) => {
+  projectJurnal.forEach((j) => {
     if (
       j.noBukti &&
       (j.coaAccount?.kategori === "PENDAPATAN" ||
@@ -750,7 +759,7 @@ export async function syncProjectSpend(projectId: string): Promise<number> {
   });
 
   let totalSpend = 0;
-  for (const j of project.jurnal) {
+  for (const j of projectJurnal) {
     if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
       const isTaxDeduction =
         Number(j.debit) > 0 &&

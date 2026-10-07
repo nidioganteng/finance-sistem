@@ -44,6 +44,7 @@ import {
   updateFakturPendapatanAction,
   deleteFakturPendapatanAction,
   upsertRekonsiliasiPajakAction,
+  toggleCeklisDokumenFakturAction,
   type FakturPendapatanInput,
 } from "@/lib/actions/pendapatan";
 import { formatRupiah } from "@/lib/dashboard-data";
@@ -94,9 +95,12 @@ export function LaporanPendapatanClient({
     kodeJenisProyek: 1, // 1 = Perencanaan, 2 = Pengawasan
     pekerjaanPerusahaan: 0,
     pekerjaanYangDipinjam: 0,
-    tanggalTerima: new Date().toISOString().split("T")[0],
-    bank: data.bankOptions[0]?.nama ?? "BPD",
+    tanggalTerima: "",
+    bank: "",
     nominalDiterima: 0,
+    ceklisPpn: false,
+    ceklisPph: false,
+    ceklisBuktiPotong: false,
     projectId: "",
   });
 
@@ -117,13 +121,16 @@ export function LaporanPendapatanClient({
 
   // Filter faktur list
   const filteredFaktur = data.fakturList.filter((f) => {
+    const q = searchQuery.toLowerCase();
     const matchSearch =
       searchQuery === "" ||
-      f.noFaktur.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.npwp.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.namaRekanan.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.namaJkp.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.bank.toLowerCase().includes(searchQuery.toLowerCase());
+      f.noFaktur.toLowerCase().includes(q) ||
+      f.npwp.toLowerCase().includes(q) ||
+      f.namaRekanan.toLowerCase().includes(q) ||
+      f.namaJkp.toLowerCase().includes(q) ||
+      (f.bank ? f.bank.toLowerCase().includes(q) : false) ||
+      (f.projectCode ? f.projectCode.toLowerCase().includes(q) : false) ||
+      (f.projectName ? f.projectName.toLowerCase().includes(q) : false);
 
     const matchJenis =
       filterJenisProyek === "ALL" ||
@@ -214,9 +221,12 @@ export function LaporanPendapatanClient({
       kodeJenisProyek: 1,
       pekerjaanPerusahaan: 0,
       pekerjaanYangDipinjam: 0,
-      tanggalTerima: new Date().toISOString().split("T")[0],
-      bank: data.bankOptions[0]?.nama ?? "BPD",
+      tanggalTerima: "",
+      bank: "",
       nominalDiterima: 0,
+      ceklisPpn: false,
+      ceklisPph: false,
+      ceklisBuktiPotong: false,
       projectId: "",
     });
     setErrorMessage(null);
@@ -248,13 +258,28 @@ export function LaporanPendapatanClient({
       kodeJenisProyek: f.kodeJenisProyek,
       pekerjaanPerusahaan: f.pekerjaanPerusahaan,
       pekerjaanYangDipinjam: f.pekerjaanYangDipinjam,
-      tanggalTerima: f.tanggalTerima,
-      bank: f.bank,
+      tanggalTerima: f.tanggalTerima ?? "",
+      bank: f.bank ?? "",
       nominalDiterima: f.nominalDiterima,
+      ceklisPpn: f.ceklisPpn,
+      ceklisPph: f.ceklisPph,
+      ceklisBuktiPotong: f.ceklisBuktiPotong,
       projectId: f.projectId ?? "",
     });
     setErrorMessage(null);
     setIsFakturModalOpen(true);
+  }
+
+  function handleToggleCeklis(fakturId: string, field: "ppn" | "pph" | "buktiPotong", currentValue: boolean) {
+    if (!canEdit) return;
+    startTransition(async () => {
+      const res = await toggleCeklisDokumenFakturAction(fakturId, field, !currentValue);
+      if (res?.error) {
+        alert(res.error);
+      } else {
+        router.refresh();
+      }
+    });
   }
 
   function openReconModal(rec: RekonsiliasiPajakItem) {
@@ -290,9 +315,12 @@ export function LaporanPendapatanClient({
         kodeJenisProyek: Number(formFaktur.kodeJenisProyek),
         pekerjaanPerusahaan: Number(formFaktur.pekerjaanPerusahaan),
         pekerjaanYangDipinjam: Number(formFaktur.pekerjaanYangDipinjam),
-        tanggalTerima: formFaktur.tanggalTerima,
-        bank: formFaktur.bank,
-        nominalDiterima: Number(formFaktur.nominalDiterima),
+        tanggalTerima: formFaktur.tanggalTerima.trim() ? formFaktur.tanggalTerima.trim() : null,
+        bank: formFaktur.bank.trim() ? formFaktur.bank.trim() : null,
+        nominalDiterima: Number(formFaktur.nominalDiterima) || 0,
+        ceklisPpn: formFaktur.ceklisPpn,
+        ceklisPph: formFaktur.ceklisPph,
+        ceklisBuktiPotong: formFaktur.ceklisBuktiPotong,
         projectId: formFaktur.projectId || null,
       };
 
@@ -671,22 +699,24 @@ export function LaporanPendapatanClient({
               <thead className="bg-surface-subtle text-navy-text border-b border-border-soft font-semibold">
                 <tr>
                   <th className="p-3 text-center w-10">No</th>
-                  <th className="p-3 text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">Kode Proyek</th>
                   <th className="p-3">No. Faktur / NPWP</th>
                   <th className="p-3">Rekanan & Uraian JKP</th>
+                  <th className="p-3 text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">Proyek Terkait</th>
                   <th className="p-3 text-center">Masa</th>
                   <th className="p-3 text-right">DPP</th>
                   <th className="p-3 text-right">DPP Nilai Lain</th>
-                  <th className="p-3 text-right">PPN (12%)</th>
-                  <th className="p-3 text-right">PPh (3.5%)</th>
+                  <th className="p-3 text-right">PPN Realisasi</th>
+                  <th className="p-3 text-right">PPh Realisasi</th>
                   <th className="p-3 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">
                     Nilai Proyek (111%)
                   </th>
                   <th className="p-3 text-right text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10">
-                    Laba Stlh Pajak
+                    Netto Tagihan
                   </th>
-                  <th className="p-3 text-right">Dana Cair</th>
-                  <th className="p-3">Tgl Terima / Bank</th>
+                  <th className="p-3 text-right">Dana Cair Bank</th>
+                  <th className="p-3 text-center">Balance Control</th>
+                  <th className="p-3">Tgl & Rekening Bank</th>
+                  <th className="p-3 text-center">Ceklis Fisik</th>
                   <th className="p-3 text-center">Jenis</th>
                   {canEdit && <th className="p-3 text-center w-20">Aksi</th>}
                 </tr>
@@ -695,7 +725,7 @@ export function LaporanPendapatanClient({
                 {filteredFaktur.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canEdit ? 15 : 14}
+                      colSpan={canEdit ? 17 : 16}
                       className="p-8 text-center text-navy-soft"
                     >
                       <Receipt className="w-8 h-8 mx-auto text-slate-300 mb-2" />
@@ -709,6 +739,23 @@ export function LaporanPendapatanClient({
                       className="hover:bg-surface-hover/50 transition-colors"
                     >
                       <td className="p-3 text-center text-navy-soft">{idx + 1}</td>
+                      <td className="p-3">
+                        <div className="font-bold text-navy-text flex items-center gap-1.5">
+                          <Receipt size={13} className="text-blue-600 shrink-0" />
+                          <span>{f.noFaktur}</span>
+                        </div>
+                        <div className="text-[11px] text-navy-soft font-mono mt-0.5">
+                          NPWP: {f.npwp}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium text-navy-text max-w-xs truncate" title={f.namaRekanan}>
+                          {f.namaRekanan}
+                        </div>
+                        <div className="text-[11px] text-navy-soft max-w-xs truncate" title={f.namaJkp}>
+                          {f.namaJkp}
+                        </div>
+                      </td>
                       <td className="p-3">
                         {f.projectCode ? (
                           <div>
@@ -728,22 +775,6 @@ export function LaporanPendapatanClient({
                           <span className="text-slate-400 font-mono text-xs">-</span>
                         )}
                       </td>
-                      <td className="p-3">
-                        <div className="font-semibold text-navy-text">
-                          {f.noFaktur}
-                        </div>
-                        <div className="text-[11px] text-navy-soft font-mono">
-                          {f.npwp}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-medium text-navy-text max-w-xs truncate">
-                          {f.namaRekanan}
-                        </div>
-                        <div className="text-[11px] text-navy-soft max-w-xs truncate">
-                          {f.namaJkp}
-                        </div>
-                      </td>
                       <td className="p-3 text-center">
                         <span className="px-2 py-1 text-[11px] font-medium rounded-full bg-surface-hover text-muted-stronger">
                           {f.namaBulan}
@@ -755,13 +786,13 @@ export function LaporanPendapatanClient({
                       </td>
                       <td className="p-3 text-right font-mono text-purple-700" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
                         {f.ppnFmt}
-                        {f.tarifPpnPersen !== 12 && (
+                        {f.isRealized && f.tarifPpnPersen !== 12 && (
                           <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPpnPersen}%)</span>
                         )}
                       </td>
                       <td className="p-3 text-right font-mono text-amber-700" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
                         {f.pphFmt}
-                        {f.tarifPphPersen !== 3.5 && (
+                        {f.isRealized && f.tarifPphPersen !== 3.5 && (
                           <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPphPersen}%)</span>
                         )}
                       </td>
@@ -772,12 +803,83 @@ export function LaporanPendapatanClient({
                         {f.labaSetelahPajakFmt}
                       </td>
                       <td className="p-3 text-right font-mono font-medium">
-                        {f.nominalDiterimaFmt}
+                        {f.isRealized ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{f.nominalDiterimaFmt}</span>
+                        ) : (
+                          <span className="text-muted-faint text-[11px] italic">Belum Cair</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {f.balanceStatus === "BALANCE" ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border border-green-200">
+                            <CheckCircle2 size={10} /> Balance
+                          </span>
+                        ) : f.balanceStatus === "SELISIH" ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-200"
+                            title={`Selisih dengan net tagihan: ${f.selisihBankFmt}`}
+                          >
+                            <AlertTriangle size={10} /> Selisih: {f.selisihBankFmt}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-subtle text-muted-faint border border-border">
+                            Belum Cair
+                          </span>
+                        )}
                       </td>
                       <td className="p-3">
-                        <div className="font-mono text-xs">{f.tanggalTerima}</div>
-                        <div className="text-[11px] font-semibold text-blue-600">
-                          {f.bank}
+                        {f.tanggalTerima ? (
+                          <>
+                            <div className="font-mono text-xs">{f.tanggalTerima}</div>
+                            <div className="text-[11px] font-semibold text-blue-600">
+                              {f.bank || "-"}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-muted-faint text-[11px] italic">Belum Diterima</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCeklis(f.id, "ppn", f.ceklisPpn)}
+                            disabled={!canEdit || isPending}
+                            title={f.ceklisPpn ? "Fisik PPN: Diterima (Klik untuk ubah)" : "Fisik PPN: Belum Diterima (Klik untuk ceklis)"}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                              f.ceklisPpn
+                                ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300"
+                                : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
+                            }`}
+                          >
+                            PPN {f.ceklisPpn ? "✓" : "○"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCeklis(f.id, "pph", f.ceklisPph)}
+                            disabled={!canEdit || isPending}
+                            title={f.ceklisPph ? "Fisik PPh: Diterima (Klik untuk ubah)" : "Fisik PPh: Belum Diterima (Klik untuk ceklis)"}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                              f.ceklisPph
+                                ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300"
+                                : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
+                            }`}
+                          >
+                            PPh {f.ceklisPph ? "✓" : "○"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCeklis(f.id, "buktiPotong", f.ceklisBuktiPotong)}
+                            disabled={!canEdit || isPending}
+                            title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima (Klik untuk ubah)" : "Bukti Potong: Belum Diterima (Klik untuk ceklis)"}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                              f.ceklisBuktiPotong
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
+                            }`}
+                          >
+                            Bupot {f.ceklisBuktiPotong ? "✓" : "○"}
+                          </button>
                         </div>
                       </td>
                       <td className="p-3 text-center">
@@ -802,7 +904,7 @@ export function LaporanPendapatanClient({
                             <button
                               onClick={() => openEditFakturModal(f)}
                               title="Edit Faktur"
-                              className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
@@ -812,7 +914,7 @@ export function LaporanPendapatanClient({
                                 setIsDeleteModalOpen(true);
                               }}
                               title="Hapus Faktur"
-                              className="p-1.5 text-navy-soft hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              className="p-1.5 text-navy-soft hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -850,7 +952,7 @@ export function LaporanPendapatanClient({
                   <td className="p-3 text-right font-mono">
                     {data.totalPeriod.nominalDiterimaFmt}
                   </td>
-                  <td colSpan={canEdit ? 3 : 2}></td>
+                  <td colSpan={canEdit ? 5 : 4}></td>
                 </tr>
               </tfoot>
             </table>
@@ -1802,11 +1904,10 @@ export function LaporanPendapatanClient({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Tanggal Terima Dana di Bank <span className="text-rose-500">*</span>
+                    Tanggal Terima Dana di Bank <span className="text-[10px] text-navy-soft font-normal">(Opsional jika belum cair)</span>
                   </label>
                   <input
                     type="date"
-                    required
                     value={formFaktur.tanggalTerima}
                     onChange={(e) =>
                       setFormFaktur({
@@ -1820,7 +1921,7 @@ export function LaporanPendapatanClient({
 
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Rekening Bank Tujuan <span className="text-rose-500">*</span>
+                    Rekening Bank Tujuan <span className="text-[10px] text-navy-soft font-normal">(Opsional)</span>
                   </label>
                   <select
                     value={formFaktur.bank}
@@ -1829,6 +1930,7 @@ export function LaporanPendapatanClient({
                     }
                     className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                   >
+                    <option value="">-- Belum Cair / Kosong --</option>
                     {data.bankOptions.map((b) => (
                       <option key={b.id} value={b.nama}>
                         {b.nama}
@@ -1842,7 +1944,7 @@ export function LaporanPendapatanClient({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-navy-text">
-                      Nominal Benar-Benar Cair <span className="text-rose-500">*</span>
+                      Nominal Benar-Benar Cair <span className="text-[10px] text-navy-soft font-normal">(Rp 0 jika belum)</span>
                     </label>
                     {liveCalc.labaSetelahPajak > 0 && (
                       <button
@@ -1866,7 +1968,6 @@ export function LaporanPendapatanClient({
                     </span>
                     <input
                       type="number"
-                      required
                       min={0}
                       step="any"
                       placeholder="0"
@@ -1885,6 +1986,59 @@ export function LaporanPendapatanClient({
                       {formatRupiah(formFaktur.nominalDiterima)}
                     </span>
                   )}
+                </div>
+              </div>
+
+              {/* Form Grid 6: Kontrol Administratif Dokumen Fisik Pajak */}
+              <div className="p-3.5 bg-surface-subtle/70 rounded-xl border border-border-soft">
+                <span className="block text-xs font-bold text-navy-text mb-2">
+                  Kontrol Administratif Dokumen Fisik Pajak
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="flex items-center gap-2.5 p-2 bg-surface-card rounded-lg border border-border-soft cursor-pointer hover:bg-surface-hover transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formFaktur.ceklisPpn}
+                      onChange={(e) =>
+                        setFormFaktur({ ...formFaktur, ceklisPpn: e.target.checked })
+                      }
+                      className="w-4 h-4 text-purple-600 rounded border-border-soft focus:ring-purple-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-semibold text-navy-text block">Faktur Pajak PPN</span>
+                      <span className="text-[10px] text-navy-soft">Fisik faktur diterima</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-2 bg-surface-card rounded-lg border border-border-soft cursor-pointer hover:bg-surface-hover transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formFaktur.ceklisPph}
+                      onChange={(e) =>
+                        setFormFaktur({ ...formFaktur, ceklisPph: e.target.checked })
+                      }
+                      className="w-4 h-4 text-amber-600 rounded border-border-soft focus:ring-amber-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-semibold text-navy-text block">Bukti Bayar PPh</span>
+                      <span className="text-[10px] text-navy-soft">Fisik SSP/NTPN ada</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-2 bg-surface-card rounded-lg border border-border-soft cursor-pointer hover:bg-surface-hover transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formFaktur.ceklisBuktiPotong}
+                      onChange={(e) =>
+                        setFormFaktur({ ...formFaktur, ceklisBuktiPotong: e.target.checked })
+                      }
+                      className="w-4 h-4 text-emerald-600 rounded border-border-soft focus:ring-emerald-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-semibold text-navy-text block">Sertifikat Bukti Potong</span>
+                      <span className="text-[10px] text-navy-soft">Bupot resmi diterima</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 

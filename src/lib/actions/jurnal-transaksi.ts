@@ -428,7 +428,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
               name: `Termin ${terminKe} (${deltaPct}% Kontrak) [${noBukti}]`,
               percentage: newPct,
               nominal: nominalTermin,
-              status: newPct >= 80 ? TerminStatus.ON_TRACK : TerminStatus.AT_RISK,
+              status: TerminStatus.ON_TRACK,
             },
           });
 

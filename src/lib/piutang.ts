@@ -400,8 +400,8 @@ export async function getPiutangData(entityId: string | string[]) {
         ppn = Number(matchedFaktur.ppn);
         pph = Number(matchedFaktur.pph);
         netBank = Number(matchedFaktur.nominalDiterima);
-        bankName = matchedFaktur.bank;
-        tanggalFmt = matchedFaktur.tanggalTerima.toLocaleDateString("id-ID");
+        bankName = matchedFaktur.bank || "-";
+        tanggalFmt = matchedFaktur.tanggalTerima ? matchedFaktur.tanggalTerima.toLocaleDateString("id-ID") : "-";
       } else if (matchedJurnals.length > 0) {
         const pphDebit = matchedJurnals
           .filter((j) => j.coaAccount && /pph/i.test(j.coaAccount.name))

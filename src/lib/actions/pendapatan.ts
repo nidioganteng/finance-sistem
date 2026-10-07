@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
 import { hitungPajakFaktur } from "@/lib/pendapatan";
+import { autoRegisterRekananIfNew } from "@/lib/actions/rekanan";
 
 export type FakturPendapatanInput = {
   entityId: string;
@@ -108,6 +109,11 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
     },
   });
 
+  // Auto-register atau sync ke Master Data Rekanan Terpusat jika rekanan baru
+  if (data.npwp && data.namaRekanan) {
+    await autoRegisterRekananIfNew(data.npwp, data.namaRekanan);
+  }
+
   logActivity(
     session.user.id,
     `Tambah faktur pendapatan: ${created.noFaktur} - ${created.namaRekanan} (${entity.name})`,
@@ -191,6 +197,10 @@ export async function updateFakturPendapatanAction(
       ...(data.bankTransactionId !== undefined ? { bankTransactionId: data.bankTransactionId || null } : {}),
     },
   });
+
+  if (data.npwp && data.namaRekanan) {
+    await autoRegisterRekananIfNew(data.npwp, data.namaRekanan);
+  }
 
   logActivity(
     session.user.id,

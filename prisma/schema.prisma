@@ -65,6 +65,7 @@ model Entity {
   asetTetap        AsetTetap[]
   fakturPendapatan FakturPendapatan[]
   rekonsiliasiPajak RekonsiliasiPajakBulanan[]
+  rekanan           Rekanan[]
 }
 
 model UserEntityAccess {
@@ -383,4 +384,39 @@ model TarifPajak {
   active         Boolean   @default(true)
   createdAt      DateTime  @default(now())
 }
+
+enum RekananTipe {
+  VENDOR
+  KLIEN
+  TENAGA_AHLI
+  LAINNYA
+}
+
+// Master Data Rekanan (Vendor, Klien, Tenaga Ahli) - Database Terpusat (Issue 84)
+model Rekanan {
+  id           String      @id @default(cuid())
+  nama         String
+  npwp         String?     // NPWP resmi (15/16 digit)
+  nik          String?     // NIK KTP (16 digit)
+  tipe         RekananTipe @default(VENDOR)
+  kategori     String?     // Sub-kategori (Subkon, Konsultan, Dinas, Supplier, dll)
+  alamat       String?     @db.Text
+  telepon      String?
+  email        String?
+  namaBank     String?     // Nama bank (Mandiri, BNI, BCA, BRI, Bank Kalteng, dll)
+  noRekening   String?     // Nomor rekening bank
+  atasNamaBank String?     // Nama pemilik rekening bank
+  entityId     String?     // Relasi opsional jika khusus entitas tertentu (null = berlaku lintas entitas / grup)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  entity Entity? @relation(fields: [entityId], references: [id])
+
+  @@index([npwp])
+  @@index([nik])
+  @@index([nama])
+  @@index([tipe])
+  @@index([entityId])
+}
+
 

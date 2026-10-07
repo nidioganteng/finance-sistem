@@ -47,6 +47,7 @@ import {
   toggleCeklisDokumenFakturAction,
   type FakturPendapatanInput,
 } from "@/lib/actions/pendapatan";
+import { searchRekananAction, type RekananItem } from "@/lib/actions/rekanan";
 import { formatRupiah } from "@/lib/dashboard-data";
 
 interface Props {
@@ -107,6 +108,12 @@ export function LaporanPendapatanClient({
   // Termin selection state for auto-syncing DPP
   const [selectedTerminId, setSelectedTerminId] = useState<string>("");
   const [showManualDppFallback, setShowManualDppFallback] = useState(false);
+
+  // Auto-Fill Master Rekanan state (Issue 84)
+  const [rekananSuggestions, setRekananSuggestions] = useState<RekananItem[]>([]);
+  const [showRekananDropdown, setShowRekananDropdown] = useState(false);
+  const [matchedRekananMaster, setMatchedRekananMaster] = useState<RekananItem | null>(null);
+  const [isSearchingRekanan, setIsSearchingRekanan] = useState(false);
 
   // Form state for Rekonsiliasi
   const [formRecon, setFormRecon] = useState({
@@ -203,10 +210,82 @@ export function LaporanPendapatanClient({
     });
   }
 
+  async function handleNpwpChange(val: string) {
+    setFormFaktur((prev) => ({ ...prev, npwp: val }));
+    const trimmed = val.trim();
+    if (trimmed.length >= 3) {
+      setIsSearchingRekanan(true);
+      try {
+        const res = await searchRekananAction(trimmed);
+        if (res.data && res.data.length > 0) {
+          const cleanedInput = trimmed.replace(/[\s.\-_/]/g, "").toLowerCase();
+          const match =
+            res.data.find((r) => {
+              const rNpwp = (r.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
+              return rNpwp === cleanedInput || rNpwp.includes(cleanedInput);
+            }) || res.data[0];
+
+          if (match) {
+            setMatchedRekananMaster(match);
+            setFormFaktur((prev) => ({
+              ...prev,
+              namaRekanan: match.nama,
+            }));
+          } else {
+            setMatchedRekananMaster(null);
+          }
+        } else {
+          setMatchedRekananMaster(null);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setIsSearchingRekanan(false);
+      }
+    } else {
+      setMatchedRekananMaster(null);
+    }
+  }
+
+  async function handleNamaRekananChange(val: string) {
+    setFormFaktur((prev) => ({ ...prev, namaRekanan: val }));
+    const trimmed = val.trim();
+    if (trimmed.length >= 2) {
+      try {
+        const res = await searchRekananAction(trimmed);
+        if (res.data && res.data.length > 0) {
+          setRekananSuggestions(res.data);
+          setShowRekananDropdown(true);
+        } else {
+          setRekananSuggestions([]);
+          setShowRekananDropdown(false);
+        }
+      } catch {
+        // ignore
+      }
+    } else {
+      setRekananSuggestions([]);
+      setShowRekananDropdown(false);
+    }
+  }
+
+  function handleSelectRekanan(r: RekananItem) {
+    setFormFaktur((prev) => ({
+      ...prev,
+      namaRekanan: r.nama,
+      npwp: r.npwp || prev.npwp,
+    }));
+    setMatchedRekananMaster(r);
+    setShowRekananDropdown(false);
+  }
+
   function openCreateFakturModal() {
     setEditingFaktur(null);
     setSelectedTerminId("");
     setShowManualDppFallback(false);
+    setMatchedRekananMaster(null);
+    setRekananSuggestions([]);
+    setShowRekananDropdown(false);
     setFormFaktur({
       npwp: "",
       noFaktur: "",
@@ -244,6 +323,9 @@ export function LaporanPendapatanClient({
       setSelectedTerminId("");
       setShowManualDppFallback(true);
     }
+    setMatchedRekananMaster(null);
+    setRekananSuggestions([]);
+    setShowRekananDropdown(false);
     setFormFaktur({
       npwp: f.npwp,
       noFaktur: f.noFaktur,
@@ -1320,8 +1402,8 @@ export function LaporanPendapatanClient({
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
-                      namaRekanan: prev.namaRekanan || (p ? p.name : ""),
-                      namaJkp: prev.namaJkp || (p ? `Jasa Konsultansi ${p.name}` : ""),
+                      namaRekanan: prev.namaRekanan,
+                      namaJkp: p ? p.name : prev.namaJkp,
                     }));
                   }}
                   className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
@@ -1427,19 +1509,30 @@ export function LaporanPendapatanClient({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    NPWP Rekanan <span className="text-rose-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-navy-text">
+                      NPWP Rekanan <span className="text-rose-500">*</span>
+                    </label>
+                    {isSearchingRekanan && (
+                      <span className="text-[10px] text-blue-600 animate-pulse font-medium">
+                        Mencari di master...
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
                     placeholder="00.000.000.0-000.000"
                     value={formFaktur.npwp}
-                    onChange={(e) =>
-                      setFormFaktur({ ...formFaktur, npwp: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => handleNpwpChange(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {matchedRekananMaster && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Auto-Fill: {matchedRekananMaster.nama}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1467,20 +1560,60 @@ export function LaporanPendapatanClient({
 
               {/* Form Grid 2: Rekanan & JKP */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Nama Rekanan / Klien <span className="text-rose-500">*</span>
-                  </label>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-navy-text">
+                      Nama Rekanan / Klien <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-navy-soft">
+                      Auto-Fill Rekanan
+                    </span>
+                  </div>
                   <input
                     type="text"
                     required
                     placeholder="Contoh: RSUD dr. Doris Sylvanus"
                     value={formFaktur.namaRekanan}
-                    onChange={(e) =>
-                      setFormFaktur({ ...formFaktur, namaRekanan: e.target.value })
-                    }
+                    onChange={(e) => handleNamaRekananChange(e.target.value)}
+                    onFocus={() => {
+                      if (rekananSuggestions.length > 0) setShowRekananDropdown(true);
+                    }}
                     className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+
+                  {/* Floating Auto-complete dropdown */}
+                  {showRekananDropdown && rekananSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-surface-card border border-border-soft rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border-soft">
+                      <div className="p-2 text-[10px] font-bold text-navy-soft uppercase tracking-wider bg-surface-subtle/50 flex items-center justify-between">
+                        <span>Pilih Rekanan:</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowRekananDropdown(false)}
+                          className="text-navy-soft hover:text-navy-text"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {rekananSuggestions.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSelectRekanan(item)}
+                          className="w-full p-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-start justify-between gap-2 cursor-pointer"
+                        >
+                          <div>
+                            <div className="text-xs font-bold text-navy-text">{item.nama}</div>
+                            {item.npwp && (
+                              <div className="text-[10px] font-mono text-navy-soft">NPWP: {item.npwp}</div>
+                            )}
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-surface-subtle text-navy-soft border border-border-soft uppercase shrink-0">
+                            {item.tipe}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>

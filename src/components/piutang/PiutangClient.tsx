@@ -689,14 +689,14 @@ export function PiutangClient({
                                             <>
                                               <div className="rounded-xl border border-border overflow-hidden">
                                                 <div className="overflow-x-auto">
-                                                  <table className="w-full min-w-[760px] text-left text-xs">
+                                                  <table className="w-full min-w-[800px] text-left text-xs">
                                                     <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                                                       <tr>
                                                         <th className="py-2.5 px-3.5">Termin & Bukti Bayar</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Kwitansi Bruto</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(-) Potongan Pajak</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(=) Net Masuk Bank</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px]">Status & Aksi</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Kwitansi Bruto</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[170px]">(-) Potongan Pajak</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[145px]">(=) Net Masuk Bank</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[190px]">Status & Aksi</th>
                                                       </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-border bg-surface-card">
@@ -729,21 +729,21 @@ export function PiutangClient({
                                                             </td>
 
                                                             {/* Kolom 2: Bruto Kwitansi */}
-                                                            <td className="py-3 px-3.5 text-right">
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                                                               <div className="font-mono font-bold text-navy-text text-sm">
                                                                 {t.nominalFmt}
                                                               </div>
-                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                              <div className="text-[11px] text-muted-faint mt-0.5 whitespace-nowrap">
                                                                 Nilai tagihan bruto
                                                               </div>
                                                             </td>
 
                                                             {/* Kolom 3: Potongan Pajak */}
-                                                            <td className="py-3 px-3.5 text-right">
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                                                               <div className="font-mono font-semibold text-amber-700 dark:text-amber-300 text-sm">
                                                                 {formatRupiah(totalPajak)}
                                                               </div>
-                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                              <div className="text-[11px] text-muted-faint mt-0.5 whitespace-nowrap">
                                                                 {t.breakdown ? (
                                                                   <span>PPN: {t.breakdown.ppnFmt} · PPh: {t.breakdown.pphFmt}</span>
                                                                 ) : (
@@ -753,11 +753,11 @@ export function PiutangClient({
                                                             </td>
 
                                                             {/* Kolom 4: Net Masuk Bank */}
-                                                            <td className="py-3 px-3.5 text-right">
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                                                               <div className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
                                                                 {t.breakdown?.netBankFmt || t.nominalFmt}
                                                               </div>
-                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                              <div className="text-[11px] text-muted-faint mt-0.5 whitespace-nowrap">
                                                                 {t.breakdown?.bank ? `Masuk ke ${t.breakdown.bank}` : "Bersih rekening bank"}
                                                               </div>
                                                             </td>
@@ -790,7 +790,7 @@ export function PiutangClient({
                                                                         handleStatusChange(t.id, e.target.value as TerminStatus)
                                                                       }
                                                                       disabled={isPending}
-                                                                      className={`h-7 text-[11px] font-bold pl-2.5 pr-6 py-0.5 rounded-lg border cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
+                                                                      className={`no-custom-chevron h-7 text-[11px] font-bold pl-2.5 pr-6 py-0.5 rounded-lg border cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
                                                                       title="Klik untuk mengubah status termin"
                                                                     >
                                                                       <option value="ON_TRACK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">On Track</option>
@@ -828,13 +828,13 @@ export function PiutangClient({
                                                         <td className="py-3 px-3.5 text-navy-text font-bold">
                                                           Total Termin Cair ({p.termin.length} Termin):
                                                         </td>
-                                                        <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm">
+                                                        <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm whitespace-nowrap">
                                                           {p.breakdownSummary?.totalGrossFmt ?? p.terminTagihFmt}
                                                         </td>
-                                                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 text-sm">
+                                                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 text-sm whitespace-nowrap">
                                                           {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
                                                         </td>
-                                                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 text-sm">
+                                                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 text-sm whitespace-nowrap">
                                                           {p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}
                                                         </td>
                                                         <td className="py-3 px-3.5" />

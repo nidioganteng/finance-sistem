@@ -1566,7 +1566,7 @@ export function LaporanPendapatanClient({
                       Nama Rekanan / Klien <span className="text-rose-500">*</span>
                     </label>
                     <span className="text-[10px] text-navy-soft">
-                      Auto-Fill Master Data
+                      Auto-Fill Rekanan
                     </span>
                   </div>
                   <input
@@ -1585,7 +1585,7 @@ export function LaporanPendapatanClient({
                   {showRekananDropdown && rekananSuggestions.length > 0 && (
                     <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-surface-card border border-border-soft rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border-soft">
                       <div className="p-2 text-[10px] font-bold text-navy-soft uppercase tracking-wider bg-surface-subtle/50 flex items-center justify-between">
-                        <span>Pilih Rekanan Master:</span>
+                        <span>Pilih Rekanan:</span>
                         <button
                           type="button"
                           onClick={() => setShowRekananDropdown(false)}

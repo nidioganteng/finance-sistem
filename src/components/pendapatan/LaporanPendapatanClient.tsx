@@ -1777,9 +1777,14 @@ export function LaporanPendapatanClient({
 
                 {/* Sub-grid 3: Live Automatic Calculation Summary Cards */}
                 <div className="pt-2">
-                  <span className="text-[11px] font-bold text-navy-soft uppercase tracking-wider block mb-2">
-                    Hasil Perhitungan Pajak Otomatis (Live):
-                  </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                    <span className="text-[11px] font-bold text-navy-soft uppercase tracking-wider block">
+                      Simulasi Estimasi Tagihan & Potensi Pajak:
+                    </span>
+                    <span className="inline-flex items-center text-[10px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 font-medium">
+                      ℹ️ Di laporan, kolom PPN & PPh otomatis KOSONG (-) sampai uang cair di Jurnal Umum
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* Card 1: PPN */}
                     <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50">

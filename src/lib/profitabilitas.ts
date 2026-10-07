@@ -13,9 +13,12 @@ export async function getProfitabilitasData(entityId: string) {
 
   const projectSpends = projects.map((p) => {
     let spendFromJurnal = 0;
-    if (p.jurnal && p.jurnal.length > 0) {
+    const projectJurnal = (p.jurnal || []).filter(
+      (j) => !(j.extraFieldsJson && (j.extraFieldsJson as Record<string, unknown>).autoPostedFromJurnal === true)
+    );
+    if (projectJurnal.length > 0) {
       const incomeNoBuktis = new Set<string>();
-      p.jurnal.forEach((j) => {
+      projectJurnal.forEach((j) => {
         if (
           j.noBukti &&
           (j.coaAccount?.kategori === "PENDAPATAN" ||
@@ -26,7 +29,7 @@ export async function getProfitabilitasData(entityId: string) {
         }
       });
 
-      for (const j of p.jurnal) {
+      for (const j of projectJurnal) {
         if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
           const isTaxDeduction =
             Number(j.debit) > 0 &&

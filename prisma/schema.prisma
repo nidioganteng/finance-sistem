@@ -495,6 +495,7 @@ model HonorTenagaAhli {
   pph21            Decimal  @default(0.00) @db.Decimal(18, 2) // Nilai pajak dipotong
   nominalBersih    Decimal  @db.Decimal(18, 2) // Net diterima
   projectId        String?  // Opsional jika dibebankan ke proyek tertentu
+  namaProyek       String?  // Nama proyek terkait (bisa custom atau dari relasi project)
   noBukti          String?  // Nomor bukti bayar / kas keluar / voucher
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

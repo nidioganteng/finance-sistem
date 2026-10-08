@@ -129,15 +129,15 @@ export function PayrollClient({
     (initialTab as "pegawai" | "tenaga-ahli" | "sync") || "pegawai"
   );
 
-  // Sub-tab pegawai: "rekap-bulan" (Rekap Gaji Setahun) | "gaji" (Gaji Per Bulan) | "master" | "tahunan"
+  // Sub-tab pegawai: "gaji" (Gaji Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "master" | "tahunan"
   const [pegawaiSubTab, setPegawaiSubTab] = useState<
-    "rekap-bulan" | "gaji" | "master" | "tahunan"
-  >("rekap-bulan");
+    "gaji" | "rekap-bulan" | "master" | "tahunan"
+  >("gaji");
 
-  // Sub-tab tenaga ahli: "rekap-bulan" (Rekap Gaji Setahun) | "honor" (Honor Per Bulan) | "rekap-nama" | "konsolidasi"
+  // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "rekap-nama" | "konsolidasi"
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
-    "rekap-bulan" | "honor" | "rekap-nama" | "konsolidasi"
-  >("rekap-bulan");
+    "honor" | "rekap-bulan" | "rekap-nama" | "konsolidasi"
+  >("honor");
 
   // Filter entitas untuk tab Cek Per Nama
   const [filterEntitasNama, setFilterEntitasNama] = useState<string>("ALL");
@@ -320,16 +320,6 @@ export function PayrollClient({
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 bg-surface-subtle p-1 rounded-xl overflow-x-auto">
               <button
-                onClick={() => setPegawaiSubTab("rekap-bulan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                  pegawaiSubTab === "rekap-bulan"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
-                }`}
-              >
-                Rekap Gaji Setahun ({selectedYear})
-              </button>
-              <button
                 onClick={() => setPegawaiSubTab("gaji")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   pegawaiSubTab === "gaji"
@@ -338,6 +328,16 @@ export function PayrollClient({
                 }`}
               >
                 Gaji Per Bulan (Input & Daftar) – {BULAN_NAMES[selectedMonth - 1]}
+              </button>
+              <button
+                onClick={() => setPegawaiSubTab("rekap-bulan")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  pegawaiSubTab === "rekap-bulan"
+                    ? "bg-surface-card text-navy-text shadow-2xs"
+                    : "text-muted-faint hover:text-navy-text"
+                }`}
+              >
+                Rekap Gaji Setahun ({selectedYear})
               </button>
               <button
                 onClick={() => setPegawaiSubTab("master")}
@@ -970,16 +970,6 @@ export function PayrollClient({
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 bg-surface-subtle p-1 rounded-xl overflow-x-auto">
               <button
-                onClick={() => setTenagaAhliSubTab("rekap-bulan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                  tenagaAhliSubTab === "rekap-bulan"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
-                }`}
-              >
-                Rekap Gaji Setahun ({selectedYear})
-              </button>
-              <button
                 onClick={() => setTenagaAhliSubTab("honor")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   tenagaAhliSubTab === "honor"
@@ -988,6 +978,16 @@ export function PayrollClient({
                 }`}
               >
                 Honor Per Bulan (Input & Daftar) – {BULAN_NAMES[selectedMonth - 1]}
+              </button>
+              <button
+                onClick={() => setTenagaAhliSubTab("rekap-bulan")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  tenagaAhliSubTab === "rekap-bulan"
+                    ? "bg-surface-card text-navy-text shadow-2xs"
+                    : "text-muted-faint hover:text-navy-text"
+                }`}
+              >
+                Rekap Gaji Setahun ({selectedYear})
               </button>
               <button
                 onClick={() => setTenagaAhliSubTab("rekap-nama")}

@@ -272,7 +272,7 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   const uraian = (formData.get("uraian") as string)?.trim();
   const tanggalStr = formData.get("tanggal") as string;
   const nominalHonor = Number(formData.get("nominalHonor")) || 0;
-  const tarifPph21Persen = Number(formData.get("tarifPph21Persen")) || 2.5;
+  const tarifPph21Persen = Number(formData.get("tarifPph21Persen")) || 0;
   const pph21 = Number(formData.get("pph21")) || 0;
   const projectId = (formData.get("projectId") as string)?.trim() || null;
   let namaProyek = (formData.get("namaProyek") as string)?.trim() || null;
@@ -375,7 +375,7 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
     });
     await logActivity(
       session.user.id,
-      `Input Honorarium Tenaga Ahli: ${nama} - Rp ${nominalHonor.toLocaleString("id-ID")} (PPh 21: Rp ${pph21.toLocaleString("id-ID")})`,
+      `Input Honorarium Tenaga Ahli: ${nama} - Rp ${nominalHonor.toLocaleString("id-ID")}`,
       "FINANCIAL_CHANGE",
       { honorId: honor.id, entityId }
     );

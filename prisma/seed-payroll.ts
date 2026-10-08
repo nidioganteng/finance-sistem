@@ -338,6 +338,7 @@ async function main() {
       pph21: 1250000,
       nominalBersih: 23750000,
       projectId: dorisProject?.id ?? null,
+      namaProyek: dorisProject ? `${dorisProject.code} - ${dorisProject.name}` : "RSUD Doris Sylvanus",
       noBukti: "HON-GHR-2610-001",
     },
     {
@@ -355,6 +356,7 @@ async function main() {
       pph21: 1500000,
       nominalBersih: 28500000,
       projectId: kahayanProject?.id ?? null,
+      namaProyek: kahayanProject ? `${kahayanProject.code} - ${kahayanProject.name}` : "Jembatan Sei Kahayan Tahap 2",
       noBukti: "HON-GHR-2610-002",
     },
     {
@@ -372,6 +374,7 @@ async function main() {
       pph21: 900000,
       nominalBersih: 17100000,
       projectId: drainaseProject?.id ?? null,
+      namaProyek: drainaseProject ? `${drainaseProject.code} - ${drainaseProject.name}` : "Drainase Kota Palangka Raya",
       noBukti: "HON-GHR-2610-003",
     },
   ];
@@ -393,6 +396,7 @@ async function main() {
       pph21: 750000,
       nominalBersih: 14250000,
       projectId: null,
+      namaProyek: "Masterplan Kawasan Kencana",
       noBukti: "HON-KCN-2609-001",
     });
   }
@@ -413,6 +417,7 @@ async function main() {
       pph21: 600000,
       nominalBersih: 11400000,
       projectId: null,
+      namaProyek: "Kajian Amdal Tataring",
       noBukti: "HON-TTR-2609-001",
     });
   }
@@ -428,7 +433,12 @@ async function main() {
       },
     });
 
-    if (!existing) {
+    if (existing) {
+      await prisma.honorTenagaAhli.update({
+        where: { id: existing.id },
+        data: { namaProyek: h.namaProyek },
+      });
+    } else {
       await prisma.honorTenagaAhli.create({
         data: h,
       });

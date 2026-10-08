@@ -384,7 +384,7 @@ export function PayrollClient({
                 }`}
               >
                 <Users size={13} className={pegawaiSubTab === "master" ? "text-navy" : "text-muted-faint"} />
-                <span>Database Karyawan</span>
+                <span>Database Pegawai Tetap</span>
                 <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
                   pegawaiSubTab === "master" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
                 }`}>
@@ -421,16 +421,36 @@ export function PayrollClient({
               </div>
 
               {isManager && (
-                <button
-                  onClick={() => {
-                    setEditingPegawai(null);
-                    setIsPegawaiModalOpen(true);
-                  }}
-                  className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                >
-                  <Plus size={14} />
-                  <span>Tambah Pegawai</span>
-                </button>
+                <div>
+                  {pegawaiSubTab === "master" ? (
+                    <button
+                      onClick={() => {
+                        setEditingPegawai(null);
+                        setIsPegawaiModalOpen(true);
+                      }}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <Plus size={14} />
+                      <span>Tambah Pegawai Baru</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const targetPegawai = data.pegawaiList.find((p) => !p.currentGaji) || data.pegawaiList[0];
+                        if (targetPegawai) {
+                          setEditingGaji({ pegawai: targetPegawai, gaji: targetPegawai.currentGaji });
+                          setIsGajiModalOpen(true);
+                        } else {
+                          setErrorMsg("Belum ada pegawai terdaftar di entitas ini. Silakan tambahkan pegawai terlebih dahulu.");
+                        }
+                      }}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <Plus size={14} />
+                      <span>Input Gaji Pegawai</span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -849,13 +869,27 @@ export function PayrollClient({
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <h3 className="text-sm font-bold text-navy-text">
-                    Database Master Pegawai Tetap
+                  <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                    <Users size={16} className="text-navy" />
+                    <span>Database Pegawai Tetap (Master Karyawan)</span>
                   </h3>
-                  <p className="text-xs text-muted-faint">
-                    Kelola data identitas, status PTKP, dan gaji pokok standar per karyawan pada {data.entity?.name}
+                  <p className="text-xs text-muted-faint mt-0.5">
+                    Daftar profil seluruh pegawai tetap. NIK dan gaji pokok didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar.
                   </p>
                 </div>
+
+                {isManager && (
+                  <button
+                    onClick={() => {
+                      setEditingPegawai(null);
+                      setIsPegawaiModalOpen(true);
+                    }}
+                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={14} />
+                    <span>Tambah Pegawai Baru</span>
+                  </button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -1038,8 +1072,8 @@ export function PayrollClient({
                     : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                <DollarSign size={13} className={tenagaAhliSubTab === "honor" ? "text-navy" : "text-muted-faint"} />
-                <span>Honor Bulanan</span>
+                <CreditCard size={13} className={tenagaAhliSubTab === "honor" ? "text-navy" : "text-muted-faint"} />
+                <span>Gaji Bulanan</span>
                 <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
                   tenagaAhliSubTab === "honor" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
                 }`}>
@@ -1151,7 +1185,7 @@ export function PayrollClient({
                       className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
                     >
                       <Plus size={14} />
-                      <span>Input Honor Tenaga Ahli</span>
+                      <span>Input Gaji Tenaga Ahli</span>
                     </button>
                   )}
                 </div>
@@ -1163,7 +1197,7 @@ export function PayrollClient({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
             <div className="p-4 rounded-2xl border border-border bg-surface-card">
               <div className="text-[11px] font-medium text-muted-faint">
-                Transaksi Honor Bulan Ini
+                Transaksi Gaji Bulan Ini
               </div>
               <div className="text-xl font-bold font-mono text-navy-text mt-1">
                 {data.summaryHonorBulanIni.totalTransaksi} Pembayaran
@@ -1175,13 +1209,13 @@ export function PayrollClient({
 
             <div className="p-4 rounded-2xl border border-border bg-surface-card">
               <div className="text-[11px] font-medium text-muted-faint">
-                Total Honor Tenaga Ahli
+                Total Gaji Tenaga Ahli
               </div>
               <div className="text-xl font-bold font-mono text-navy-text mt-1">
                 {data.summaryHonorBulanIni.totalHonorBrutoFmt}
               </div>
               <div className="text-[10px] text-muted-faint mt-1">
-                Beban honorarium bulan {BULAN_NAMES[selectedMonth - 1]}
+                Beban gaji bulan {BULAN_NAMES[selectedMonth - 1]}
               </div>
             </div>
 
@@ -1210,18 +1244,34 @@ export function PayrollClient({
             </div>
           </div>
 
-          {/* Sub-Tab 1: Honorarium Bulan Ini */}
+          {/* Sub-Tab 1: Gaji Bulanan Tenaga Ahli */}
           {tenagaAhliSubTab === "honor" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="text-sm font-bold text-navy-text">
-                    Daftar Honorarium Tenaga Ahli – {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
+                    Daftar Gaji Tenaga Ahli – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
                   </h3>
                   <p className="text-xs text-muted-faint">
-                    Pencatatan pembayaran honorarium jasa tenaga ahli pada entitas {data.entity?.name}
+                    Entitas: {data.entity?.name} · Pencatatan pembayaran gaji tenaga ahli lepas
                   </p>
                 </div>
+
+                {isManager && (
+                  <button
+                    onClick={() => {
+                      setEditingHonor(null);
+                      if (data.rekananTenagaAhli.length > 0 && !selectedRekananIdForHonor) {
+                        setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
+                      }
+                      setIsHonorModalOpen(true);
+                    }}
+                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={14} />
+                    <span>Input Gaji Tenaga Ahli</span>
+                  </button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -1231,7 +1281,7 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5">Tanggal & Bukti</th>
                       <th className="py-2.5 px-3.5">Tenaga Ahli</th>
                       <th className="py-2.5 px-3.5">Uraian / Pekerjaan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Nominal Honorarium</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Nominal Gaji</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Aksi</th>
                     </tr>
                   </thead>
@@ -1239,7 +1289,7 @@ export function PayrollClient({
                     {filteredHonorList.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-8 text-center text-muted-faint">
-                          Belum ada transaksi honorarium tenaga ahli pada bulan ini.
+                          Belum ada data gaji tenaga ahli pada bulan ini. Silakan klik "Input Gaji Tenaga Ahli" untuk mencatat gaji.
                         </td>
                       </tr>
                     ) : (
@@ -1425,11 +1475,11 @@ export function PayrollClient({
               <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-surface-subtle/30">
                 <div>
                   <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                    <Award size={16} className="text-navy" />
-                    <span>Database Tenaga Ahli (Master Rekanan Bukan Pegawai)</span>
+                    <Users size={16} className="text-navy" />
+                    <span>Database Pegawai Tenaga Ahli (Master Rekanan)</span>
                   </h3>
                   <p className="text-xs text-muted-faint mt-0.5">
-                    Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input honor bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
+                    Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
                   </p>
                 </div>
 
@@ -1442,7 +1492,7 @@ export function PayrollClient({
                     className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
                   >
                     <Plus size={14} />
-                    <span>Tambah Tenaga Ahli</span>
+                    <span>Tambah Tenaga Ahli Baru</span>
                   </button>
                 )}
               </div>
@@ -1463,7 +1513,7 @@ export function PayrollClient({
                         <td colSpan={4} className="py-8 text-center text-muted-faint">
                           {searchQuery
                             ? "Tidak ada tenaga ahli yang cocok dengan pencarian."
-                            : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli' untuk mendaftarkan profil tenaga ahli."}
+                            : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli Baru' untuk mendaftarkan profil tenaga ahli."}
                         </td>
                       </tr>
                     ) : (
@@ -1507,10 +1557,10 @@ export function PayrollClient({
                                         setIsHonorModalOpen(true);
                                       }}
                                       className="h-7 px-2.5 rounded-lg bg-navy text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs hover:bg-navy-light"
-                                      title="Input Pembayaran Honor untuk Tenaga Ahli ini"
+                                      title="Input Gaji untuk Tenaga Ahli ini"
                                     >
                                       <Plus size={11} />
-                                      <span>Input Honor</span>
+                                      <span>Input Gaji</span>
                                     </button>
                                     <button
                                       onClick={() => {
@@ -2406,7 +2456,7 @@ export function PayrollClient({
                     disabled={isPending}
                     className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
                   >
-                    {isPending ? "Menyimpan..." : "Simpan Gaji"}
+                    {isPending ? "Menyimpan..." : "Simpan Gaji Pegawai"}
                   </button>
                 </div>
               </div>
@@ -2416,23 +2466,23 @@ export function PayrollClient({
       )}
 
       {/* ========================================================= */}
-      {/* MODAL 3: FORM INPUT / EDIT HONOR TENAGA AHLI */}
+      {/* MODAL 3: FORM INPUT / EDIT GAJI TENAGA AHLI */}
       {/* ========================================================= */}
       {isHonorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Award size={16} />
+                <CreditCard size={16} />
                 <span>
                   {editingHonor
-                    ? "Edit Honorarium Tenaga Ahli"
-                    : "Input Honorarium Tenaga Ahli (Bukan Pegawai)"}
+                    ? "Edit Gaji Tenaga Ahli"
+                    : "Input Gaji Tenaga Ahli"}
                 </span>
               </h3>
               <button
                 onClick={() => setIsHonorModalOpen(false)}
-                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors"
+                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -2446,7 +2496,7 @@ export function PayrollClient({
                 startTransition(async () => {
                   try {
                     await saveHonorTenagaAhliAction(fd);
-                    setSuccessMsg("Data honorarium tenaga ahli berhasil disimpan.");
+                    setSuccessMsg("Data gaji tenaga ahli berhasil disimpan.");
                     setIsHonorModalOpen(false);
                     router.refresh();
                   } catch (err: unknown) {
@@ -2656,9 +2706,9 @@ export function PayrollClient({
                 </span>
               </div>
 
-              {/* Nominal Honorarium (Tanpa Potongan PPh) */}
+              {/* Nominal Gaji Tenaga Ahli */}
               <div>
-                <label className="font-semibold text-navy-text block mb-1">Nominal Honorarium (Rp) *</label>
+                <label className="font-semibold text-navy-text block mb-1">Nominal Gaji (Rp) *</label>
                 <input
                   type="number"
                   name="nominalHonor"
@@ -2684,7 +2734,7 @@ export function PayrollClient({
                   disabled={isPending}
                   className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
                 >
-                  {isPending ? "Menyimpan..." : "Simpan Honorarium"}
+                  {isPending ? "Menyimpan..." : "Simpan Gaji Tenaga Ahli"}
                 </button>
               </div>
             </form>
@@ -2854,11 +2904,11 @@ export function PayrollClient({
           <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Award size={16} />
+                <Users size={16} />
                 <span>
                   {editingMasterAhli?.id
-                    ? "Edit Profil Tenaga Ahli"
-                    : "Daftarkan Tenaga Ahli Baru ke Database"}
+                    ? "Edit Data Tenaga Ahli"
+                    : "Tambah Tenaga Ahli Baru"}
                 </span>
               </h3>
               <button

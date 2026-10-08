@@ -152,9 +152,13 @@ export type RekapTenagaAhliPerNamaItem = {
   totalPph21Fmt: string;
   totalHonorBersih: number;
   totalHonorBersihFmt: string;
+  daftarEntitas: string[];
   daftarProyek: string[];
+  daftarBulan: string[];
   rincian: {
     id: string;
+    entityId: string;
+    entityName: string;
     tanggal: string;
     tanggalFmt: string;
     bulan: number;
@@ -513,12 +517,26 @@ export async function getPayrollData(
     };
   });
 
-  // Pengelompokan Rekap Tenaga Ahli Per Nama (Patokan NIK)
+  // 8. Rekapitulasi Tenaga Ahli Lintas Seluruh Entitas (Cek Per Nama & Konsolidasi Holding)
+  const allHonorTahunRaw = await prisma.honorTenagaAhli.findMany({
+    where: {
+      tahun: year,
+    },
+    include: {
+      entity: { select: { id: true, key: true, name: true } },
+      project: { select: { id: true, code: true, name: true } },
+    },
+    orderBy: [{ tanggal: "desc" }],
+  });
+
+  // Pengelompokan Rekap Tenaga Ahli Per Nama (Patokan NIK) - Lintas Entitas Holding
   const perNamaMap = new Map<string, RekapTenagaAhliPerNamaItem>();
-  for (const h of allHonorEntitasTahun) {
+  for (const h of allHonorTahunRaw) {
     const key = h.nik?.trim() || h.nama.trim();
     const resolvedProjName =
       h.namaProyek || (h.project ? `${h.project.code} - ${h.project.name}` : "Umum / Non-Proyek");
+    const entityName = h.entity.name;
+    const bulanName = BULAN_NAMES[h.bulan - 1] || `Bulan ${h.bulan}`;
     const bruto = Number(h.nominalHonor);
     const pph = Number(h.pph21);
     const bersih = Number(h.nominalBersih);
@@ -535,7 +553,9 @@ export async function getPayrollData(
         totalPph21Fmt: "Rp 0",
         totalHonorBersih: 0,
         totalHonorBersihFmt: "Rp 0",
+        daftarEntitas: [],
         daftarProyek: [],
+        daftarBulan: [],
         rincian: [],
       });
     }
@@ -545,15 +565,23 @@ export async function getPayrollData(
     rec.totalHonorBruto += bruto;
     rec.totalPph21 += pph;
     rec.totalHonorBersih += bersih;
+    if (entityName && !rec.daftarEntitas.includes(entityName)) {
+      rec.daftarEntitas.push(entityName);
+    }
     if (resolvedProjName && !rec.daftarProyek.includes(resolvedProjName)) {
       rec.daftarProyek.push(resolvedProjName);
     }
+    if (bulanName && !rec.daftarBulan.includes(bulanName)) {
+      rec.daftarBulan.push(bulanName);
+    }
     rec.rincian.push({
       id: h.id,
+      entityId: h.entityId,
+      entityName: h.entity.name,
       tanggal: h.tanggal.toISOString(),
       tanggalFmt: h.tanggal.toLocaleDateString("id-ID"),
       bulan: h.bulan,
-      bulanName: BULAN_NAMES[h.bulan - 1] || `Bulan ${h.bulan}`,
+      bulanName,
       uraian: h.uraian,
       namaProyek: resolvedProjName,
       noBukti: h.noBukti,
@@ -574,17 +602,6 @@ export async function getPayrollData(
       totalHonorBersihFmt: formatRupiah(r.totalHonorBersih),
     }))
     .sort((a, b) => b.totalHonorBruto - a.totalHonorBruto);
-
-  // 8. Laporan Konsolidasi Tahunan Tenaga Ahli (Lintas Seluruh Entitas Usaha)
-  const allHonorTahunRaw = await prisma.honorTenagaAhli.findMany({
-    where: {
-      tahun: year,
-    },
-    include: {
-      entity: { select: { id: true, key: true, name: true } },
-    },
-    orderBy: [{ nama: "asc" }, { tanggal: "asc" }],
-  });
 
   const konsolidasiMap = new Map<string, KonsolidasiTenagaAhliItem>();
 

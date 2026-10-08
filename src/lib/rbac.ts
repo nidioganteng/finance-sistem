@@ -42,6 +42,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
         { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
+        { label: "Payroll", href: "/payroll", icon: "banknote" },
         { label: "Rekanan", href: "/rekanan", icon: "users" },
         { label: "Log Aktivitas", href: "/log", icon: "history" },
         { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
@@ -69,6 +70,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Buku Bank", href: "/bank-buku" },
             { label: "Entry Jurnal", href: "/jurnal-transaksi" },
             { label: "Aktiva Tetap", href: "/aktiva-tetap" },
+            { label: "Payroll", href: "/payroll" },
           ],
         },
         {
@@ -134,6 +136,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Buku Bank", href: "/bank-buku" },
             { label: "Entry Jurnal", href: "/jurnal-transaksi" },
             { label: "Aktiva Tetap", href: "/aktiva-tetap" },
+            { label: "Payroll", href: "/payroll" },
           ],
         },
         {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileText,
@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Building,
   Sparkles,
+  Copy,
 } from "lucide-react";
 import type {
   LaporanPendapatanData,
@@ -120,6 +121,7 @@ export function LaporanPendapatanClient({
     month: 1,
     dppTerlapor: 0,
     pajakTerlapor: 0,
+    pphTerlapor: 0,
     keterangan: "",
   });
 
@@ -146,6 +148,41 @@ export function LaporanPendapatanClient({
 
     return matchSearch && matchJenis;
   });
+
+  // Rekonsiliasi 12-month totals (Lapis 3 Footer)
+  const rekonTotals = useMemo(() => {
+    return data.rekonsiliasiList.reduce(
+      (acc, r) => {
+        acc.dppRekap += r.dppRekap;
+        acc.dppTerlapor += r.dppTerlapor;
+        acc.selisihDpp += r.selisihDpp;
+        acc.ppnRekap += r.ppnRekap;
+        acc.pajakTerlapor += r.pajakTerlapor;
+        acc.selisihPajak += r.selisihPajak;
+        acc.pphRekap += r.pphRekap;
+        acc.pphTerlapor += r.pphTerlapor;
+        acc.selisihPph += r.selisihPph;
+        acc.totalPajakRekap += r.totalPajakRekap;
+        acc.totalPajakTerlapor += r.totalPajakTerlapor;
+        acc.selisihTotalPajak += r.selisihTotalPajak;
+        return acc;
+      },
+      {
+        dppRekap: 0,
+        dppTerlapor: 0,
+        selisihDpp: 0,
+        ppnRekap: 0,
+        pajakTerlapor: 0,
+        selisihPajak: 0,
+        pphRekap: 0,
+        pphTerlapor: 0,
+        selisihPph: 0,
+        totalPajakRekap: 0,
+        totalPajakTerlapor: 0,
+        selisihTotalPajak: 0,
+      }
+    );
+  }, [data.rekonsiliasiList]);
 
   // Live calculation for Faktur Form
   const liveCalc = hitungPajakFaktur(
@@ -370,6 +407,7 @@ export function LaporanPendapatanClient({
       month: rec.month,
       dppTerlapor: rec.dppTerlapor,
       pajakTerlapor: rec.pajakTerlapor,
+      pphTerlapor: rec.pphTerlapor,
       keterangan: rec.keterangan,
     });
     setErrorMessage(null);
@@ -464,6 +502,7 @@ export function LaporanPendapatanClient({
         month: formRecon.month,
         dppTerlapor: Number(formRecon.dppTerlapor),
         pajakTerlapor: Number(formRecon.pajakTerlapor),
+        pphTerlapor: Number(formRecon.pphTerlapor),
         keterangan: formRecon.keterangan,
       });
 
@@ -681,7 +720,7 @@ export function LaporanPendapatanClient({
             )}
           </div>
           <p className="text-[11px] text-navy-soft mt-1">
-            Selisih PPN: {data.kpiSummary.totalSelisihPajakFmt}
+            Selisih Pajak: {data.kpiSummary.totalSelisihPajakFmt}
           </p>
         </div>
       </div>
@@ -1195,8 +1234,8 @@ export function LaporanPendapatanClient({
                   Audit Kepatuhan & Rekonsiliasi Faktur vs SPT Pajak Resmi
                 </h3>
                 <p className="text-xs text-navy-soft mt-0.5">
-                  Membandingkan DPP dan PPN hasil rekap faktur sistem dengan angka yang dilaporkan resmi ke kantor pajak (SPT Masa).
-                  Baris bertanda merah mengindikasikan adanya faktur yang belum atau salah dilaporkan.
+                  Membandingkan DPP, PPN, dan PPh hasil rekap faktur sistem dengan angka yang dilaporkan resmi ke kantor pajak (SPT Masa).
+                  Baris bertanda merah mengindikasikan adanya selisih pada PPN atau PPh yang perlu disesuaikan.
                 </p>
               </div>
             </div>
@@ -1222,8 +1261,14 @@ export function LaporanPendapatanClient({
                   <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">DPP Terlapor (SPT)</th>
                   <th className="p-3 text-right">Selisih DPP</th>
                   <th className="p-3 text-right">PPN Rekap Faktur</th>
-                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">Pajak Terlapor (SPT)</th>
+                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">PPN Terlapor (SPT)</th>
                   <th className="p-3 text-right">Selisih PPN</th>
+                  <th className="p-3 text-right">PPh Rekap Faktur</th>
+                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">PPh Terlapor (SPT)</th>
+                  <th className="p-3 text-right">Selisih PPh</th>
+                  <th className="p-3 text-right">Total Pajak Rekap</th>
+                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">Total Pajak SPT</th>
+                  <th className="p-3 text-right">Selisih Total Pajak</th>
                   <th className="p-3 text-center">Status Audit</th>
                   <th className="p-3">Catatan / Tindak Lanjut</th>
                   {canEdit && <th className="p-3 text-center w-16">Aksi</th>}
@@ -1284,6 +1329,40 @@ export function LaporanPendapatanClient({
                           {rec.selisihPajakFmt}
                         </span>
                       </td>
+                      <td className="p-3 text-right font-mono text-amber-700">
+                        {rec.pphRekapFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
+                        {rec.pphTerlaporFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        <span
+                          className={`font-semibold ${
+                            Math.abs(rec.selisihPph) > 0.01
+                              ? "text-rose-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {rec.selisihPphFmt}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-mono font-medium">
+                        {rec.totalPajakRekapFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
+                        {rec.totalPajakTerlaporFmt}
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        <span
+                          className={`font-semibold ${
+                            Math.abs(rec.selisihTotalPajak) > 0.01
+                              ? "text-rose-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {rec.selisihTotalPajakFmt}
+                        </span>
+                      </td>
                       <td className="p-3 text-center">
                         {isMatch ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
@@ -1310,7 +1389,7 @@ export function LaporanPendapatanClient({
                           <button
                             onClick={() => openReconModal(rec)}
                             title="Edit Angka Terlapor SPT"
-                            className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -1320,6 +1399,94 @@ export function LaporanPendapatanClient({
                   );
                 })}
               </tbody>
+              <tfoot className="bg-surface-subtle font-bold text-navy-text border-t-2 border-border-soft">
+                <tr>
+                  <td colSpan={2} className="p-3 text-center uppercase tracking-wider">
+                    Total Setahun
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {formatRupiah(rekonTotals.dppRekap)}
+                  </td>
+                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
+                    {formatRupiah(rekonTotals.dppTerlapor)}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    <span
+                      className={
+                        Math.abs(rekonTotals.selisihDpp) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }
+                    >
+                      {formatRupiah(rekonTotals.selisihDpp)}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right font-mono text-purple-700">
+                    {formatRupiah(rekonTotals.ppnRekap)}
+                  </td>
+                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
+                    {formatRupiah(rekonTotals.pajakTerlapor)}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    <span
+                      className={
+                        Math.abs(rekonTotals.selisihPajak) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }
+                    >
+                      {formatRupiah(rekonTotals.selisihPajak)}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right font-mono text-amber-700">
+                    {formatRupiah(rekonTotals.pphRekap)}
+                  </td>
+                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
+                    {formatRupiah(rekonTotals.pphTerlapor)}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    <span
+                      className={
+                        Math.abs(rekonTotals.selisihPph) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }
+                    >
+                      {formatRupiah(rekonTotals.selisihPph)}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {formatRupiah(rekonTotals.totalPajakRekap)}
+                  </td>
+                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
+                    {formatRupiah(rekonTotals.totalPajakTerlapor)}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    <span
+                      className={
+                        Math.abs(rekonTotals.selisihTotalPajak) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }
+                    >
+                      {formatRupiah(rekonTotals.selisihTotalPajak)}
+                    </span>
+                  </td>
+                  <td className="p-3 text-center">
+                    {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                        SEMUA SESUAI
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-100 text-rose-800">
+                        {data.kpiSummary.jumlahBulanSelisih} BULAN BEDA
+                      </span>
+                    )}
+                  </td>
+                  <td></td>
+                  {canEdit && <td></td>}
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -2245,23 +2412,54 @@ export function LaporanPendapatanClient({
                 </div>
               )}
 
-              {/* Reference from invoices */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-navy-soft block text-[11px]">
-                    DPP Rekap Faktur Sistem:
+              {/* Reference from invoices & Copy Button */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-navy-text">
+                    Nilai Rekap Sistem (Masa {editingRecon.namaBulan})
                   </span>
-                  <span className="font-mono font-bold text-navy-text">
-                    {editingRecon.dppRekapFmt}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormRecon((prev) => ({
+                        ...prev,
+                        dppTerlapor: editingRecon.dppRekap,
+                        pajakTerlapor: editingRecon.ppnRekap,
+                        pphTerlapor: editingRecon.pphRekap,
+                      }));
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
+                    title="Salin nilai DPP, PPN, dan PPh rekap sistem ke formulir terlapor SPT"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin dari Rekap Sistem</span>
+                  </button>
                 </div>
-                <div>
-                  <span className="text-navy-soft block text-[11px]">
-                    PPN Rekap Faktur Sistem:
-                  </span>
-                  <span className="font-mono font-bold text-purple-700">
-                    {editingRecon.ppnRekapFmt}
-                  </span>
+                <div className="grid grid-cols-3 gap-2.5 text-xs pt-1">
+                  <div className="bg-surface-card p-2 rounded-lg border border-border-soft">
+                    <span className="text-navy-soft block text-[10px] uppercase font-semibold">
+                      DPP Rekap:
+                    </span>
+                    <span className="font-mono font-bold text-navy-text text-xs">
+                      {editingRecon.dppRekapFmt}
+                    </span>
+                  </div>
+                  <div className="bg-surface-card p-2 rounded-lg border border-border-soft">
+                    <span className="text-navy-soft block text-[10px] uppercase font-semibold">
+                      PPN Rekap:
+                    </span>
+                    <span className="font-mono font-bold text-purple-700 text-xs">
+                      {editingRecon.ppnRekapFmt}
+                    </span>
+                  </div>
+                  <div className="bg-surface-card p-2 rounded-lg border border-border-soft">
+                    <span className="text-navy-soft block text-[10px] uppercase font-semibold">
+                      PPh Rekap:
+                    </span>
+                    <span className="font-mono font-bold text-amber-700 text-xs">
+                      {editingRecon.pphRekapFmt}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -2269,69 +2467,124 @@ export function LaporanPendapatanClient({
                 <label className="block text-xs font-semibold text-navy-text mb-1">
                   DPP Terlapor di SPT Masa Resmi
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={formRecon.dppTerlapor}
-                  onChange={(e) =>
-                    setFormRecon({
-                      ...formRecon,
-                      dppTerlapor: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={formRecon.dppTerlapor}
+                    onChange={(e) =>
+                      setFormRecon({
+                        ...formRecon,
+                        dppTerlapor: Number(e.target.value),
+                      })
+                    }
+                    className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-navy-text mb-1">
-                  PPN / Pajak Terlapor di SPT Masa Resmi
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={formRecon.pajakTerlapor}
-                  onChange={(e) =>
-                    setFormRecon({
-                      ...formRecon,
-                      pajakTerlapor: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    PPN Terlapor di SPT Masa Resmi
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
+                      Rp
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={formRecon.pajakTerlapor}
+                      onChange={(e) =>
+                        setFormRecon({
+                          ...formRecon,
+                          pajakTerlapor: Number(e.target.value),
+                        })
+                      }
+                      className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    PPh Terlapor di SPT Masa Resmi
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
+                      Rp
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={formRecon.pphTerlapor}
+                      onChange={(e) =>
+                        setFormRecon({
+                          ...formRecon,
+                          pphTerlapor: Number(e.target.value),
+                        })
+                      }
+                      className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Live Preview of Differences */}
-              <div className="p-3 rounded-lg bg-blue-50/70 border border-blue-200 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-blue-700 block text-[11px]">
-                    Selisih DPP:
-                  </span>
-                  <span
-                    className={`font-mono font-bold ${
-                      Math.abs(editingRecon.dppRekap - formRecon.dppTerlapor) > 0.01
-                        ? "text-rose-600"
-                        : "text-emerald-600"
-                    }`}
-                  >
-                    {formatRupiah(editingRecon.dppRekap - formRecon.dppTerlapor)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-blue-700 block text-[11px]">
-                    Selisih PPN:
-                  </span>
-                  <span
-                    className={`font-mono font-bold ${
-                      Math.abs(editingRecon.ppnRekap - formRecon.pajakTerlapor) > 0.01
-                        ? "text-rose-600"
-                        : "text-emerald-600"
-                    }`}
-                  >
-                    {formatRupiah(editingRecon.ppnRekap - formRecon.pajakTerlapor)}
-                  </span>
+              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2 text-xs">
+                <span className="font-bold text-blue-950 block text-[11px] uppercase tracking-wider">
+                  Live Selisih (Rekap Sistem vs Input SPT):
+                </span>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <span className="text-blue-700 block text-[10px] font-semibold">
+                      Selisih DPP:
+                    </span>
+                    <span
+                      className={`font-mono font-bold ${
+                        Math.abs(editingRecon.dppRekap - formRecon.dppTerlapor) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      {formatRupiah(editingRecon.dppRekap - formRecon.dppTerlapor)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 block text-[10px] font-semibold">
+                      Selisih PPN:
+                    </span>
+                    <span
+                      className={`font-mono font-bold ${
+                        Math.abs(editingRecon.ppnRekap - formRecon.pajakTerlapor) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      {formatRupiah(editingRecon.ppnRekap - formRecon.pajakTerlapor)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 block text-[10px] font-semibold">
+                      Selisih PPh:
+                    </span>
+                    <span
+                      className={`font-mono font-bold ${
+                        Math.abs(editingRecon.pphRekap - formRecon.pphTerlapor) > 0.01
+                          ? "text-rose-600"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      {formatRupiah(editingRecon.pphRekap - formRecon.pphTerlapor)}
+                    </span>
+                  </div>
                 </div>
               </div>
 

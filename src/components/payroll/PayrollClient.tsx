@@ -48,6 +48,8 @@ import {
   saveHonorTenagaAhliAction,
   deleteHonorTenagaAhliAction,
   copyGajiBulanSebelumnyaAction,
+  saveTenagaAhliMasterAction,
+  deleteTenagaAhliMasterAction,
 } from "@/lib/actions/payroll";
 import { formatRupiah } from "@/lib/dashboard-data";
 
@@ -134,9 +136,9 @@ export function PayrollClient({
     "gaji" | "rekap-bulan" | "master" | "tahunan"
   >("gaji");
 
-  // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "rekap-nama" | "konsolidasi"
+  // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "database-ahli" | "rekap-nama" | "konsolidasi"
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
-    "honor" | "rekap-bulan" | "rekap-nama" | "konsolidasi"
+    "honor" | "rekap-bulan" | "database-ahli" | "rekap-nama" | "konsolidasi"
   >("honor");
 
   // Filter entitas untuk tab Cek Per Nama
@@ -160,6 +162,19 @@ export function PayrollClient({
 
   const [isHonorModalOpen, setIsHonorModalOpen] = useState(false);
   const [editingHonor, setEditingHonor] = useState<HonorTenagaAhliItem | null>(null);
+
+  // Master Tenaga Ahli Modal
+  const [isMasterAhliModalOpen, setIsMasterAhliModalOpen] = useState(false);
+  const [editingMasterAhli, setEditingMasterAhli] = useState<{
+    id?: string;
+    nama: string;
+    nik: string | null;
+    npwp: string | null;
+    kategori: string | null;
+  } | null>(null);
+
+  // State selection di modal honor
+  const [selectedRekananIdForHonor, setSelectedRekananIdForHonor] = useState<string>("");
 
   const [slipModalItem, setSlipModalItem] = useState<GajiBulananItem | null>(null);
 
@@ -214,6 +229,13 @@ export function PayrollClient({
 
     return matchSearch && matchEntitas;
   });
+
+  const filteredRekananList = data.rekananTenagaAhli.filter(
+    (r) =>
+      r.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.nik && r.nik.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (r.kategori && r.kategori.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   return (
     <div className="space-y-6">
@@ -460,34 +482,51 @@ export function PayrollClient({
                 </div>
 
                 {isManager && (
-                  <button
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Salin atau generate otomatis data gaji seluruh pegawai aktif untuk bulan ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}?`
-                        )
-                      ) {
-                        startTransition(async () => {
-                          try {
-                            const res = await copyGajiBulanSebelumnyaAction(
-                              data.entity?.id ?? "",
-                              selectedYear,
-                              selectedMonth
-                            );
-                            setSuccessMsg(res.message);
-                            router.refresh();
-                          } catch (err: unknown) {
-                            setErrorMsg((err as Error).message);
-                          }
-                        });
-                      }
-                    }}
-                    className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-navy-text shadow-2xs"
-                    title="Salin data gaji dari bulan lalu atau buat otomatis dari master gaji pokok"
-                  >
-                    <Copy size={13} />
-                    <span>Salin / Generate dari Bulan Lalu</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const targetPegawai = data.pegawaiList.find((p) => !p.currentGaji) || data.pegawaiList[0];
+                        if (targetPegawai) {
+                          setEditingGaji({ pegawai: targetPegawai, gaji: targetPegawai.currentGaji });
+                          setIsGajiModalOpen(true);
+                        } else {
+                          setErrorMsg("Belum ada pegawai terdaftar di entitas ini. Silakan tambahkan pegawai terlebih dahulu.");
+                        }
+                      }}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <Plus size={14} />
+                      <span>Input Gaji Pegawai</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Salin atau generate otomatis data gaji seluruh pegawai aktif untuk bulan ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}?`
+                          )
+                        ) {
+                          startTransition(async () => {
+                            try {
+                              const res = await copyGajiBulanSebelumnyaAction(
+                                data.entity?.id ?? "",
+                                selectedYear,
+                                selectedMonth
+                              );
+                              setSuccessMsg(res.message);
+                              router.refresh();
+                            } catch (err: unknown) {
+                              setErrorMsg((err as Error).message);
+                            }
+                          });
+                        }
+                      }}
+                      className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-navy-text shadow-2xs"
+                      title="Salin data gaji dari bulan lalu atau buat otomatis dari master gaji pokok"
+                    >
+                      <Copy size={13} />
+                      <span>Salin / Generate dari Bulan Lalu</span>
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -990,6 +1029,16 @@ export function PayrollClient({
                 Rekap Gaji Setahun ({selectedYear})
               </button>
               <button
+                onClick={() => setTenagaAhliSubTab("database-ahli")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  tenagaAhliSubTab === "database-ahli"
+                    ? "bg-surface-card text-navy-text shadow-2xs"
+                    : "text-muted-faint hover:text-navy-text"
+                }`}
+              >
+                Database Tenaga Ahli ({data.rekananTenagaAhli.length})
+              </button>
+              <button
                 onClick={() => setTenagaAhliSubTab("rekap-nama")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   tenagaAhliSubTab === "rekap-nama"
@@ -1027,16 +1076,47 @@ export function PayrollClient({
               </div>
 
               {isManager && (
-                <button
-                  onClick={() => {
-                    setEditingHonor(null);
-                    setIsHonorModalOpen(true);
-                  }}
-                  className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                >
-                  <Plus size={14} />
-                  <span>Input Honor Tenaga Ahli</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {tenagaAhliSubTab === "database-ahli" ? (
+                    <button
+                      onClick={() => {
+                        setEditingMasterAhli(null);
+                        setIsMasterAhliModalOpen(true);
+                      }}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <Plus size={14} />
+                      <span>Tambah Tenaga Ahli Baru</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingMasterAhli(null);
+                          setIsMasterAhliModalOpen(true);
+                        }}
+                        className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-navy-text shadow-2xs"
+                        title="Daftarkan profil dan NIK tenaga ahli baru ke database"
+                      >
+                        <Plus size={13} />
+                        <span>+ Master Tenaga Ahli</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingHonor(null);
+                          if (data.rekananTenagaAhli.length > 0 && !selectedRekananIdForHonor) {
+                            setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
+                          }
+                          setIsHonorModalOpen(true);
+                        }}
+                        className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                      >
+                        <Plus size={14} />
+                        <span>Input Honor Tenaga Ahli</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1336,6 +1416,164 @@ export function PayrollClient({
                       <td />
                     </tr>
                   </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-Tab Content: Database Tenaga Ahli */}
+          {tenagaAhliSubTab === "database-ahli" && (
+            <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
+              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-surface-subtle/30">
+                <div>
+                  <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                    <Award size={16} className="text-navy" />
+                    <span>Database Tenaga Ahli (Master Rekanan Bukan Pegawai)</span>
+                  </h3>
+                  <p className="text-xs text-muted-faint mt-0.5">
+                    Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input honor bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
+                  </p>
+                </div>
+
+                {isManager && (
+                  <button
+                    onClick={() => {
+                      setEditingMasterAhli(null);
+                      setIsMasterAhliModalOpen(true);
+                    }}
+                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={14} />
+                    <span>Tambah Tenaga Ahli</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-xs">
+                  <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                    <tr>
+                      <th className="py-2.5 px-3.5">Nama & Spesialisasi</th>
+                      <th className="py-2.5 px-3.5">NIK (16 Digit Terdaftar)</th>
+                      <th className="py-2.5 px-3.5">NPWP</th>
+                      <th className="py-2.5 px-3.5">Tarif PPh 21 Standar</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredRekananList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-muted-faint">
+                          {searchQuery
+                            ? "Tidak ada tenaga ahli yang cocok dengan pencarian."
+                            : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli' untuk mendaftarkan nama, NIK, dan NPWP."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRekananList.map((r) => {
+                        const hasNpwp = !!(r.npwp && r.npwp.trim());
+                        return (
+                          <tr key={r.id} className="hover:bg-surface-hover/30 transition-colors">
+                            <td className="py-3 px-3.5">
+                              <div className="font-bold text-navy-text text-sm">{r.nama}</div>
+                              {r.kategori && (
+                                <div className="text-[11px] text-muted-faint mt-0.5 inline-flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-medium">
+                                    {r.kategori}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 font-mono">
+                              {r.nik ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
+                                  <CheckCircle size={12} />
+                                  <span>{r.nik}</span>
+                                </span>
+                              ) : (
+                                <span className="text-amber-600 dark:text-amber-400 font-sans italic text-[11px]">
+                                  Belum diisi
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 font-mono text-muted-stronger">
+                              {hasNpwp ? (
+                                r.npwp
+                              ) : (
+                                <span className="text-muted-faint italic font-sans text-[11px]">
+                                  Non-NPWP (Tarif +20%)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold ${
+                                  hasNpwp
+                                    ? "bg-surface-subtle text-navy-text border border-border"
+                                    : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                }`}
+                              >
+                                {hasNpwp ? "2.5% (Tarif NPWP)" : "3.0% (Tarif Tanpa NPWP)"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center justify-end gap-1.5">
+                                {isManager && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedRekananIdForHonor(r.id);
+                                        setEditingHonor(null);
+                                        setIsHonorModalOpen(true);
+                                      }}
+                                      className="h-7 px-2.5 rounded-lg bg-navy text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs hover:bg-navy-light"
+                                      title="Input Pembayaran Honor untuk Tenaga Ahli ini"
+                                    >
+                                      <Plus size={11} />
+                                      <span>Input Honor</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingMasterAhli(r);
+                                        setIsMasterAhliModalOpen(true);
+                                      }}
+                                      className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    >
+                                      <Pencil size={11} />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (
+                                          confirm(
+                                            `Hapus ${r.nama} dari database tenaga ahli? Tindakan ini hanya diperbolehkan jika belum ada riwayat pembayaran honor.`
+                                          )
+                                        ) {
+                                          startTransition(async () => {
+                                            try {
+                                              const res = await deleteTenagaAhliMasterAction(r.id);
+                                              setSuccessMsg(res.message);
+                                              router.refresh();
+                                            } catch (err: unknown) {
+                                              setErrorMsg((err as Error).message);
+                                            }
+                                          });
+                                        }
+                                      }}
+                                      className="h-7 w-7 rounded-lg border border-rose-200 dark:border-rose-900 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 inline-flex items-center justify-center cursor-pointer transition-colors"
+                                      title="Hapus Tenaga Ahli"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -2039,12 +2277,37 @@ export function PayrollClient({
               <input type="hidden" name="bulan" value={selectedMonth} />
               <input type="hidden" name="tahun" value={selectedYear} />
 
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Pilih Pegawai Terdaftar *
+                </label>
+                <select
+                  value={editingGaji.pegawai.id}
+                  onChange={(e) => {
+                    const sel = data.pegawaiList.find((p) => p.id === e.target.value);
+                    if (sel) {
+                      setEditingGaji({ pegawai: sel, gaji: sel.currentGaji });
+                    }
+                  }}
+                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                >
+                  {data.pegawaiList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nama} – {p.jabatan} {p.currentGaji ? "(Sudah Ada Data Bulan Ini)" : "(Belum Diinput)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="p-3 rounded-xl bg-surface-subtle border border-border flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] text-muted-faint block">Status Pajak & NIK</span>
-                  <strong className="text-navy-text">
-                    {editingGaji.pegawai.statusKeluarga} (PTKP: {editingGaji.pegawai.ptkpFmt})
+                  <span className="text-[11px] text-muted-faint block">NIK & Status Pajak (Terkunci)</span>
+                  <strong className="text-navy-text font-mono">
+                    {editingGaji.pegawai.nik}
                   </strong>
+                  <div className="text-[11px] text-muted-faint">
+                    {editingGaji.pegawai.statusKeluarga} (PTKP: {editingGaji.pegawai.ptkpFmt})
+                  </div>
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] text-muted-faint block">Gaji Pokok Master</span>
@@ -2254,74 +2517,125 @@ export function PayrollClient({
               {editingHonor && <input type="hidden" name="id" value={editingHonor.id} />}
               <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
 
-              {/* Quick Select from Master Rekanan */}
-              {data.rekananTenagaAhli.length > 0 && !editingHonor && (
-                <div className="p-2.5 rounded-xl bg-surface-subtle border border-border">
-                  <label className="font-semibold text-navy-text block mb-1 text-[11px]">
-                    Auto-Fill dari Master Rekanan Tenaga Ahli:
-                  </label>
-                  <select
-                    onChange={(e) => {
-                      const selected = data.rekananTenagaAhli.find((r) => r.id === e.target.value);
-                      if (selected) {
-                        const form = e.target.form;
-                        if (form) {
-                          (form.elements.namedItem("nama") as HTMLInputElement).value = selected.nama;
-                          (form.elements.namedItem("nik") as HTMLInputElement).value = selected.nik || "";
-                          (form.elements.namedItem("npwp") as HTMLInputElement).value = selected.npwp || "";
-                          (form.elements.namedItem("rekananId") as HTMLInputElement).value = selected.id;
-                        }
-                      }
-                    }}
-                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground"
-                  >
-                    <option value="">-- Pilih dari Master Rekanan (Opsional) --</option>
-                    {data.rekananTenagaAhli.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.nama} {r.kategori ? `(${r.kategori})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Pemilihan Tenaga Ahli Terdaftar dari Database */}
+              {(() => {
+                const currentExpert = editingHonor
+                  ? {
+                      id: editingHonor.rekananId || "",
+                      nama: editingHonor.nama,
+                      nik: editingHonor.nik,
+                      npwp: editingHonor.npwp,
+                      kategori: null as string | null,
+                    }
+                  : data.rekananTenagaAhli.find((r) => r.id === selectedRekananIdForHonor) ||
+                    data.rekananTenagaAhli[0] ||
+                    null;
 
-              <input type="hidden" name="rekananId" defaultValue={editingHonor?.rekananId ?? ""} />
+                return (
+                  <div className="space-y-2.5">
+                    <input type="hidden" name="rekananId" value={currentExpert?.id ?? ""} />
+                    <input type="hidden" name="nama" value={currentExpert?.nama ?? ""} />
+                    <input type="hidden" name="nik" value={currentExpert?.nik ?? ""} />
+                    <input type="hidden" name="npwp" value={currentExpert?.npwp ?? ""} />
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">NIK Tenaga Ahli (16 digit) *</label>
-                  <input
-                    type="text"
-                    name="nik"
-                    required
-                    defaultValue={editingHonor?.nik ?? ""}
-                    placeholder="Contoh: 620301xxxxxxxxxx"
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">NPWP (Opsional)</label>
-                  <input
-                    type="text"
-                    name="npwp"
-                    defaultValue={editingHonor?.npwp ?? ""}
-                    placeholder="15 atau 16 digit NPWP"
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                  />
-                </div>
-              </div>
+                    {!editingHonor && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="font-semibold text-navy-text block text-xs">
+                            Pilih Tenaga Ahli Terdaftar *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsHonorModalOpen(false);
+                              setEditingMasterAhli(null);
+                              setIsMasterAhliModalOpen(true);
+                            }}
+                            className="text-[11px] font-semibold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus size={12} />
+                            <span>+ Daftarkan Tenaga Ahli Baru</span>
+                          </button>
+                        </div>
 
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Nama Lengkap Tenaga Ahli *</label>
-                <input
-                  type="text"
-                  name="nama"
-                  required
-                  defaultValue={editingHonor?.nama ?? ""}
-                  placeholder="Nama lengkap & gelar tenaga ahli"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
-                />
-              </div>
+                        {data.rekananTenagaAhli.length === 0 ? (
+                          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between">
+                            <div>
+                              <p className="font-bold">Belum Ada Tenaga Ahli di Database</p>
+                              <p className="text-[11px] mt-0.5">Daftarkan profil tenaga ahli terlebih dahulu.</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsHonorModalOpen(false);
+                                setEditingMasterAhli(null);
+                                setIsMasterAhliModalOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-navy text-white text-[11px] font-semibold cursor-pointer"
+                            >
+                              + Tambah Ahli
+                            </button>
+                          </div>
+                        ) : (
+                          <select
+                            value={currentExpert?.id || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedRekananIdForHonor(val);
+                              const chosen = data.rekananTenagaAhli.find((r) => r.id === val);
+                              const form = e.target.form;
+                              if (form && chosen) {
+                                const newTarif = chosen.npwp ? 2.5 : 3.0;
+                                const tarifInput = form.elements.namedItem("tarifPph21Persen") as HTMLInputElement;
+                                if (tarifInput) tarifInput.value = newTarif.toString();
+                                const bruto = Number((form.elements.namedItem("nominalHonor") as HTMLInputElement).value) || 0;
+                                const pph = Math.round((bruto * newTarif) / 100);
+                                const pphInput = form.elements.namedItem("pph21") as HTMLInputElement;
+                                if (pphInput) pphInput.value = pph.toString();
+                              }
+                            }}
+                            className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                          >
+                            {data.rekananTenagaAhli.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.nama} {r.kategori ? `· ${r.kategori}` : ""} (NIK: {r.nik || "-"})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Locked Identity Card (Read-only dari Database) */}
+                    {currentExpert && (
+                      <div className="p-3 rounded-xl bg-surface-subtle border border-border space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-navy-text">
+                            {currentExpert.nama}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-1">
+                            <CheckCircle size={10} /> Terverifikasi di Database
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-border/60">
+                          <div>
+                            <span className="text-muted-faint block">NIK (16 Digit Terkunci):</span>
+                            <span className="font-mono font-bold text-navy-text">
+                              {currentExpert.nik || "-"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-faint block">NPWP (Terkunci):</span>
+                            <span className="font-mono text-muted-stronger">
+                              {currentExpert.npwp || "Tanpa NPWP (Tarif Pajak 3.0%)"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="font-semibold text-navy-text block mb-1">Uraian Tugas / Jasa Keahlian *</label>
@@ -2641,6 +2955,138 @@ export function PayrollClient({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 5: MASTER DATABASE TENAGA AHLI */}
+      {/* ========================================================= */}
+      {isMasterAhliModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
+              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                <Award size={16} />
+                <span>
+                  {editingMasterAhli?.id
+                    ? "Edit Profil Tenaga Ahli"
+                    : "Daftarkan Tenaga Ahli Baru ke Database"}
+                </span>
+              </h3>
+              <button
+                onClick={() => setIsMasterAhliModalOpen(false)}
+                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const fd = new FormData(form);
+                startTransition(async () => {
+                  try {
+                    const res = await saveTenagaAhliMasterAction(fd);
+                    setSuccessMsg(res.message);
+                    setIsMasterAhliModalOpen(false);
+                    if (res.data?.id) {
+                      setSelectedRekananIdForHonor(res.data.id);
+                    }
+                    router.refresh();
+                  } catch (err: unknown) {
+                    setErrorMsg((err as Error).message);
+                  }
+                });
+              }}
+              className="p-5 space-y-4 text-xs"
+            >
+              {editingMasterAhli?.id && (
+                <input type="hidden" name="id" value={editingMasterAhli.id} />
+              )}
+              <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Nama Lengkap & Gelar *
+                </label>
+                <input
+                  type="text"
+                  name="nama"
+                  required
+                  defaultValue={editingMasterAhli?.nama ?? ""}
+                  placeholder="Contoh: Ir. Budi Santoso, M.T."
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  NIK (Nomor Induk Kependudukan - 16 Digit) *
+                </label>
+                <input
+                  type="text"
+                  name="nik"
+                  required
+                  minLength={16}
+                  maxLength={16}
+                  defaultValue={editingMasterAhli?.nik ?? ""}
+                  placeholder="Contoh: 6203011204850002"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
+                <span className="text-[10px] text-muted-faint mt-0.5 block">
+                  Wajib 16 digit angka. NIK menjadi patokan pelacakan honor lintas entitas dan proyek.
+                </span>
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  NPWP (Opsional)
+                </label>
+                <input
+                  type="text"
+                  name="npwp"
+                  defaultValue={editingMasterAhli?.npwp ?? ""}
+                  placeholder="Contoh: 75.888.999.1-711.000"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
+                <span className="text-[10px] text-muted-faint mt-0.5 block">
+                  Jika ada NPWP tarif PPh 21 standar adalah 2.5%, jika tidak diisi berlaku tarif 3.0%.
+                </span>
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Bidang Keahlian / Spesialisasi (Opsional)
+                </label>
+                <input
+                  type="text"
+                  name="kategori"
+                  defaultValue={editingMasterAhli?.kategori ?? ""}
+                  placeholder="Contoh: Tenaga Ahli Struktur / Arsitektur / Geoteknik"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsMasterAhliModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+                >
+                  {isPending ? "Menyimpan..." : "Simpan Tenaga Ahli"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

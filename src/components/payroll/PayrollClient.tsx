@@ -2,6 +2,7 @@
 
 import { useState, useTransition, Fragment } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Role } from "@prisma/client";
 import {
   Users,
@@ -26,6 +27,7 @@ import {
   ChevronDown,
   Copy,
   HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import {
   type PegawaiItem,
@@ -36,6 +38,8 @@ import {
   type RekapBulanPegawaiItem,
   type RekapBulanTenagaAhliItem,
   type RekapTenagaAhliPerNamaItem,
+  type JurnalTransaksiGajiItem,
+  type PenyesuaianAkunGaji,
   BULAN_NAMES,
   PTKP_RATES,
 } from "@/lib/payroll";
@@ -100,6 +104,7 @@ type PayrollData = {
     totalHonorBersihFmt: string;
   };
   konsolidasiTenagaAhli: KonsolidasiTenagaAhliItem[];
+  penyesuaianJurnal: PenyesuaianAkunGaji;
   syncData: PayrollSyncLabaRugi;
 };
 
@@ -131,15 +136,22 @@ export function PayrollClient({
     (initialTab as "pegawai" | "tenaga-ahli" | "sync") || "pegawai"
   );
 
-  // Sub-tab pegawai: "gaji" (Gaji Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "master" | "tahunan"
+  // Sub-tab pegawai: "gaji" (Gaji Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "penyesuaian" | "master" | "tahunan"
   const [pegawaiSubTab, setPegawaiSubTab] = useState<
-    "gaji" | "rekap-bulan" | "master" | "tahunan"
+    "gaji" | "rekap-bulan" | "penyesuaian" | "master" | "tahunan"
   >("gaji");
 
-  // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "database-ahli" | "rekap-nama" | "konsolidasi"
+  // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
-    "honor" | "rekap-bulan" | "database-ahli" | "rekap-nama" | "konsolidasi"
+    "honor" | "rekap-bulan" | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   >("honor");
+
+  // Filter periode penyesuaian jurnal (Bulan ini vs Sepanjang tahun)
+  const [periodeFilterPegawai, setPeriodeFilterPegawai] = useState<"bulan" | "tahun">("bulan");
+  const [periodeFilterAhli, setPeriodeFilterAhli] = useState<"bulan" | "tahun">("bulan");
+
+  // Tab rincian transaksi di Tab Sinkronisasi: "pegawai" (Akun 511) | "tenaga-ahli" (Akun 612)
+  const [syncDetailTab, setSyncDetailTab] = useState<"pegawai" | "tenaga-ahli">("pegawai");
 
   // Filter entitas untuk tab Cek Per Nama
   const [filterEntitasNama, setFilterEntitasNama] = useState<string>("ALL");
@@ -376,6 +388,25 @@ export function PayrollClient({
               </button>
 
               <button
+                onClick={() => setPegawaiSubTab("penyesuaian")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                  pegawaiSubTab === "penyesuaian"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
+                }`}
+              >
+                <Scale size={13} className={pegawaiSubTab === "penyesuaian" ? "text-navy" : "text-muted-faint"} />
+                <span>Penyesuaian Gaji</span>
+                {(periodeFilterPegawai === "bulan"
+                  ? data.penyesuaianJurnal.pegawai.isSinkronBulan
+                  : data.penyesuaianJurnal.pegawai.isSinkronTahun) ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                )}
+              </button>
+
+              <button
                 onClick={() => setPegawaiSubTab("master")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   pegawaiSubTab === "master"
@@ -422,7 +453,15 @@ export function PayrollClient({
 
               {isManager && (
                 <div>
-                  {pegawaiSubTab === "master" ? (
+                  {pegawaiSubTab === "penyesuaian" ? (
+                    <Link
+                      href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Buka Jurnal Transaksi</span>
+                    </Link>
+                  ) : pegawaiSubTab === "master" ? (
                     <button
                       onClick={() => {
                         setEditingPegawai(null);
@@ -864,6 +903,285 @@ export function PayrollClient({
             </div>
           )}
 
+          {/* Sub-Tab Content 3: Penyesuaian Gaji Pegawai Tetap & Tarikan Jurnal Umum */}
+          {pegawaiSubTab === "penyesuaian" && (
+            <div className="space-y-6">
+              {/* Card 1: Ringkasan Rekonsiliasi & Status */}
+              <div className="p-5 rounded-2xl border border-border bg-surface-card space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 rounded-xl bg-navy/10 text-navy font-bold">
+                        <Scale size={18} />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-navy-text">
+                          Penyesuaian Gaji Pegawai Tetap & Transaksi Jurnal Umum
+                        </h3>
+                        <p className="text-xs text-muted-faint mt-0.5">
+                          Pencocokan antara catatan gaji modul payroll dengan transaksi riil yang ditarik dari Jurnal Umum (Akun 511 - Gaji) pada entitas {data.entity?.name}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter Periode Toggle (Bulan Ini vs Sepanjang Tahun) */}
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <div className="flex items-center bg-surface-subtle p-1 rounded-xl border border-border">
+                      <button
+                        onClick={() => setPeriodeFilterPegawai("bulan")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          periodeFilterPegawai === "bulan"
+                            ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                            : "text-muted-faint hover:text-navy-text"
+                        }`}
+                      >
+                        Bulan Ini ({BULAN_NAMES[selectedMonth - 1]})
+                      </button>
+                      <button
+                        onClick={() => setPeriodeFilterPegawai("tahun")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          periodeFilterPegawai === "tahun"
+                            ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                            : "text-muted-faint hover:text-navy-text"
+                        }`}
+                      >
+                        Sepanjang Tahun ({selectedYear})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Badge & Alert */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-surface-subtle/50 border border-border">
+                  <div className="flex items-center gap-2.5">
+                    {(periodeFilterPegawai === "bulan"
+                      ? data.penyesuaianJurnal.pegawai.isSinkronBulan
+                      : data.penyesuaianJurnal.pegawai.isSinkronTahun) ? (
+                      <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                        <CheckCircle size={18} />
+                        <div>
+                          <span className="text-xs font-bold block">100% SINKRON (Sesuai)</span>
+                          <span className="text-[11px] text-muted-faint">
+                            Tidak ada selisih antara pencatatan payroll dan transaksi Akun 511 di Jurnal Umum.
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                        <AlertCircle size={18} />
+                        <div>
+                          <span className="text-xs font-bold block">
+                            TERDAPAT SELISIH PENYESUAIAN:{" "}
+                            {periodeFilterPegawai === "bulan"
+                              ? data.penyesuaianJurnal.pegawai.selisihBulanFmt
+                              : data.penyesuaianJurnal.pegawai.selisihTahunFmt}
+                          </span>
+                          <span className="text-[11px] text-muted-faint">
+                            Nominal di Jurnal Umum berbeda dengan total rekap gaji pegawai pada periode ini.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Link
+                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                    className="h-7 px-3 rounded-lg border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto shadow-2xs"
+                  >
+                    <ExternalLink size={12} />
+                    <span>Buka Jurnal Transaksi</span>
+                  </Link>
+                </div>
+
+                {/* 3 Metric Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                  <div className="p-4 rounded-xl border border-border bg-surface-card shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-faint font-medium">Catatan Modul Penggajian</span>
+                      <Users size={14} className="text-muted-faint" />
+                    </div>
+                    <div className="text-lg font-bold font-mono text-navy-text">
+                      {periodeFilterPegawai === "bulan"
+                        ? data.penyesuaianJurnal.pegawai.totalPayrollBulanFmt
+                        : data.penyesuaianJurnal.pegawai.totalPayrollTahunFmt}
+                    </div>
+                    <p className="text-[11px] text-muted-faint">
+                      Total gaji kotor ({periodeFilterPegawai === "bulan" ? `Bulan ${BULAN_NAMES[selectedMonth - 1]}` : `Tahun ${selectedYear}`})
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border bg-surface-card shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-faint font-medium">Ditarik dari Jurnal Umum</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-navy/10 text-navy">
+                        Akun 511 · Gaji
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold font-mono text-navy-text">
+                      {periodeFilterPegawai === "bulan"
+                        ? data.penyesuaianJurnal.pegawai.totalJurnalBulanFmt
+                        : data.penyesuaianJurnal.pegawai.totalJurnalTahunFmt}
+                    </div>
+                    <p className="text-[11px] text-muted-faint">
+                      Total debet akun 511 ({periodeFilterPegawai === "bulan" ? data.penyesuaianJurnal.pegawai.transaksiBulan.length : data.penyesuaianJurnal.pegawai.transaksiTahun.length} transaksi)
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border bg-surface-card shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-faint font-medium">Selisih Penyesuaian</span>
+                      <Scale size={14} className="text-muted-faint" />
+                    </div>
+                    <div className={`text-lg font-bold font-mono ${(periodeFilterPegawai === "bulan" ? data.penyesuaianJurnal.pegawai.isSinkronBulan : data.penyesuaianJurnal.pegawai.isSinkronTahun) ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                      {periodeFilterPegawai === "bulan"
+                        ? data.penyesuaianJurnal.pegawai.selisihBulanFmt
+                        : data.penyesuaianJurnal.pegawai.selisihTahunFmt}
+                    </div>
+                    <p className="text-[11px] text-muted-faint">
+                      {(periodeFilterPegawai === "bulan" ? data.penyesuaianJurnal.pegawai.isSinkronBulan : data.penyesuaianJurnal.pegawai.isSinkronTahun)
+                        ? "Saldo telah sesuai (sinkron)"
+                        : "Perlu penyesuaian di jurnal umum"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Tabel Transaksi Jurnal Umum Akun 511 */}
+              <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                      <FileText size={16} className="text-navy" />
+                      <span>Daftar Transaksi Akun Pegawai Tetap yang Ditarik dari Jurnal Umum (Kode Akun 511)</span>
+                    </h3>
+                    <p className="text-xs text-muted-faint mt-0.5">
+                      Daftar transaksi pengeluaran gaji riil yang menggunakan kode akun 511 pada entitas {data.entity?.name} ({periodeFilterPegawai === "bulan" ? `Periode ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}` : `Tahun ${selectedYear}`})
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={14} />
+                    <span>Input Transaksi Jurnal</span>
+                  </Link>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[750px] text-left text-xs">
+                    <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                      <tr>
+                        <th className="py-2.5 px-3.5">Tanggal & No Bukti</th>
+                        <th className="py-2.5 px-3.5">Sumber Jurnal</th>
+                        <th className="py-2.5 px-3.5">Kode & Nama Akun</th>
+                        <th className="py-2.5 px-3.5">Keterangan / Uraian</th>
+                        <th className="py-2.5 px-3.5">Proyek</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Pengeluaran (Debit)</th>
+                        <th className="py-2.5 px-3.5 text-center">Staff</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {(periodeFilterPegawai === "bulan"
+                        ? data.penyesuaianJurnal.pegawai.transaksiBulan
+                        : data.penyesuaianJurnal.pegawai.transaksiTahun
+                      ).length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-10 text-center">
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-faint max-w-md mx-auto">
+                              <FileText size={32} className="opacity-40" />
+                              <p className="font-semibold text-navy-text">
+                                Belum Ada Transaksi di Jurnal Umum untuk Akun 511 (Gaji)
+                              </p>
+                              <p className="text-[11px] leading-relaxed">
+                                Sistem siap menarik data. Jika staf mencatat transaksi pengeluaran gaji melalui menu <strong>Jurnal Transaksi</strong> atau <strong>Buku Kas & Bank</strong> menggunakan kode akun <strong>511</strong>, data akan otomatis ditarik dan muncul di tabel ini untuk penyesuaian.
+                              </p>
+                              <Link
+                                href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                                className="mt-2 h-7 px-3 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <ExternalLink size={12} />
+                                <span>Buka Jurnal Transaksi</span>
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        (periodeFilterPegawai === "bulan"
+                          ? data.penyesuaianJurnal.pegawai.transaksiBulan
+                          : data.penyesuaianJurnal.pegawai.transaksiTahun
+                        ).map((tx) => (
+                          <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
+                            <td className="py-3 px-3.5">
+                              <div className="font-semibold text-navy-text">{tx.tanggalFmt}</div>
+                              <div className="font-mono text-[11px] text-muted-faint mt-0.5">
+                                Bukti: {tx.noBukti}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
+                                {tx.jenisInputNama}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <div className="font-mono font-bold text-navy-text text-xs">
+                                {tx.coaCode}
+                              </div>
+                              <div className="text-[11px] text-muted-faint">
+                                {tx.coaName}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3.5 text-muted-stronger">
+                              {tx.keterangan}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              {tx.namaProyek ? (
+                                <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
+                                  <Briefcase size={11} />
+                                  <span>{tx.namaProyek}</span>
+                                </span>
+                              ) : (
+                                <span className="text-muted-faint text-[11px]">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm">
+                              {tx.debitFmt}
+                            </td>
+                            <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint">
+                              {tx.staffName || "-"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {(periodeFilterPegawai === "bulan"
+                      ? data.penyesuaianJurnal.pegawai.transaksiBulan
+                      : data.penyesuaianJurnal.pegawai.transaksiTahun
+                    ).length > 0 && (
+                      <tfoot className="bg-surface-subtle border-t-2 border-border font-bold text-xs">
+                        <tr>
+                          <td colSpan={5} className="py-3 px-3.5 text-navy-text">
+                            Total ({(periodeFilterPegawai === "bulan"
+                              ? data.penyesuaianJurnal.pegawai.transaksiBulan
+                              : data.penyesuaianJurnal.pegawai.transaksiTahun
+                            ).length} Transaksi Jurnal Umum):
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm whitespace-nowrap">
+                            {periodeFilterPegawai === "bulan"
+                              ? data.penyesuaianJurnal.pegawai.totalJurnalBulanFmt
+                              : data.penyesuaianJurnal.pegawai.totalJurnalTahunFmt}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Sub-Tab Content 2: Master Database Karyawan */}
           {pegawaiSubTab === "master" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
@@ -1099,6 +1417,25 @@ export function PayrollClient({
               </button>
 
               <button
+                onClick={() => setTenagaAhliSubTab("penyesuaian")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                  tenagaAhliSubTab === "penyesuaian"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
+                }`}
+              >
+                <Scale size={13} className={tenagaAhliSubTab === "penyesuaian" ? "text-navy" : "text-muted-faint"} />
+                <span>Penyesuaian Gaji</span>
+                {(periodeFilterAhli === "bulan"
+                  ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan
+                  : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun) ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                )}
+              </button>
+
+              <button
                 onClick={() => setTenagaAhliSubTab("database-ahli")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   tenagaAhliSubTab === "database-ahli"
@@ -1162,7 +1499,15 @@ export function PayrollClient({
 
               {isManager && (
                 <div>
-                  {tenagaAhliSubTab === "database-ahli" ? (
+                  {tenagaAhliSubTab === "penyesuaian" ? (
+                    <Link
+                      href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Buka Jurnal Transaksi</span>
+                    </Link>
+                  ) : tenagaAhliSubTab === "database-ahli" ? (
                     <button
                       onClick={() => {
                         setEditingMasterAhli(null);
@@ -1465,6 +1810,285 @@ export function PayrollClient({
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-Tab Content 3: Penyesuaian Gaji Tenaga Ahli & Tarikan Jurnal Umum */}
+          {tenagaAhliSubTab === "penyesuaian" && (
+            <div className="space-y-6">
+              {/* Card 1: Ringkasan Rekonsiliasi & Status */}
+              <div className="p-5 rounded-2xl border border-border bg-surface-card space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 rounded-xl bg-navy/10 text-navy font-bold">
+                        <Scale size={18} />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-navy-text">
+                          Penyesuaian Gaji Tenaga Ahli & Transaksi Jurnal Umum
+                        </h3>
+                        <p className="text-xs text-muted-faint mt-0.5">
+                          Pencocokan antara catatan honorarium modul tenaga ahli dengan transaksi riil yang ditarik dari Jurnal Umum (Akun 612 - Gaji Tenaga Ahli) pada entitas {data.entity?.name}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter Periode Toggle (Bulan Ini vs Sepanjang Tahun) */}
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <div className="flex items-center bg-surface-subtle p-1 rounded-xl border border-border">
+                      <button
+                        onClick={() => setPeriodeFilterAhli("bulan")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          periodeFilterAhli === "bulan"
+                            ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                            : "text-muted-faint hover:text-navy-text"
+                        }`}
+                      >
+                        Bulan Ini ({BULAN_NAMES[selectedMonth - 1]})
+                      </button>
+                      <button
+                        onClick={() => setPeriodeFilterAhli("tahun")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          periodeFilterAhli === "tahun"
+                            ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                            : "text-muted-faint hover:text-navy-text"
+                        }`}
+                      >
+                        Sepanjang Tahun ({selectedYear})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Badge & Alert */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-surface-subtle/50 border border-border">
+                  <div className="flex items-center gap-2.5">
+                    {(periodeFilterAhli === "bulan"
+                      ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan
+                      : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun) ? (
+                      <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                        <CheckCircle size={18} />
+                        <div>
+                          <span className="text-xs font-bold block">100% SINKRON (Sesuai)</span>
+                          <span className="text-[11px] text-muted-faint">
+                            Tidak ada selisih antara pencatatan honorarium dan transaksi Akun 612 di Jurnal Umum.
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                        <AlertCircle size={18} />
+                        <div>
+                          <span className="text-xs font-bold block">
+                            TERDAPAT SELISIH PENYESUAIAN:{" "}
+                            {periodeFilterAhli === "bulan"
+                              ? data.penyesuaianJurnal.tenagaAhli.selisihBulanFmt
+                              : data.penyesuaianJurnal.tenagaAhli.selisihTahunFmt}
+                          </span>
+                          <span className="text-[11px] text-muted-faint">
+                            Nominal di Jurnal Umum berbeda dengan total rekap honor tenaga ahli pada periode ini.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Link
+                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                    className="h-7 px-3 rounded-lg border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto shadow-2xs"
+                  >
+                    <ExternalLink size={12} />
+                    <span>Buka Jurnal Transaksi</span>
+                  </Link>
+                </div>
+
+                {/* 3 Metric Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                  <div className="p-4 rounded-xl border border-border bg-surface-card shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-faint font-medium">Catatan Modul Tenaga Ahli</span>
+                      <Award size={14} className="text-muted-faint" />
+                    </div>
+                    <div className="text-lg font-bold font-mono text-navy-text">
+                      {periodeFilterAhli === "bulan"
+                        ? data.penyesuaianJurnal.tenagaAhli.totalPayrollBulanFmt
+                        : data.penyesuaianJurnal.tenagaAhli.totalPayrollTahunFmt}
+                    </div>
+                    <p className="text-[11px] text-muted-faint">
+                      Total honorarium bruto ({periodeFilterAhli === "bulan" ? `Bulan ${BULAN_NAMES[selectedMonth - 1]}` : `Tahun ${selectedYear}`})
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border bg-surface-card shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-faint font-medium">Ditarik dari Jurnal Umum</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-navy/10 text-navy">
+                        Akun 612 · Gaji Tenaga Ahli
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold font-mono text-navy-text">
+                      {periodeFilterAhli === "bulan"
+                        ? data.penyesuaianJurnal.tenagaAhli.totalJurnalBulanFmt
+                        : data.penyesuaianJurnal.tenagaAhli.totalJurnalTahunFmt}
+                    </div>
+                    <p className="text-[11px] text-muted-faint">
+                      Total debet akun 612 ({periodeFilterAhli === "bulan" ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan.length : data.penyesuaianJurnal.tenagaAhli.transaksiTahun.length} transaksi)
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border bg-surface-card shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-faint font-medium">Selisih Penyesuaian</span>
+                      <Scale size={14} className="text-muted-faint" />
+                    </div>
+                    <div className={`text-lg font-bold font-mono ${(periodeFilterAhli === "bulan" ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun) ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                      {periodeFilterAhli === "bulan"
+                        ? data.penyesuaianJurnal.tenagaAhli.selisihBulanFmt
+                        : data.penyesuaianJurnal.tenagaAhli.selisihTahunFmt}
+                    </div>
+                    <p className="text-[11px] text-muted-faint">
+                      {(periodeFilterAhli === "bulan" ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun)
+                        ? "Saldo telah sesuai (sinkron)"
+                        : "Perlu penyesuaian di jurnal umum"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Tabel Transaksi Jurnal Umum Akun 612 */}
+              <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                      <FileText size={16} className="text-navy" />
+                      <span>Daftar Transaksi Akun Tenaga Ahli yang Ditarik dari Jurnal Umum (Kode Akun 612)</span>
+                    </h3>
+                    <p className="text-xs text-muted-faint mt-0.5">
+                      Daftar transaksi pengeluaran honor tenaga ahli riil yang menggunakan kode akun 612 pada entitas {data.entity?.name} ({periodeFilterAhli === "bulan" ? `Periode ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}` : `Tahun ${selectedYear}`})
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={14} />
+                    <span>Input Transaksi Jurnal</span>
+                  </Link>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[750px] text-left text-xs">
+                    <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                      <tr>
+                        <th className="py-2.5 px-3.5">Tanggal & No Bukti</th>
+                        <th className="py-2.5 px-3.5">Sumber Jurnal</th>
+                        <th className="py-2.5 px-3.5">Kode & Nama Akun</th>
+                        <th className="py-2.5 px-3.5">Keterangan / Uraian</th>
+                        <th className="py-2.5 px-3.5">Proyek</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Pengeluaran (Debit)</th>
+                        <th className="py-2.5 px-3.5 text-center">Staff</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {(periodeFilterAhli === "bulan"
+                        ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan
+                        : data.penyesuaianJurnal.tenagaAhli.transaksiTahun
+                      ).length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-10 text-center">
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-faint max-w-md mx-auto">
+                              <FileText size={32} className="opacity-40" />
+                              <p className="font-semibold text-navy-text">
+                                Belum Ada Transaksi di Jurnal Umum untuk Akun 612 (Gaji Tenaga Ahli)
+                              </p>
+                              <p className="text-[11px] leading-relaxed">
+                                Sistem siap menarik data. Jika staf mencatat transaksi pengeluaran honor melalui menu <strong>Jurnal Transaksi</strong> atau <strong>Buku Kas & Bank</strong> menggunakan kode akun <strong>612</strong>, data akan otomatis ditarik dan muncul di tabel ini untuk penyesuaian.
+                              </p>
+                              <Link
+                                href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                                className="mt-2 h-7 px-3 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <ExternalLink size={12} />
+                                <span>Buka Jurnal Transaksi</span>
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        (periodeFilterAhli === "bulan"
+                          ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan
+                          : data.penyesuaianJurnal.tenagaAhli.transaksiTahun
+                        ).map((tx) => (
+                          <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
+                            <td className="py-3 px-3.5">
+                              <div className="font-semibold text-navy-text">{tx.tanggalFmt}</div>
+                              <div className="font-mono text-[11px] text-muted-faint mt-0.5">
+                                Bukti: {tx.noBukti}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
+                                {tx.jenisInputNama}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <div className="font-mono font-bold text-navy-text text-xs">
+                                {tx.coaCode}
+                              </div>
+                              <div className="text-[11px] text-muted-faint">
+                                {tx.coaName}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3.5 text-muted-stronger">
+                              {tx.keterangan}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              {tx.namaProyek ? (
+                                <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
+                                  <Briefcase size={11} />
+                                  <span>{tx.namaProyek}</span>
+                                </span>
+                              ) : (
+                                <span className="text-muted-faint text-[11px]">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm">
+                              {tx.debitFmt}
+                            </td>
+                            <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint">
+                              {tx.staffName || "-"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {(periodeFilterAhli === "bulan"
+                      ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan
+                      : data.penyesuaianJurnal.tenagaAhli.transaksiTahun
+                    ).length > 0 && (
+                      <tfoot className="bg-surface-subtle border-t-2 border-border font-bold text-xs">
+                        <tr>
+                          <td colSpan={5} className="py-3 px-3.5 text-navy-text">
+                            Total ({(periodeFilterAhli === "bulan"
+                              ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan
+                              : data.penyesuaianJurnal.tenagaAhli.transaksiTahun
+                            ).length} Transaksi Jurnal Umum):
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm whitespace-nowrap">
+                            {periodeFilterAhli === "bulan"
+                              ? data.penyesuaianJurnal.tenagaAhli.totalJurnalBulanFmt
+                              : data.penyesuaianJurnal.tenagaAhli.totalJurnalTahunFmt}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -2056,6 +2680,139 @@ export function PayrollClient({
                 <p className="text-[11px] text-muted-faint">
                   Catatan: Pengeluaran honorarium tenaga ahli di jurnal dicatat debet pada akun 612 dan kredit pada kas/bank.
                 </p>
+              </div>
+            </div>
+
+            {/* Tabel Penarikan Transaksi Jurnal Umum Riil */}
+            <div className="pt-2 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText size={16} className="text-navy" />
+                  <div>
+                    <h4 className="text-xs font-bold text-navy-text">
+                      Daftar Transaksi yang Ditarik Langsung dari Jurnal Umum
+                    </h4>
+                    <p className="text-[11px] text-muted-faint">
+                      Transaksi beban penggajian riil dari Jurnal Umum entitas {data.entity?.name} (Bulan {BULAN_NAMES[selectedMonth - 1]} {selectedYear})
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-surface-subtle p-1 rounded-xl border border-border">
+                  <button
+                    onClick={() => setSyncDetailTab("pegawai")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                      syncDetailTab === "pegawai"
+                        ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    <span>Akun 511 (Gaji Pegawai)</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-navy/10 text-navy">
+                      {data.syncData.jurnalPegawaiRows.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setSyncDetailTab("tenaga-ahli")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                      syncDetailTab === "tenaga-ahli"
+                        ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    <span>Akun 612 (Tenaga Ahli)</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-navy/10 text-navy">
+                      {data.syncData.jurnalTenagaAhliRows.length}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabel Transaksi Tab Terpilih */}
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full min-w-[700px] text-left text-xs">
+                  <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                    <tr>
+                      <th className="py-2.5 px-3">Tanggal & Bukti</th>
+                      <th className="py-2.5 px-3">Sumber Jurnal</th>
+                      <th className="py-2.5 px-3">Kode Akun</th>
+                      <th className="py-2.5 px-3">Keterangan</th>
+                      <th className="py-2.5 px-3">Proyek</th>
+                      <th className="py-2.5 px-3 text-right">Debit (Beban)</th>
+                      <th className="py-2.5 px-3 text-center">Staff</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {(syncDetailTab === "pegawai"
+                      ? data.syncData.jurnalPegawaiRows
+                      : data.syncData.jurnalTenagaAhliRows
+                    ).length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-muted-faint">
+                          Belum ada transaksi di Jurnal Umum untuk {syncDetailTab === "pegawai" ? "Akun 511 (Gaji Pegawai Tetap)" : "Akun 612 (Gaji Tenaga Ahli)"} pada bulan {BULAN_NAMES[selectedMonth - 1]} {selectedYear}.
+                        </td>
+                      </tr>
+                    ) : (
+                      (syncDetailTab === "pegawai"
+                        ? data.syncData.jurnalPegawaiRows
+                        : data.syncData.jurnalTenagaAhliRows
+                      ).map((tx) => (
+                        <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
+                          <td className="py-2.5 px-3 font-medium">
+                            <div className="text-navy-text">{tx.tanggalFmt}</div>
+                            <div className="text-[10px] font-mono text-muted-faint">{tx.noBukti}</div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
+                              {tx.jenisInputNama}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-navy-text">
+                            {tx.coaCode} - {tx.coaName}
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-stronger">
+                            {tx.keterangan}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {tx.namaProyek ? (
+                              <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
+                                <Briefcase size={11} />
+                                <span>{tx.namaProyek}</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-faint text-[11px]">-</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap">
+                            {tx.debitFmt}
+                          </td>
+                          <td className="py-2.5 px-3 text-center text-[11px] text-muted-faint">
+                            {tx.staffName || "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {(syncDetailTab === "pegawai"
+                    ? data.syncData.jurnalPegawaiRows
+                    : data.syncData.jurnalTenagaAhliRows
+                  ).length > 0 && (
+                    <tfoot className="bg-surface-subtle border-t border-border font-bold text-xs">
+                      <tr>
+                        <td colSpan={5} className="py-2.5 px-3 text-navy-text">
+                          Total Debit ({syncDetailTab === "pegawai" ? "Akun 511" : "Akun 612"}):
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-navy-text whitespace-nowrap">
+                          {syncDetailTab === "pegawai"
+                            ? data.syncData.glBebanGaji511Fmt
+                            : data.syncData.glBebanTenagaAhli612Fmt}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
               </div>
             </div>
           </div>

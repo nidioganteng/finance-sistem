@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, Fragment } from "react";
+import { useState, useEffect, useTransition, Fragment } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Role } from "@prisma/client";
@@ -192,6 +192,12 @@ export function PayrollClient({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Bersihkan notifikasi error/sukses setiap kali berganti tab utama atau sub-tab
+  useEffect(() => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+  }, [mainTab, pegawaiSubTab, tenagaAhliSubTab]);
+
   function handleMonthChange(newMonth: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", newMonth.toString());
@@ -199,6 +205,8 @@ export function PayrollClient({
   }
 
   function handleTabChange(tab: "pegawai" | "tenaga-ahli" | "sync") {
+    setErrorMsg(null);
+    setSuccessMsg(null);
     setMainTab(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
@@ -1482,7 +1490,7 @@ export function PayrollClient({
                     <button
                       onClick={() => {
                         if (data.rekananTenagaAhli.length === 0) {
-                          setErrorMsg("Belum ada tenaga ahli terdaftar di database. Silakan daftarkan profil tenaga ahli di sub-tab Database Tenaga Ahli terlebih dahulu.");
+                          setErrorMsg("Belum ada tenaga ahli terdaftar di entitas ini. Silakan tambahkan tenaga ahli terlebih dahulu.");
                           return;
                         }
                         setEditingHonor(null);
@@ -1570,7 +1578,7 @@ export function PayrollClient({
                   <button
                     onClick={() => {
                       if (data.rekananTenagaAhli.length === 0) {
-                        setErrorMsg("Belum ada tenaga ahli terdaftar di database. Silakan daftarkan profil tenaga ahli di sub-tab Database Tenaga Ahli terlebih dahulu.");
+                        setErrorMsg("Belum ada tenaga ahli terdaftar di entitas ini. Silakan tambahkan tenaga ahli terlebih dahulu.");
                         return;
                       }
                       setEditingHonor(null);

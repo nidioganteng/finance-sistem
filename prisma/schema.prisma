@@ -66,6 +66,9 @@ model Entity {
   fakturPendapatan FakturPendapatan[]
   rekonsiliasiPajak RekonsiliasiPajakBulanan[]
   rekanan           Rekanan[]
+  pegawai          Pegawai[]
+  gajiBulanan      GajiPegawaiBulanan[]
+  honorTenagaAhli  HonorTenagaAhli[]
 }
 
 model UserEntityAccess {
@@ -99,6 +102,7 @@ model Project {
   termin           Termin[]
   jurnal           Transaction[]
   fakturPendapatan FakturPendapatan[]
+  honorTenagaAhli  HonorTenagaAhli[]
 
   // profit dihitung di query layer (contractValue - spend), tidak disimpan
 }
@@ -411,6 +415,7 @@ model Rekanan {
   updatedAt    DateTime    @updatedAt
 
   entity Entity? @relation(fields: [entityId], references: [id])
+  honorTenagaAhli HonorTenagaAhli[]
 
   @@index([npwp])
   @@index([nik])
@@ -418,5 +423,93 @@ model Rekanan {
   @@index([tipe])
   @@index([entityId])
 }
+
+// ==========================================
+// MODUL PAYROLL (PENGGAJIAN & TENAGA AHLI) - ISSUE 86
+// ==========================================
+
+// Sub-Modul Pegawai Tetap (Khusus Per Entitas Usaha)
+model Pegawai {
+  id             String                @id @default(cuid())
+  entityId       String
+  nik            String                // NIK KTP atau Kode Karyawan
+  nama           String
+  jabatan        String
+  statusKeluarga String                @default("TK/0") // TK/0, TK/1, K/0, K/1, K/2, K/3, dll
+  ptkp           Decimal               @default(54000000.00) @db.Decimal(18, 2)
+  gajiPokok      Decimal               @default(0.00) @db.Decimal(18, 2)
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  entity         Entity                @relation(fields: [entityId], references: [id])
+  gajiBulanan    GajiPegawaiBulanan[]
+
+  @@index([entityId])
+  @@index([nik])
+  @@index([nama])
+}
+
+// Rekapitulasi & Komponen Variabel Bulanan Pegawai Tetap
+model GajiPegawaiBulanan {
+  id                  String   @id @default(cuid())
+  pegawaiId           String
+  entityId            String
+  bulan               Int      // 1 - 12
+  tahun               Int      // e.g. 2026
+  gajiPokok           Decimal  @db.Decimal(18, 2)
+  tunjanganJabatan    Decimal  @default(0.00) @db.Decimal(18, 2)
+  tunjanganTransport  Decimal  @default(0.00) @db.Decimal(18, 2)
+  insentif            Decimal  @default(0.00) @db.Decimal(18, 2)
+  bpjsKesehatan       Decimal  @default(0.00) @db.Decimal(18, 2)
+  bpjsKetenagakerjaan Decimal  @default(0.00) @db.Decimal(18, 2)
+  potonganLain        Decimal  @default(0.00) @db.Decimal(18, 2)
+  pph21               Decimal  @default(0.00) @db.Decimal(18, 2)
+  totalGajiKotor      Decimal  @db.Decimal(18, 2) // Pokok + Tunjangan + Insentif
+  totalGajiBersih     Decimal  @db.Decimal(18, 2) // Take Home Pay
+  catatan             String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  pegawai             Pegawai  @relation(fields: [pegawaiId], references: [id], onDelete: Cascade)
+  entity              Entity   @relation(fields: [entityId], references: [id])
+
+  @@unique([pegawaiId, bulan, tahun])
+  @@index([entityId, tahun, bulan])
+}
+
+// Sub-Modul Tenaga Ahli / Bukan Pegawai (Fleksibel & Konsolidasi Lintas Entitas)
+model HonorTenagaAhli {
+  id               String   @id @default(cuid())
+  entityId         String   // Entitas pembayar / pembeban biaya
+  rekananId        String?  // Terhubung opsional ke Master Rekanan
+  nik              String   // NIK KTP Tenaga Ahli (16 digit)
+  nama             String   // Nama Tenaga Ahli
+  npwp             String?  // NPWP Tenaga Ahli jika ada
+  uraian           String   // Deskripsi pekerjaan / jasa keahlian
+  tanggal          DateTime // Tanggal pembayaran
+  bulan            Int      // 1 - 12
+  tahun            Int      // e.g. 2026
+  nominalHonor     Decimal  @db.Decimal(18, 2) // Nilai bruto
+  tarifPph21Persen Decimal  @default(2.50) @db.Decimal(5, 2)
+  pph21            Decimal  @default(0.00) @db.Decimal(18, 2) // Nilai pajak dipotong
+  nominalBersih    Decimal  @db.Decimal(18, 2) // Net diterima
+  projectId        String?  // Opsional jika dibebankan ke proyek tertentu
+  namaProyek       String?  // Nama proyek terkait (bisa custom atau dari relasi project)
+  noBukti          String?  // Nomor bukti bayar / kas keluar / voucher
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  entity           Entity   @relation(fields: [entityId], references: [id])
+  rekanan          Rekanan? @relation(fields: [rekananId], references: [id])
+  project          Project? @relation(fields: [projectId], references: [id])
+
+  @@index([nik])
+  @@index([nama])
+  @@index([entityId, tahun, bulan])
+  @@index([rekananId])
+  @@index([projectId])
+}
+
 
 

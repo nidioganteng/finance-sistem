@@ -2077,13 +2077,14 @@ export function LaporanPendapatanClient({
 
                 {/* Sub-grid 3: Live Automatic Calculation Summary Cards */}
                 <div className="pt-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
-                    <span className="text-[11px] font-bold text-navy-soft uppercase tracking-wider block">
-                      Simulasi Estimasi Tagihan & Potensi Pajak:
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                    <span className="text-[11px] font-bold text-navy-soft uppercase tracking-wider">
+                      Estimasi Tagihan & Potensi Pajak:
                     </span>
-                    <span className="inline-flex items-center text-[10px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 font-medium">
-                      ℹ️ Di laporan, kolom PPN & PPh otomatis KOSONG (-) sampai uang cair di Jurnal Umum
-                    </span>
+                    <div className="inline-flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 font-medium">
+                      <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Di laporan, kolom PPN & PPh otomatis kosong (-) sampai uang cair di Jurnal Umum</span>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* Card 1: PPN */}

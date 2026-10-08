@@ -1,0 +1,386 @@
+"use server";
+
+import { getServerSession } from "next-auth";
+import { revalidatePath } from "next/cache";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { canManageTransaksi } from "@/lib/rbac";
+import { logActivity } from "@/lib/actions/log";
+
+// Helper check auth
+async function checkAuth() {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Akses ditolak. Silakan login terlebih dahulu.");
+  if (!canManageTransaksi(session.user.role)) {
+    throw new Error("Akses ditolak. Anda tidak memiliki izin mengelola modul Payroll.");
+  }
+  return session;
+}
+
+// ----------------------------------------------------
+// PEGAWAI TETAP (MASTER DATA)
+// ----------------------------------------------------
+
+export async function createPegawaiAction(formData: FormData) {
+  const session = await checkAuth();
+
+  const entityId = formData.get("entityId") as string;
+  const nik = (formData.get("nik") as string)?.trim();
+  const nama = (formData.get("nama") as string)?.trim();
+  const jabatan = (formData.get("jabatan") as string)?.trim() || "Karyawan";
+  const statusKeluarga = (formData.get("statusKeluarga") as string)?.trim() || "TK/0";
+  const ptkp = Number(formData.get("ptkp")) || 54000000;
+  const gajiPokok = Number(formData.get("gajiPokok")) || 0;
+  const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
+
+  if (!entityId || !nik || !nama) {
+    throw new Error("Entitas, NIK/Kode, dan Nama Pegawai wajib diisi.");
+  }
+
+  // Check unique NIK within entity
+  const existing = await prisma.pegawai.findFirst({
+    where: { entityId, nik },
+  });
+  if (existing) {
+    throw new Error(`Pegawai dengan NIK/Kode ${nik} sudah terdaftar pada entitas ini.`);
+  }
+
+  const pegawai = await prisma.pegawai.create({
+    data: {
+      entityId,
+      nik,
+      nama,
+      jabatan,
+      statusKeluarga,
+      ptkp,
+      gajiPokok,
+      isActive,
+    },
+  });
+
+  await logActivity(
+    session.user.id,
+    `Tambah Pegawai Tetap: ${nama} (${nik}) - ${jabatan}`,
+    "FINANCIAL_CHANGE",
+    { pegawaiId: pegawai.id, entityId }
+  );
+
+  revalidatePath("/payroll");
+  return { success: true, data: pegawai };
+}
+
+export async function updatePegawaiAction(formData: FormData) {
+  const session = await checkAuth();
+
+  const id = formData.get("id") as string;
+  const nik = (formData.get("nik") as string)?.trim();
+  const nama = (formData.get("nama") as string)?.trim();
+  const jabatan = (formData.get("jabatan") as string)?.trim() || "Karyawan";
+  const statusKeluarga = (formData.get("statusKeluarga") as string)?.trim() || "TK/0";
+  const ptkp = Number(formData.get("ptkp")) || 54000000;
+  const gajiPokok = Number(formData.get("gajiPokok")) || 0;
+  const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
+
+  if (!id || !nik || !nama) {
+    throw new Error("ID, NIK/Kode, dan Nama Pegawai wajib diisi.");
+  }
+
+  const existing = await prisma.pegawai.findUnique({ where: { id } });
+  if (!existing) throw new Error("Data pegawai tidak ditemukan.");
+
+  // Check unique NIK within entity if NIK changed
+  if (existing.nik !== nik) {
+    const duplicate = await prisma.pegawai.findFirst({
+      where: { entityId: existing.entityId, nik, id: { not: id } },
+    });
+    if (duplicate) {
+      throw new Error(`Pegawai dengan NIK/Kode ${nik} sudah terdaftar pada entitas ini.`);
+    }
+  }
+
+  const updated = await prisma.pegawai.update({
+    where: { id },
+    data: {
+      nik,
+      nama,
+      jabatan,
+      statusKeluarga,
+      ptkp,
+      gajiPokok,
+      isActive,
+    },
+  });
+
+  await logActivity(
+    session.user.id,
+    `Update Pegawai Tetap: ${nama} (${nik})`,
+    "FINANCIAL_CHANGE",
+    { pegawaiId: id }
+  );
+
+  revalidatePath("/payroll");
+  return { success: true, data: updated };
+}
+
+export async function deletePegawaiAction(id: string) {
+  const session = await checkAuth();
+
+  const existing = await prisma.pegawai.findUnique({
+    where: { id },
+    select: { id: true, nama: true, nik: true, entityId: true },
+  });
+  if (!existing) throw new Error("Data pegawai tidak ditemukan.");
+
+  await prisma.pegawai.delete({ where: { id } });
+
+  await logActivity(
+    session.user.id,
+    `Hapus Pegawai Tetap: ${existing.nama} (${existing.nik})`,
+    "FINANCIAL_CHANGE",
+    { pegawaiId: id, entityId: existing.entityId }
+  );
+
+  revalidatePath("/payroll");
+  return { success: true };
+}
+
+// ----------------------------------------------------
+// GAJI BULANAN PEGAWAI TETAP
+// ----------------------------------------------------
+
+export async function saveGajiBulananAction(formData: FormData) {
+  const session = await checkAuth();
+
+  const pegawaiId = formData.get("pegawaiId") as string;
+  const entityId = formData.get("entityId") as string;
+  const bulan = Number(formData.get("bulan"));
+  const tahun = Number(formData.get("tahun"));
+  const gajiPokok = Number(formData.get("gajiPokok")) || 0;
+  const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
+  const tunjanganTransport = Number(formData.get("tunjanganTransport")) || 0;
+  const insentif = Number(formData.get("insentif")) || 0;
+  const bpjsKesehatan = Number(formData.get("bpjsKesehatan")) || 0;
+  const bpjsKetenagakerjaan = Number(formData.get("bpjsKetenagakerjaan")) || 0;
+  const potonganLain = Number(formData.get("potonganLain")) || 0;
+  const pph21 = Number(formData.get("pph21")) || 0;
+  const catatan = (formData.get("catatan") as string)?.trim() || null;
+
+  if (!pegawaiId || !entityId || !bulan || !tahun) {
+    throw new Error("Pegawai, Entitas, Bulan, dan Tahun wajib diisi.");
+  }
+
+  const pegawai = await prisma.pegawai.findUnique({
+    where: { id: pegawaiId },
+    select: { id: true, nama: true, nik: true },
+  });
+  if (!pegawai) throw new Error("Pegawai tidak ditemukan.");
+
+  const totalGajiKotor = gajiPokok + tunjanganJabatan + tunjanganTransport + insentif;
+  const totalGajiBersih = Math.max(
+    0,
+    totalGajiKotor - bpjsKesehatan - bpjsKetenagakerjaan - potonganLain - pph21
+  );
+
+  const gaji = await prisma.gajiPegawaiBulanan.upsert({
+    where: {
+      pegawaiId_bulan_tahun: {
+        pegawaiId,
+        bulan,
+        tahun,
+      },
+    },
+    update: {
+      gajiPokok,
+      tunjanganJabatan,
+      tunjanganTransport,
+      insentif,
+      bpjsKesehatan,
+      bpjsKetenagakerjaan,
+      potonganLain,
+      pph21,
+      totalGajiKotor,
+      totalGajiBersih,
+      catatan,
+    },
+    create: {
+      pegawaiId,
+      entityId,
+      bulan,
+      tahun,
+      gajiPokok,
+      tunjanganJabatan,
+      tunjanganTransport,
+      insentif,
+      bpjsKesehatan,
+      bpjsKetenagakerjaan,
+      potonganLain,
+      pph21,
+      totalGajiKotor,
+      totalGajiBersih,
+      catatan,
+    },
+  });
+
+  await logActivity(
+    session.user.id,
+    `Input Gaji Pegawai ${pegawai.nama} Bulan ${bulan}/${tahun} (Kotor: Rp ${totalGajiKotor.toLocaleString("id-ID")}, Bersih: Rp ${totalGajiBersih.toLocaleString("id-ID")})`,
+    "FINANCIAL_CHANGE",
+    { gajiId: gaji.id, pegawaiId, bulan, tahun }
+  );
+
+  revalidatePath("/payroll");
+  revalidatePath("/laporan");
+  return { success: true, data: gaji };
+}
+
+export async function deleteGajiBulananAction(id: string) {
+  const session = await checkAuth();
+
+  const existing = await prisma.gajiPegawaiBulanan.findUnique({
+    where: { id },
+    include: { pegawai: { select: { nama: true } } },
+  });
+  if (!existing) throw new Error("Data gaji bulanan tidak ditemukan.");
+
+  await prisma.gajiPegawaiBulanan.delete({ where: { id } });
+
+  await logActivity(
+    session.user.id,
+    `Hapus Gaji Pegawai: ${existing.pegawai.nama} Bulan ${existing.bulan}/${existing.tahun}`,
+    "FINANCIAL_CHANGE",
+    { gajiId: id }
+  );
+
+  revalidatePath("/payroll");
+  revalidatePath("/laporan");
+  return { success: true };
+}
+
+// ----------------------------------------------------
+// SUB-MODUL TENAGA AHLI / BUKAN PEGAWAI
+// ----------------------------------------------------
+
+export async function saveHonorTenagaAhliAction(formData: FormData) {
+  const session = await checkAuth();
+
+  const id = (formData.get("id") as string)?.trim() || null;
+  const entityId = formData.get("entityId") as string;
+  const rekananId = (formData.get("rekananId") as string)?.trim() || null;
+  const nik = (formData.get("nik") as string)?.trim();
+  const nama = (formData.get("nama") as string)?.trim();
+  const npwp = (formData.get("npwp") as string)?.trim() || null;
+  const uraian = (formData.get("uraian") as string)?.trim();
+  const tanggalStr = formData.get("tanggal") as string;
+  const nominalHonor = Number(formData.get("nominalHonor")) || 0;
+  const tarifPph21Persen = Number(formData.get("tarifPph21Persen")) || 2.5;
+  const pph21 = Number(formData.get("pph21")) || 0;
+  const projectId = (formData.get("projectId") as string)?.trim() || null;
+  const noBukti = (formData.get("noBukti") as string)?.trim() || null;
+
+  if (!entityId || !nik || !nama || !uraian || !tanggalStr || nominalHonor <= 0) {
+    throw new Error("Entitas, NIK, Nama, Uraian Tugas, Tanggal, dan Nominal Honor (> 0) wajib diisi.");
+  }
+
+  const tanggal = new Date(tanggalStr);
+  const bulan = tanggal.getMonth() + 1;
+  const tahun = tanggal.getFullYear();
+  const nominalBersih = Math.max(0, nominalHonor - pph21);
+
+  // Jika rekananId belum ada, cek apakah ada master Rekanan dengan NIK/NPWP cocok
+  let finalRekananId = rekananId;
+  if (!finalRekananId) {
+    const matchedRekanan = await prisma.rekanan.findFirst({
+      where: {
+        tipe: "TENAGA_AHLI",
+        OR: [{ nik }, ...(npwp ? [{ npwp }] : [])],
+      },
+      select: { id: true },
+    });
+    if (matchedRekanan) {
+      finalRekananId = matchedRekanan.id;
+    }
+  }
+
+  let honor;
+  if (id) {
+    honor = await prisma.honorTenagaAhli.update({
+      where: { id },
+      data: {
+        entityId,
+        rekananId: finalRekananId,
+        nik,
+        nama,
+        npwp,
+        uraian,
+        tanggal,
+        bulan,
+        tahun,
+        nominalHonor,
+        tarifPph21Persen,
+        pph21,
+        nominalBersih,
+        projectId,
+        noBukti,
+      },
+    });
+    await logActivity(
+      session.user.id,
+      `Update Honorarium Tenaga Ahli: ${nama} - Rp ${nominalHonor.toLocaleString("id-ID")}`,
+      "FINANCIAL_CHANGE",
+      { honorId: id, entityId }
+    );
+  } else {
+    honor = await prisma.honorTenagaAhli.create({
+      data: {
+        entityId,
+        rekananId: finalRekananId,
+        nik,
+        nama,
+        npwp,
+        uraian,
+        tanggal,
+        bulan,
+        tahun,
+        nominalHonor,
+        tarifPph21Persen,
+        pph21,
+        nominalBersih,
+        projectId,
+        noBukti,
+      },
+    });
+    await logActivity(
+      session.user.id,
+      `Input Honorarium Tenaga Ahli: ${nama} - Rp ${nominalHonor.toLocaleString("id-ID")} (PPh 21: Rp ${pph21.toLocaleString("id-ID")})`,
+      "FINANCIAL_CHANGE",
+      { honorId: honor.id, entityId }
+    );
+  }
+
+  revalidatePath("/payroll");
+  revalidatePath("/laporan");
+  return { success: true, data: honor };
+}
+
+export async function deleteHonorTenagaAhliAction(id: string) {
+  const session = await checkAuth();
+
+  const existing = await prisma.honorTenagaAhli.findUnique({
+    where: { id },
+    select: { id: true, nama: true, nominalHonor: true, entityId: true },
+  });
+  if (!existing) throw new Error("Data honorarium tidak ditemukan.");
+
+  await prisma.honorTenagaAhli.delete({ where: { id } });
+
+  await logActivity(
+    session.user.id,
+    `Hapus Honorarium Tenaga Ahli: ${existing.nama} - Rp ${Number(existing.nominalHonor).toLocaleString("id-ID")}`,
+    "FINANCIAL_CHANGE",
+    { honorId: id, entityId: existing.entityId }
+  );
+
+  revalidatePath("/payroll");
+  revalidatePath("/laporan");
+  return { success: true };
+}

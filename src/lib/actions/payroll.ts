@@ -266,9 +266,9 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   const id = (formData.get("id") as string)?.trim() || null;
   const entityId = formData.get("entityId") as string;
   const rekananId = (formData.get("rekananId") as string)?.trim() || null;
-  const nik = (formData.get("nik") as string)?.trim();
-  const nama = (formData.get("nama") as string)?.trim();
-  const npwp = (formData.get("npwp") as string)?.trim() || null;
+  let nik = (formData.get("nik") as string)?.trim();
+  let nama = (formData.get("nama") as string)?.trim();
+  let npwp = (formData.get("npwp") as string)?.trim() || null;
   const uraian = (formData.get("uraian") as string)?.trim();
   const tanggalStr = formData.get("tanggal") as string;
   const nominalHonor = Number(formData.get("nominalHonor")) || 0;
@@ -278,8 +278,19 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   let namaProyek = (formData.get("namaProyek") as string)?.trim() || null;
   const noBukti = (formData.get("noBukti") as string)?.trim() || null;
 
+  // Jika rekananId dipilih, ambil NIK, Nama, dan NPWP dari database rekanan jika belum terisi
+  let finalRekananId = rekananId;
+  if (rekananId) {
+    const r = await prisma.rekanan.findUnique({ where: { id: rekananId } });
+    if (r) {
+      nama = nama || r.nama;
+      nik = nik || r.nik || "";
+      npwp = npwp || r.npwp;
+    }
+  }
+
   if (!entityId || !nik || !nama || !uraian || !tanggalStr || nominalHonor <= 0) {
-    throw new Error("Entitas, NIK, Nama, Uraian Tugas, Tanggal, dan Nominal Honor (> 0) wajib diisi.");
+    throw new Error("Entitas, Tenaga Ahli (NIK & Nama), Uraian Tugas, Tanggal, dan Nominal Honor (> 0) wajib diisi.");
   }
 
   // Jika projectId dipilih tapi namaProyek belum diisi, ambil nama dari relasi project
@@ -299,7 +310,6 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   const nominalBersih = Math.max(0, nominalHonor - pph21);
 
   // Jika rekananId belum ada, cek apakah ada master Rekanan dengan NIK/NPWP cocok
-  let finalRekananId = rekananId;
   if (!finalRekananId) {
     const matchedRekanan = await prisma.rekanan.findFirst({
       where: {
@@ -517,3 +527,112 @@ export async function copyGajiBulanSebelumnyaAction(
     message: `${count} gaji pegawai berhasil disalin dari bulan ${sourceMonth}/${sourceYear}.`,
   };
 }
+
+/**
+ * Tambah / Edit Tenaga Ahli ke Master Database
+ */
+export async function saveTenagaAhliMasterAction(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  if (!canManageTransaksi(session.user.role) && session.user.role !== "SUPER_ADMIN") {
+    throw new Error("Hanya staf/manajer keuangan yang dapat mengelola database tenaga ahli.");
+  }
+
+  const id = (formData.get("id") as string)?.trim() || null;
+  const nama = (formData.get("nama") as string)?.trim();
+  const nik = (formData.get("nik") as string)?.trim();
+  const npwp = (formData.get("npwp") as string)?.trim() || null;
+  const kategori = (formData.get("kategori") as string)?.trim() || null;
+  const entityId = (formData.get("entityId") as string)?.trim() || null;
+
+  if (!nama || !nik) {
+    throw new Error("Nama Lengkap dan NIK Tenaga Ahli wajib diisi.");
+  }
+
+  const cleanNik = nik.replace(/\D/g, "");
+  if (cleanNik.length !== 16) {
+    throw new Error("NIK Tenaga Ahli harus berupa 16 digit angka KTP.");
+  }
+
+  let record;
+  if (id) {
+    record = await prisma.rekanan.update({
+      where: { id },
+      data: {
+        nama,
+        nik: cleanNik,
+        npwp,
+        kategori,
+        entityId: entityId || null,
+      },
+    });
+    await logActivity(
+      session.user.id,
+      `Update Database Tenaga Ahli: ${nama} (${cleanNik})`,
+      "FINANCIAL_CHANGE",
+      { rekananId: id }
+    );
+  } else {
+    // Cek apakah NIK sudah pernah terdaftar di Rekanan
+    const existing = await prisma.rekanan.findFirst({
+      where: { tipe: "TENAGA_AHLI", nik: cleanNik },
+    });
+    if (existing) {
+      throw new Error(`Tenaga Ahli dengan NIK ${cleanNik} sudah terdaftar (${existing.nama}).`);
+    }
+
+    record = await prisma.rekanan.create({
+      data: {
+        nama,
+        nik: cleanNik,
+        npwp,
+        tipe: "TENAGA_AHLI",
+        kategori,
+        entityId: entityId || null,
+      },
+    });
+    await logActivity(
+      session.user.id,
+      `Tambah Database Tenaga Ahli: ${nama} (${cleanNik})`,
+      "FINANCIAL_CHANGE",
+      { rekananId: record.id }
+    );
+  }
+
+  revalidatePath("/payroll");
+  return {
+    success: true,
+    data: {
+      id: record.id,
+      nama: record.nama,
+      nik: record.nik,
+      npwp: record.npwp,
+      kategori: record.kategori,
+    },
+    message: `Tenaga Ahli ${nama} berhasil disimpan ke database.`,
+  };
+}
+
+/**
+ * Hapus Tenaga Ahli dari Master Database
+ */
+export async function deleteTenagaAhliMasterAction(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  if (!canManageTransaksi(session.user.role) && session.user.role !== "SUPER_ADMIN") {
+    throw new Error("Hanya staf/manajer keuangan yang dapat menghapus data tenaga ahli.");
+  }
+
+  // Cek apakah ada riwayat honor
+  const honorCount = await prisma.honorTenagaAhli.count({
+    where: { rekananId: id },
+  });
+  if (honorCount > 0) {
+    throw new Error(`Tenaga Ahli tidak dapat dihapus karena memiliki ${honorCount} riwayat pembayaran honor.`);
+  }
+
+  await prisma.rekanan.delete({ where: { id } });
+  revalidatePath("/payroll");
+  return { success: true, message: "Tenaga Ahli berhasil dihapus dari database." };
+}
+

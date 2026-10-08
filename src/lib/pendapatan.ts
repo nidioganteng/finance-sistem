@@ -145,8 +145,14 @@ export interface RekonsiliasiPajakItem {
   dppTerlapor: number;
   selisihDpp: number;
   ppnRekap: number;
-  pajakTerlapor: number;
-  selisihPajak: number;
+  pajakTerlapor: number; // PPN Terlapor di SPT
+  selisihPajak: number; // Selisih PPN
+  pphRekap: number;
+  pphTerlapor: number; // PPh Terlapor di SPT
+  selisihPph: number; // Selisih PPh
+  totalPajakRekap: number;
+  totalPajakTerlapor: number;
+  selisihTotalPajak: number;
   keterangan: string;
   status: "MATCH" | "SELISIH" | "BELUM_DILAPORKAN";
 
@@ -156,6 +162,12 @@ export interface RekonsiliasiPajakItem {
   ppnRekapFmt: string;
   pajakTerlaporFmt: string;
   selisihPajakFmt: string;
+  pphRekapFmt: string;
+  pphTerlaporFmt: string;
+  selisihPphFmt: string;
+  totalPajakRekapFmt: string;
+  totalPajakTerlaporFmt: string;
+  selisihTotalPajakFmt: string;
 }
 
 export interface LaporanPendapatanData {
@@ -736,25 +748,37 @@ export async function getLaporanPendapatanData(
 
     const dppRekap = bucket.dpp;
     const ppnRekap = bucket.ppn;
+    const pphRekap = bucket.pph;
+
     const dppTerlapor = rec ? Number(rec.dppTerlapor) : 0;
-    const pajakTerlapor = rec ? Number(rec.pajakTerlapor) : 0;
+    const pajakTerlapor = rec ? Number(rec.pajakTerlapor) : 0; // PPN Terlapor
+    const pphTerlapor = rec ? Number(rec.pphTerlapor ?? 0) : 0; // PPh Terlapor
     const keterangan = rec?.keterangan ?? "";
 
     const selisihDpp = dppRekap - dppTerlapor;
-    const selisihPajak = ppnRekap - pajakTerlapor;
+    const selisihPajak = ppnRekap - pajakTerlapor; // Selisih PPN
+    const selisihPph = pphRekap - pphTerlapor; // Selisih PPh
 
-    const hasRekap = dppRekap > 0 || ppnRekap > 0;
-    const hasTerlapor = dppTerlapor > 0 || pajakTerlapor > 0;
+    const totalPajakRekap = ppnRekap + pphRekap;
+    const totalPajakTerlapor = pajakTerlapor + pphTerlapor;
+    const selisihTotalPajak = totalPajakRekap - totalPajakTerlapor;
+
+    const hasRekap = dppRekap > 0 || ppnRekap > 0 || pphRekap > 0;
+    const hasTerlapor = dppTerlapor > 0 || pajakTerlapor > 0 || pphTerlapor > 0;
 
     let status: "MATCH" | "SELISIH" | "BELUM_DILAPORKAN" = "MATCH";
-    if (Math.abs(selisihDpp) > 0.01 || Math.abs(selisihPajak) > 0.01) {
+    if (
+      Math.abs(selisihDpp) > 0.01 ||
+      Math.abs(selisihPajak) > 0.01 ||
+      Math.abs(selisihPph) > 0.01
+    ) {
       if (hasRekap && !hasTerlapor) {
         status = "BELUM_DILAPORKAN";
       } else {
         status = "SELISIH";
       }
       jumlahBulanSelisih += 1;
-      totalSelisihPajak += Math.abs(selisihPajak);
+      totalSelisihPajak += Math.abs(selisihPajak) + Math.abs(selisihPph);
     }
 
     rekonsiliasiList.push({
@@ -766,6 +790,12 @@ export async function getLaporanPendapatanData(
       ppnRekap,
       pajakTerlapor,
       selisihPajak,
+      pphRekap,
+      pphTerlapor,
+      selisihPph,
+      totalPajakRekap,
+      totalPajakTerlapor,
+      selisihTotalPajak,
       keterangan,
       status,
 
@@ -775,6 +805,12 @@ export async function getLaporanPendapatanData(
       ppnRekapFmt: formatRupiah(ppnRekap),
       pajakTerlaporFmt: formatRupiah(pajakTerlapor),
       selisihPajakFmt: formatRupiah(selisihPajak),
+      pphRekapFmt: formatRupiah(pphRekap),
+      pphTerlaporFmt: formatRupiah(pphTerlapor),
+      selisihPphFmt: formatRupiah(selisihPph),
+      totalPajakRekapFmt: formatRupiah(totalPajakRekap),
+      totalPajakTerlaporFmt: formatRupiah(totalPajakTerlapor),
+      selisihTotalPajakFmt: formatRupiah(selisihTotalPajak),
     });
   }
 

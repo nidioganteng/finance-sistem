@@ -39,7 +39,8 @@ export type RekonsiliasiPajakInput = {
   year: number;
   month: number;
   dppTerlapor: number;
-  pajakTerlapor: number;
+  pajakTerlapor: number; // PPN Terlapor
+  pphTerlapor?: number; // PPh Terlapor
   keterangan?: string;
 };
 
@@ -319,6 +320,8 @@ export async function upsertRekonsiliasiPajakAction(data: RekonsiliasiPajakInput
   });
   if (!entity) return { error: "Kamu tidak punya akses ke entitas ini." };
 
+  const pphTerlapor = Number(data.pphTerlapor) || 0;
+
   const saved = await prisma.rekonsiliasiPajakBulanan.upsert({
     where: {
       entityId_year_month: {
@@ -330,6 +333,7 @@ export async function upsertRekonsiliasiPajakAction(data: RekonsiliasiPajakInput
     update: {
       dppTerlapor: data.dppTerlapor,
       pajakTerlapor: data.pajakTerlapor,
+      pphTerlapor: pphTerlapor,
       keterangan: data.keterangan?.trim() || null,
     },
     create: {
@@ -338,6 +342,7 @@ export async function upsertRekonsiliasiPajakAction(data: RekonsiliasiPajakInput
       month: data.month,
       dppTerlapor: data.dppTerlapor,
       pajakTerlapor: data.pajakTerlapor,
+      pphTerlapor: pphTerlapor,
       keterangan: data.keterangan?.trim() || null,
     },
   });
@@ -353,6 +358,7 @@ export async function upsertRekonsiliasiPajakAction(data: RekonsiliasiPajakInput
       month: data.month,
       dppTerlapor: data.dppTerlapor,
       pajakTerlapor: data.pajakTerlapor,
+      pphTerlapor: pphTerlapor,
     }
   );
 

@@ -275,10 +275,22 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   const tarifPph21Persen = Number(formData.get("tarifPph21Persen")) || 2.5;
   const pph21 = Number(formData.get("pph21")) || 0;
   const projectId = (formData.get("projectId") as string)?.trim() || null;
+  let namaProyek = (formData.get("namaProyek") as string)?.trim() || null;
   const noBukti = (formData.get("noBukti") as string)?.trim() || null;
 
   if (!entityId || !nik || !nama || !uraian || !tanggalStr || nominalHonor <= 0) {
     throw new Error("Entitas, NIK, Nama, Uraian Tugas, Tanggal, dan Nominal Honor (> 0) wajib diisi.");
+  }
+
+  // Jika projectId dipilih tapi namaProyek belum diisi, ambil nama dari relasi project
+  if (!namaProyek && projectId) {
+    const proj = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { code: true, name: true },
+    });
+    if (proj) {
+      namaProyek = `${proj.code} - ${proj.name}`;
+    }
   }
 
   const tanggal = new Date(tanggalStr);
@@ -320,6 +332,7 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
         pph21,
         nominalBersih,
         projectId,
+        namaProyek,
         noBukti,
       },
     });
@@ -346,6 +359,7 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
         pph21,
         nominalBersih,
         projectId,
+        namaProyek,
         noBukti,
       },
     });
@@ -383,4 +397,123 @@ export async function deleteHonorTenagaAhliAction(id: string) {
   revalidatePath("/payroll");
   revalidatePath("/laporan");
   return { success: true };
+}
+
+// ----------------------------------------------------
+// AUTO-GENERATE / SALIN GAJI DARI BULAN SEBELUMNYA
+// ----------------------------------------------------
+
+export async function copyGajiBulanSebelumnyaAction(
+  entityId: string,
+  targetYear: number,
+  targetMonth: number
+) {
+  const session = await checkAuth();
+
+  const sourceMonth = targetMonth === 1 ? 12 : targetMonth - 1;
+  const sourceYear = targetMonth === 1 ? targetYear - 1 : targetYear;
+
+  const prevGajiList = await prisma.gajiPegawaiBulanan.findMany({
+    where: { entityId, tahun: sourceYear, bulan: sourceMonth },
+  });
+
+  if (prevGajiList.length === 0) {
+    // Jika bulan lalu belum ada data, buat otomatis dari master Pegawai yang aktif
+    const activePegawai = await prisma.pegawai.findMany({
+      where: { entityId, isActive: true },
+    });
+    if (activePegawai.length === 0) {
+      throw new Error("Belum ada pegawai aktif di master database entitas ini.");
+    }
+
+    let count = 0;
+    for (const p of activePegawai) {
+      const existing = await prisma.gajiPegawaiBulanan.findUnique({
+        where: {
+          pegawaiId_bulan_tahun: {
+            pegawaiId: p.id,
+            bulan: targetMonth,
+            tahun: targetYear,
+          },
+        },
+      });
+
+      if (!existing) {
+        const gp = Number(p.gajiPokok);
+        await prisma.gajiPegawaiBulanan.create({
+          data: {
+            entityId,
+            pegawaiId: p.id,
+            bulan: targetMonth,
+            tahun: targetYear,
+            gajiPokok: gp,
+            totalGajiKotor: gp,
+            totalGajiBersih: gp,
+            catatan: "Dibuat otomatis dari Gaji Pokok Master",
+          },
+        });
+        count++;
+      }
+    }
+
+    await logActivity(
+      session.user.id,
+      `Generate otomatis gaji ${count} pegawai dari master untuk bulan ${targetMonth}/${targetYear}`,
+      "FINANCIAL_CHANGE",
+      { entityId, targetYear, targetMonth }
+    );
+
+    revalidatePath("/payroll");
+    return { success: true, count, message: `${count} pegawai berhasil dibuat dari master data.` };
+  }
+
+  let count = 0;
+  for (const prev of prevGajiList) {
+    const existing = await prisma.gajiPegawaiBulanan.findUnique({
+      where: {
+        pegawaiId_bulan_tahun: {
+          pegawaiId: prev.pegawaiId,
+          bulan: targetMonth,
+          tahun: targetYear,
+        },
+      },
+    });
+
+    if (!existing) {
+      await prisma.gajiPegawaiBulanan.create({
+        data: {
+          entityId,
+          pegawaiId: prev.pegawaiId,
+          bulan: targetMonth,
+          tahun: targetYear,
+          gajiPokok: prev.gajiPokok,
+          tunjanganJabatan: prev.tunjanganJabatan,
+          tunjanganTransport: prev.tunjanganTransport,
+          insentif: prev.insentif,
+          bpjsKesehatan: prev.bpjsKesehatan,
+          bpjsKetenagakerjaan: prev.bpjsKetenagakerjaan,
+          potonganLain: prev.potonganLain,
+          pph21: prev.pph21,
+          totalGajiKotor: prev.totalGajiKotor,
+          totalGajiBersih: prev.totalGajiBersih,
+          catatan: `Disalin dari bulan ${sourceMonth}/${sourceYear}`,
+        },
+      });
+      count++;
+    }
+  }
+
+  await logActivity(
+    session.user.id,
+    `Salin gaji ${count} pegawai dari bulan ${sourceMonth}/${sourceYear} ke bulan ${targetMonth}/${targetYear}`,
+    "FINANCIAL_CHANGE",
+    { entityId, targetYear, targetMonth }
+  );
+
+  revalidatePath("/payroll");
+  return {
+    success: true,
+    count,
+    message: `${count} gaji pegawai berhasil disalin dari bulan ${sourceMonth}/${sourceYear}.`,
+  };
 }

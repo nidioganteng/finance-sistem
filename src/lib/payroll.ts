@@ -198,6 +198,59 @@ export type KonsolidasiTenagaAhliItem = {
   }[];
 };
 
+export type JurnalTransaksiGajiItem = {
+  id: string;
+  entityId: string;
+  tanggal: string;
+  tanggalFmt: string;
+  bulan: number;
+  tahun: number;
+  noBukti: string;
+  keterangan: string;
+  coaAccountId: string | null;
+  coaCode: string;
+  coaName: string;
+  jenisInputKey: string;
+  jenisInputNama: string;
+  projectId?: string | null;
+  projectCode?: string | null;
+  projectName?: string | null;
+  namaProyek?: string | null;
+  debit: number;
+  debitFmt: string;
+  kredit: number;
+  kreditFmt: string;
+  staffName?: string | null;
+};
+
+export type PenyesuaianAkunGajiDetail = {
+  coaCode: string;
+  coaName: string;
+  totalPayrollBulan: number;
+  totalPayrollBulanFmt: string;
+  totalJurnalBulan: number;
+  totalJurnalBulanFmt: string;
+  selisihBulan: number;
+  selisihBulanFmt: string;
+  isSinkronBulan: boolean;
+
+  totalPayrollTahun: number;
+  totalPayrollTahunFmt: string;
+  totalJurnalTahun: number;
+  totalJurnalTahunFmt: string;
+  selisihTahun: number;
+  selisihTahunFmt: string;
+  isSinkronTahun: boolean;
+
+  transaksiBulan: JurnalTransaksiGajiItem[];
+  transaksiTahun: JurnalTransaksiGajiItem[];
+};
+
+export type PenyesuaianAkunGaji = {
+  pegawai: PenyesuaianAkunGajiDetail;
+  tenagaAhli: PenyesuaianAkunGajiDetail;
+};
+
 export type PayrollSyncLabaRugi = {
   tahun: number;
   bulan?: number;
@@ -227,6 +280,10 @@ export type PayrollSyncLabaRugi = {
   totalSelisih: number;
   totalSelisihFmt: string;
   isOverallSinkron: boolean;
+
+  // Transaksi Jurnal Umum
+  jurnalPegawaiRows: JurnalTransaksiGajiItem[];
+  jurnalTenagaAhliRows: JurnalTransaksiGajiItem[];
 };
 
 export async function getPayrollData(
@@ -665,8 +722,152 @@ export async function getPayrollData(
     })),
   }));
 
-  // 9. Sinkronisasi Laba Rugi (Beban Gaji 511 & Tenaga Ahli 612)
-  const syncData = await getPayrollSyncData(entityId, year, month);
+  // 9. Penarikan Transaksi Jurnal Umum Riil untuk Kode Akun Gaji Pegawai (511) & Tenaga Ahli (612)
+  const startYear = new Date(year, 0, 1, 0, 0, 0, 0);
+  const endYear = new Date(year, 11, 31, 23, 59, 59, 999);
+
+  const txGajiTahunRaw = await prisma.transaction.findMany({
+    where: {
+      entityId,
+      tanggal: { gte: startYear, lte: endYear },
+      coaAccountId: { not: null },
+      coaAccount: {
+        kategori: "BEBAN",
+        OR: [
+          { code: "511" },
+          { code: "612" },
+          { name: { contains: "Gaji" } },
+          { name: { contains: "Honor" } },
+          { name: { contains: "Tenaga Ahli" } },
+        ],
+      },
+    },
+    include: {
+      coaAccount: { select: { code: true, name: true } },
+      jenisInput: { select: { key: true, nama: true } },
+      project: { select: { code: true, name: true } },
+      staff: { select: { name: true } },
+    },
+    orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }],
+  });
+
+  const txPegawaiTahun: JurnalTransaksiGajiItem[] = [];
+  const txTenagaAhliTahun: JurnalTransaksiGajiItem[] = [];
+
+  for (const t of txGajiTahunRaw) {
+    if (!t.coaAccount) continue;
+    const code = t.coaAccount.code;
+    const name = t.coaAccount.name.toLowerCase();
+    const item = mapTransactionToGajiItem(t);
+
+    if (code === "511" || (/gaji/i.test(name) && !/tenaga ahli|honor/i.test(name))) {
+      txPegawaiTahun.push(item);
+    } else if (code === "612" || /tenaga ahli|honor/i.test(name)) {
+      txTenagaAhliTahun.push(item);
+    }
+  }
+
+  const txPegawaiBulan = txPegawaiTahun.filter((t) => t.bulan === month);
+  const txTenagaAhliBulan = txTenagaAhliTahun.filter((t) => t.bulan === month);
+
+  const totalJurnalPegawaiBulan = txPegawaiBulan.reduce((s, t) => s + t.debit, 0);
+  const totalJurnalPegawaiTahun = txPegawaiTahun.reduce((s, t) => s + t.debit, 0);
+  const totalPayrollPegawaiBulan = summaryBulanIni.totalGajiKotor;
+  const totalPayrollPegawaiTahun = rekapBulananPegawai.reduce((s, r) => s + r.totalGajiKotor, 0);
+  const selisihPegawaiBulan = Math.abs(totalPayrollPegawaiBulan - totalJurnalPegawaiBulan);
+  const selisihPegawaiTahun = Math.abs(totalPayrollPegawaiTahun - totalJurnalPegawaiTahun);
+
+  const totalJurnalTenagaAhliBulan = txTenagaAhliBulan.reduce((s, t) => s + t.debit, 0);
+  const totalJurnalTenagaAhliTahun = txTenagaAhliTahun.reduce((s, t) => s + t.debit, 0);
+  const totalPayrollTenagaAhliBulan = summaryHonorBulanIni.totalHonorBruto;
+  const totalPayrollTenagaAhliTahun = rekapBulananTenagaAhli.reduce((s, r) => s + r.totalHonorBruto, 0);
+  const selisihTenagaAhliBulan = Math.abs(totalPayrollTenagaAhliBulan - totalJurnalTenagaAhliBulan);
+  const selisihTenagaAhliTahun = Math.abs(totalPayrollTenagaAhliTahun - totalJurnalTenagaAhliTahun);
+
+  const penyesuaianJurnal: PenyesuaianAkunGaji = {
+    pegawai: {
+      coaCode: "511",
+      coaName: "Gaji",
+      totalPayrollBulan: totalPayrollPegawaiBulan,
+      totalPayrollBulanFmt: formatRupiah(totalPayrollPegawaiBulan),
+      totalJurnalBulan: totalJurnalPegawaiBulan,
+      totalJurnalBulanFmt: formatRupiah(totalJurnalPegawaiBulan),
+      selisihBulan: selisihPegawaiBulan,
+      selisihBulanFmt: formatRupiah(selisihPegawaiBulan),
+      isSinkronBulan: selisihPegawaiBulan === 0,
+
+      totalPayrollTahun: totalPayrollPegawaiTahun,
+      totalPayrollTahunFmt: formatRupiah(totalPayrollPegawaiTahun),
+      totalJurnalTahun: totalJurnalPegawaiTahun,
+      totalJurnalTahunFmt: formatRupiah(totalJurnalPegawaiTahun),
+      selisihTahun: selisihPegawaiTahun,
+      selisihTahunFmt: formatRupiah(selisihPegawaiTahun),
+      isSinkronTahun: selisihPegawaiTahun === 0,
+
+      transaksiBulan: txPegawaiBulan,
+      transaksiTahun: txPegawaiTahun,
+    },
+    tenagaAhli: {
+      coaCode: "612",
+      coaName: "Gaji Tenaga Ahli",
+      totalPayrollBulan: totalPayrollTenagaAhliBulan,
+      totalPayrollBulanFmt: formatRupiah(totalPayrollTenagaAhliBulan),
+      totalJurnalBulan: totalJurnalTenagaAhliBulan,
+      totalJurnalBulanFmt: formatRupiah(totalJurnalTenagaAhliBulan),
+      selisihBulan: selisihTenagaAhliBulan,
+      selisihBulanFmt: formatRupiah(selisihTenagaAhliBulan),
+      isSinkronBulan: selisihTenagaAhliBulan === 0,
+
+      totalPayrollTahun: totalPayrollTenagaAhliTahun,
+      totalPayrollTahunFmt: formatRupiah(totalPayrollTenagaAhliTahun),
+      totalJurnalTahun: totalJurnalTenagaAhliTahun,
+      totalJurnalTahunFmt: formatRupiah(totalJurnalTenagaAhliTahun),
+      selisihTahun: selisihTenagaAhliTahun,
+      selisihTahunFmt: formatRupiah(selisihTenagaAhliTahun),
+      isSinkronTahun: selisihTenagaAhliTahun === 0,
+
+      transaksiBulan: txTenagaAhliBulan,
+      transaksiTahun: txTenagaAhliTahun,
+    },
+  };
+
+  const syncData: PayrollSyncLabaRugi = {
+    tahun: year,
+    bulan: month,
+    payrollGajiPegawai: totalPayrollPegawaiBulan,
+    payrollGajiPegawaiFmt: formatRupiah(totalPayrollPegawaiBulan),
+    glBebanGaji511: totalJurnalPegawaiBulan,
+    glBebanGaji511Fmt: formatRupiah(totalJurnalPegawaiBulan),
+    selisihGajiPegawai: selisihPegawaiBulan,
+    selisihGajiPegawaiFmt: formatRupiah(selisihPegawaiBulan),
+    isGajiPegawaiSinkron: selisihPegawaiBulan === 0,
+
+    payrollHonorTenagaAhli: totalPayrollTenagaAhliBulan,
+    payrollHonorTenagaAhliFmt: formatRupiah(totalPayrollTenagaAhliBulan),
+    glBebanTenagaAhli612: totalJurnalTenagaAhliBulan,
+    glBebanTenagaAhli612Fmt: formatRupiah(totalJurnalTenagaAhliBulan),
+    selisihTenagaAhli: selisihTenagaAhliBulan,
+    selisihTenagaAhliFmt: formatRupiah(selisihTenagaAhliBulan),
+    isTenagaAhliSinkron: selisihTenagaAhliBulan === 0,
+
+    totalPayroll: totalPayrollPegawaiBulan + totalPayrollTenagaAhliBulan,
+    totalPayrollFmt: formatRupiah(totalPayrollPegawaiBulan + totalPayrollTenagaAhliBulan),
+    totalGLBeban: totalJurnalPegawaiBulan + totalJurnalTenagaAhliBulan,
+    totalGLBebanFmt: formatRupiah(totalJurnalPegawaiBulan + totalJurnalTenagaAhliBulan),
+    totalSelisih: Math.abs(
+      totalPayrollPegawaiBulan + totalPayrollTenagaAhliBulan - (totalJurnalPegawaiBulan + totalJurnalTenagaAhliBulan)
+    ),
+    totalSelisihFmt: formatRupiah(
+      Math.abs(
+        totalPayrollPegawaiBulan + totalPayrollTenagaAhliBulan - (totalJurnalPegawaiBulan + totalJurnalTenagaAhliBulan)
+      )
+    ),
+    isOverallSinkron:
+      selisihPegawaiBulan === 0 && selisihTenagaAhliBulan === 0,
+
+    jurnalPegawaiRows: txPegawaiBulan,
+    jurnalTenagaAhliRows: txTenagaAhliBulan,
+  };
 
   return {
     entity,
@@ -701,7 +902,67 @@ export async function getPayrollData(
       totalHonorBersihFmt: formatRupiah(summaryHonorBulanIni.totalHonorBersih),
     },
     konsolidasiTenagaAhli,
+    penyesuaianJurnal,
     syncData,
+  };
+}
+
+function mapTransactionToGajiItem(t: {
+  id: string;
+  entityId: string;
+  tanggal: Date;
+  noBukti: string;
+  keterangan: string;
+  coaAccountId: string | null;
+  coaAccount?: { code: string; name: string } | null;
+  jenisInput?: { key: string; nama: string } | null;
+  projectId?: string | null;
+  project?: { code: string; name: string } | null;
+  debit: unknown;
+  kredit: unknown;
+  staff?: { name: string } | null;
+}): JurnalTransaksiGajiItem {
+  const d = Number(t.debit ?? 0);
+  const k = Number(t.kredit ?? 0);
+  const tgl = new Date(t.tanggal);
+  const bln = tgl.getMonth() + 1;
+  const thn = tgl.getFullYear();
+
+  let jenisNama = t.jenisInput?.nama || "Jurnal Umum";
+  if (t.jenisInput?.key === "kasKecil") jenisNama = "Kas Kecil";
+  else if (t.jenisInput?.key === "kasBesar") jenisNama = "Kas Besar";
+  else if (t.jenisInput?.key === "bankBuku") jenisNama = "Buku Bank";
+  else if (t.jenisInput?.key === "jurnalTransaksi") jenisNama = "Jurnal Umum";
+
+  const resolvedProjName = t.project ? `${t.project.code} - ${t.project.name}` : null;
+
+  return {
+    id: t.id,
+    entityId: t.entityId,
+    tanggal: t.tanggal.toISOString(),
+    tanggalFmt: tgl.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    bulan: bln,
+    tahun: thn,
+    noBukti: t.noBukti,
+    keterangan: t.keterangan,
+    coaAccountId: t.coaAccountId,
+    coaCode: t.coaAccount?.code || "-",
+    coaName: t.coaAccount?.name || "Beban Gaji",
+    jenisInputKey: t.jenisInput?.key || "jurnalTransaksi",
+    jenisInputNama: jenisNama,
+    projectId: t.projectId ?? null,
+    projectCode: t.project?.code ?? null,
+    projectName: t.project?.name ?? null,
+    namaProyek: resolvedProjName,
+    debit: d,
+    debitFmt: formatRupiah(d),
+    kredit: k,
+    kreditFmt: formatRupiah(k),
+    staffName: t.staff?.name ?? null,
   };
 }
 
@@ -761,28 +1022,39 @@ export async function getPayrollSyncData(
         OR: [
           { code: "511" },
           { code: "612" },
-          { name: { contains: "gaji" } },
-          { name: { contains: "honor" } },
-          { name: { contains: "tenaga ahli" } },
+          { name: { contains: "Gaji" } },
+          { name: { contains: "Honor" } },
+          { name: { contains: "Tenaga Ahli" } },
         ],
       },
     },
-    include: { coaAccount: true },
+    include: {
+      coaAccount: { select: { code: true, name: true } },
+      jenisInput: { select: { key: true, nama: true } },
+      project: { select: { code: true, name: true } },
+      staff: { select: { name: true } },
+    },
+    orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }],
   });
 
   let glBebanGaji511 = 0;
   let glBebanTenagaAhli612 = 0;
+  const jurnalPegawaiRows: JurnalTransaksiGajiItem[] = [];
+  const jurnalTenagaAhliRows: JurnalTransaksiGajiItem[] = [];
 
   for (const t of txGaji) {
     if (!t.coaAccount) continue;
     const debit = Number(t.debit ?? 0);
     const code = t.coaAccount.code;
     const name = t.coaAccount.name.toLowerCase();
+    const item = mapTransactionToGajiItem(t);
 
     if (code === "511" || (/gaji/i.test(name) && !/tenaga ahli|honor/i.test(name))) {
       glBebanGaji511 += debit;
+      jurnalPegawaiRows.push(item);
     } else if (code === "612" || /tenaga ahli|honor/i.test(name)) {
       glBebanTenagaAhli612 += debit;
+      jurnalTenagaAhliRows.push(item);
     }
   }
 
@@ -825,5 +1097,8 @@ export async function getPayrollSyncData(
     totalSelisih,
     totalSelisihFmt: formatRupiah(totalSelisih),
     isOverallSinkron,
+
+    jurnalPegawaiRows,
+    jurnalTenagaAhliRows,
   };
 }

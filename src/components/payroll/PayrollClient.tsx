@@ -1127,7 +1127,7 @@ export function PayrollClient({
               </div>
 
               {isManager && (
-                <div className="flex items-center gap-2 flex-wrap">
+                <div>
                   {tenagaAhliSubTab === "database-ahli" ? (
                     <button
                       onClick={() => {
@@ -1140,32 +1140,19 @@ export function PayrollClient({
                       <span>Tambah Tenaga Ahli Baru</span>
                     </button>
                   ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setEditingMasterAhli(null);
-                          setIsMasterAhliModalOpen(true);
-                        }}
-                        className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-navy-text shadow-2xs"
-                        title="Daftarkan profil dan NIK tenaga ahli baru ke database"
-                      >
-                        <Plus size={13} />
-                        <span>+ Master Ahli</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingHonor(null);
-                          if (data.rekananTenagaAhli.length > 0 && !selectedRekananIdForHonor) {
-                            setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
-                          }
-                          setIsHonorModalOpen(true);
-                        }}
-                        className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                      >
-                        <Plus size={14} />
-                        <span>Input Honor Tenaga Ahli</span>
-                      </button>
-                    </>
+                    <button
+                      onClick={() => {
+                        setEditingHonor(null);
+                        if (data.rekananTenagaAhli.length > 0 && !selectedRekananIdForHonor) {
+                          setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
+                        }
+                        setIsHonorModalOpen(true);
+                      }}
+                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                    >
+                      <Plus size={14} />
+                      <span>Input Honor Tenaga Ahli</span>
+                    </button>
                   )}
                 </div>
               )}
@@ -1188,37 +1175,37 @@ export function PayrollClient({
 
             <div className="p-4 rounded-2xl border border-border bg-surface-card">
               <div className="text-[11px] font-medium text-muted-faint">
-                Total Honor Bruto
+                Total Honor Tenaga Ahli
               </div>
               <div className="text-xl font-bold font-mono text-navy-text mt-1">
                 {data.summaryHonorBulanIni.totalHonorBrutoFmt}
               </div>
               <div className="text-[10px] text-muted-faint mt-1">
-                Beban honorarium sebelum pajak
+                Beban honorarium bulan {BULAN_NAMES[selectedMonth - 1]}
               </div>
             </div>
 
             <div className="p-4 rounded-2xl border border-border bg-surface-card">
               <div className="text-[11px] font-medium text-muted-faint">
-                Potongan Pajak PPh 21
+                Tenaga Ahli Terbayar
               </div>
-              <div className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300 mt-1">
-                {data.summaryHonorBulanIni.totalPph21Fmt}
+              <div className="text-xl font-bold font-mono text-navy-text mt-1">
+                {new Set(data.honorList.map((h) => h.nik)).size} Orang
               </div>
               <div className="text-[10px] text-muted-faint mt-1">
-                PPh 21 bukan pegawai / tenaga ahli
+                Tenaga ahli aktif bulan ini
               </div>
             </div>
 
             <div className="p-4 rounded-2xl border border-border bg-surface-card">
               <div className="text-[11px] font-medium text-muted-faint">
-                Total Honor Bersih (Net)
+                Database Tenaga Ahli
               </div>
               <div className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300 mt-1">
-                {data.summaryHonorBulanIni.totalHonorBersihFmt}
+                {data.rekananTenagaAhli.length} Terdaftar
               </div>
               <div className="text-[10px] text-muted-faint mt-1">
-                Diterima bersih oleh tenaga ahli
+                Profil tersimpan di holding
               </div>
             </div>
           </div>
@@ -1238,23 +1225,20 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-left text-xs">
+                <table className="w-full min-w-[700px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">Tanggal & Bukti</th>
                       <th className="py-2.5 px-3.5">Tenaga Ahli</th>
                       <th className="py-2.5 px-3.5">Uraian / Pekerjaan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Honor Bruto</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">Tarif PPh</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">(-) PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">(=) Net Diterima</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Nominal Honorarium</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredHonorList.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-muted-faint">
+                        <td colSpan={5} className="py-8 text-center text-muted-faint">
                           Belum ada transaksi honorarium tenaga ahli pada bulan ini.
                         </td>
                       </tr>
@@ -1287,20 +1271,8 @@ export function PayrollClient({
                             )}
                           </td>
 
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
+                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap text-sm">
                             {h.nominalHonorFmt}
-                          </td>
-
-                          <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                            {h.tarifPph21Persen}%
-                          </td>
-
-                          <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                            {h.pph21Fmt}
-                          </td>
-
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                            {h.nominalBersihFmt}
                           </td>
 
                           <td className="py-3 px-3.5 text-right whitespace-nowrap">
@@ -1347,15 +1319,8 @@ export function PayrollClient({
                         <td colSpan={3} className="py-3 px-3.5 text-navy-text whitespace-nowrap">
                           Total ({data.summaryHonorBulanIni.totalTransaksi} Transaksi):
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap text-sm">
                           {data.summaryHonorBulanIni.totalHonorBrutoFmt}
-                        </td>
-                        <td className="py-3 px-3.5" />
-                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                          {data.summaryHonorBulanIni.totalPph21Fmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                          {data.summaryHonorBulanIni.totalHonorBersihFmt}
                         </td>
                         <td className="py-3 px-3.5" />
                       </tr>
@@ -1381,14 +1346,12 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[750px] text-left text-xs">
+                <table className="w-full min-w-[550px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">Bulan</th>
                       <th className="py-2.5 px-3.5 text-center">Jml Pembayaran</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Total Honor Bruto</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">(-) Pajak PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">(=) Total Net Bersih</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Total Honorarium</th>
                       <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Aksi</th>
                     </tr>
                   </thead>
@@ -1422,12 +1385,6 @@ export function PayrollClient({
                         <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                           {r.totalHonorBrutoFmt}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                          {r.totalPph21Fmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                          {r.totalHonorBersihFmt}
-                        </td>
                         <td className="py-3 px-3.5 text-center whitespace-nowrap">
                           <button
                             onClick={() => {
@@ -1452,16 +1409,6 @@ export function PayrollClient({
                       <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                         {formatRupiah(
                           data.rekapBulananTenagaAhli.reduce((s, r) => s + r.totalHonorBruto, 0)
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                        {formatRupiah(
-                          data.rekapBulananTenagaAhli.reduce((s, r) => s + r.totalPph21, 0)
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                        {formatRupiah(
-                          data.rekapBulananTenagaAhli.reduce((s, r) => s + r.totalHonorBersih, 0)
                         )}
                       </td>
                       <td />
@@ -1501,23 +1448,22 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left text-xs">
+                <table className="w-full min-w-[700px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">Nama & Spesialisasi</th>
                       <th className="py-2.5 px-3.5">NIK (16 Digit Terdaftar)</th>
                       <th className="py-2.5 px-3.5">NPWP</th>
-                      <th className="py-2.5 px-3.5">Tarif PPh 21 Standar</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredRekananList.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-muted-faint">
+                        <td colSpan={4} className="py-8 text-center text-muted-faint">
                           {searchQuery
                             ? "Tidak ada tenaga ahli yang cocok dengan pencarian."
-                            : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli' untuk mendaftarkan nama, NIK, dan NPWP."}
+                            : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli' untuk mendaftarkan profil tenaga ahli."}
                         </td>
                       </tr>
                     ) : (
@@ -1548,24 +1494,7 @@ export function PayrollClient({
                               )}
                             </td>
                             <td className="py-3 px-3.5 font-mono text-muted-stronger">
-                              {hasNpwp ? (
-                                r.npwp
-                              ) : (
-                                <span className="text-muted-faint italic font-sans text-[11px]">
-                                  Non-NPWP (Tarif +20%)
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3.5">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold ${
-                                  hasNpwp
-                                    ? "bg-surface-subtle text-navy-text border border-border"
-                                    : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                                }`}
-                              >
-                                {hasNpwp ? "2.5% (Tarif NPWP)" : "3.0% (Tarif Tanpa NPWP)"}
-                              </span>
+                              {hasNpwp ? r.npwp : <span className="text-muted-faint">-</span>}
                             </td>
                             <td className="py-3 px-3.5 text-right whitespace-nowrap">
                               <div className="inline-flex items-center justify-end gap-1.5">
@@ -1676,7 +1605,7 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1050px] text-left text-xs">
+                <table className="w-full min-w-[850px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">NIK & Tenaga Ahli</th>
@@ -1684,16 +1613,14 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5">🏗️ Proyek Mana Saja</th>
                       <th className="py-2.5 px-3.5">📅 Bulan Apa Saja</th>
                       <th className="py-2.5 px-3.5 text-center">Jml Transaksi</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Total Bruto</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">(-) Total PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">(=) Net Diterima</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Total Honorarium</th>
                       <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Rincian</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredRekapPerNama.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-8 text-center text-muted-faint">
+                        <td colSpan={7} className="py-8 text-center text-muted-faint">
                           Belum ada transaksi honorarium tenaga ahli untuk filter terpilih tahun {selectedYear}.
                         </td>
                       </tr>
@@ -1779,14 +1706,6 @@ export function PayrollClient({
                                 {r.totalHonorBrutoFmt}
                               </td>
 
-                              <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                                {r.totalPph21Fmt}
-                              </td>
-
-                              <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                                {r.totalHonorBersihFmt}
-                              </td>
-
                               <td className="py-3 px-3.5 text-center whitespace-nowrap">
                                 <button
                                   onClick={() => setExpandedNik(isExpanded ? null : r.nik)}
@@ -1809,7 +1728,7 @@ export function PayrollClient({
                             {/* Accordion Rincian Transaksi */}
                             {isExpanded && (
                               <tr className="bg-surface-subtle/30">
-                                <td colSpan={9} className="p-3.5">
+                                <td colSpan={7} className="p-3.5">
                                   <div className="rounded-xl border border-border bg-surface-card p-3.5 shadow-inner">
                                     <div className="flex items-center justify-between flex-wrap gap-2 mb-3 pb-2 border-b border-border">
                                       <div className="text-xs font-bold text-navy-text flex items-center gap-1.5">
@@ -1823,9 +1742,9 @@ export function PayrollClient({
                                         <span className="font-semibold text-navy-text">
                                           {r.daftarEntitas.join(", ")}
                                         </span>
-                                        <span className="text-muted-faint ml-2">Total Net:</span>
-                                        <span className="font-bold text-emerald-600 font-mono">
-                                          {r.totalHonorBersihFmt}
+                                        <span className="text-muted-faint ml-2">Total Honor:</span>
+                                        <span className="font-bold text-navy-text font-mono">
+                                          {r.totalHonorBrutoFmt}
                                         </span>
                                       </div>
                                     </div>
@@ -1838,9 +1757,7 @@ export function PayrollClient({
                                             <th className="py-2 px-3">Bulan</th>
                                             <th className="py-2 px-3">Nama Proyek</th>
                                             <th className="py-2 px-3">Uraian Tugas / Jasa</th>
-                                            <th className="py-2 px-3 text-right">Honor Bruto</th>
-                                            <th className="py-2 px-3 text-right">(-) PPh 21</th>
-                                            <th className="py-2 px-3 text-right">(=) Bersih Diterima</th>
+                                            <th className="py-2 px-3 text-right">Nominal Honorarium</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
@@ -1875,12 +1792,6 @@ export function PayrollClient({
                                               <td className="py-2 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                                                 {item.nominalHonorFmt}
                                               </td>
-                                              <td className="py-2 px-3 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                                                {item.pph21Fmt}
-                                              </td>
-                                              <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                                                {item.nominalBersihFmt}
-                                              </td>
                                             </tr>
                                           ))}
                                         </tbody>
@@ -1904,16 +1815,6 @@ export function PayrollClient({
                         <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                           {formatRupiah(
                             filteredRekapPerNama.reduce((s, r) => s + r.totalHonorBruto, 0)
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                          {formatRupiah(
-                            filteredRekapPerNama.reduce((s, r) => s + r.totalPph21, 0)
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                          {formatRupiah(
-                            filteredRekapPerNama.reduce((s, r) => s + r.totalHonorBersih, 0)
                           )}
                         </td>
                         <td />
@@ -1940,21 +1841,19 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-left text-xs">
+                <table className="w-full min-w-[650px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">Tenaga Ahli</th>
                       <th className="py-2.5 px-3.5">Rincian Per Entitas Pembayar</th>
                       <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Frekuensi</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total Honor Bruto</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total Net Diterima</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total Honorarium</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredKonsolidasi.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-muted-faint">
+                        <td colSpan={4} className="py-8 text-center text-muted-faint">
                           Belum ada transaksi honorarium tenaga ahli pada tahun {selectedYear}.
                         </td>
                       </tr>
@@ -1989,14 +1888,6 @@ export function PayrollClient({
 
                           <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                             {k.totalHonorBrutoFmt}
-                          </td>
-
-                          <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                            {k.totalPph21Fmt}
-                          </td>
-
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                            {k.totalHonorBersihFmt}
                           </td>
                         </tr>
                       ))
@@ -2113,7 +2004,7 @@ export function PayrollClient({
                 </div>
 
                 <p className="text-[11px] text-muted-faint">
-                  Catatan: Pengeluaran honorarium tenaga ahli di jurnal dicatat debet pada akun 612 dan kredit pada kas/bank serta utang PPh 21.
+                  Catatan: Pengeluaran honorarium tenaga ahli di jurnal dicatat debet pada akun 612 dan kredit pada kas/bank.
                 </p>
               </div>
             </div>
@@ -2631,19 +2522,7 @@ export function PayrollClient({
                           <select
                             value={currentExpert?.id || ""}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              setSelectedRekananIdForHonor(val);
-                              const chosen = data.rekananTenagaAhli.find((r) => r.id === val);
-                              const form = e.target.form;
-                              if (form && chosen) {
-                                const newTarif = chosen.npwp ? 2.5 : 3.0;
-                                const tarifInput = form.elements.namedItem("tarifPph21Persen") as HTMLInputElement;
-                                if (tarifInput) tarifInput.value = newTarif.toString();
-                                const bruto = Number((form.elements.namedItem("nominalHonor") as HTMLInputElement).value) || 0;
-                                const pph = Math.round((bruto * newTarif) / 100);
-                                const pphInput = form.elements.namedItem("pph21") as HTMLInputElement;
-                                if (pphInput) pphInput.value = pph.toString();
-                              }
+                              setSelectedRekananIdForHonor(e.target.value);
                             }}
                             className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
                           >
@@ -2678,7 +2557,7 @@ export function PayrollClient({
                           <div>
                             <span className="text-muted-faint block">NPWP (Terkunci):</span>
                             <span className="font-mono text-muted-stronger">
-                              {currentExpert.npwp || "Tanpa NPWP (Tarif Pajak 3.0%)"}
+                              {currentExpert.npwp || "Tanpa NPWP"}
                             </span>
                           </div>
                         </div>
@@ -2777,62 +2656,19 @@ export function PayrollClient({
                 </span>
               </div>
 
-              {/* Kalkulasi Honor & Pajak PPh 21 */}
-              <div className="p-3 rounded-xl bg-surface-subtle/50 border border-border space-y-2.5">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Nominal Honor Bruto (Rp) *</label>
-                    <input
-                      type="number"
-                      name="nominalHonor"
-                      required
-                      defaultValue={editingHonor?.nominalHonor ?? 0}
-                      onChange={(e) => {
-                        const form = e.target.form;
-                        if (form) {
-                          const bruto = Number(e.target.value) || 0;
-                          const tarif = Number((form.elements.namedItem("tarifPph21Persen") as HTMLInputElement).value) || 2.5;
-                          const pph = Math.round((bruto * tarif) / 100);
-                          (form.elements.namedItem("pph21") as HTMLInputElement).value = pph.toString();
-                        }
-                      }}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Tarif PPh 21 (%)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="tarifPph21Persen"
-                      defaultValue={editingHonor?.tarifPph21Persen ?? 2.5}
-                      onChange={(e) => {
-                        const form = e.target.form;
-                        if (form) {
-                          const tarif = Number(e.target.value) || 0;
-                          const bruto = Number((form.elements.namedItem("nominalHonor") as HTMLInputElement).value) || 0;
-                          const pph = Math.round((bruto * tarif) / 100);
-                          (form.elements.namedItem("pph21") as HTMLInputElement).value = pph.toString();
-                        }
-                      }}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">Nominal PPh 21 Dipotong (Rp)</label>
-                  <input
-                    type="number"
-                    name="pph21"
-                    defaultValue={editingHonor?.pph21 ?? 0}
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-amber-700 dark:text-amber-300 font-mono font-bold"
-                  />
-                  <span className="text-[10px] text-muted-faint block mt-0.5">
-                    *Tarif standar tenaga ahli ber-NPWP: 5% x 50% = 2.5%. Jika tanpa NPWP atau tarif khusus, nominal dapat disesuaikan.
-                  </span>
-                </div>
+              {/* Nominal Honorarium (Tanpa Potongan PPh) */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">Nominal Honorarium (Rp) *</label>
+                <input
+                  type="number"
+                  name="nominalHonor"
+                  required
+                  defaultValue={editingHonor?.nominalHonor ?? 0}
+                  placeholder="0"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold"
+                />
+                <input type="hidden" name="tarifPph21Persen" value="0" />
+                <input type="hidden" name="pph21" value="0" />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
@@ -3104,7 +2940,7 @@ export function PayrollClient({
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
                 <span className="text-[10px] text-muted-faint mt-0.5 block">
-                  Jika ada NPWP tarif PPh 21 standar adalah 2.5%, jika tidak diisi berlaku tarif 3.0%.
+                  Nomor Pokok Wajib Pajak tenaga ahli (opsional sebagai kelengkapan administrasi).
                 </span>
               </div>
 

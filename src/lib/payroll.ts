@@ -252,11 +252,10 @@ export async function getPayrollData(
     orderBy: { code: "asc" },
   });
 
-  // 3. Fetch Master Rekanan Tenaga Ahli for fast auto-fill
+  // 3. Fetch Master Database Tenaga Ahli (Lintas Entitas Holding)
   const rekananTenagaAhli = await prisma.rekanan.findMany({
     where: {
       tipe: "TENAGA_AHLI",
-      OR: [{ entityId: null }, { entityId }],
     },
     select: {
       id: true,

@@ -265,7 +265,7 @@ export function PayrollClient({
 
       {/* Main Tabs Navigation */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-border pb-3">
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleTabChange("pegawai")}
             className={`px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap cursor-pointer ${
@@ -339,51 +339,73 @@ export function PayrollClient({
       {mainTab === "pegawai" && (
         <div className="space-y-6">
           {/* Sub-Tabs Pegawai */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 bg-surface-subtle p-1 rounded-xl overflow-x-auto">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 bg-surface-subtle p-1 rounded-xl border border-border/60">
               <button
                 onClick={() => setPegawaiSubTab("gaji")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   pegawaiSubTab === "gaji"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Gaji Per Bulan (Input & Daftar) – {BULAN_NAMES[selectedMonth - 1]}
+                <CreditCard size={13} className={pegawaiSubTab === "gaji" ? "text-navy" : "text-muted-faint"} />
+                <span>Gaji Bulanan</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  pegawaiSubTab === "gaji" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {BULAN_NAMES[selectedMonth - 1]}
+                </span>
               </button>
+
               <button
                 onClick={() => setPegawaiSubTab("rekap-bulan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   pegawaiSubTab === "rekap-bulan"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Rekap Gaji Setahun ({selectedYear})
+                <Calendar size={13} className={pegawaiSubTab === "rekap-bulan" ? "text-navy" : "text-muted-faint"} />
+                <span>Rekap Setahun</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  pegawaiSubTab === "rekap-bulan" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {selectedYear}
+                </span>
               </button>
+
               <button
                 onClick={() => setPegawaiSubTab("master")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   pegawaiSubTab === "master"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Database Karyawan ({data.pegawaiList.length})
+                <Users size={13} className={pegawaiSubTab === "master" ? "text-navy" : "text-muted-faint"} />
+                <span>Database Karyawan</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  pegawaiSubTab === "master" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {data.pegawaiList.length}
+                </span>
               </button>
+
               <button
                 onClick={() => setPegawaiSubTab("tahunan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   pegawaiSubTab === "tahunan"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Akumulasi Per Pegawai ({selectedYear})
+                <Briefcase size={13} className={pegawaiSubTab === "tahunan" ? "text-navy" : "text-muted-faint"} />
+                <span>Akumulasi Pegawai</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <div className="relative flex-1 sm:w-60">
                 <Search
                   size={14}
@@ -1006,61 +1028,90 @@ export function PayrollClient({
       {mainTab === "tenaga-ahli" && (
         <div className="space-y-6">
           {/* Sub-Tabs Tenaga Ahli */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 bg-surface-subtle p-1 rounded-xl overflow-x-auto">
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 bg-surface-subtle p-1 rounded-xl border border-border/60">
               <button
                 onClick={() => setTenagaAhliSubTab("honor")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   tenagaAhliSubTab === "honor"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Honor Per Bulan (Input & Daftar) – {BULAN_NAMES[selectedMonth - 1]}
+                <DollarSign size={13} className={tenagaAhliSubTab === "honor" ? "text-navy" : "text-muted-faint"} />
+                <span>Honor Bulanan</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  tenagaAhliSubTab === "honor" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {BULAN_NAMES[selectedMonth - 1]}
+                </span>
               </button>
+
               <button
                 onClick={() => setTenagaAhliSubTab("rekap-bulan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   tenagaAhliSubTab === "rekap-bulan"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Rekap Gaji Setahun ({selectedYear})
+                <Calendar size={13} className={tenagaAhliSubTab === "rekap-bulan" ? "text-navy" : "text-muted-faint"} />
+                <span>Rekap Setahun</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  tenagaAhliSubTab === "rekap-bulan" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {selectedYear}
+                </span>
               </button>
+
               <button
                 onClick={() => setTenagaAhliSubTab("database-ahli")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   tenagaAhliSubTab === "database-ahli"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Database Tenaga Ahli ({data.rekananTenagaAhli.length})
+                <Users size={13} className={tenagaAhliSubTab === "database-ahli" ? "text-navy" : "text-muted-faint"} />
+                <span>Database Tenaga Ahli</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  tenagaAhliSubTab === "database-ahli" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {data.rekananTenagaAhli.length}
+                </span>
               </button>
+
               <button
                 onClick={() => setTenagaAhliSubTab("rekap-nama")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   tenagaAhliSubTab === "rekap-nama"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Cek Per Nama (Patokan NIK) ({data.rekapTenagaAhliPerNama.length})
+                <Award size={13} className={tenagaAhliSubTab === "rekap-nama" ? "text-navy" : "text-muted-faint"} />
+                <span>Cek Per Nama (NIK)</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  tenagaAhliSubTab === "rekap-nama" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
+                }`}>
+                  {data.rekapTenagaAhliPerNama.length}
+                </span>
               </button>
+
               <button
                 onClick={() => setTenagaAhliSubTab("konsolidasi")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   tenagaAhliSubTab === "konsolidasi"
-                    ? "bg-surface-card text-navy-text shadow-2xs"
-                    : "text-muted-faint hover:text-navy-text"
+                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
                 }`}
               >
-                Konsolidasi Holding ({selectedYear})
+                <Building2 size={13} className={tenagaAhliSubTab === "konsolidasi" ? "text-navy" : "text-muted-faint"} />
+                <span>Konsolidasi Holding</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <div className="relative flex-1 sm:w-60">
                 <Search
                   size={14}
@@ -1076,7 +1127,7 @@ export function PayrollClient({
               </div>
 
               {isManager && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {tenagaAhliSubTab === "database-ahli" ? (
                     <button
                       onClick={() => {
@@ -1099,7 +1150,7 @@ export function PayrollClient({
                         title="Daftarkan profil dan NIK tenaga ahli baru ke database"
                       >
                         <Plus size={13} />
-                        <span>+ Master Tenaga Ahli</span>
+                        <span>+ Master Ahli</span>
                       </button>
                       <button
                         onClick={() => {

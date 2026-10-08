@@ -369,7 +369,8 @@ model RekonsiliasiPajakBulanan {
   year          Int
   month         Int      // 1 - 12
   dppTerlapor   Decimal  @default(0.00) @db.Decimal(18, 2)
-  pajakTerlapor Decimal  @default(0.00) @db.Decimal(18, 2)
+  pajakTerlapor Decimal  @default(0.00) @db.Decimal(18, 2) // PPN Terlapor
+  pphTerlapor   Decimal  @default(0.00) @db.Decimal(18, 2) // PPh Terlapor
   keterangan    String?  @db.Text
   updatedAt     DateTime @updatedAt
 

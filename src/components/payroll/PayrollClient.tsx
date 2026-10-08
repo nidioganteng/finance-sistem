@@ -25,7 +25,6 @@ import {
   Briefcase,
   ChevronRight,
   ChevronDown,
-  Copy,
   HelpCircle,
   ExternalLink,
 } from "lucide-react";
@@ -51,7 +50,6 @@ import {
   deleteGajiBulananAction,
   saveHonorTenagaAhliAction,
   deleteHonorTenagaAhliAction,
-  copyGajiBulanSebelumnyaAction,
   saveTenagaAhliMasterAction,
   deleteTenagaAhliMasterAction,
 } from "@/lib/actions/payroll";
@@ -455,11 +453,11 @@ export function PayrollClient({
                 <div>
                   {pegawaiSubTab === "penyesuaian" ? (
                     <Link
-                      href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                      href={`/jurnal?entity=${data.entity?.key ?? ""}`}
                       className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
                     >
                       <ExternalLink size={14} />
-                      <span>Buka Jurnal Transaksi</span>
+                      <span>Buka Jurnal Umum</span>
                     </Link>
                   ) : pegawaiSubTab === "master" ? (
                     <button
@@ -563,51 +561,21 @@ export function PayrollClient({
                 </div>
 
                 {isManager && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        const targetPegawai = data.pegawaiList.find((p) => !p.currentGaji) || data.pegawaiList[0];
-                        if (targetPegawai) {
-                          setEditingGaji({ pegawai: targetPegawai, gaji: targetPegawai.currentGaji });
-                          setIsGajiModalOpen(true);
-                        } else {
-                          setErrorMsg("Belum ada pegawai terdaftar di entitas ini. Silakan tambahkan pegawai terlebih dahulu.");
-                        }
-                      }}
-                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                    >
-                      <Plus size={14} />
-                      <span>Input Gaji Pegawai</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Salin atau generate otomatis data gaji seluruh pegawai aktif untuk bulan ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}?`
-                          )
-                        ) {
-                          startTransition(async () => {
-                            try {
-                              const res = await copyGajiBulanSebelumnyaAction(
-                                data.entity?.id ?? "",
-                                selectedYear,
-                                selectedMonth
-                              );
-                              setSuccessMsg(res.message);
-                              router.refresh();
-                            } catch (err: unknown) {
-                              setErrorMsg((err as Error).message);
-                            }
-                          });
-                        }
-                      }}
-                      className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer text-navy-text shadow-2xs"
-                      title="Salin data gaji dari bulan lalu atau buat otomatis dari master gaji pokok"
-                    >
-                      <Copy size={13} />
-                      <span>Salin / Generate dari Bulan Lalu</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      const targetPegawai = data.pegawaiList.find((p) => !p.currentGaji) || data.pegawaiList[0];
+                      if (targetPegawai) {
+                        setEditingGaji({ pegawai: targetPegawai, gaji: targetPegawai.currentGaji });
+                        setIsGajiModalOpen(true);
+                      } else {
+                        setErrorMsg("Belum ada pegawai terdaftar di entitas ini. Silakan tambahkan pegawai terlebih dahulu.");
+                      }
+                    }}
+                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                  >
+                    <Plus size={14} />
+                    <span>Input Gaji Pegawai</span>
+                  </button>
                 )}
               </div>
 
@@ -986,11 +954,11 @@ export function PayrollClient({
                   </div>
 
                   <Link
-                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                    href={`/jurnal?entity=${data.entity?.key ?? ""}`}
                     className="h-7 px-3 rounded-lg border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto shadow-2xs"
                   >
                     <ExternalLink size={12} />
-                    <span>Buka Jurnal Transaksi</span>
+                    <span>Buka Jurnal Umum</span>
                   </Link>
                 </div>
 
@@ -1059,14 +1027,6 @@ export function PayrollClient({
                       Daftar transaksi pengeluaran gaji riil yang menggunakan kode akun 511 pada entitas {data.entity?.name} ({periodeFilterPegawai === "bulan" ? `Periode ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}` : `Tahun ${selectedYear}`})
                     </p>
                   </div>
-
-                  <Link
-                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
-                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                  >
-                    <Plus size={14} />
-                    <span>Input Transaksi Jurnal</span>
-                  </Link>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1082,7 +1042,7 @@ export function PayrollClient({
                         <th className="py-2.5 px-3.5 text-center">Staff</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y border-b border-border">
                       {(periodeFilterPegawai === "bulan"
                         ? data.penyesuaianJurnal.pegawai.transaksiBulan
                         : data.penyesuaianJurnal.pegawai.transaksiTahun
@@ -1095,14 +1055,14 @@ export function PayrollClient({
                                 Belum Ada Transaksi di Jurnal Umum untuk Akun 511 (Gaji)
                               </p>
                               <p className="text-[11px] leading-relaxed">
-                                Sistem siap menarik data. Jika staf mencatat transaksi pengeluaran gaji melalui menu <strong>Jurnal Transaksi</strong> atau <strong>Buku Kas & Bank</strong> menggunakan kode akun <strong>511</strong>, data akan otomatis ditarik dan muncul di tabel ini untuk penyesuaian.
+                                Sistem siap menarik data. Jika staf mencatat transaksi pengeluaran gaji melalui <strong>Kas Kecil</strong>, <strong>Kas Besar</strong>, atau <strong>Buku Bank</strong> menggunakan kode akun <strong>511</strong>, data akan otomatis ditarik dan muncul di tabel ini untuk penyesuaian.
                               </p>
                               <Link
-                                href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                                href={`/jurnal?entity=${data.entity?.key ?? ""}`}
                                 className="mt-2 h-7 px-3 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
                               >
                                 <ExternalLink size={12} />
-                                <span>Buka Jurnal Transaksi</span>
+                                <span>Buka Jurnal Umum</span>
                               </Link>
                             </div>
                           </td>
@@ -1501,11 +1461,11 @@ export function PayrollClient({
                 <div>
                   {tenagaAhliSubTab === "penyesuaian" ? (
                     <Link
-                      href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                      href={`/jurnal?entity=${data.entity?.key ?? ""}`}
                       className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
                     >
                       <ExternalLink size={14} />
-                      <span>Buka Jurnal Transaksi</span>
+                      <span>Buka Jurnal Umum</span>
                     </Link>
                   ) : tenagaAhliSubTab === "database-ahli" ? (
                     <button
@@ -1905,11 +1865,11 @@ export function PayrollClient({
                   </div>
 
                   <Link
-                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                    href={`/jurnal?entity=${data.entity?.key ?? ""}`}
                     className="h-7 px-3 rounded-lg border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto shadow-2xs"
                   >
                     <ExternalLink size={12} />
-                    <span>Buka Jurnal Transaksi</span>
+                    <span>Buka Jurnal Umum</span>
                   </Link>
                 </div>
 
@@ -1978,14 +1938,6 @@ export function PayrollClient({
                       Daftar transaksi pengeluaran honor tenaga ahli riil yang menggunakan kode akun 612 pada entitas {data.entity?.name} ({periodeFilterAhli === "bulan" ? `Periode ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}` : `Tahun ${selectedYear}`})
                     </p>
                   </div>
-
-                  <Link
-                    href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
-                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                  >
-                    <Plus size={14} />
-                    <span>Input Transaksi Jurnal</span>
-                  </Link>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -2014,14 +1966,14 @@ export function PayrollClient({
                                 Belum Ada Transaksi di Jurnal Umum untuk Akun 612 (Gaji Tenaga Ahli)
                               </p>
                               <p className="text-[11px] leading-relaxed">
-                                Sistem siap menarik data. Jika staf mencatat transaksi pengeluaran honor melalui menu <strong>Jurnal Transaksi</strong> atau <strong>Buku Kas & Bank</strong> menggunakan kode akun <strong>612</strong>, data akan otomatis ditarik dan muncul di tabel ini untuk penyesuaian.
+                                Sistem siap menarik data. Jika staf mencatat transaksi pengeluaran honor melalui <strong>Kas Kecil</strong>, <strong>Kas Besar</strong>, atau <strong>Buku Bank</strong> menggunakan kode akun <strong>612</strong>, data akan otomatis ditarik dan muncul di tabel ini untuk penyesuaian.
                               </p>
                               <Link
-                                href={`/jurnal-transaksi?entity=${data.entity?.key ?? ""}`}
+                                href={`/jurnal?entity=${data.entity?.key ?? ""}`}
                                 className="mt-2 h-7 px-3 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
                               >
                                 <ExternalLink size={12} />
-                                <span>Buka Jurnal Transaksi</span>
+                                <span>Buka Jurnal Umum</span>
                               </Link>
                             </div>
                           </td>

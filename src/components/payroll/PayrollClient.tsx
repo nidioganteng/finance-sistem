@@ -1521,8 +1521,12 @@ export function PayrollClient({
                   ) : (
                     <button
                       onClick={() => {
+                        if (data.rekananTenagaAhli.length === 0) {
+                          setErrorMsg("Belum ada tenaga ahli terdaftar di database. Silakan daftarkan profil tenaga ahli di sub-tab Database Tenaga Ahli terlebih dahulu.");
+                          return;
+                        }
                         setEditingHonor(null);
-                        if (data.rekananTenagaAhli.length > 0 && !selectedRekananIdForHonor) {
+                        if (!selectedRekananIdForHonor) {
                           setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
                         }
                         setIsHonorModalOpen(true);
@@ -1605,8 +1609,12 @@ export function PayrollClient({
                 {isManager && (
                   <button
                     onClick={() => {
+                      if (data.rekananTenagaAhli.length === 0) {
+                        setErrorMsg("Belum ada tenaga ahli terdaftar di database. Silakan daftarkan profil tenaga ahli di sub-tab Database Tenaga Ahli terlebih dahulu.");
+                        return;
+                      }
                       setEditingHonor(null);
-                      if (data.rekananTenagaAhli.length > 0 && !selectedRekananIdForHonor) {
+                      if (!selectedRekananIdForHonor) {
                         setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
                       }
                       setIsHonorModalOpen(true);
@@ -3289,29 +3297,13 @@ export function PayrollClient({
 
                     {!editingHonor && (
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="font-semibold text-navy-text block text-xs">
-                            Pilih Tenaga Ahli Terdaftar *
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsHonorModalOpen(false);
-                              setEditingMasterAhli(null);
-                              setIsMasterAhliModalOpen(true);
-                            }}
-                            className="text-[11px] font-semibold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <Plus size={12} />
-                            <span>+ Daftarkan Tenaga Ahli Baru</span>
-                          </button>
-                        </div>
-
                         {data.rekananTenagaAhli.length === 0 ? (
-                          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between">
+                          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between gap-3">
                             <div>
                               <p className="font-bold">Belum Ada Tenaga Ahli di Database</p>
-                              <p className="text-[11px] mt-0.5">Daftarkan profil tenaga ahli terlebih dahulu.</p>
+                              <p className="text-[11px] mt-0.5 text-amber-700 dark:text-amber-300">
+                                Daftarkan profil tenaga ahli terlebih dahulu.
+                              </p>
                             </div>
                             <button
                               type="button"
@@ -3320,25 +3312,45 @@ export function PayrollClient({
                                 setEditingMasterAhli(null);
                                 setIsMasterAhliModalOpen(true);
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-navy text-white text-[11px] font-semibold cursor-pointer"
+                              className="h-7 px-3 rounded-lg bg-navy text-white text-[11px] font-semibold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs hover:bg-navy-light"
                             >
-                              + Tambah Ahli
+                              <Plus size={12} />
+                              <span>Daftarkan Tenaga Ahli Baru</span>
                             </button>
                           </div>
                         ) : (
-                          <select
-                            value={currentExpert?.id || ""}
-                            onChange={(e) => {
-                              setSelectedRekananIdForHonor(e.target.value);
-                            }}
-                            className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
-                          >
-                            {data.rekananTenagaAhli.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.nama} {r.kategori ? `· ${r.kategori}` : ""} (NIK: {r.nik || "-"})
-                              </option>
-                            ))}
-                          </select>
+                          <>
+                            <div className="flex items-center justify-between">
+                              <label className="font-semibold text-navy-text block text-xs">
+                                Pilih Tenaga Ahli Terdaftar *
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsHonorModalOpen(false);
+                                  setEditingMasterAhli(null);
+                                  setIsMasterAhliModalOpen(true);
+                                }}
+                                className="text-[11px] font-semibold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus size={12} />
+                                <span>Daftarkan Tenaga Ahli Baru</span>
+                              </button>
+                            </div>
+                            <select
+                              value={currentExpert?.id || ""}
+                              onChange={(e) => {
+                                setSelectedRekananIdForHonor(e.target.value);
+                              }}
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                            >
+                              {data.rekananTenagaAhli.map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.nama} {r.kategori ? `· ${r.kategori}` : ""} (NIK: {r.nik || "-"})
+                                </option>
+                              ))}
+                            </select>
+                          </>
                         )}
                       </div>
                     )}
@@ -3488,8 +3500,8 @@ export function PayrollClient({
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending}
-                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+                  disabled={isPending || (!editingHonor && data.rekananTenagaAhli.length === 0)}
+                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPending ? "Menyimpan..." : "Simpan Gaji Tenaga Ahli"}
                 </button>

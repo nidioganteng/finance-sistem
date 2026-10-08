@@ -760,10 +760,13 @@ export async function getPayrollData(
     const name = t.coaAccount.name.toLowerCase();
     const item = mapTransactionToGajiItem(t);
 
-    if (code === "511" || (/gaji/i.test(name) && !/tenaga ahli|honor/i.test(name))) {
-      txPegawaiTahun.push(item);
-    } else if (code === "612" || /tenaga ahli|honor/i.test(name)) {
+    // Pemisahan transaksi akun jurnal:
+    // 1. Kode akun 612 atau Tenaga Ahli/Honor masuk ke Tenaga Ahli
+    if (code === "612" || /tenaga ahli|honor/i.test(name)) {
       txTenagaAhliTahun.push(item);
+    } else if (code === "511" || /gaji/i.test(name)) {
+      // 2. Kode akun 511 atau Gaji Pegawai masuk ke Pegawai Tetap
+      txPegawaiTahun.push(item);
     }
   }
 

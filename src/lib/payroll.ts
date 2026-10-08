@@ -88,7 +88,87 @@ export type HonorTenagaAhliItem = {
   projectId?: string | null;
   projectCode?: string | null;
   projectName?: string | null;
+  namaProyek?: string | null;
   noBukti?: string | null;
+};
+
+export const BULAN_NAMES = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+export type RekapBulanPegawaiItem = {
+  bulan: number;
+  bulanName: string;
+  totalPegawai: number;
+  totalGajiPokok: number;
+  totalGajiPokokFmt: string;
+  totalTunjangan: number;
+  totalTunjanganFmt: string;
+  totalInsentif: number;
+  totalInsentifFmt: string;
+  totalGajiKotor: number;
+  totalGajiKotorFmt: string;
+  totalBpjs: number;
+  totalBpjsFmt: string;
+  totalPph21: number;
+  totalPph21Fmt: string;
+  totalPotonganLain: number;
+  totalPotonganLainFmt: string;
+  totalGajiBersih: number;
+  totalGajiBersihFmt: string;
+};
+
+export type RekapBulanTenagaAhliItem = {
+  bulan: number;
+  bulanName: string;
+  totalTransaksi: number;
+  totalHonorBruto: number;
+  totalHonorBrutoFmt: string;
+  totalPph21: number;
+  totalPph21Fmt: string;
+  totalHonorBersih: number;
+  totalHonorBersihFmt: string;
+};
+
+export type RekapTenagaAhliPerNamaItem = {
+  nik: string;
+  nama: string;
+  npwp?: string | null;
+  totalTransaksi: number;
+  totalHonorBruto: number;
+  totalHonorBrutoFmt: string;
+  totalPph21: number;
+  totalPph21Fmt: string;
+  totalHonorBersih: number;
+  totalHonorBersihFmt: string;
+  daftarProyek: string[];
+  rincian: {
+    id: string;
+    tanggal: string;
+    tanggalFmt: string;
+    bulan: number;
+    bulanName: string;
+    uraian: string;
+    namaProyek: string;
+    noBukti?: string | null;
+    nominalHonor: number;
+    nominalHonorFmt: string;
+    pph21: number;
+    pph21Fmt: string;
+    nominalBersih: number;
+    nominalBersihFmt: string;
+  }[];
 };
 
 export type KonsolidasiTenagaAhliItem = {
@@ -319,6 +399,8 @@ export async function getPayrollData(
     const bruto = Number(h.nominalHonor);
     const pph = Number(h.pph21);
     const bersih = Number(h.nominalBersih);
+    const resolvedProjName =
+      h.namaProyek || (h.project ? `${h.project.code} - ${h.project.name}` : null);
     return {
       id: h.id,
       entityId: h.entityId,
@@ -343,6 +425,7 @@ export async function getPayrollData(
       projectId: h.projectId,
       projectCode: h.project?.code ?? null,
       projectName: h.project?.name ?? null,
+      namaProyek: resolvedProjName,
       noBukti: h.noBukti,
     };
   });
@@ -354,7 +437,145 @@ export async function getPayrollData(
     totalHonorBersih: honorList.reduce((s, h) => s + h.nominalBersih, 0),
   };
 
-  // 6. Laporan Konsolidasi Tahunan Tenaga Ahli (Lintas Seluruh Entitas Usaha)
+  // 6. Rekapitulasi Per Bulan (Januari - Desember) untuk Pegawai Tetap
+  const allGajiTahunRaw = await prisma.gajiPegawaiBulanan.findMany({
+    where: { entityId, tahun: year },
+    orderBy: [{ bulan: "asc" }],
+  });
+
+  const rekapBulananPegawai: RekapBulanPegawaiItem[] = BULAN_NAMES.map((name, idx) => {
+    const m = idx + 1;
+    const gListM = allGajiTahunRaw.filter((g) => g.bulan === m);
+    const totGajiPokok = gListM.reduce((s, g) => s + Number(g.gajiPokok), 0);
+    const totTunjangan = gListM.reduce(
+      (s, g) => s + Number(g.tunjanganJabatan) + Number(g.tunjanganTransport),
+      0
+    );
+    const totInsentif = gListM.reduce((s, g) => s + Number(g.insentif), 0);
+    const totGajiKotor = gListM.reduce((s, g) => s + Number(g.totalGajiKotor), 0);
+    const totBpjs = gListM.reduce(
+      (s, g) => s + Number(g.bpjsKesehatan) + Number(g.bpjsKetenagakerjaan),
+      0
+    );
+    const totPph21 = gListM.reduce((s, g) => s + Number(g.pph21), 0);
+    const totPotonganLain = gListM.reduce((s, g) => s + Number(g.potonganLain), 0);
+    const totGajiBersih = gListM.reduce((s, g) => s + Number(g.totalGajiBersih), 0);
+
+    return {
+      bulan: m,
+      bulanName: name,
+      totalPegawai: gListM.length,
+      totalGajiPokok: totGajiPokok,
+      totalGajiPokokFmt: formatRupiah(totGajiPokok),
+      totalTunjangan: totTunjangan,
+      totalTunjanganFmt: formatRupiah(totTunjangan),
+      totalInsentif: totInsentif,
+      totalInsentifFmt: formatRupiah(totInsentif),
+      totalGajiKotor: totGajiKotor,
+      totalGajiKotorFmt: formatRupiah(totGajiKotor),
+      totalBpjs: totBpjs,
+      totalBpjsFmt: formatRupiah(totBpjs),
+      totalPph21: totPph21,
+      totalPph21Fmt: formatRupiah(totPph21),
+      totalPotonganLain: totPotonganLain,
+      totalPotonganLainFmt: formatRupiah(totPotonganLain),
+      totalGajiBersih: totGajiBersih,
+      totalGajiBersihFmt: formatRupiah(totGajiBersih),
+    };
+  });
+
+  // 7. Rekapitulasi Per Bulan & Per Nama (Patokan NIK) untuk Tenaga Ahli (Entitas Ini)
+  const allHonorEntitasTahun = await prisma.honorTenagaAhli.findMany({
+    where: { entityId, tahun: year },
+    include: {
+      project: { select: { id: true, code: true, name: true } },
+    },
+    orderBy: [{ tanggal: "desc" }],
+  });
+
+  const rekapBulananTenagaAhli: RekapBulanTenagaAhliItem[] = BULAN_NAMES.map((name, idx) => {
+    const m = idx + 1;
+    const hListM = allHonorEntitasTahun.filter((h) => h.bulan === m);
+    const bruto = hListM.reduce((s, h) => s + Number(h.nominalHonor), 0);
+    const pph = hListM.reduce((s, h) => s + Number(h.pph21), 0);
+    const bersih = hListM.reduce((s, h) => s + Number(h.nominalBersih), 0);
+
+    return {
+      bulan: m,
+      bulanName: name,
+      totalTransaksi: hListM.length,
+      totalHonorBruto: bruto,
+      totalHonorBrutoFmt: formatRupiah(bruto),
+      totalPph21: pph,
+      totalPph21Fmt: formatRupiah(pph),
+      totalHonorBersih: bersih,
+      totalHonorBersihFmt: formatRupiah(bersih),
+    };
+  });
+
+  // Pengelompokan Rekap Tenaga Ahli Per Nama (Patokan NIK)
+  const perNamaMap = new Map<string, RekapTenagaAhliPerNamaItem>();
+  for (const h of allHonorEntitasTahun) {
+    const key = h.nik?.trim() || h.nama.trim();
+    const resolvedProjName =
+      h.namaProyek || (h.project ? `${h.project.code} - ${h.project.name}` : "Umum / Non-Proyek");
+    const bruto = Number(h.nominalHonor);
+    const pph = Number(h.pph21);
+    const bersih = Number(h.nominalBersih);
+
+    if (!perNamaMap.has(key)) {
+      perNamaMap.set(key, {
+        nik: h.nik,
+        nama: h.nama,
+        npwp: h.npwp,
+        totalTransaksi: 0,
+        totalHonorBruto: 0,
+        totalHonorBrutoFmt: "Rp 0",
+        totalPph21: 0,
+        totalPph21Fmt: "Rp 0",
+        totalHonorBersih: 0,
+        totalHonorBersihFmt: "Rp 0",
+        daftarProyek: [],
+        rincian: [],
+      });
+    }
+
+    const rec = perNamaMap.get(key)!;
+    rec.totalTransaksi += 1;
+    rec.totalHonorBruto += bruto;
+    rec.totalPph21 += pph;
+    rec.totalHonorBersih += bersih;
+    if (resolvedProjName && !rec.daftarProyek.includes(resolvedProjName)) {
+      rec.daftarProyek.push(resolvedProjName);
+    }
+    rec.rincian.push({
+      id: h.id,
+      tanggal: h.tanggal.toISOString(),
+      tanggalFmt: h.tanggal.toLocaleDateString("id-ID"),
+      bulan: h.bulan,
+      bulanName: BULAN_NAMES[h.bulan - 1] || `Bulan ${h.bulan}`,
+      uraian: h.uraian,
+      namaProyek: resolvedProjName,
+      noBukti: h.noBukti,
+      nominalHonor: bruto,
+      nominalHonorFmt: formatRupiah(bruto),
+      pph21: pph,
+      pph21Fmt: formatRupiah(pph),
+      nominalBersih: bersih,
+      nominalBersihFmt: formatRupiah(bersih),
+    });
+  }
+
+  const rekapTenagaAhliPerNama: RekapTenagaAhliPerNamaItem[] = Array.from(perNamaMap.values())
+    .map((r) => ({
+      ...r,
+      totalHonorBrutoFmt: formatRupiah(r.totalHonorBruto),
+      totalPph21Fmt: formatRupiah(r.totalPph21),
+      totalHonorBersihFmt: formatRupiah(r.totalHonorBersih),
+    }))
+    .sort((a, b) => b.totalHonorBruto - a.totalHonorBruto);
+
+  // 8. Laporan Konsolidasi Tahunan Tenaga Ahli (Lintas Seluruh Entitas Usaha)
   const allHonorTahunRaw = await prisma.honorTenagaAhli.findMany({
     where: {
       tahun: year,
@@ -428,7 +649,7 @@ export async function getPayrollData(
     })),
   }));
 
-  // 7. Sinkronisasi Laba Rugi (Beban Gaji 511 & Tenaga Ahli 612)
+  // 9. Sinkronisasi Laba Rugi (Beban Gaji 511 & Tenaga Ahli 612)
   const syncData = await getPayrollSyncData(entityId, year, month);
 
   return {
@@ -440,6 +661,7 @@ export async function getPayrollData(
     month,
     pegawaiList,
     gajiBulanIni,
+    rekapBulananPegawai,
     summaryBulanIni: {
       ...summaryBulanIni,
       totalGajiPokokFmt: formatRupiah(summaryBulanIni.totalGajiPokok),
@@ -454,6 +676,8 @@ export async function getPayrollData(
       totalGajiBersihFmt: formatRupiah(summaryBulanIni.totalGajiBersih),
     },
     honorList,
+    rekapBulananTenagaAhli,
+    rekapTenagaAhliPerNama,
     summaryHonorBulanIni: {
       ...summaryHonorBulanIni,
       totalHonorBrutoFmt: formatRupiah(summaryHonorBulanIni.totalHonorBruto),

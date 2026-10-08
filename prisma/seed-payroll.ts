@@ -32,6 +32,9 @@ async function main() {
   const hendraRekanan = await prisma.rekanan.findFirst({
     where: { nama: { contains: "Hendra Setiawan" } },
   });
+  const ratnaRekanan = await prisma.rekanan.findFirst({
+    where: { nama: { contains: "Ratna Kusuma" } },
+  });
 
   // ==========================================
   // 1. SEED MASTER PEGAWAI GAHARU
@@ -361,7 +364,7 @@ async function main() {
     },
     {
       entityId: gaharu.id,
-      rekananId: null,
+      rekananId: ratnaRekanan?.id ?? null,
       nik: "6271025510860003",
       nama: "Ratna Kusuma, S.T., M.Sc.",
       npwp: "75.888.999.1-711.000",
@@ -404,7 +407,7 @@ async function main() {
   if (tataring) {
     honorTenagaAhliData.push({
       entityId: tataring.id,
-      rekananId: null,
+      rekananId: ratnaRekanan?.id ?? null,
       nik: "6271025510860003",
       nama: "Ratna Kusuma, S.T., M.Sc.",
       npwp: "75.888.999.1-711.000",

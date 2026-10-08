@@ -40,8 +40,8 @@ export default async function PayrollPage({
   return (
     <PageTransition>
       <PageHeader
-        title={`Payroll & Tenaga Ahli – ${selectedEntity.name}`}
-        subtitle={`Modul Penggajian Karyawan Tetap, Honorarium Tenaga Ahli Lintas Entitas, dan Rekonsiliasi Laba Rugi (Tahun ${year})`}
+        title={`Laporan Gaji – ${selectedEntity.name}`}
+        subtitle={`Laporan Penggajian Karyawan Tetap, Honorarium Tenaga Ahli Lintas Entitas, dan Rekonsiliasi Laba Rugi (Tahun ${year})`}
         rightSlot={
           <>
             <YearSelect currentYear={year} />

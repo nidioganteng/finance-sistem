@@ -7,7 +7,7 @@ import { authOptions, resolveStaffId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRunningSaldo, ENTITY_PREFIX, ENTITY_PREFIX_UMUM } from "@/lib/kas";
 import { isValidRekening, getRekeningNama, REKENING_COA_CODE, REKENING_BY_ENTITY } from "@/lib/bank-accounts";
-import { computeNewTerminPercentage, syncProjectSpend, PIUTANG_COA } from "@/lib/piutang";
+import { computeNewTerminPercentage, syncProjectSpend } from "@/lib/piutang";
 import { TerminStatus } from "@prisma/client";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
@@ -103,55 +103,14 @@ async function resolveKasCoa(jenisInputKey: string, entityKey: string, rekeningI
 }
 
 async function resolveCrossingDebitCoa(
-  primaryRowCoaId: string | undefined,
-  targetEntityKey?: string,
-  projectId?: string
+  primaryRowCoaId: string | undefined
 ): Promise<{ coaAccountId: string; role: "PIUTANG" | "BEBAN" } | null> {
   const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
   if (!coa) return null;
 
-  if (coa.kategori === "BEBAN") {
-    return {
-      coaAccountId: coa.id,
-      role: "BEBAN",
-    };
-  }
-
-  // Jika transaksi ini untuk proyek (talangan pengeluaran proyek entitas rekanan):
-  // Di entitas tujuan pemilik proyek, ini adalah BEBAN PROYEK!
-  if (projectId) {
-    const bebanProyekCoa =
-      (await prisma.coaAccount.findFirst({ where: { code: "630" } })) ||
-      (await prisma.coaAccount.findFirst({ where: { kategori: "BEBAN" } }));
-    if (bebanProyekCoa) {
-      return {
-        coaAccountId: bebanProyekCoa.id,
-        role: "BEBAN",
-      };
-    }
-  }
-
-  // Jika akun di entitas asal adalah akun piutang yang mengarah ke targetEntity itu sendiri
-  // (misal Tataring talangi Gaharu dengan akun 112 Piutang GS):
-  // Di Gaharu (targetEntity), akun debitnya tidak boleh 112 Piutang GS (piutang ke diri sendiri),
-  // melainkan akun beban operasional rekanan.
-  const targetPiutangCode = targetEntityKey ? PIUTANG_COA[targetEntityKey] : undefined;
-  if (targetPiutangCode && coa.code === targetPiutangCode) {
-    const fallbackBeban =
-      (await prisma.coaAccount.findFirst({ where: { code: "630" } })) ||
-      (await prisma.coaAccount.findFirst({ where: { code: "528" } })) ||
-      (await prisma.coaAccount.findFirst({ where: { kategori: "BEBAN" } }));
-    if (fallbackBeban) {
-      return {
-        coaAccountId: fallbackBeban.id,
-        role: "BEBAN",
-      };
-    }
-  }
-
   return {
     coaAccountId: coa.id,
-    role: "PIUTANG",
+    role: coa.kategori === "BEBAN" ? "BEBAN" : "PIUTANG",
   };
 }
 
@@ -322,7 +281,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId, crossEntity.key, input.projectId);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaId);
 
       if (debitTarget) {
         ops.push(
@@ -617,7 +576,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
       };
       const ops: ReturnType<typeof prisma.transaction.create>[] = [];
 
-      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace, crossEntity.key, input.projectId);
+      const debitTarget = await resolveCrossingDebitCoa(primaryRowCoaIdReplace);
 
       if (debitTarget) {
         ops.push(

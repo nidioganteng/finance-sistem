@@ -10,6 +10,7 @@ declare module "next-auth" {
       email: string;
       role: Role;
       entityKeys: string[];
+      phpToken: string;
     };
   }
 }
@@ -18,5 +19,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     role: Role;
     entityKeys: string[];
+    phpToken: string;
   }
 }

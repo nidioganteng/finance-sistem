@@ -36,6 +36,7 @@ export type FakturOption = {
   nilaiProyek: number;
   labaSetelahPajak: number;
   nominalDiterima: number;
+  bank?: string | null;
   projectId?: string | null;
   projectCode?: string | null;
   projectName?: string | null;
@@ -115,8 +116,45 @@ export function JurnalTransaksiClient({
     ? (fakturOptions ?? []).filter((f) => f.projectId !== projectId)
     : (fakturOptions ?? []);
 
-  // Default COA Accounts untuk automasi E-Faktur
-  const defaultBankAcc = coa.find((c) => /^(111|112|120|21|22|23|24|31|32|41|51)$/.test(c.code) || /bank|bpd|bri|bni|mandiri|kas/i.test(c.name)) || coa[0];
+  // Mapping prioritas kode bank per entitas (BPD diutamakan untuk dinas/pemda, disusul BRI, BNI, Mandiri)
+  const entityBankCodes: Record<string, string[]> = {
+    gaharu: ["22", "21", "23", "24"],      // BPD GS, BRI GS, BNI GS, MDR GS
+    kencana: ["12", "11", "13", "14"],     // BPD KAK, BRI KAK, BNI KAK, MDR KAK
+    tataring: ["31", "32"],                // BPD TB, BNI TB
+    ciptaAsri: ["41"],                     // BPD CAD
+    umum: ["51"],                          // BPD KP
+  };
+
+  // Default COA Accounts untuk automasi E-Faktur:
+  // Pilih akun Bank sesuai entitas yang sedang dibuka (bukan Kas dan bukan entitas lain)
+  const targetBankCodes = entityBankCodes[entityKey] || [];
+  const fakturBankName = selectedFaktur?.bank?.trim().toLowerCase();
+
+  const defaultBankAcc =
+    // 1. Jika ada preferensi bank dari faktur (misal "BRI" atau "BPD"), pilih bank entitas ini yang cocok
+    (fakturBankName
+      ? targetBankCodes
+          .map((code) => coa.find((c) => c.code === code))
+          .find((c) => c && c.name.toLowerCase().includes(fakturBankName))
+      : undefined) ||
+    // 2. Ambil bank utama entitas ini berdasarkan daftar kode bank resmi
+    targetBankCodes
+      .map((code) => coa.find((c) => c.code === code))
+      .find(Boolean) ||
+    // 3. Fallback: cari akun bank yang mengandung suffix entitas (GS, KAK, TB, CAD, KP)
+    coa.find(
+      (c) =>
+        /bpd|bri|bni|mdr|bank/i.test(c.name) &&
+        (entityKey === "gaharu" ? /gs|gaharu/i.test(c.name) :
+         entityKey === "kencana" ? /kak|kencana/i.test(c.name) :
+         entityKey === "tataring" ? /tb|tataring/i.test(c.name) :
+         entityKey === "ciptaAsri" ? /cad|cipta/i.test(c.name) :
+         entityKey === "umum" ? /kp/i.test(c.name) : true)
+    ) ||
+    // 4. Fallback umum: akun Bank pertama (bukan kas)
+    coa.find((c) => /^(11|12|13|14|21|22|23|24|31|32|41|51)$/.test(c.code) || /bpd|bri|bni|bank/i.test(c.name)) ||
+    coa[0];
+
   const defaultPphAcc = coa.find((c) => c.code === "534" || /pph final|pasal 4 ayat 2/i.test(c.name))
     || coa.find((c) => c.code.startsWith("53") && /pph/i.test(c.name))
     || coa.find((c) => /pph/i.test(c.name));

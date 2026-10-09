@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { getPenyusutanSummary } from "./aset-tetap";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
+import { getExcludedNoBuktiForVersion, isAutoPostedMirror } from "./akuntansi";
 import type { ReportVersion } from "./laba-rugi";
 
 export interface TaxReportRow {
@@ -177,6 +177,7 @@ export async function getLaporanPajakData(
 
   for (const tx of transactions) {
     if (!tx.coaAccount) continue;
+    if (isAutoPostedMirror(tx)) continue;
     const code = tx.coaAccount.code;
     const repCat = tx.coaAccount.reportCategory;
 

@@ -32,16 +32,57 @@ export default async function JurnalTransaksiPage({
 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 
-  const [coaAccounts, { groups, totalPages }, projectOptions] = await Promise.all([
+  const [coaAccounts, { groups, totalPages }, projectOptions, fakturRaw] = await Promise.all([
     prisma.coaAccount.findMany({
       select: { id: true, code: true, name: true, kategori: true },
       orderBy: { urutan: "asc" },
     }),
     getJurnalTransaksiHistory(selectedEntity.id, page, searchParams.dari, searchParams.sampai),
     getProjectOptions(selectedEntity.id),
+    prisma.fakturPendapatan.findMany({
+      where: { entityId: selectedEntity.id },
+      select: {
+        id: true,
+        noFaktur: true,
+        namaRekanan: true,
+        namaJkp: true,
+        dpp: true,
+        dppNilaiLain: true,
+        ppn: true,
+        pph: true,
+        nilaiProyek: true,
+        labaSetelahPajak: true,
+        nominalDiterima: true,
+        bank: true,
+        projectId: true,
+        project: { select: { id: true, code: true, name: true } },
+        tahunPajak: true,
+        masaPajak: true,
+      },
+      orderBy: [{ tahunPajak: "desc" }, { masaPajak: "desc" }, { createdAt: "desc" }],
+    }),
   ]);
 
   const coa = coaAccounts.map((c) => ({ id: c.id, code: c.code, name: c.name, kategori: c.kategori }));
+  const fakturOptions = fakturRaw.map((f) => ({
+    id: f.id,
+    noFaktur: f.noFaktur,
+    namaRekanan: f.namaRekanan,
+    namaJkp: f.namaJkp,
+    dpp: Number(f.dpp),
+    dppNilaiLain: Number(f.dppNilaiLain),
+    ppn: Number(f.ppn),
+    pph: Number(f.pph),
+    nilaiProyek: Number(f.nilaiProyek),
+    labaSetelahPajak: Number(f.labaSetelahPajak),
+    nominalDiterima: Number(f.nominalDiterima),
+    bank: f.bank,
+    projectId: f.projectId,
+    projectCode: f.project?.code ?? null,
+    projectName: f.project?.name ?? null,
+    tahunPajak: f.tahunPajak,
+    masaPajak: f.masaPajak,
+  }));
 
   // Build search params record for pagination href builder (exclude page)
   const spRecord: Record<string, string> = {};
@@ -66,6 +107,7 @@ export default async function JurnalTransaksiPage({
         coa={coa}
         history={groups}
         projectOptions={projectOptions}
+        fakturOptions={fakturOptions}
         page={page}
         totalPages={totalPages}
         dari={searchParams.dari ?? ""}

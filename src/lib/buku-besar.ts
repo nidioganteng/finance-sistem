@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { CoaKategori } from "@prisma/client";
-import { isDebetNormal, hitungSaldoAkhir } from "./akuntansi";
+import { isDebetNormal, hitungSaldoAkhir, isAutoPostedMirror } from "./akuntansi";
 
 // ── Tampilan Rekap ───────────────────────────────────────────────
 // Satu baris per akun COA: Saldo Awal | Total Debet | Total Kredit | Saldo Akhir
@@ -28,6 +28,7 @@ export async function getBukuBesarRekap(entityId: string, year: number) {
 
   for (const t of transactions) {
     if (!t.coaAccount) continue;
+    if (isAutoPostedMirror(t)) continue;
     if (!grouped.has(t.coaAccountId!)) {
       grouped.set(t.coaAccountId!, {
         coaId: t.coaAccountId!,
@@ -102,7 +103,9 @@ export async function getBukuBesarDrilldown(entityId: string, coaId: string, yea
   const debetNormal = isDebetNormal(coa.kategori, coa.code);
   let saldo = saldoAwal;
 
-  const entries = transactions.map((t) => {
+  const cleanTransactions = transactions.filter((t) => !isAutoPostedMirror(t));
+
+  const entries = cleanTransactions.map((t) => {
     const debit = Number(t.debit);
     const kredit = Number(t.kredit);
     saldo += debetNormal ? debit - kredit : kredit - debit;
@@ -117,8 +120,8 @@ export async function getBukuBesarDrilldown(entityId: string, coaId: string, yea
     };
   });
 
-  const totalDebet = transactions.reduce((s, t) => s + Number(t.debit), 0);
-  const totalKredit = transactions.reduce((s, t) => s + Number(t.kredit), 0);
+  const totalDebet = cleanTransactions.reduce((s, t) => s + Number(t.debit), 0);
+  const totalKredit = cleanTransactions.reduce((s, t) => s + Number(t.kredit), 0);
 
   return {
     coa: { id: coa.id, code: coa.code, name: coa.name, kategori: coa.kategori },

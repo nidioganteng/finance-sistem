@@ -8,6 +8,7 @@ import {
   isLabaDitahan,
   hitungSaldoAkhir,
   getExcludedNoBuktiForVersion,
+  isAutoPostedMirror,
 } from "./akuntansi";
 import { calculateAsetDepreciation } from "./aset-tetap";
 
@@ -73,6 +74,7 @@ export async function getLaporanKeuanganData(
       kredit: true,
       tanggal: true,
       jenisInputId: true,
+      extraFieldsJson: true,
     },
     orderBy: { tanggal: "asc" },
   });
@@ -81,6 +83,7 @@ export async function getLaporanKeuanganData(
   const totalsByAccount = new Map<string, { debit: number; kredit: number }>();
   for (const t of transactions) {
     if (!t.coaAccountId) continue;
+    if (isAutoPostedMirror(t)) continue;
     const cur = totalsByAccount.get(t.coaAccountId) ?? { debit: 0, kredit: 0 };
     cur.debit += Number(t.debit);
     cur.kredit += Number(t.kredit);

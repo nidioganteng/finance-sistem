@@ -965,7 +965,13 @@ export function PiutangClient({
                                                           </span>
                                                         </td>
                                                         <td className="py-2.5 px-3 whitespace-nowrap">
-                                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-surface-subtle text-muted-stronger border border-border">
+                                                          <span
+                                                            className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                                                              exp.sumberKasBank.startsWith("Talangan")
+                                                                ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 font-semibold"
+                                                                : "bg-surface-subtle text-muted-stronger border-border"
+                                                            }`}
+                                                          >
                                                             {exp.sumberKasBank}
                                                           </span>
                                                         </td>

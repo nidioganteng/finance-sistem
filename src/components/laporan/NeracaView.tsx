@@ -3,7 +3,7 @@
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import type { CoaLine } from "@/lib/laporan-keuangan";
 import type { RekapKategoriAset } from "@/lib/aset-tetap";
-import { getMetricValueFontSize } from "@/lib/dashboard-data";
+import { getMetricValueFontSize, formatRupiah } from "@/lib/dashboard-data";
 
 interface NeracaViewProps {
   data: {
@@ -52,6 +52,19 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
   const totalLancarFmt = data.totalAktivaLancarFmt ?? data.totalAsetFmt;
   const totalTetapFmt = data.totalAktivaTetapFmt ?? "Rp 0";
   const totalEkuitasFmt = data.totalEkuitasFmt ?? data.totalModalDanLabaFmt ?? data.totalPassivaFmt;
+
+  const rekapKategoriList = data.rekapPerKategoriAset && data.rekapPerKategoriAset.length === 4
+    ? data.rekapPerKategoriAset
+    : [
+        { kategori: "TANAH" as const, label: "Tanah", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+        { kategori: "BANGUNAN" as const, label: "Bangunan", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+        { kategori: "KENDARAAN" as const, label: "Kendaraan", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+        { kategori: "PERALATAN_KANTOR" as const, label: "Peralatan Kantor", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+      ];
+
+  const totalAkumulasiDariKategori = rekapKategoriList.reduce((s, r) => s + r.totalAkumulasiPenyusutan, 0);
+  const akmCoa = aktivaTetap.find((a) => a.isContra || a.code === "1001" || /penyusutan/i.test(a.name));
+  const totalAkumulasiAktivaTetap = Math.max(totalAkumulasiDariKategori, akmCoa?.saldo ?? 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -226,7 +239,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
             </div>
           </div>
 
-          {/* II. Aktiva Tetap (Issue 88 Poin 3: Laporan Neraca menyajikan total per 4 kategori) */}
+          {/* II. Aktiva Tetap (Format Standar SAK: Perolehan per Kategori + Akumulasi Penyusutan) */}
           <div className="bg-surface-card rounded-[22px] border border-border-soft shadow-xs overflow-hidden">
             <div className="px-6 py-3.5 border-b border-cyan-100 dark:border-cyan-500/20 bg-cyan-50/50 dark:bg-cyan-500/10 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -236,116 +249,88 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                 </span>
               </div>
               <span className="text-[11px] font-bold text-muted-faint">
-                {data.rekapPerKategoriAset && data.rekapPerKategoriAset.some((r) => r.totalHargaPerolehan > 0 || r.jumlahAset > 0)
-                  ? "Total per 4 Kategori"
-                  : `${aktivaTetap.length} Akun`}
+                Total per Kategori Aset
               </span>
             </div>
 
             <div className="divide-y divide-surface-subtle">
-              {data.rekapPerKategoriAset && data.rekapPerKategoriAset.some((r) => r.totalHargaPerolehan > 0 || r.jumlahAset > 0) ? (
-                <>
-                  {data.rekapPerKategoriAset.map((rekap, idx) => (
-                    <div
-                      key={rekap.kategori}
-                      className="px-6 py-3 hover:bg-surface-hover/30 transition-colors"
-                    >
-                      <div className="flex items-baseline justify-between">
-                        <div className="flex items-baseline gap-2 min-w-0">
-                          <span className="text-[11px] font-mono font-bold text-cyan-700 dark:text-cyan-400 shrink-0">
-                            {idx + 1}.
-                          </span>
-                          <span className="text-[13px] font-bold text-navy-text truncate">
-                            {rekap.label}
-                          </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-subtle text-muted-faint font-semibold">
-                            {rekap.jumlahAset} aset
-                          </span>
-                        </div>
-                        <span className="text-[13px] font-extrabold tabular-nums text-navy-text shrink-0 whitespace-nowrap">
-                          {rekap.totalNilaiBukuFmt}
-                        </span>
-                      </div>
-                      <div className="mt-1 pl-4 flex items-center justify-between text-[11px] text-muted-faint">
-                        <span>
-                          Perolehan: <span className="font-mono text-muted-strong">{rekap.totalHargaPerolehanFmt}</span>
-                          {rekap.kategori !== "TANAH" ? (
-                            <>
-                              {" "}· Akm:{" "}
-                              <span className="font-mono text-status-amber">
-                                ({rekap.totalAkumulasiPenyusutanFmt})
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-blue-600 dark:text-blue-400 font-semibold italic">
-                              {" "}· Tanah Tidak Disusutkan (PSAK 16)
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-semibold text-muted-strong text-[10.5px]">Nilai Buku</span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Akun Aktiva Tetap lain yang bukan dari modul otomatisasi */}
-                  {aktivaTetap
-                    .filter((item) => item.code !== "100" && item.code !== "1001" && !/aktiva tetap/i.test(item.name))
-                    .map((item) => (
-                      <div
-                        key={item.code}
-                        className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors bg-surface-subtle/20"
-                      >
-                        <div className="flex items-baseline gap-2 min-w-0">
-                          <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
-                          <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
-                          {item.isContra && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                              Pengurang
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          className={`text-[13px] font-bold tabular-nums shrink-0 whitespace-nowrap ${
-                            item.isContra ? "text-status-amber" : "text-navy-text"
-                          }`}
-                        >
-                          {item.saldoFmt}
-                        </span>
-                      </div>
-                    ))}
-                </>
-              ) : aktivaTetap.length === 0 ? (
-                <p className="py-4 px-6 text-[12.5px] text-muted-faint italic">Tidak ada akun aktiva tetap.</p>
-              ) : (
-                aktivaTetap.map((item) => (
+              {/* 1. Baris Kategori Aset Tetap: Tanah, Bangunan, Kendaraan, Peralatan Kantor */}
+              {rekapKategoriList.map((rekap) => {
+                const hasValue = rekap.totalHargaPerolehan > 0;
+                return (
                   <div
-                    key={item.code}
+                    key={rekap.kategori}
                     className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors"
                   >
                     <div className="flex items-baseline gap-2 min-w-0">
-                      <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
-                      <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
-                      {item.isContra && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                          Pengurang
+                      <span className="text-[13px] font-semibold text-navy-text truncate">
+                        {rekap.label}
+                      </span>
+                      {rekap.jumlahAset > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-subtle text-muted-faint font-semibold">
+                          {rekap.jumlahAset} aset
                         </span>
                       )}
                     </div>
                     <span
                       className={`text-[13px] font-bold tabular-nums shrink-0 whitespace-nowrap ${
-                        item.isContra ? "text-status-amber" : "text-navy-text"
+                        hasValue ? "text-navy-text" : "text-muted-faint"
                       }`}
                     >
+                      {hasValue ? formatRupiah(rekap.totalHargaPerolehan) : "-"}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* 2. Akun Aktiva Tetap Lain dari COA di luar 100 & 1001 jika ada */}
+              {aktivaTetap
+                .filter(
+                  (item) =>
+                    item.code !== "100" &&
+                    item.code !== "1001" &&
+                    !/aktiva tetap|aset tetap/i.test(item.name) &&
+                    !item.isContra
+                )
+                .map((item) => (
+                  <div
+                    key={item.code}
+                    className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors bg-surface-subtle/20"
+                  >
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
+                      <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
+                    </div>
+                    <span className="text-[13px] font-bold tabular-nums text-navy-text shrink-0 whitespace-nowrap">
                       {item.saldoFmt}
                     </span>
                   </div>
-                ))
-              )}
+                ))}
+
+              {/* 3. Baris Akumulasi Penyusutan (Pengurang / Kontra Aset) */}
+              <div className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors bg-amber-50/20 dark:bg-amber-500/5">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-[13px] font-semibold text-navy-text truncate">
+                    Akumulasi Penyusutan
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                    Pengurang
+                  </span>
+                </div>
+                <span className="text-[13px] font-bold tabular-nums text-status-amber shrink-0 whitespace-nowrap">
+                  {totalAkumulasiAktivaTetap > 0
+                    ? `(${formatRupiah(totalAkumulasiAktivaTetap)})`
+                    : "-"}
+                </span>
+              </div>
             </div>
 
-            <div className="px-6 py-3 bg-cyan-50/40 dark:bg-cyan-500/10 border-t border-cyan-100 dark:border-cyan-500/20 flex items-center justify-between">
-              <span className="text-[12.5px] font-bold text-cyan-950 dark:text-cyan-300">Total Aktiva Tetap (Net)</span>
-              <span className="text-[13.5px] font-extrabold text-cyan-700 dark:text-cyan-400 tabular-nums whitespace-nowrap">
+            {/* Subtotal Footer: Total Aktiva Tetap (Net) */}
+            <div className="px-6 py-3.5 bg-cyan-50/40 dark:bg-cyan-500/10 border-t border-cyan-100 dark:border-cyan-500/20 flex items-center justify-between">
+              <span className="text-[12.5px] font-extrabold text-cyan-950 dark:text-cyan-300 uppercase tracking-wider">
+                Total Aktiva Tetap
+              </span>
+              <span className="text-[14px] font-black text-cyan-700 dark:text-cyan-400 tabular-nums whitespace-nowrap">
                 {totalTetapFmt}
               </span>
             </div>

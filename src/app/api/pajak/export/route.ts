@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { getLaporanPajakData } from "@/lib/pajak";
 import { generateLaporanPajakExcel } from "@/lib/pajak-excel";
 
@@ -19,25 +19,27 @@ export async function GET(req: NextRequest) {
   const versionParam = searchParams.get("version");
   const version = versionParam?.toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
 
+  const token = await getPhpToken().catch(() => null);
+  if (!token) return new NextResponse("Unauthorized", { status: 401 });
+
   let targetEntityId = entityId;
 
   if (!targetEntityId && entityKey) {
-    const ent = await prisma.entity.findUnique({
-      where: { key: entityKey },
-      select: { id: true, key: true },
-    });
-    if (ent) targetEntityId = ent.id;
+    try {
+      const ent = await phpFetch<{ id: string; key: string }>(`/api/entities?key=${encodeURIComponent(entityKey)}`, token);
+      if (ent?.id) targetEntityId = ent.id;
+    } catch { /* entity not found */ }
   }
 
   if (!targetEntityId) {
     return new NextResponse("Entity ID is required", { status: 400 });
   }
 
-  // Validasi otorisasi entitas
-  const entity = await prisma.entity.findUnique({
-    where: { id: targetEntityId },
-    select: { id: true, key: true, name: true },
-  });
+  let entity: { id: string; key: string; name: string } | null = null;
+  try {
+    const all = await phpFetch<{ id: string; key: string; name: string }[]>("/api/entities", token);
+    entity = (Array.isArray(all) ? all : []).find((e) => e.id === targetEntityId) ?? null;
+  } catch { /* ignore */ }
 
   if (!entity) {
     return new NextResponse("Entity not found", { status: 404 });
@@ -57,25 +59,15 @@ export async function GET(req: NextRequest) {
     const filename = `Laporan_Laba_Rugi_${safeName}_${year}_${version.toLowerCase()}.xlsx`;
 
     const versionLabel = version === "UMUM" ? "Umum" : "Internal";
-    try {
-      await prisma.activityLog.create({
-        data: {
-          actorId: session.user.id,
-          action: `Export Excel Laporan Laba Rugi (${versionLabel}) – ${entity.name} (${year})`,
-          category: "USER_ACTIVITY",
-          detail: {
-            format: "Excel",
-            jenis: "Laba Rugi",
-            version: versionLabel,
-            entitas: entity.name,
-            entityKey: entity.key,
-            year,
-          },
-        },
-      });
-    } catch (logErr) {
-      console.error("Gagal mencatat log aktivitas ekspor:", logErr);
-    }
+    phpFetch("/api/log", token, {
+      method: "POST",
+      body: JSON.stringify({
+        actorId: session.user.id,
+        action: `Export Excel Laporan Laba Rugi (${versionLabel}) – ${entity.name} (${year})`,
+        category: "USER_ACTIVITY",
+        detail: { format: "Excel", jenis: "Laba Rugi", version: versionLabel, entitas: entity.name, entityKey: entity.key, year },
+      }),
+    }).catch(() => {});
 
     return new NextResponse(new Uint8Array(excelBuffer), {
       status: 200,

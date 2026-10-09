@@ -1,27 +1,18 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { LogCategory } from "@prisma/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
+
+export type LogCategory = "USER_ACTIVITY" | "FINANCIAL_CHANGE";
 
 export async function logExportActivity(action: string, detail?: Record<string, unknown>) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return { success: false };
-
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.activityLog.create({
-      data: {
-        actorId: session.user.id,
-        action,
-        category: "USER_ACTIVITY",
-        detail: (detail ?? {}) as any,
-      },
+    const token = await getPhpToken();
+    await phpFetch("/api/log/activity", token, {
+      method: "POST",
+      body: JSON.stringify({ action, category: "USER_ACTIVITY", detail: detail ?? {} }),
     });
     return { success: true };
-  } catch (err) {
-    console.error("Gagal mencatat log ekspor:", err);
+  } catch {
     return { success: false };
   }
 }
@@ -32,8 +23,7 @@ export async function logActivity(
   category: LogCategory,
   detail?: Record<string, unknown>,
 ) {
-  // Hanya catat tindakan yang mengubah konten data (tambah, edit, hapus, mutasi)
-  // Tindakan navigasi klik halaman atau melihat data biasa diabaikan agar audit trail tetap bersih
+  // Hanya catat tindakan yang mengubah konten data
   const trimmed = action.trim();
   if (
     trimmed.startsWith("Buka ") ||
@@ -44,9 +34,13 @@ export async function logActivity(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.activityLog.create({ data: { actorId, action, category, detail: detail as any } });
-  } catch {
+    const token = await getPhpToken();
+    await phpFetch("/api/log/activity", token, {
+      method: "POST",
+      body: JSON.stringify({ actorId, action, category, detail: detail ?? {} }),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) return;
     // log gagal tidak boleh gagalkan operasi utama
   }
 }

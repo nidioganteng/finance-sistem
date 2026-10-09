@@ -1,60 +1,57 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { revalidatePath } from "next/cache";
-import { CoaKategori, ReportType, type ReportCategory } from "@prisma/client";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { logActivity } from "@/lib/actions/log";
+import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
 export async function createCOA(formData: FormData) {
-  const session = await getServerSession(authOptions);
+  const token = await getPhpToken();
   const code = (formData.get("code") as string)?.trim();
   const name = (formData.get("name") as string)?.trim();
-  const kategori = formData.get("kategori") as CoaKategori;
-  const reportType = formData.get("reportType") as ReportType;
-  const reportCategory = (formData.get("reportCategory") as ReportCategory) || "SEMUA";
+  const kategori = formData.get("kategori") as string;
+  const reportType = formData.get("reportType") as string;
+  const reportCategory = (formData.get("reportCategory") as string) || "SEMUA";
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 
-  const last = await prisma.coaAccount.findFirst({ orderBy: { urutan: "desc" }, select: { urutan: true } });
-  const urutan = (last?.urutan ?? -1) + 1;
-
-  await prisma.coaAccount.create({ data: { code, name, kategori, reportType, reportCategory, urutan } });
-  if (session?.user.id) {
-    logActivity(session.user.id, `Tambah COA ${code} – ${name}`, "FINANCIAL_CHANGE", { code, name, kategori, reportType, reportCategory });
+  try {
+    await phpFetch("/api/coa", token, {
+      method: "POST",
+      body: JSON.stringify({ code, name, kategori, reportType, reportCategory }),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw e;
   }
-  revalidatePath("/coa");
 }
 
 export async function updateCOA(id: string, formData: FormData) {
-  const session = await getServerSession(authOptions);
+  const token = await getPhpToken();
   const code = (formData.get("code") as string)?.trim();
   const name = (formData.get("name") as string)?.trim();
-  const kategori = formData.get("kategori") as CoaKategori;
-  const reportType = formData.get("reportType") as ReportType;
-  const reportCategory = (formData.get("reportCategory") as ReportCategory) || "SEMUA";
+  const kategori = formData.get("kategori") as string;
+  const reportType = formData.get("reportType") as string;
+  const reportCategory = (formData.get("reportCategory") as string) || "SEMUA";
 
   if (!code || !name || !kategori || !reportType) throw new Error("Semua field wajib diisi.");
 
-  await prisma.coaAccount.update({ where: { id }, data: { code, name, kategori, reportType, reportCategory } });
-  if (session?.user.id) {
-    logActivity(session.user.id, `Update COA ${code} – ${name}`, "FINANCIAL_CHANGE", { id, code, name, kategori, reportType, reportCategory });
+  try {
+    await phpFetch(`/api/coa/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify({ code, name, kategori, reportType, reportCategory }),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw e;
   }
-  revalidatePath("/coa");
 }
 
 export async function deleteCOA(id: string) {
-  const session = await getServerSession(authOptions);
-  if (session?.user.role !== "MANAJER_KEUANGAN" && session?.user.role !== "SUPER_ADMIN" && session?.user.role !== "STAF_KEUANGAN") {
-    throw new Error("Akses ditolak.");
+  const token = await getPhpToken();
+  try {
+    await phpFetch(`/api/coa/${id}`, token, {
+      method: "DELETE",
+    });
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw e;
   }
-  const count = await prisma.transaction.count({ where: { coaAccountId: id } });
-  if (count > 0) throw new Error("COA ini masih digunakan oleh " + count + " transaksi dan tidak bisa dihapus.");
-  const coa = await prisma.coaAccount.findUnique({ where: { id }, select: { code: true, name: true } });
-  await prisma.coaAccount.delete({ where: { id } });
-  if (session?.user.id) {
-    logActivity(session.user.id, `Hapus COA ${coa?.code} – ${coa?.name}`, "FINANCIAL_CHANGE", { id });
-  }
-  revalidatePath("/coa");
 }

@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { Role, type ReportCategory } from "@prisma/client";
 import { calculateAsetDepreciation } from "./aset-tetap";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
+import { getExcludedNoBuktiForVersion, isAutoPostedMirror } from "./akuntansi";
 
 export function formatRupiah(n: number) {
   return "Rp\u00A0" + Math.round(n).toLocaleString("id-ID");
@@ -77,6 +77,7 @@ export async function getAccessibleEntities(
         kredit: true,
         debit: true,
         coaAccount: { select: { kategori: true, code: true, name: true } },
+        extraFieldsJson: true,
       },
     }),
     prisma.asetTetap.findMany({
@@ -93,7 +94,7 @@ export async function getAccessibleEntities(
         coaAccount: { code: { in: ["111", "112", "113", "114", "115"] } },
         debit: { gt: 0 },
       },
-      select: { entityId: true, debit: true, kredit: true },
+      select: { entityId: true, debit: true, kredit: true, extraFieldsJson: true },
     }),
     // Mutasi talangan masuk / hutang afiliasi (kode akun 311-315) di targetYear
     prisma.transaction.findMany({
@@ -106,13 +107,14 @@ export async function getAccessibleEntities(
         coaAccount: { code: { in: ["311", "312", "313", "314", "315"] } },
         kredit: { gt: 0 },
       },
-      select: { entityId: true, debit: true, kredit: true },
+      select: { entityId: true, debit: true, kredit: true, extraFieldsJson: true },
     }),
   ]);
 
   const revenueMap = new Map<string, number>();
   const spendMap = new Map<string, number>();
   for (const tx of txRows) {
+    if (isAutoPostedMirror(tx)) continue;
     if (tx.coaAccount?.kategori === "PENDAPATAN") {
       revenueMap.set(
         tx.entityId,
@@ -144,6 +146,7 @@ export async function getAccessibleEntities(
 
   const talanganKeluarMap = new Map<string, number>();
   for (const t of talanganKeluarTx) {
+    if (isAutoPostedMirror(t)) continue;
     talanganKeluarMap.set(
       t.entityId,
       (talanganKeluarMap.get(t.entityId) ?? 0) + Number(t.debit) - Number(t.kredit)
@@ -152,6 +155,7 @@ export async function getAccessibleEntities(
 
   const talanganMasukMap = new Map<string, number>();
   for (const t of talanganMasukTx) {
+    if (isAutoPostedMirror(t)) continue;
     talanganMasukMap.set(
       t.entityId,
       (talanganMasukMap.get(t.entityId) ?? 0) + Number(t.kredit) - Number(t.debit)
@@ -303,13 +307,16 @@ export async function getMonthlyChartData(entityKeys: string[], year: number, ve
       tanggal: true,
       kredit: true,
       entity: { select: { key: true } },
+      extraFieldsJson: true,
     },
   });
+
+  const cleanRows = rows.filter((r) => !isAutoPostedMirror(r));
 
   return BULAN.map((month, i) => {
     const entry: Record<string, string | number> = { month };
     for (const key of entityKeys) {
-      entry[key] = rows
+      entry[key] = cleanRows
         .filter((r) => r.entity.key === key && new Date(r.tanggal).getMonth() === i)
         .reduce((s, r) => s + Number(r.kredit), 0);
     }
@@ -336,13 +343,15 @@ export async function getMonthlyByYear(entityIds: string[], years: number[], ver
         reportCategory: { in: allowedCategories },
       },
     },
-    select: { tanggal: true, kredit: true },
+    select: { tanggal: true, kredit: true, extraFieldsJson: true },
   });
+
+  const cleanRows = rows.filter((r) => !isAutoPostedMirror(r));
 
   return BULAN.map((month, i) => {
     const entry: Record<string, string | number> = { month };
     for (const y of years) {
-      entry[String(y)] = rows
+      entry[String(y)] = cleanRows
         .filter((r) => {
           const d = new Date(r.tanggal);
           return d.getFullYear() === y && d.getMonth() === i;

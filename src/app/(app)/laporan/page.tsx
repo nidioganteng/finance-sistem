@@ -471,7 +471,12 @@ export default async function LaporanPage({
 
       {tab === "laba-rugi" && laporanKeuanganData && (
         <div className="flex flex-col gap-6">
-          {validasiPajak3Arah && <ValidasiPajak3ArahCard data={validasiPajak3Arah} />}
+          {validasiPajak3Arah && (
+            <ValidasiPajak3ArahCard
+              data={validasiPajak3Arah}
+              entityName={entityLabel}
+            />
+          )}
           {taxData ? (
             <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
           ) : (

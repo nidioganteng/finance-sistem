@@ -153,6 +153,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
         }
       : undefined;
 
+    const txExtra = {
+      ...(extraFieldsJson || {}),
+      ...(fakturId ? { fakturId } : {}),
+    };
+
     allOps.push(
       prisma.transaction.create({
         data: {
@@ -167,8 +172,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
           saldoSetelah: 0,
           staffId,
           projectId: projectId || null,
-          fakturId: fakturId || null,
-          ...(extraFieldsJson ? { extraFieldsJson } : {}),
+          extraFieldsJson: txExtra,
         },
       })
     );
@@ -232,11 +236,11 @@ export async function saveJurnalTransaksi(formData: FormData) {
           saldoSetelah: newSaldo,
           staffId,
           projectId: null,
-          fakturId: fakturId || null,
           extraFieldsJson: {
             isKasEntry: true,
             autoPostedFromJurnal: true,
             ...(rekeningNama ? { rekeningNama } : {}),
+            ...(fakturId ? { fakturId } : {}),
           },
         },
       })
@@ -264,10 +268,10 @@ export async function saveJurnalTransaksi(formData: FormData) {
             saldoSetelah: newSaldo,
             staffId,
             projectId: null,
-            fakturId: fakturId || null,
             extraFieldsJson: {
               autoPostedFromJurnal: true,
               ...(rekeningNama ? { rekeningNama } : {}),
+              ...(fakturId ? { fakturId } : {}),
             },
           },
         })
@@ -276,6 +280,20 @@ export async function saveJurnalTransaksi(formData: FormData) {
   }
 
   await prisma.$transaction(allOps);
+
+  // Pastikan kolom fakturId di tabel Transaction langsung terupdate di database
+  if (fakturId && noBukti) {
+    try {
+      await prisma.$executeRawUnsafe(
+        "UPDATE `Transaction` SET `fakturId` = ? WHERE `noBukti` = ? AND `entityId` = ?",
+        fakturId,
+        noBukti,
+        entity.id
+      );
+    } catch {
+      // Abaikan jika raw query tidak tersedia
+    }
+  }
 
   // ── SINKRONISASI KE LAPORAN PENDAPATAN & KONTROL TERMIN ──────────────────
   const pendapatanRows = validRows.filter((r) => {

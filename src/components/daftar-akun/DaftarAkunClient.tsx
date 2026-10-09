@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Check, X, Search, Lock } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";
 import { getCoaOwnerEntityKey, ENTITY_NAMES } from "@/lib/bank-accounts";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type Row = {
   coaId: string;
@@ -72,6 +74,7 @@ export function DaftarAkunClient({
   year: number;
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +98,7 @@ export function DaftarAkunClient({
     startTransition(async () => {
       try {
         await upsertSaldoAwal(entityId, coaId, year, nominal);
+        router.refresh();
         setEditingId(null);
       } catch (e: any) {
         setError(e.message);
@@ -103,7 +107,8 @@ export function DaftarAkunClient({
   }
 
   return (
-    <div className="bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
+    <div className="relative bg-surface-card border border-border-soft rounded-[20px] overflow-hidden">
+      <LoadingOverlay visible={isPending} />
       {/* ── Toolbar: Search & Info ── */}
       <div className="px-5 py-3.5 border-b border-surface-subtle flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 print:hidden">
         <div className="relative w-full sm:w-80 md:w-96">

@@ -1,20 +1,24 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, X, ChevronDown } from "lucide-react";
 import { approveUser, rejectUser, updateUserEntities, deactivateUser, activateUser } from "@/lib/actions/pengguna";
 import { roleLabel } from "@/lib/rbac";
 import { Role, UserStatus } from "@prisma/client";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type EntityItem = { id: string; name: string; key: string };
 type UserItem = {
   id: string;
   name: string;
   email: string;
-  role: Role | null;
-  status: UserStatus;
-  createdAt: Date;
+  // PHP returns role/status as plain strings; accept string but cast where enum is required
+  role: string | null;
+  status: string;
+  createdAt: Date | string;
   entityAccess: { entity: EntityItem }[];
+  entityKeys?: string[];
 };
 
 const STATUS_BADGE: Record<UserStatus, string> = {
@@ -47,6 +51,7 @@ export function PenggunaClient({
   allEntities: EntityItem[];
   viewerRole: string;
 }) {
+  const router = useRouter();
   const roleOpts = viewerRole === "SUPER_ADMIN" ? ROLE_OPTS_SUPER : ROLE_OPTS_MANAGER;
   const [filter, setFilter] = useState("semua");
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -83,6 +88,7 @@ export function PenggunaClient({
     startTransition(async () => {
       try {
         await approveUser(userId, selectedRole, selectedEntities);
+        router.refresh();
         setApprovingId(null);
       } catch (e: any) {
         setError(e.message);
@@ -94,6 +100,7 @@ export function PenggunaClient({
     if (!confirm("Tolak pendaftaran pengguna ini?")) return;
     startTransition(async () => {
       await rejectUser(userId);
+      router.refresh();
       setApprovingId(null);
     });
   }
@@ -102,6 +109,7 @@ export function PenggunaClient({
     startTransition(async () => {
       try {
         await updateUserEntities(userId, selectedEntities);
+        router.refresh();
         setEditEntityId(null);
       } catch (e: any) {
         setError(e.message);
@@ -111,11 +119,17 @@ export function PenggunaClient({
 
   async function handleDeactivate(userId: string) {
     if (!confirm("Nonaktifkan pengguna ini?")) return;
-    startTransition(() => { deactivateUser(userId); });
+    startTransition(async () => {
+      await deactivateUser(userId);
+      router.refresh();
+    });
   }
 
   async function handleActivate(userId: string) {
-    startTransition(() => { activateUser(userId); });
+    startTransition(async () => {
+      await activateUser(userId);
+      router.refresh();
+    });
   }
 
   return (
@@ -138,7 +152,8 @@ export function PenggunaClient({
         ))}
       </div>
 
-      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+      <div className="relative bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+        <LoadingOverlay visible={isPending} />
         <div className="overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0">
         <table className="w-full text-sm min-w-[700px]">
           <thead>
@@ -170,7 +185,7 @@ export function PenggunaClient({
                   </td>
                   <td className="py-3 px-3 text-[12.5px] text-muted-stronger">{user.email}</td>
                   <td className="py-3 px-3 text-[12.5px] text-muted">
-                    {user.role ? roleLabel(user.role) : "-"}
+                    {user.role ? roleLabel(user.role as Role) : "-"}
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex flex-wrap gap-1">
@@ -186,8 +201,8 @@ export function PenggunaClient({
                     </div>
                   </td>
                   <td className="py-3 px-3">
-                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${STATUS_BADGE[user.status]}`}>
-                      {STATUS_LABEL[user.status]}
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${STATUS_BADGE[user.status as UserStatus] ?? ""}`}>
+                      {STATUS_LABEL[user.status as UserStatus] ?? user.status}
                     </span>
                   </td>
                   <td className="py-3 px-6 text-right">

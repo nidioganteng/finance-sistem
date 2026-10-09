@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CoaKategori, ReportType, ReportCategory } from "@prisma/client";
 import { createCOA, updateCOA, deleteCOA } from "@/lib/actions/coa";
 import { Pencil, Trash2, Plus, X, Check } from "lucide-react";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type COAItem = {
   id: string;
@@ -12,7 +14,7 @@ type COAItem = {
   kategori: CoaKategori;
   reportType: ReportType;
   reportCategory: ReportCategory;
-  createdAt: Date;
+  createdAt: Date | string;
 };
 
 const KATEGORI_OPTS: CoaKategori[] = ["PENDAPATAN", "BEBAN", "ASET", "KEWAJIBAN", "MODAL"];
@@ -48,6 +50,7 @@ const REPORT_CATEGORY_BADGE: Record<ReportCategory, string> = {
 };
 
 export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; canDelete: boolean }) {
+  const router = useRouter();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,7 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
     startTransition(async () => {
       try {
         await createCOA(formData);
+        router.refresh();
         setShowAdd(false);
       } catch (e: any) {
         setError(e.message);
@@ -70,6 +74,7 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
     startTransition(async () => {
       try {
         await updateCOA(id, formData);
+        router.refresh();
         setEditingId(null);
       } catch (e: any) {
         setError(e.message);
@@ -83,6 +88,7 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
     startTransition(async () => {
       try {
         await deleteCOA(id);
+        router.refresh();
       } catch (e: any) {
         setError(e.message);
       }
@@ -90,7 +96,8 @@ export function CoaClient({ initialCoa, canDelete }: { initialCoa: COAItem[]; ca
   }
 
   return (
-    <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+    <div className="relative bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+      <LoadingOverlay visible={isPending} />
       <div className="flex items-center justify-between px-6 py-4 border-b border-surface-subtle">
         <span className="text-sm font-bold text-navy-text">{initialCoa.length} Akun Terdaftar</span>
         <button

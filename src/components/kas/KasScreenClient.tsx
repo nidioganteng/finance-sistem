@@ -8,6 +8,7 @@ import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string };
@@ -314,7 +315,8 @@ export function KasScreenClient({
         </div>
       )}
 
-      <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
+      <div className="relative bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
+        <LoadingOverlay visible={isPending} />
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">

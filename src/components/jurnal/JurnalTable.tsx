@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Check, X } from "lucide-react";
 import { updateKodeAkunJurnal, updateProyekJurnal } from "@/lib/actions/jurnal";
 import { CoaCombobox } from "@/components/kas/CoaCombobox";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type JurnalRow = {
   id: string;
@@ -52,6 +54,7 @@ export function JurnalTable({
   coaOptions: { code: string; name: string }[];
   projectOptions?: { id: string; code: string; name: string }[];
 }) {
+  const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCode, setEditCode] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -70,6 +73,7 @@ export function JurnalTable({
     startTransition(async () => {
       try {
         await updateProyekJurnal(id, entityId, editProjectId || null);
+        router.refresh();
         setEditingProjectId(null);
       } catch (e: any) {
         setError(e.message);
@@ -93,6 +97,7 @@ export function JurnalTable({
     startTransition(async () => {
       try {
         await updateKodeAkunJurnal(id, entityId, editCode);
+        router.refresh();
         setEditingId(null);
       } catch (e: any) {
         setError(e.message);
@@ -101,7 +106,8 @@ export function JurnalTable({
   }
 
   return (
-    <div className="bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
+    <div className="relative bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
+      <LoadingOverlay visible={isPending} />
       {error && (
         <div className="mb-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}

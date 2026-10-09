@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { TerminStatus } from "@prisma/client";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 import {
   AlertTriangle,
   CheckCircle,
@@ -80,6 +82,7 @@ export function PiutangClient({
   showTabs?: boolean;
   isGrup?: boolean;
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<"berjalan" | "selesai" | "dock">("berjalan");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set()
@@ -117,6 +120,7 @@ export function PiutangClient({
     startTransition(async () => {
       try {
         await auditTermin(id);
+        router.refresh();
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -126,6 +130,7 @@ export function PiutangClient({
   function handleStatusChange(id: string, status: TerminStatus) {
     startTransition(async () => {
       await updateTerminStatus(id, status);
+      router.refresh();
     });
   }
 
@@ -134,6 +139,7 @@ export function PiutangClient({
     startTransition(async () => {
       try {
         await completeProject(id);
+        router.refresh();
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -145,6 +151,7 @@ export function PiutangClient({
     startTransition(async () => {
       try {
         await cancelProject(id);
+        router.refresh();
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -156,6 +163,7 @@ export function PiutangClient({
     startTransition(async () => {
       try {
         await reopenProject(id);
+        router.refresh();
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -163,7 +171,8 @@ export function PiutangClient({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="relative flex flex-col gap-4">
+      <LoadingOverlay visible={isPending} />
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}

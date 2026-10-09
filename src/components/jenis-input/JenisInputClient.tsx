@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, X, Check, ToggleLeft, ToggleRight, Trash2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { createJenisInput, toggleJenisInput, deleteJenisInput } from "@/lib/actions/jenis-input";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type JenisInputItem = {
   id: string;
@@ -11,7 +13,7 @@ type JenisInputItem = {
   nama: string;
   active: boolean;
   createdBy: { name: string } | null;
-  createdAt: Date;
+  createdAt: Date | string;
   arahLaporan: string[];
   entityKeys: string[];
 };
@@ -43,6 +45,7 @@ export function JenisInputClient({
   entities: { key: string; name: string }[];
   userRole: string;
 }) {
+  const router = useRouter();
   const [showAdd, setShowAdd] = useState(false);
   const [nama, setNama] = useState("");
   const [arahLaporan, setArahLaporan] = useState<string[]>(["JURNAL_UMUM"]);
@@ -69,6 +72,7 @@ export function JenisInputClient({
     startTransition(async () => {
       try {
         await createJenisInput({ nama, arahLaporan, entityKeys: selectedEntityKeys });
+        router.refresh();
         setShowAdd(false);
         setNama("");
         setArahLaporan(["JURNAL_UMUM"]);
@@ -83,6 +87,7 @@ export function JenisInputClient({
     startTransition(async () => {
       try {
         await toggleJenisInput(id, active);
+        router.refresh();
       } catch (e: any) {
         setError(e.message);
       }
@@ -94,6 +99,7 @@ export function JenisInputClient({
     startTransition(async () => {
       try {
         await deleteJenisInput(id);
+        router.refresh();
       } catch (e: any) {
         setError(e.message);
       }
@@ -101,7 +107,8 @@ export function JenisInputClient({
   }
 
   return (
-    <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+    <div className="relative bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+      <LoadingOverlay visible={isPending} />
       <div className="flex items-center justify-between px-6 py-4 border-b border-surface-subtle">
         <span className="text-sm font-bold text-navy-text">{initialData.length} Jenis Input</span>
         {canManage && (

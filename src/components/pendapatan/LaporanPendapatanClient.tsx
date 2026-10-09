@@ -686,7 +686,7 @@ export function LaporanPendapatanClient({
             </span>
             <Wallet className="w-4 h-4 text-emerald-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-emerald-600 truncate" title={data.kpiSummary.totalLabaSetelahPajakFmt}>
+          <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate" title={data.kpiSummary.totalLabaSetelahPajakFmt}>
             {data.kpiSummary.totalLabaSetelahPajakFmt}
           </div>
           <p className="text-[11px] text-navy-soft mt-1 truncate">
@@ -720,9 +720,9 @@ export function LaporanPendapatanClient({
           </div>
           <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? "Match 100%" : `${data.kpiSummary.jumlahBulanSelisih} Bulan Beda`}>
             {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
-              <span className="text-emerald-600">Match 100%</span>
+              <span className="text-emerald-600 dark:text-emerald-400">Match 100%</span>
             ) : (
-              <span className="text-rose-600">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>
+              <span className="text-rose-600 dark:text-rose-400">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>
             )}
           </div>
           <p className="text-[11px] text-navy-soft mt-1 truncate">
@@ -745,7 +745,7 @@ export function LaporanPendapatanClient({
         >
           <Receipt className="w-4 h-4" />
           <span>Lapis 1: Daftar E-Faktur & Total Periode</span>
-          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
             {filteredFaktur.length}
           </span>
         </button>
@@ -773,7 +773,7 @@ export function LaporanPendapatanClient({
           <Scale className="w-4 h-4" />
           <span>Lapis 3: Rekonsiliasi Audit Pajak (Faktur vs SPT)</span>
           {data.kpiSummary.jumlahBulanSelisih > 0 && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-rose-100 text-rose-700 font-bold">
+            <span className="px-2 py-0.5 text-xs rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold">
               {data.kpiSummary.jumlahBulanSelisih}
             </span>
           )}
@@ -886,7 +886,7 @@ export function LaporanPendapatanClient({
                       <td className="p-3">
                         {f.projectCode ? (
                           <div>
-                            <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
                               {f.projectCode}
                             </span>
                             {f.projectName && (
@@ -911,13 +911,13 @@ export function LaporanPendapatanClient({
                       <td className="p-3 text-right font-mono text-navy-soft">
                         {f.dppNilaiLainFmt}
                       </td>
-                      <td className="p-3 text-right font-mono text-purple-700" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
+                      <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
                         {f.ppnFmt}
                         {f.isRealized && f.tarifPpnPersen !== 12 && (
                           <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPpnPersen}%)</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-700" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
+                      <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
                         {f.pphFmt}
                         {f.isRealized && f.tarifPphPersen !== 3.5 && (
                           <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPphPersen}%)</span>
@@ -938,12 +938,12 @@ export function LaporanPendapatanClient({
                       </td>
                       <td className="p-3 text-center">
                         {f.balanceStatus === "BALANCE" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border border-green-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/60">
                             <CheckCircle2 size={10} /> Balance
                           </span>
                         ) : f.balanceStatus === "SELISIH" ? (
                           <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-200"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60"
                             title={`Selisih dengan net tagihan: ${f.selisihBankFmt}`}
                           >
                             <AlertTriangle size={10} /> Selisih: {f.selisihBankFmt}
@@ -958,7 +958,7 @@ export function LaporanPendapatanClient({
                         {f.tanggalTerima ? (
                           <>
                             <div className="font-mono text-xs">{f.tanggalTerima}</div>
-                            <div className="text-[11px] font-semibold text-blue-600">
+                            <div className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
                               {f.bank || "-"}
                             </div>
                           </>
@@ -975,7 +975,7 @@ export function LaporanPendapatanClient({
                             title={f.ceklisPpn ? "Fisik PPN: Diterima (Klik untuk ubah)" : "Fisik PPN: Belum Diterima (Klik untuk ceklis)"}
                             className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
                               f.ceklisPpn
-                                ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300"
+                                ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800/60"
                                 : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
                             }`}
                           >
@@ -988,7 +988,7 @@ export function LaporanPendapatanClient({
                             title={f.ceklisPph ? "Fisik PPh: Diterima (Klik untuk ubah)" : "Fisik PPh: Belum Diterima (Klik untuk ceklis)"}
                             className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
                               f.ceklisPph
-                                ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300"
+                                ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800/60"
                                 : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
                             }`}
                           >
@@ -1001,7 +1001,7 @@ export function LaporanPendapatanClient({
                             title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima (Klik untuk ubah)" : "Bukti Potong: Belum Diterima (Klik untuk ceklis)"}
                             className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
                               f.ceklisBuktiPotong
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800/60"
                                 : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
                             }`}
                           >
@@ -1013,14 +1013,14 @@ export function LaporanPendapatanClient({
                         <span
                           className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
                             f.kodeJenisProyek === 2
-                              ? "bg-purple-50 text-purple-700 border border-purple-200"
-                              : "bg-blue-50 text-blue-700 border border-blue-200"
+                              ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60"
+                              : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60"
                           }`}
                         >
                           {f.jenisProyekLabel}
                         </span>
                         {f.pekerjaanYangDipinjam > 0 && (
-                          <div className="text-[10px] text-amber-600 mt-0.5">
+                          <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
                             Dipinjam: {f.pekerjaanYangDipinjamFmt}
                           </div>
                         )}
@@ -1031,7 +1031,7 @@ export function LaporanPendapatanClient({
                             <button
                               onClick={() => openEditFakturModal(f)}
                               title="Edit Faktur"
-                              className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-navy-soft hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
@@ -1041,7 +1041,7 @@ export function LaporanPendapatanClient({
                                 setIsDeleteModalOpen(true);
                               }}
                               title="Hapus Faktur"
-                              className="p-1.5 text-navy-soft hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-navy-soft hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1064,10 +1064,10 @@ export function LaporanPendapatanClient({
                   <td className="p-3 text-right font-mono text-navy-soft">
                     {data.totalPeriod.dppNilaiLainFmt}
                   </td>
-                  <td className="p-3 text-right font-mono text-purple-700">
+                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
                     {data.totalPeriod.ppnFmt}
                   </td>
-                  <td className="p-3 text-right font-mono text-amber-700">
+                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
                     {data.totalPeriod.pphFmt}
                   </td>
                   <td className="p-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/15">
@@ -1105,9 +1105,9 @@ export function LaporanPendapatanClient({
               href={exportUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition-colors"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Ekspor Rekap</span>
             </a>
           </div>
@@ -1160,16 +1160,16 @@ export function LaporanPendapatanClient({
                     <td className="p-3 text-right font-mono text-navy-soft">
                       {b.dppNilaiLainFmt}
                     </td>
-                    <td className="p-3 text-right font-mono text-purple-700">
+                    <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
                       {b.ppnFmt}
                     </td>
-                    <td className="p-3 text-right font-mono text-amber-700">
+                    <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
                       {b.pphFmt}
                     </td>
-                    <td className="p-3 text-right font-mono font-bold text-blue-700 bg-blue-50/30">
+                    <td className="p-3 text-right font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-500/10">
                       {b.nilaiProyekFmt}
                     </td>
-                    <td className="p-3 text-right font-mono font-semibold text-emerald-700 bg-emerald-50/30">
+                    <td className="p-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/10">
                       {b.labaSetelahPajakFmt}
                     </td>
                     <td className="p-3 text-right font-mono">
@@ -1181,7 +1181,7 @@ export function LaporanPendapatanClient({
                           handleFilterChange(undefined, undefined, b.month);
                           setActiveTab("faktur");
                         }}
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                       >
                         <span>Lihat Faktur</span>
                         <ArrowRight className="w-3 h-3" />
@@ -1204,10 +1204,10 @@ export function LaporanPendapatanClient({
                   <td className="p-3 text-right font-mono text-navy-soft">
                     {data.totalTahunanRekap.dppNilaiLainFmt}
                   </td>
-                  <td className="p-3 text-right font-mono text-purple-700">
+                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
                     {data.totalTahunanRekap.ppnFmt}
                   </td>
-                  <td className="p-3 text-right font-mono text-amber-700">
+                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
                     {data.totalTahunanRekap.pphFmt}
                   </td>
                   <td className="p-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/15">
@@ -1311,14 +1311,14 @@ export function LaporanPendapatanClient({
                         <span
                           className={`font-semibold ${
                             Math.abs(rec.selisihDpp) > 0.01
-                              ? "text-rose-600"
-                              : "text-emerald-600"
+                              ? "text-rose-600 dark:text-rose-400"
+                              : "text-emerald-600 dark:text-emerald-400"
                           }`}
                         >
                           {rec.selisihDppFmt}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono text-purple-700">
+                      <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
                         {rec.ppnRekapFmt}
                       </td>
                       <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
@@ -1328,14 +1328,14 @@ export function LaporanPendapatanClient({
                         <span
                           className={`font-semibold ${
                             Math.abs(rec.selisihPajak) > 0.01
-                              ? "text-rose-600"
-                              : "text-emerald-600"
+                              ? "text-rose-600 dark:text-rose-400"
+                              : "text-emerald-600 dark:text-emerald-400"
                           }`}
                         >
                           {rec.selisihPajakFmt}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-700">
+                      <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
                         {rec.pphRekapFmt}
                       </td>
                       <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
@@ -1345,8 +1345,8 @@ export function LaporanPendapatanClient({
                         <span
                           className={`font-semibold ${
                             Math.abs(rec.selisihPph) > 0.01
-                              ? "text-rose-600"
-                              : "text-emerald-600"
+                              ? "text-rose-600 dark:text-rose-400"
+                              : "text-emerald-600 dark:text-emerald-400"
                           }`}
                         >
                           {rec.selisihPphFmt}
@@ -1362,8 +1362,8 @@ export function LaporanPendapatanClient({
                         <span
                           className={`font-semibold ${
                             Math.abs(rec.selisihTotalPajak) > 0.01
-                              ? "text-rose-600"
-                              : "text-emerald-600"
+                              ? "text-rose-600 dark:text-rose-400"
+                              : "text-emerald-600 dark:text-emerald-400"
                           }`}
                         >
                           {rec.selisihTotalPajakFmt}
@@ -1371,18 +1371,18 @@ export function LaporanPendapatanClient({
                       </td>
                       <td className="p-3 text-center">
                         {isMatch ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                             SESUAI
                           </span>
                         ) : isUnreported ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
-                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/60">
+                            <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                             BELUM LAPOR
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30">
-                            <AlertTriangle className="w-3 h-3 text-rose-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800/60">
+                            <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
                             SELISIH
                           </span>
                         )}
@@ -1395,7 +1395,7 @@ export function LaporanPendapatanClient({
                           <button
                             onClick={() => openReconModal(rec)}
                             title="Edit Angka Terlapor SPT"
-                            className="p-1.5 text-navy-soft hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 text-navy-soft hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -1420,14 +1420,14 @@ export function LaporanPendapatanClient({
                     <span
                       className={
                         Math.abs(rekonTotals.selisihDpp) > 0.01
-                          ? "text-rose-600"
-                          : "text-emerald-600"
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
                       }
                     >
                       {formatRupiah(rekonTotals.selisihDpp)}
                     </span>
                   </td>
-                  <td className="p-3 text-right font-mono text-purple-700">
+                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
                     {formatRupiah(rekonTotals.ppnRekap)}
                   </td>
                   <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
@@ -1437,14 +1437,14 @@ export function LaporanPendapatanClient({
                     <span
                       className={
                         Math.abs(rekonTotals.selisihPajak) > 0.01
-                          ? "text-rose-600"
-                          : "text-emerald-600"
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
                       }
                     >
                       {formatRupiah(rekonTotals.selisihPajak)}
                     </span>
                   </td>
-                  <td className="p-3 text-right font-mono text-amber-700">
+                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
                     {formatRupiah(rekonTotals.pphRekap)}
                   </td>
                   <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
@@ -1454,8 +1454,8 @@ export function LaporanPendapatanClient({
                     <span
                       className={
                         Math.abs(rekonTotals.selisihPph) > 0.01
-                          ? "text-rose-600"
-                          : "text-emerald-600"
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
                       }
                     >
                       {formatRupiah(rekonTotals.selisihPph)}
@@ -1471,8 +1471,8 @@ export function LaporanPendapatanClient({
                     <span
                       className={
                         Math.abs(rekonTotals.selisihTotalPajak) > 0.01
-                          ? "text-rose-600"
-                          : "text-emerald-600"
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
                       }
                     >
                       {formatRupiah(rekonTotals.selisihTotalPajak)}
@@ -1480,11 +1480,11 @@ export function LaporanPendapatanClient({
                   </td>
                   <td className="p-3 text-center">
                     {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                         SEMUA SESUAI
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-100 text-rose-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
                         {data.kpiSummary.jumlahBulanSelisih} BULAN BEDA
                       </span>
                     )}

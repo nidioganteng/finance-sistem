@@ -336,12 +336,23 @@ export async function saveJurnalTransaksi(formData: FormData) {
     const txDate = new Date(tanggal);
 
     if (fakturId) {
+      const curFaktur = await prisma.fakturPendapatan.findUnique({ where: { id: fakturId } });
+      const needsTaxFill = curFaktur && (Number(curFaktur.dpp) === 0 || Number(curFaktur.ppn) === 0);
       await prisma.fakturPendapatan.update({
         where: { id: fakturId },
         data: {
           tanggalTerima: txDate,
           bank: bankName,
           nominalDiterima: nominalDiterima > 0 ? nominalDiterima : undefined,
+          ...(needsTaxFill && dpp > 0 ? {
+            dpp,
+            dppNilaiLain,
+            ppn,
+            pph,
+            nilaiProyek,
+            labaSetelahPajak,
+            pekerjaanPerusahaan: dpp,
+          } : {}),
           ...(projectId ? { projectId } : {}),
         },
       });

@@ -136,7 +136,6 @@ export function calculateAsetDepreciation(
   const depreciableBase = Math.max(0, hargaPerolehan - nilaiResidu);
   const penyusutanPerBulan = depreciableBase / umurBulan;
 
-  const tglBeli = new Date(asset.tanggalPerolehan);
   const buyYear = tglBeli.getFullYear();
   const buyMonth = tglBeli.getMonth() + 1; // 1-12
 
@@ -171,12 +170,6 @@ export function calculateAsetDepreciation(
 
   const bebanPeriodeIni = Math.max(0, akumulasiPenyusutan - akumulasiPrior);
   const nilaiBuku = Math.max(nilaiResidu, hargaPerolehan - akumulasiPenyusutan);
-
-  const tglStr = tglBeli.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
   return {
     ...asset,

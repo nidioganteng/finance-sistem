@@ -10,6 +10,16 @@ export type JurnalTransaksiGroup = {
   keterangan: string;
   projectId?: string | null;
   project?: { id: string; code: string; name: string } | null;
+  fakturId?: string | null;
+  faktur?: {
+    id: string;
+    noFaktur: string;
+    namaRekanan: string;
+    dpp: number;
+    ppn: number;
+    pph: number;
+    labaSetelahPajak: number;
+  } | null;
   rows: { coaAccountId: string; coaName: string; coaCode: string; keterangan: string; debit: number; kredit: number }[];
   totalDebit: number;
   totalKredit: number;
@@ -61,6 +71,17 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
     include: {
       coaAccount: true,
       project: { select: { id: true, code: true, name: true } },
+      faktur: {
+        select: {
+          id: true,
+          noFaktur: true,
+          namaRekanan: true,
+          dpp: true,
+          ppn: true,
+          pph: true,
+          labaSetelahPajak: true,
+        },
+      },
     },
     orderBy: [{ tanggal: "desc" }, { noBukti: "desc" }, { createdAt: "asc" }],
   });
@@ -75,6 +96,8 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
       keterangan: "",
       projectId: null,
       project: null,
+      fakturId: null,
+      faktur: null,
       rows: [],
       totalDebit: 0,
       totalKredit: 0,
@@ -96,9 +119,37 @@ export async function getJurnalTransaksiHistory(entityId: string, page = 1, dari
       group.keterangan = row.keterangan;
       group.projectId = row.projectId ?? null;
       group.project = row.project ?? null;
-    } else if (!group.projectId && row.projectId) {
-      group.projectId = row.projectId;
-      group.project = row.project ?? null;
+      group.fakturId = row.fakturId ?? null;
+      group.faktur = row.faktur
+        ? {
+            id: row.faktur.id,
+            noFaktur: row.faktur.noFaktur,
+            namaRekanan: row.faktur.namaRekanan,
+            dpp: Number(row.faktur.dpp),
+            ppn: Number(row.faktur.ppn),
+            pph: Number(row.faktur.pph),
+            labaSetelahPajak: Number(row.faktur.labaSetelahPajak),
+          }
+        : null;
+    } else {
+      if (!group.projectId && row.projectId) {
+        group.projectId = row.projectId;
+        group.project = row.project ?? null;
+      }
+      if (!group.fakturId && row.fakturId) {
+        group.fakturId = row.fakturId;
+        group.faktur = row.faktur
+          ? {
+              id: row.faktur.id,
+              noFaktur: row.faktur.noFaktur,
+              namaRekanan: row.faktur.namaRekanan,
+              dpp: Number(row.faktur.dpp),
+              ppn: Number(row.faktur.ppn),
+              pph: Number(row.faktur.pph),
+              labaSetelahPajak: Number(row.faktur.labaSetelahPajak),
+            }
+          : null;
+      }
     }
 
     const debit = Number(row.debit);

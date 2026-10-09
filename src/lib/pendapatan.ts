@@ -348,15 +348,18 @@ export async function getLaporanPendapatanData(
     ),
   ];
 
-  // Penarikan Data Berbasis Nomor Faktur:
-  // Ambil transaksi Jurnal Umum (Kas Masuk / Bank) yang memiliki noBukti atau keterangan sesuai nomor faktur
+  const allFakturIds = allYearFakturRaw.map((f) => f.id);
+
+  // Penarikan Data Berbasis Nomor Faktur & FakturId:
+  // Ambil transaksi Jurnal Umum (Kas Masuk / Bank) yang memiliki relasi fakturId, noBukti, atau keterangan sesuai nomor faktur
   const matchingTransactions =
-    allNoFakturs.length > 0
+    allNoFakturs.length > 0 || allFakturIds.length > 0
       ? await prisma.transaction.findMany({
           where: {
             entityId: entity.id,
             OR: [
-              { noBukti: { in: allNoFakturs } },
+              ...(allFakturIds.length > 0 ? [{ fakturId: { in: allFakturIds } }] : []),
+              ...(allNoFakturs.length > 0 ? [{ noBukti: { in: allNoFakturs } }] : []),
               ...allNoFakturs.map((nf) => ({ keterangan: { contains: nf } })),
             ],
           },
@@ -368,8 +371,9 @@ export async function getLaporanPendapatanData(
         })
       : [];
 
-  // Helper untuk mengekstrak data pencairan riil dari Jurnal Umum berdasarkan Nomor Faktur
+  // Helper untuk mengekstrak data pencairan riil dari Jurnal Umum berdasarkan Nomor Faktur & fakturId
   function extractJurnalDataForFaktur(
+    fakturId: string,
     noFaktur: string,
     fTanggalTerima: Date | null,
     fBank: string | null,
@@ -378,11 +382,20 @@ export async function getLaporanPendapatanData(
     fPph: number
   ) {
     const trimmed = noFaktur.trim().toLowerCase();
-    const matches = matchingTransactions.filter(
+    const rawMatches = matchingTransactions.filter(
       (tx) =>
+        (tx.fakturId && tx.fakturId === fakturId) ||
         (tx.noBukti && tx.noBukti.trim().toLowerCase() === trimmed) ||
         (tx.keterangan && tx.keterangan.toLowerCase().includes(trimmed))
     );
+
+    // Prioritaskan transaksi asli (jurnalTransaksi) dan abaikan salinan autoPostedFromJurnal ke Buku Bank
+    // agar nilai nominal masuk, PPN, dan PPh tidak terhitung dua kali lipat
+    const nonAutoPosted = rawMatches.filter((tx) => {
+      const extra = tx.extraFieldsJson as any;
+      return !extra?.autoPostedFromJurnal;
+    });
+    const matches = nonAutoPosted.length > 0 ? nonAutoPosted : rawMatches;
 
     if (matches.length > 0) {
       // 1. Nominal masuk bank (Debit ke Kas/Bank/Aset)
@@ -466,8 +479,9 @@ export async function getLaporanPendapatanData(
     const calculated = hitungPajakFaktur(dpp, dppNilaiLain, tarifPpnPersen, tarifPphPersen);
     const nilaiProyek = Number(f.nilaiProyek) > 0 ? Number(f.nilaiProyek) : calculated.nilaiProyek;
 
-    // Tarik data riil dari Jurnal Umum berdasarkan noFaktur
+    // Tarik data riil dari Jurnal Umum berdasarkan fakturId & noFaktur
     const real = extractJurnalDataForFaktur(
+      f.id,
       f.noFaktur,
       f.tanggalTerima,
       f.bank,
@@ -646,6 +660,7 @@ export async function getLaporanPendapatanData(
       const nilaiProyek = Number(f.nilaiProyek) > 0 ? Number(f.nilaiProyek) : calculated.nilaiProyek;
 
       const real = extractJurnalDataForFaktur(
+        f.id,
         f.noFaktur,
         f.tanggalTerima,
         f.bank,

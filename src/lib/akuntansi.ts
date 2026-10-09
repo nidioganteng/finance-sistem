@@ -89,3 +89,14 @@ export function hitungAlokasi(kategori: CoaKategori): Alokasi {
   return kategori === CoaKategori.PENDAPATAN || kategori === CoaKategori.BEBAN ? "LABA_RUGI" : "NERACA";
 }
 
+/**
+ * Mengecek apakah transaksi merupakan salinan otomatis dari jurnal ke Buku Bank (mirror row).
+ * Baris mirror ini dibuat agar Buku Bank mencatat mutasi, namun tidak boleh dihitung
+ * dua kali dalam laporan akuntansi (Dashboard, Laba Rugi, Neraca, Buku Besar, dll).
+ */
+export function isAutoPostedMirror(tx: { extraFieldsJson?: unknown } | null | undefined): boolean {
+  if (!tx || !tx.extraFieldsJson) return false;
+  const extra = tx.extraFieldsJson as Record<string, unknown>;
+  return extra.autoPostedFromJurnal === true;
+}
+

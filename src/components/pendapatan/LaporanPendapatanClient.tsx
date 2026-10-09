@@ -611,7 +611,7 @@ export function LaporanPendapatanClient({
           {canEdit && (
             <button
               onClick={openCreateFakturModal}
-              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-xl bg-navy text-white hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Input E-Faktur</span>
@@ -625,101 +625,101 @@ export function LaporanPendapatanClient({
       {/* ─────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* KPI 1 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
           <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider truncate">
               Nilai Proyek (111%)
             </span>
-            <TrendingUp className="w-4 h-4 text-blue-500" />
+            <TrendingUp className="w-4 h-4 text-blue-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate">
+          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalNilaiProyekFmt}>
             {data.kpiSummary.totalNilaiProyekFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1">
+          <p className="text-[11px] text-navy-soft mt-1 truncate">
             Diakui sebagai Pendapatan di Laba Rugi
           </p>
         </div>
 
         {/* KPI 2 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
           <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider truncate">
               Total DPP
             </span>
-            <FileText className="w-4 h-4 text-indigo-500" />
+            <FileText className="w-4 h-4 text-indigo-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate">
+          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalDppFmt}>
             {data.kpiSummary.totalDppFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1">
+          <p className="text-[11px] text-navy-soft mt-1 truncate">
             DPP Nilai Lain: {data.totalPeriod.dppNilaiLainFmt}
           </p>
         </div>
 
         {/* KPI 3 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
           <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider truncate">
               Kewajiban Pajak
             </span>
-            <Receipt className="w-4 h-4 text-purple-500" />
+            <Receipt className="w-4 h-4 text-purple-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate">
+          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalPajakFmt}>
             {data.kpiSummary.totalPajakFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1">
+          <p className="text-[11px] text-navy-soft mt-1 truncate">
             PPN: {data.totalPeriod.ppnFmt} | PPh: {data.totalPeriod.pphFmt}
           </p>
         </div>
 
         {/* KPI 4 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
           <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider truncate">
               Laba Stlh Pajak
             </span>
-            <Wallet className="w-4 h-4 text-emerald-500" />
+            <Wallet className="w-4 h-4 text-emerald-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-emerald-600 truncate">
+          <div className="text-lg font-bold text-emerald-600 truncate" title={data.kpiSummary.totalLabaSetelahPajakFmt}>
             {data.kpiSummary.totalLabaSetelahPajakFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1">
+          <p className="text-[11px] text-navy-soft mt-1 truncate">
             Margin bersih setelah PPN & PPh
           </p>
         </div>
 
         {/* KPI 5 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
           <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider truncate">
               Total Dana Cair
             </span>
-            <Building2 className="w-4 h-4 text-sky-500" />
+            <Building2 className="w-4 h-4 text-sky-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate">
+          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalNominalDiterimaFmt}>
             {data.kpiSummary.totalNominalDiterimaFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1">
+          <p className="text-[11px] text-navy-soft mt-1 truncate">
             {data.totalPeriod.jumlahFaktur} faktur tercatat
           </p>
         </div>
 
         {/* KPI 6 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs">
+        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
           <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider truncate">
               Audit SPT Pajak
             </span>
-            <Scale className="w-4 h-4 text-amber-500" />
+            <Scale className="w-4 h-4 text-amber-500 shrink-0 ml-1" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate">
+          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? "Match 100%" : `${data.kpiSummary.jumlahBulanSelisih} Bulan Beda`}>
             {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
               <span className="text-emerald-600">Match 100%</span>
             ) : (
               <span className="text-rose-600">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>
             )}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1">
+          <p className="text-[11px] text-navy-soft mt-1 truncate">
             Selisih Pajak: {data.kpiSummary.totalSelisihPajakFmt}
           </p>
         </div>
@@ -1501,7 +1501,7 @@ export function LaporanPendapatanClient({
             {/* Modal Header (Fixed at top) */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle/50 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                <div className="p-2 rounded-xl bg-navy/10 dark:bg-navy/30 text-navy-text dark:text-white">
                   <Receipt className="w-5 h-5" />
                 </div>
                 <div>
@@ -1619,12 +1619,15 @@ export function LaporanPendapatanClient({
                                   {t.name} ({t.percentage}% Kontrak) — {t.nominalFmt}
                                 </option>
                               ))}
-                              <option value="manual">✍️ Input Nilai DPP Manual (Tanpa Termin)</option>
+                              <option value="manual">Input Nilai DPP Manual (Tanpa Termin)</option>
                             </select>
                             {selectedTermin ? (
                               <div className="text-[11px] text-emerald-900 dark:text-emerald-300 bg-surface-input p-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                                <span>
-                                  ⚡ Nilai Termin: <strong className="font-mono">{selectedTermin.nominalFmt}</strong> ({selectedTermin.percentage}% dari nilai kontrak)
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  <span>
+                                    Nilai Termin: <strong className="font-mono">{selectedTermin.nominalFmt}</strong> ({selectedTermin.percentage}% dari nilai kontrak)
+                                  </span>
                                 </span>
                                 <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-1.5 py-0.5 rounded">
                                   DPP otomatis tersinkron
@@ -1935,10 +1938,11 @@ export function LaporanPendapatanClient({
                                 }
                               }
                             }}
-                            className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 cursor-pointer"
                             title="Hitung DPP = 100/111 x Nilai Kwitansi"
                           >
-                            ⚡ 100/111 Kwitansi
+                            <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>100/111 Kwitansi</span>
                           </button>
                         </div>
                         <div className="relative">
@@ -1981,9 +1985,10 @@ export function LaporanPendapatanClient({
                                 }))
                               }
                               title="Hitung 11/12 x DPP Dasar"
-                              className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 cursor-pointer"
                             >
-                              ⚡ 11/12 × DPP
+                              <Sparkles className="w-3 h-3 text-indigo-600 shrink-0" />
+                              <span>11/12 × DPP</span>
                             </button>
                             <button
                               type="button"
@@ -1994,9 +1999,10 @@ export function LaporanPendapatanClient({
                                 }))
                               }
                               title="Samakan dengan DPP Dasar"
-                              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 cursor-pointer"
                             >
-                              ⚡ Samakan
+                              <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
+                              <span>Samakan</span>
                             </button>
                           </div>
                         </div>
@@ -2088,57 +2094,69 @@ export function LaporanPendapatanClient({
                   </div>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* Card 1: PPN */}
-                    <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50">
+                    <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
                       <div className="flex items-center justify-between text-purple-700 dark:text-purple-300 mb-1">
-                        <span className="text-[11px] font-semibold">PPN Dipungut</span>
-                        <Receipt className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-semibold truncate">PPN Dipungut</span>
+                        <Receipt className="w-3.5 h-3.5 shrink-0 ml-1" />
                       </div>
-                      <div className="text-sm font-bold font-mono text-purple-800 dark:text-purple-200">
+                      <div
+                        className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-purple-800 dark:text-purple-200 truncate block"
+                        title={formatRupiah(liveCalc.ppn)}
+                      >
                         {formatRupiah(liveCalc.ppn)}
                       </div>
-                      <span className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 block">
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 block truncate">
                         {formFaktur.tarifPpnPersen}% × DPP Nilai Lain
                       </span>
                     </div>
 
                     {/* Card 2: PPh */}
-                    <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50">
+                    <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
                       <div className="flex items-center justify-between text-amber-700 dark:text-amber-300 mb-1">
-                        <span className="text-[11px] font-semibold">PPh Dipotong</span>
-                        <FileText className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-semibold truncate">PPh Dipotong</span>
+                        <FileText className="w-3.5 h-3.5 shrink-0 ml-1" />
                       </div>
-                      <div className="text-sm font-bold font-mono text-amber-800 dark:text-amber-200">
+                      <div
+                        className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-amber-800 dark:text-amber-200 truncate block"
+                        title={formatRupiah(liveCalc.pph)}
+                      >
                         {formatRupiah(liveCalc.pph)}
                       </div>
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 block">
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 block truncate">
                         {formFaktur.tarifPphPersen}% × DPP Dasar
                       </span>
                     </div>
 
                     {/* Card 3: Nilai Proyek */}
-                    <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50">
+                    <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
                       <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 mb-1">
-                        <span className="text-[11px] font-semibold">Nilai Proyek (111%)</span>
-                        <TrendingUp className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-semibold truncate">Nilai Proyek (111%)</span>
+                        <TrendingUp className="w-3.5 h-3.5 shrink-0 ml-1" />
                       </div>
-                      <div className="text-sm font-bold font-mono text-blue-800 dark:text-blue-200">
+                      <div
+                        className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-blue-800 dark:text-blue-200 truncate block"
+                        title={formatRupiah(liveCalc.nilaiProyek)}
+                      >
                         {formatRupiah(liveCalc.nilaiProyek)}
                       </div>
-                      <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 block">
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 block truncate">
                         Diakui Pendapatan Laba Rugi
                       </span>
                     </div>
 
                     {/* Card 4: Laba Bersih Setelah Pajak */}
-                    <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/60 shadow-xs">
+                    <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/60 shadow-xs min-w-0 overflow-hidden flex flex-col justify-between">
                       <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-300 mb-1">
-                        <span className="text-[11px] font-bold">Laba Stlh Pajak</span>
-                        <Wallet className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-bold truncate">Laba Stlh Pajak</span>
+                        <Wallet className="w-3.5 h-3.5 shrink-0 ml-1" />
                       </div>
-                      <div className="text-sm font-extrabold font-mono text-emerald-800 dark:text-emerald-200">
+                      <div
+                        className="text-xs sm:text-[13px] md:text-sm font-extrabold font-mono tracking-tight text-emerald-800 dark:text-emerald-200 truncate block"
+                        title={formatRupiah(liveCalc.labaSetelahPajak)}
+                      >
                         {formatRupiah(liveCalc.labaSetelahPajak)}
                       </div>
-                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-medium">
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-medium truncate">
                         DPP Dasar − PPh Final
                       </span>
                     </div>
@@ -2261,10 +2279,11 @@ export function LaporanPendapatanClient({
                             nominalDiterima: liveCalc.labaSetelahPajak,
                           }))
                         }
-                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
                         title="Klik untuk mengisi nominal cair dengan nilai setelah pemotongan PPh"
                       >
-                        ⚡ Isi Net Pajak
+                        <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Isi Net Pajak</span>
                       </button>
                     )}
                   </div>
@@ -2363,7 +2382,7 @@ export function LaporanPendapatanClient({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-navy hover:opacity-90 rounded-xl transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting ? "Menyimpan..." : "Simpan Faktur"}
                 </button>
@@ -2382,7 +2401,7 @@ export function LaporanPendapatanClient({
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle/50 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                <div className="p-2 rounded-xl bg-navy/10 dark:bg-navy/30 text-navy-text dark:text-white">
                   <Scale className="w-5 h-5" />
                 </div>
                 <div>
@@ -2619,7 +2638,7 @@ export function LaporanPendapatanClient({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-navy hover:opacity-90 rounded-xl transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting ? "Menyimpan..." : "Simpan SPT"}
                 </button>

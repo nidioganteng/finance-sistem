@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
+import { isAutoPostedMirror } from "./akuntansi";
 
 async function getTxByKategori(entityIds: string[], kategori: "KEWAJIBAN" | "ASET", year: number) {
   const gte = new Date(year, 0, 1);
@@ -26,6 +27,7 @@ export async function getLaporanUtangAsetData(entityIds: string[], year: number)
   const utangByAkun = new Map<string, { code: string; name: string; masuk: number; keluar: number }>();
   for (const tx of utangTx) {
     if (!tx.coaAccount) continue;
+    if (isAutoPostedMirror(tx)) continue;
     const key = tx.coaAccount.id;
     if (!utangByAkun.has(key)) {
       utangByAkun.set(key, { code: tx.coaAccount.code, name: tx.coaAccount.name, masuk: 0, keluar: 0 });
@@ -49,6 +51,7 @@ export async function getLaporanUtangAsetData(entityIds: string[], year: number)
   const asetByAkun = new Map<string, { code: string; name: string; masuk: number; keluar: number }>();
   for (const tx of asetTx) {
     if (!tx.coaAccount) continue;
+    if (isAutoPostedMirror(tx)) continue;
     const key = tx.coaAccount.id;
     if (!asetByAkun.has(key)) {
       asetByAkun.set(key, { code: tx.coaAccount.code, name: tx.coaAccount.name, masuk: 0, keluar: 0 });

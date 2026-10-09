@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
+import { isAutoPostedMirror } from "./akuntansi";
 
 const MONTHS = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -30,8 +31,10 @@ export async function getArusKasData(
     orderBy: { tanggal: "asc" },
   });
 
+  const cleanTransactions = transactions.filter((t) => !isAutoPostedMirror(t));
+
   const monthly = MONTHS.map((bulan, i) => {
-    const monthTx = transactions.filter((t) => t.tanggal.getMonth() === i);
+    const monthTx = cleanTransactions.filter((t) => t.tanggal.getMonth() === i);
     const masuk = monthTx.reduce((s, t) => s + Number(t.debit), 0);
     const keluar = monthTx.reduce((s, t) => s + Number(t.kredit), 0);
     const net = masuk - keluar;
@@ -48,8 +51,8 @@ export async function getArusKasData(
     };
   });
 
-  const totalMasuk = transactions.reduce((s, t) => s + Number(t.debit), 0);
-  const totalKeluar = transactions.reduce((s, t) => s + Number(t.kredit), 0);
+  const totalMasuk = cleanTransactions.reduce((s, t) => s + Number(t.debit), 0);
+  const totalKeluar = cleanTransactions.reduce((s, t) => s + Number(t.kredit), 0);
   const netTotal = totalMasuk - totalKeluar;
 
   return {

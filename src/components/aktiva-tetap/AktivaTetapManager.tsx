@@ -27,6 +27,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 const KATEGORI_OPTIONS = [
   { value: "KENDARAAN", label: "Kendaraan" },
@@ -190,7 +191,8 @@ export function AktivaTetapManager({
   const livePenyusutanTahun = livePenyusutanBulan * 12;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative flex flex-col gap-6">
+      <LoadingOverlay visible={isPending} />
       {/* ── 4 Card Ringkasan Finansial Aset ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Total Harga Perolehan */}

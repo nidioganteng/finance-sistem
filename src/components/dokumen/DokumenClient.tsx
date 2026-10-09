@@ -1,16 +1,18 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ExternalLink, Plus, Trash2, X, Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { DokumenFilterTabs } from "./DokumenFilterTabs";
 import { uploadDokumen, deleteDokumen } from "@/lib/actions/dokumen";
+import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type Dokumen = {
   id: string;
   judul: string;
-  kategori: "SOP" | "DOKUMEN_PENDUKUNG";
+  kategori: string;
   fileUrl: string;
-  createdAt: Date;
+  createdAt: Date | string;
   uploadedBy: { name: string };
 };
 
@@ -35,6 +37,7 @@ export function DokumenClient({
   canUpload: boolean;
   canDelete: boolean;
 }) {
+  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,7 @@ export function DokumenClient({
       if (res?.error) {
         setError(res.error);
       } else {
+        router.refresh();
         setSuccessMsg("Dokumen berhasil diupload.");
         setFileName(null);
         formRef.current?.reset();
@@ -74,6 +78,7 @@ export function DokumenClient({
     setDeletingId(id);
     startTransition(async () => {
       await deleteDokumen(id);
+      router.refresh();
       setDeletingId(null);
     });
   }
@@ -92,7 +97,8 @@ export function DokumenClient({
         )}
       </div>
 
-      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+      <div className="relative bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+        <LoadingOverlay visible={isPending} />
         {dokumen.length === 0 ? (
           <div className="py-16 text-center">
             <FileText size={36} className="mx-auto text-muted-faint mb-3" />

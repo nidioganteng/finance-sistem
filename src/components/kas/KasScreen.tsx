@@ -38,6 +38,18 @@ export async function KasScreen({
   const selectedKey = resolveEntityKey(searchParams.entity, validKeys);
   const selectedEntity = entities.find((e) => e.key === selectedKey);
 
+  // Jika entity=grup (atau entity param tidak valid) ada di URL, redirect ke entity pertama yang valid
+  // supaya PHP API tidak menerima "grup" atau nilai yang bukan entity key asli.
+  if (searchParams.entity && !validKeys.includes(searchParams.entity) && validKeys.length > 0) {
+    const params = new URLSearchParams();
+    params.set("entity", validKeys[0]);
+    if (searchParams.rekening) params.set("rekening", searchParams.rekening);
+    if (searchParams.dari) params.set("dari", searchParams.dari);
+    if (searchParams.sampai) params.set("sampai", searchParams.sampai);
+    if (searchParams.page) params.set("page", searchParams.page);
+    redirect(`${pagePath}?${params.toString()}`);
+  }
+
   const jenisInput = await getJenisInput(jenisInputKey);
   if (!selectedEntity || !jenisInput) {
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
@@ -69,8 +81,8 @@ export async function KasScreen({
   const [coaOptions, saldo, kasLedger, projectOptions, saldoAwal] = await Promise.all([
     getCoaOptions(),
     getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama, currentYear),
-    getKasLedger(selectedEntity.id, jenisInput.id, selectedRekeningNama, searchParams.dari, searchParams.sampai, kasPage, currentYear),
-    getProjectOptions(selectedEntity.id),
+    getKasLedger(selectedEntity.id, jenisInputKey, selectedRekeningNama, searchParams.dari, searchParams.sampai, kasPage, currentYear),
+    getProjectOptions(selectedEntity.key),
     searchParams.dari
       ? getSaldoSebelum(selectedEntity.id, jenisInput.id, searchParams.dari, selectedRekeningNama, currentYear)
       : getInitialSaldoAwal(selectedEntity.id, jenisInput.id, selectedRekeningNama, currentYear),

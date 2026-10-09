@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
+import { syncProjectSpend } from "@/lib/piutang";
 
 // Edit kode akun langsung dari tabel Jurnal Umum (issue #29). Kode akun disimpan
 // di tabel CoaAccount yang di-share lintas entitas, jadi kita TIDAK BOLEH update
@@ -59,7 +60,19 @@ export async function updateKodeAkunJurnal(transactionId: string, entityId: stri
     newCode: code,
   });
 
+  if (transaction.projectId) {
+    await syncProjectSpend(transaction.projectId);
+  }
+
   revalidatePath("/jurnal");
+  revalidatePath("/jurnal-transaksi");
+  revalidatePath("/buku-besar");
+  revalidatePath("/piutang");
+  revalidatePath("/pendapatan");
+  revalidatePath("/laporan-keuangan");
+  revalidatePath("/laba-rugi");
+  revalidatePath("/neraca");
+  revalidatePath("/laporan-hutang-piutang");
 }
 
 export async function updateProyekJurnal(transactionId: string, entityId: string, newProjectId: string | null) {
@@ -121,6 +134,13 @@ export async function updateProyekJurnal(transactionId: string, entityId: string
       newProjectId: targetProjectId,
     }
   );
+
+  if (transaction.projectId) {
+    await syncProjectSpend(transaction.projectId);
+  }
+  if (targetProjectId && targetProjectId !== transaction.projectId) {
+    await syncProjectSpend(targetProjectId);
+  }
 
   revalidatePath("/jurnal");
   revalidatePath("/jurnal-transaksi");

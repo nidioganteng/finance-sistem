@@ -1226,27 +1226,27 @@ export function LaporanPendapatanClient({
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "rekonsiliasi" && (
         <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-surface-subtle border border-border-soft">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 p-4 rounded-xl bg-surface-subtle border border-border-soft">
             <div className="flex items-start gap-3">
-              <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5" />
+              <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
               <div>
                 <h3 className="text-sm font-bold text-navy-text">
                   Audit Kepatuhan & Rekonsiliasi Faktur vs SPT Pajak Resmi
                 </h3>
-                <p className="text-xs text-navy-soft mt-0.5">
+                <p className="text-xs text-navy-soft mt-0.5 max-w-2xl leading-relaxed">
                   Membandingkan DPP, PPN, dan PPh hasil rekap faktur sistem dengan angka yang dilaporkan resmi ke kantor pajak (SPT Masa).
                   Baris bertanda merah mengindikasikan adanya selisih pada PPN atau PPh yang perlu disesuaikan.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Selisih Rp 0 = Sesuai
+            <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap self-start lg:self-center">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 whitespace-nowrap shadow-2xs">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>Selisih Rp 0 = Sesuai</span>
               </span>
-              <span className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Selisih ≠ 0 = Alert
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 whitespace-nowrap shadow-2xs">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                <span>Selisih ≠ 0 = Alert</span>
               </span>
             </div>
           </div>

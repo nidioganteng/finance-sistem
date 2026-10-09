@@ -1,63 +1,92 @@
-import { prisma } from "./prisma";
+import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
 
-const MONTHS = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-
 export type ReportVersion = "INTERNAL" | "UMUM";
+
+export type ArusKasMonthly = {
+  bulan: string;
+  masuk: number;
+  keluar: number;
+  net: number;
+  masukFmt: string;
+  keluarFmt: string;
+  netFmt: string;
+  netPositive: boolean;
+  hasData: boolean;
+};
+
+export type ArusKasData = {
+  monthly: ArusKasMonthly[];
+  totalMasuk: number;
+  totalKeluar: number;
+  netTotal: number;
+  totalMasukFmt: string;
+  totalKeluarFmt: string;
+  netTotalFmt: string;
+  netTotalPositive: boolean;
+  version: ReportVersion;
+};
+
+// PHP monthly item: { bulan, namaBulan, masuk, keluar, neto }
+type PhpMonthly = {
+  bulan: number;
+  namaBulan: string;
+  masuk: number;
+  keluar: number;
+  neto: number;
+};
+
+// PHP response: { entityId, year, monthly, totalMasuk, totalKeluar, totalNeto }
+type PhpArusKasResponse = {
+  entityId: string;
+  year: number;
+  monthly: PhpMonthly[];
+  totalMasuk: number;
+  totalKeluar: number;
+  totalNeto: number;
+};
 
 export async function getArusKasData(
   entityId: string,
   year: number,
   version: ReportVersion | string = "INTERNAL"
-) {
-  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+): Promise<ArusKasData> {
+  const token = await getPhpToken();
+  // version is sent but PHP currently ignores it (harmless, future-proof)
+  const raw = await phpFetch<PhpArusKasResponse>(
+    `/api/arus-kas?entityId=${encodeURIComponent(entityId)}&year=${year}&version=${encodeURIComponent(version)}`,
+    token
+  );
 
-  // Filter ke semua akun ber-reportType ARUS_KAS (kas & bank) — sama untuk internal dan umum
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      entityId,
-      tanggal: {
-        gte: new Date(`${year}-01-01`),
-        lte: new Date(`${year}-12-31T23:59:59`),
-      },
-      coaAccount: {
-        reportType: "ARUS_KAS",
-      },
-    },
-    orderBy: { tanggal: "asc" },
-  });
-
-  const monthly = MONTHS.map((bulan, i) => {
-    const monthTx = transactions.filter((t) => t.tanggal.getMonth() === i);
-    const masuk = monthTx.reduce((s, t) => s + Number(t.debit), 0);
-    const keluar = monthTx.reduce((s, t) => s + Number(t.kredit), 0);
-    const net = masuk - keluar;
+  const monthly: ArusKasMonthly[] = raw.monthly.map((m) => {
+    const net = m.neto;
+    const hasData = m.masuk > 0 || m.keluar > 0;
     return {
-      bulan,
-      masuk,
-      keluar,
+      bulan: m.namaBulan,
+      masuk: m.masuk,
+      keluar: m.keluar,
       net,
-      masukFmt: masuk > 0 ? formatRupiah(masuk) : "-",
-      keluarFmt: keluar > 0 ? formatRupiah(keluar) : "-",
+      masukFmt: hasData && m.masuk > 0 ? formatRupiah(m.masuk) : "-",
+      keluarFmt: hasData && m.keluar > 0 ? formatRupiah(m.keluar) : "-",
       netFmt: formatRupiah(Math.abs(net)),
       netPositive: net >= 0,
-      hasData: monthTx.length > 0,
+      hasData,
     };
   });
 
-  const totalMasuk = transactions.reduce((s, t) => s + Number(t.debit), 0);
-  const totalKeluar = transactions.reduce((s, t) => s + Number(t.kredit), 0);
-  const netTotal = totalMasuk - totalKeluar;
+  const totalMasuk = raw.totalMasuk;
+  const totalKeluar = raw.totalKeluar;
+  const netTotal = raw.totalNeto;
 
   return {
     monthly,
+    totalMasuk,
+    totalKeluar,
+    netTotal,
     totalMasukFmt: formatRupiah(totalMasuk),
     totalKeluarFmt: formatRupiah(totalKeluar),
     netTotalFmt: formatRupiah(Math.abs(netTotal)),
     netTotalPositive: netTotal >= 0,
-    version: normVersion,
+    version: version as ReportVersion,
   };
 }

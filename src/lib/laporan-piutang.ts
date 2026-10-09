@@ -1,70 +1,45 @@
-import { prisma } from "./prisma";
+import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
 
-export async function getLaporanPiutangData(entityIds: string[]) {
-  const projects = await prisma.project.findMany({
-    where: { entityId: { in: entityIds } },
-    include: {
-      entity: { select: { name: true, key: true } },
-      termin: { orderBy: { createdAt: "asc" } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+export type LaporanPiutangRow = {
+  id: string;
+  entityName: string;
+  code: string;
+  name: string;
+  contractValue: number;
+  contractValueFmt: string;
+  tertagih: number;
+  tertagihFmt: string;
+  belumTagih: number;
+  belumTagihFmt: string;
+  maxPct: number;
+  deadlineFmt: string;
+  isOverdue: boolean;
+  status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  jumlahTermin: number;
+};
 
-  const now = new Date();
-  let totalKontrak = 0;
-  let totalTagih = 0;
-  let totalBelumTagih = 0;
-
-  const rows = projects.map((p) => {
-    const contractValue = Number(p.contractValue);
-    const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
-    const tertagih = (maxPct / 100) * contractValue;
-    const belumTagih = contractValue - tertagih;
-    const isSelesai = p.status === "COMPLETED" || p.status === "CANCELLED";
-    const isOverdue = !isSelesai && maxPct < 100 && p.deadline < now;
-
-    if (!isSelesai) {
-      totalKontrak += contractValue;
-      totalTagih += tertagih;
-      totalBelumTagih += belumTagih;
-    }
-
-    return {
-      id: p.id,
-      entityName: p.entity.name,
-      code: p.code,
-      name: p.name,
-      contractValue,
-      contractValueFmt: formatRupiah(contractValue),
-      tertagih,
-      tertagihFmt: formatRupiah(tertagih),
-      belumTagih,
-      belumTagihFmt: formatRupiah(Math.max(0, belumTagih)),
-      maxPct,
-      deadlineFmt: p.deadline.toLocaleDateString("id-ID"),
-      isOverdue,
-      status: p.status as "ACTIVE" | "COMPLETED" | "CANCELLED",
-      jumlahTermin: p.termin.length,
-    };
-  });
-
-  const aktif = rows.filter((r) => r.status === "ACTIVE");
-  const selesai = rows.filter((r) => r.status === "COMPLETED" || r.status === "CANCELLED");
-
-  return {
-    aktif,
-    selesai,
-    summary: {
-      totalKontrak,
-      totalKontrakFmt: formatRupiah(totalKontrak),
-      totalTagih,
-      totalTagihFmt: formatRupiah(totalTagih),
-      totalBelumTagih,
-      totalBelumTagihFmt: formatRupiah(totalBelumTagih),
-      pctTagih: totalKontrak > 0 ? Math.round((totalTagih / totalKontrak) * 100) : 0,
-      jumlahAktif: aktif.length,
-      jumlahOverdue: aktif.filter((r) => r.isOverdue).length,
-    },
+export type LaporanPiutangData = {
+  aktif: LaporanPiutangRow[];
+  selesai: LaporanPiutangRow[];
+  summary: {
+    totalKontrak: number;
+    totalKontrakFmt: string;
+    totalTagih: number;
+    totalTagihFmt: string;
+    totalBelumTagih: number;
+    totalBelumTagihFmt: string;
+    pctTagih: number;
+    jumlahAktif: number;
+    jumlahOverdue: number;
   };
+};
+
+export async function getLaporanPiutangData(entityIds: string[]): Promise<LaporanPiutangData> {
+  const token = await getPhpToken();
+  const params = new URLSearchParams();
+  entityIds.forEach((id) => params.append("entityKeys[]", id));
+  params.set("type", "laporan");
+
+  return phpFetch<LaporanPiutangData>(`/api/piutang?${params.toString()}`, token);
 }

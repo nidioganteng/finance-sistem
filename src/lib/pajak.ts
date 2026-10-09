@@ -1,7 +1,11 @@
-import { prisma } from "./prisma";
-import { getPenyusutanSummary } from "./aset-tetap";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
+import { phpFetch, getPhpToken } from "./api-client";
 import type { ReportVersion } from "./laba-rugi";
+
+// ── Types consumed by LabaRugiUmumView, pajak-excel, and page components ─────
+// These form the "Laporan Laba Rugi" structure (income statement).
+// The `koreksi` and `fiskal` columns are remnants of an earlier fiscal-
+// correction design; the UI currently only reads `komersial`.  We keep the
+// shape so existing components don't break.
 
 export interface TaxReportRow {
   code: string;
@@ -77,394 +81,240 @@ export interface LaporanPajakData {
 }
 
 export function formatAccounting(val: number): string {
-  if (!val || Math.round(val) === 0) return "Rp\u00A0-";
+  if (!val || Math.round(val) === 0) return "Rp -";
   const rounded = Math.round(val);
   const formatted = Math.abs(rounded).toLocaleString("id-ID");
-  return rounded < 0 ? `Rp\u00A0(${formatted})` : `Rp\u00A0${formatted}`;
+  return rounded < 0 ? `Rp (${formatted})` : `Rp ${formatted}`;
 }
 
-// Template standar akun sesuai format spreadsheet Excel acuan
-const TEMPLATE_BIAYA_LANGSUNG = [
-  { code: "612", name: "Gaji Tenaga Ahli" },
-  { code: "613", name: "By Pra Kontrak" },
-  { code: "614", name: "By Survey" },
-  { code: "615", name: "By Perjalanan Dinas" },
-  { code: "618", name: "By BPJS dan Jaminan" },
-  { code: "619", name: "By Dokumentasi" },
-  { code: "623", name: "By Presentasi" },
-  { code: "624", name: "By Komunikasi" },
-  { code: "625", name: "By Taktis" },
-  { code: "626", name: "By SKA" },
-  { code: "627", name: "By Kontrak" },
-  { code: "628", name: "By Marketing" },
-  { code: "630", name: "Biaya Lainnya" },
-  { code: "632", name: "By Akomodasi" },
-];
+// ── PHP /api/laba-rugi item shape ─────────────────────────────────────────────
+type PhpLRItem = {
+  id: string | null;
+  code: string;
+  name: string;
+  kategori: string;
+  debit: number;
+  kredit: number;
+  saldo: number;
+  isAuto?: boolean;
+};
 
-const TEMPLATE_BIAYA_OPERASIONAL = [
-  { code: "511", name: "Gaji Pegawai Tetap" },
-  { code: "512", name: "Biaya Penyusutan" },
-  { code: "513", name: "Beban Listrik" },
-  { code: "514", name: "Beban Telepon" },
-  { code: "515", name: "Beban PDAM" },
-  { code: "516", name: "BPJS Kesehatan" },
-  { code: "517", name: "BPJS Ketenagakerjaan" },
-  { code: "518", name: "By Meterai" },
-  { code: "519", name: "Pemeliharaan Aktiva" },
-  { code: "520", name: "By Samsat" },
-  { code: "522", name: "Perlengkapan" },
-  { code: "523", name: "By Transport" },
-  { code: "524", name: "By Konsumsi" },
-  { code: "527", name: "By Iuran" },
-  { code: "528", name: "By Umum" },
-  { code: "529", name: "By Upacara" },
-  { code: "530", name: 'By Lain"' },
-  { code: "533", name: "By. PPH 21" },
-  { code: "611", name: "Gaji Direktur" },
-  { code: "633", name: "By Ijin Usaha" },
-  { code: "634", name: "By Imbalan Pasca Kerja" },
-];
+type PhpLabaRugiResponse = {
+  entityId: string;
+  dari: string;
+  sampai: string;
+  version: string;
+  pendapatan: PhpLRItem[];
+  beban: PhpLRItem[];
+  totalPendapatan: number;
+  totalBeban: number;
+  labaBersih: number;
+  bebanPenyusutan: number;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function makeRow(item: PhpLRItem): TaxReportRow {
+  return {
+    code:       item.code,
+    name:       item.name,
+    komersial:  item.saldo,
+    koreksi:    0,
+    fiskal:     item.saldo,
+    isCustom:   item.isAuto ?? false,
+  };
+}
+
+function makeSection(items: TaxReportRow[]) {
+  const totalKomersial = items.reduce((s, r) => s + r.komersial, 0);
+  return {
+    items,
+    totalKomersial,
+    totalKoreksi: 0,
+    totalFiskal:  totalKomersial,
+  };
+}
+
+/**
+ * Classify a beban COA item into one of four section buckets:
+ *   - "langsung"    → COA codes starting with 6 (project-level direct costs)
+ *   - "operasional" → COA codes starting with 5 (overhead / admin)
+ *   - "pph"         → COA name contains "PPh" / "pph" / "pajak final"
+ *   - "lain"        → anything else
+ */
+function classifyBeban(item: PhpLRItem): "langsung" | "operasional" | "pph" | "lain" {
+  const code = item.code.trim();
+  const nameLower = item.name.toLowerCase();
+
+  // PPh final recognition (by name keyword — no dedicated code range in seed)
+  if (
+    nameLower.includes("pph") ||
+    nameLower.includes("ppfinal") ||
+    nameLower.includes("pajak final") ||
+    nameLower.includes("pajak penghasilan final")
+  ) {
+    return "pph";
+  }
+
+  // Code-based classification
+  const firstChar = code[0];
+  if (firstChar === "6") return "langsung";
+  if (firstChar === "5") return "operasional";
+
+  // 4xx beban (rare but possible for contra-revenue items) → lain
+  return "lain";
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
 
 export async function getLaporanPajakData(
   entityId: string | string[],
   year: number,
-  version: ReportVersion = "INTERNAL"
+  version: ReportVersion = "INTERNAL",
+  entityName?: string
 ): Promise<LaporanPajakData> {
+  const token = await getPhpToken();
+
+  // Normalise to array; for multiple entities we aggregate by fetching each
+  // individually and summing saldo values.
   const ids = Array.isArray(entityId) ? entityId : [entityId];
-  let entityName = "Semua Entitas (Grup)";
-  let primaryEntityId = ids[0] ?? "";
-  if (ids.length === 1) {
-    const entity = await prisma.entity.findUnique({
-      where: { id: ids[0] },
-      select: { id: true, name: true },
-    });
-    if (entity) {
-      entityName = entity.name;
-      primaryEntityId = entity.id;
+
+  // Fetch all entities concurrently
+  const responses = await Promise.all(
+    ids.map((id) => {
+      const params = new URLSearchParams({
+        entityId: id,
+        dari:     `${year}-01-01`,
+        sampai:   `${year}-12-31`,
+        version:  version,
+      });
+      return phpFetch<PhpLabaRugiResponse>(
+        `/api/laba-rugi?${params.toString()}`,
+        token
+      );
+    })
+  );
+
+  // Aggregate rows across entities
+  // Key = code; accumulate saldo
+  const pendapatanMap = new Map<string, PhpLRItem>();
+  const bebanMap = new Map<string, PhpLRItem>();
+
+  for (const resp of responses) {
+    for (const item of resp.pendapatan) {
+      const existing = pendapatanMap.get(item.code);
+      if (existing) {
+        existing.saldo  += item.saldo;
+        existing.debit  += item.debit;
+        existing.kredit += item.kredit;
+      } else {
+        pendapatanMap.set(item.code, { ...item });
+      }
     }
-  }
-
-  const start = new Date(`${year}-01-01`);
-  const end = new Date(`${year}-12-31T23:59:59`);
-
-  const [excludedNoBuktiUmum, penyusutanSummaries, allAccounts, transactions] = await Promise.all([
-    getExcludedNoBuktiForVersion(ids, year, "UMUM"),
-    Promise.all(ids.map((id) => getPenyusutanSummary(id, year))),
-    prisma.coaAccount.findMany({
-      where: {
-        OR: [
-          { kategori: { in: ["PENDAPATAN", "BEBAN"] } },
-          { code: { in: ["400", "410", "534", "535", "532", "616"] } },
-        ],
-      },
-      orderBy: { code: "asc" },
-    }),
-    prisma.transaction.findMany({
-      where: {
-        entityId: { in: ids },
-        tanggal: { gte: start, lte: end },
-        coaAccountId: { not: null },
-      },
-      include: { coaAccount: true },
-    }),
-  ]);
-
-  const excludedUmumSet = new Set(excludedNoBuktiUmum);
-
-  // Akumulasi nilai per kode akun: Komersial (Internal) dan Fiskal (Umum)
-  const komersialMap = new Map<string, number>();
-  const fiskalMap = new Map<string, number>();
-
-  for (const tx of transactions) {
-    if (!tx.coaAccount) continue;
-    const code = tx.coaAccount.code;
-    const repCat = tx.coaAccount.reportCategory;
-
-    // Untuk Pendapatan (kredit - debit), untuk Beban (debit - kredit)
-    const isPendapatan = tx.coaAccount.kategori === "PENDAPATAN";
-    const netAmount = isPendapatan
-      ? Number(tx.kredit) - Number(tx.debit)
-      : Number(tx.debit) - Number(tx.kredit);
-
-    // Komersial: mencakup transaksi dengan akun INTERNAL dan SEMUA
-    if (repCat === "INTERNAL" || repCat === "SEMUA") {
-      komersialMap.set(code, (komersialMap.get(code) ?? 0) + netAmount);
-    }
-
-    // Fiskal: mencakup akun UMUM dan SEMUA (kecuali nomor bukti yang dikecualikan di versi umum)
-    if (repCat === "UMUM" || (repCat === "SEMUA" && !excludedUmumSet.has(tx.noBukti))) {
-      fiskalMap.set(code, (fiskalMap.get(code) ?? 0) + netAmount);
-    }
-  }
-
-  // Set nilai penyusutan otomatis dari modul aktiva tetap
-  const totalBebanPenyusutan = penyusutanSummaries.reduce((sum, s) => sum + s.totalBebanPenyusutan, 0);
-  if (totalBebanPenyusutan > 0) {
-    const penyusutanCode = "512";
-    komersialMap.set(penyusutanCode, totalBebanPenyusutan);
-    fiskalMap.set(penyusutanCode, totalBebanPenyusutan);
-  }
-
-  // Buat map nama akun dari DB untuk fallback nama yang tepat
-  const accountNameMap = new Map<string, string>();
-  for (const acc of allAccounts) {
-    accountNameMap.set(acc.code, acc.name);
-  }
-
-  // Pilih sumber nilai komersial berdasarkan versi laporan:
-  // Versi INTERNAL memakai komersialMap (transaksi internal + semua)
-  // Versi UMUM memakai fiskalMap (transaksi umum + semua tanpa nomor bukti yang dikecualikan)
-  const activeAmountMap = version === "UMUM" ? fiskalMap : komersialMap;
-
-  // 1. PENDAPATAN
-  // Akun 400 (Pendapatan Usaha) dan akun 616/535 (PPN)
-  const pend400Komersial = activeAmountMap.get("400") ?? 0;
-  const pend400Fiskal = fiskalMap.get("400") ?? 0;
-  const ppnKomersial = (activeAmountMap.get("616") ?? 0) || (activeAmountMap.get("535") ?? 0);
-  const ppnFiskal = (fiskalMap.get("616") ?? 0) || (fiskalMap.get("535") ?? 0);
-
-  const pendapatanRows: TaxReportRow[] = [
-    {
-      code: "400",
-      name: accountNameMap.get("400") ?? "PENDAPATAN",
-      komersial: pend400Komersial,
-      fiskal: pend400Fiskal,
-      koreksi: pend400Fiskal - pend400Komersial,
-    },
-    {
-      code: "616",
-      name: "PPN",
-      komersial: ppnKomersial,
-      fiskal: ppnFiskal,
-      koreksi: ppnFiskal - ppnKomersial,
-    },
-  ];
-
-  // Tambahkan akun pendapatan usaha lain (selain 400 dan 410 Giro) jika ada
-  for (const acc of allAccounts) {
-    if (acc.kategori === "PENDAPATAN" && acc.code !== "400" && acc.code !== "410") {
-      const k = activeAmountMap.get(acc.code) ?? 0;
-      const f = fiskalMap.get(acc.code) ?? 0;
-      if (k !== 0 || f !== 0) {
-        pendapatanRows.push({
-          code: acc.code,
-          name: acc.name,
-          komersial: k,
-          fiskal: f,
-          koreksi: f - k,
-          isCustom: true,
-        });
+    for (const item of resp.beban) {
+      const existing = bebanMap.get(item.code);
+      if (existing) {
+        existing.saldo  += item.saldo;
+        existing.debit  += item.debit;
+        existing.kredit += item.kredit;
+      } else {
+        bebanMap.set(item.code, { ...item });
       }
     }
   }
 
-  const totalPendapatanKomersial = pend400Komersial - ppnKomersial;
-  const totalPendapatanFiskal = pend400Fiskal - ppnFiskal;
+  // --- Pendapatan ---
+  // Split: "main" revenue (4xx code) vs "pendapatan lain-lain" (jasa giro etc.)
+  const pendapatanItems: TaxReportRow[] = [];
+  const pendapatanLainItems: TaxReportRow[] = [];
 
-  // 2. BIAYA LANGSUNG (Akun 6xx proyek/langsung)
-  // Untuk Internal: akun 628 disajikan sebagai By Marketing.
-  // Untuk Umum: akun 628 dimasukkan juga ke Laba Rugi dengan nama Kas Titipan (kode 150).
-  const templateBiayaLangsung = TEMPLATE_BIAYA_LANGSUNG.map((t) => {
-    if (t.code === "628" && version === "UMUM") {
-      return { code: "150", name: "Kas Titipan" };
-    }
-    return t;
-  });
-
-  const biayaLangsungCodes = new Set(templateBiayaLangsung.map((t) => t.code));
-  const biayaLangsungRows: TaxReportRow[] = templateBiayaLangsung.map((item) => {
-    const codeToLookup = item.code === "150" ? "628" : item.code;
-    const k = activeAmountMap.get(codeToLookup) ?? activeAmountMap.get(item.code) ?? 0;
-    const f = fiskalMap.get(codeToLookup) ?? fiskalMap.get(item.code) ?? 0;
-    return {
-      code: item.code,
-      name: item.code === "150" ? "Kas Titipan" : (accountNameMap.get(item.code) ?? item.name),
-      komersial: k,
-      fiskal: f,
-      koreksi: f - k,
-    };
-  });
-
-  // Tambahkan akun 6xx lain di luar template standar (selain 611 dan 633) jika ada
-  for (const acc of allAccounts) {
-    if (
-      acc.code.startsWith("6") &&
-      !biayaLangsungCodes.has(acc.code) &&
-      acc.code !== "611" &&
-      acc.code !== "633" &&
-      acc.code !== "616" &&
-      acc.code !== "628" &&
-      acc.code !== "150"
-    ) {
-      const k = activeAmountMap.get(acc.code) ?? 0;
-      const f = fiskalMap.get(acc.code) ?? 0;
-      if (k !== 0 || f !== 0) {
-        biayaLangsungRows.push({
-          code: acc.code,
-          name: acc.name,
-          komersial: k,
-          fiskal: f,
-          koreksi: f - k,
-          isCustom: true,
-        });
-      }
+  for (const item of pendapatanMap.values()) {
+    const row = makeRow(item);
+    // "Pendapatan Jasa Giro" (code 410 etc.) → lain-lain; 400 → main pendapatan
+    if (item.code === "400" || item.code.startsWith("40")) {
+      pendapatanItems.push(row);
+    } else {
+      // Pendapatan non-400: put into pendapatanBiayaLain (income from other sources)
+      pendapatanLainItems.push(row);
     }
   }
 
-  const totalBiayaLangsungKomersial = biayaLangsungRows.reduce((s, r) => s + r.komersial, 0);
-  const totalBiayaLangsungFiskal = biayaLangsungRows.reduce((s, r) => s + r.fiskal, 0);
-
-  // 3. LABA KOTOR
-  const labaKotorKomersial = totalPendapatanKomersial - totalBiayaLangsungKomersial;
-  const labaKotorFiskal = totalPendapatanFiskal - totalBiayaLangsungFiskal;
-
-  // 4. BIAYA OPERASIONAL (Akun 5xx, 611 Gaji Direktur, 633 By Ijin Usaha)
-  const biayaOperasionalCodes = new Set(TEMPLATE_BIAYA_OPERASIONAL.map((t) => t.code));
-  const biayaOperasionalRows: TaxReportRow[] = TEMPLATE_BIAYA_OPERASIONAL.map((item) => {
-    const k = activeAmountMap.get(item.code) ?? 0;
-    const f = fiskalMap.get(item.code) ?? 0;
-    return {
-      code: item.code,
-      name: accountNameMap.get(item.code) ?? item.name,
-      komersial: k,
-      fiskal: f,
-      koreksi: f - k,
-    };
-  });
-
-  // Tambahkan akun 5xx lain yang ada di DB (selain 534 PPh Final dan 532 Adm Bank)
-  for (const acc of allAccounts) {
-    if (
-      acc.code.startsWith("5") &&
-      !biayaOperasionalCodes.has(acc.code) &&
-      acc.code !== "534" &&
-      acc.code !== "532" &&
-      acc.code !== "535" &&
-      acc.code !== "536"
-    ) {
-      const k = activeAmountMap.get(acc.code) ?? 0;
-      const f = fiskalMap.get(acc.code) ?? 0;
-      if (k !== 0 || f !== 0) {
-        biayaOperasionalRows.push({
-          code: acc.code,
-          name: acc.name,
-          komersial: k,
-          fiskal: f,
-          koreksi: f - k,
-          isCustom: true,
-        });
-      }
-    }
+  // If pendapatanItems is empty (all were "other"), move them to main
+  if (pendapatanItems.length === 0 && pendapatanLainItems.length > 0) {
+    pendapatanItems.push(...pendapatanLainItems.splice(0));
   }
 
-  const totalBiayaOperasionalKomersial = biayaOperasionalRows.reduce((s, r) => s + r.komersial, 0);
-  const totalBiayaOperasionalFiskal = biayaOperasionalRows.reduce((s, r) => s + r.fiskal, 0);
+  const pendapatanSection = makeSection(pendapatanItems);
 
-  // 5. LABA OPERASIONAL
-  const labaOperasionalKomersial = labaKotorKomersial - totalBiayaOperasionalKomersial;
-  const labaOperasionalFiskal = labaKotorFiskal - totalBiayaOperasionalFiskal;
+  // --- Beban classification ---
+  const langsungRows: TaxReportRow[] = [];
+  const operasionalRows: TaxReportRow[] = [];
+  const pphRows: TaxReportRow[] = [];
+  const bebanLainRows: TaxReportRow[] = [];
 
-  // 6. PPH FINAL (Akun 534)
-  const pphFinalKomersial = activeAmountMap.get("534") ?? 0;
-  const pphFinalFiskal = fiskalMap.get("534") ?? 0;
-  const pphFinalRows: TaxReportRow[] = [
-    {
-      code: "534",
-      name: accountNameMap.get("534") ?? "PPH Final Pasal 4 Ayat 2",
-      komersial: pphFinalKomersial,
-      fiskal: pphFinalFiskal,
-      koreksi: pphFinalFiskal - pphFinalKomersial,
-    },
+  for (const item of bebanMap.values()) {
+    const bucket = classifyBeban(item);
+    const row = makeRow(item);
+    if (bucket === "langsung")    langsungRows.push(row);
+    else if (bucket === "operasional") operasionalRows.push(row);
+    else if (bucket === "pph")    pphRows.push(row);
+    else                          bebanLainRows.push(row);
+  }
+
+  const biayaLangsungSection    = makeSection(langsungRows);
+  const biayaOperasionalSection = makeSection(operasionalRows);
+  const pphFinalSection         = makeSection(pphRows);
+
+  // Merge beban lain-lain with pendapatan lain-lain (both go into the same section)
+  // Sign convention: income is positive, expense is negative for the "lain" section
+  const pendapatanBiayaLainItems: TaxReportRow[] = [
+    ...pendapatanLainItems,
+    // negate beban items so they reduce the net
+    ...bebanLainRows.map((r) => ({ ...r, komersial: -r.komersial, fiskal: -r.fiskal })),
   ];
+  const pendapatanBiayaLainSection = makeSection(pendapatanBiayaLainItems);
 
-  // 7. LABA SETELAH PAJAK
-  const labaSetelahPajakKomersial = labaOperasionalKomersial - pphFinalKomersial;
-  const labaSetelahPajakFiskal = labaOperasionalFiskal - pphFinalFiskal;
+  // --- Computed subtotals ---
+  const labaKotor = {
+    komersial: pendapatanSection.totalKomersial - biayaLangsungSection.totalKomersial,
+    koreksi:   0,
+    fiskal:    pendapatanSection.totalKomersial - biayaLangsungSection.totalKomersial,
+  };
 
-  // 8. PENDAPATAN & BIAYA LAIN - LAIN
-  // 410 Pendapatan Jasa Giro & 532 By. Adm & Pjk bank
-  const jasaGiroKomersial = activeAmountMap.get("410") ?? 0;
-  const jasaGiroFiskal = fiskalMap.get("410") ?? 0;
-  const admBankKomersial = activeAmountMap.get("532") ?? 0;
-  const admBankFiskal = fiskalMap.get("532") ?? 0;
+  const labaOperasional = {
+    komersial: labaKotor.komersial - biayaOperasionalSection.totalKomersial,
+    koreksi:   0,
+    fiskal:    labaKotor.fiskal    - biayaOperasionalSection.totalFiskal,
+  };
 
-  const pendapatanBiayaLainRows: TaxReportRow[] = [
-    {
-      code: "410",
-      name: accountNameMap.get("410") ?? "Pendapatan Jasa Giro",
-      komersial: jasaGiroKomersial,
-      fiskal: jasaGiroFiskal,
-      koreksi: jasaGiroFiskal - jasaGiroKomersial,
-    },
-    {
-      code: "532",
-      name: accountNameMap.get("532") ?? "By. Adm & Pjk bank",
-      komersial: admBankKomersial,
-      fiskal: admBankFiskal,
-      koreksi: admBankFiskal - admBankKomersial,
-    },
-  ];
+  const labaSetelahPajak = {
+    komersial: labaOperasional.komersial - pphFinalSection.totalKomersial,
+    koreksi:   0,
+    fiskal:    labaOperasional.fiskal    - pphFinalSection.totalFiskal,
+  };
 
-  const totalLainKomersial = jasaGiroKomersial - admBankKomersial;
-  const totalLainFiskal = jasaGiroFiskal - admBankFiskal;
+  const labaBersih = {
+    komersial: labaSetelahPajak.komersial + pendapatanBiayaLainSection.totalKomersial,
+    koreksi:   0,
+    fiskal:    labaSetelahPajak.fiskal    + pendapatanBiayaLainSection.totalFiskal,
+  };
 
-  // 9. RUGI / LABA BERSIH
-  const labaBersihKomersial = labaSetelahPajakKomersial + totalLainKomersial;
-  const labaBersihFiskal = labaSetelahPajakFiskal + totalLainFiskal;
+  // Entity name: use the caller-provided name if given, otherwise fall back to
+  // the entityId string (callers that have the entity object should pass .name).
+  const resolvedEntityName = entityName ?? (ids.length === 1 ? ids[0] : "Grup");
 
   return {
-    entityId: primaryEntityId,
-    entityName,
+    entityId: ids[0],
+    entityName: resolvedEntityName,
     year,
-    pendapatan: {
-      items: pendapatanRows,
-      totalKomersial: totalPendapatanKomersial,
-      totalFiskal: totalPendapatanFiskal,
-      totalKoreksi: totalPendapatanFiskal - totalPendapatanKomersial,
-    },
-    biayaLangsung: {
-      items: biayaLangsungRows,
-      totalKomersial: totalBiayaLangsungKomersial,
-      totalFiskal: totalBiayaLangsungFiskal,
-      totalKoreksi: totalBiayaLangsungFiskal - totalBiayaLangsungKomersial,
-    },
-    labaKotor: {
-      komersial: labaKotorKomersial,
-      fiskal: labaKotorFiskal,
-      koreksi: labaKotorFiskal - labaKotorKomersial,
-    },
-    biayaOperasional: {
-      items: biayaOperasionalRows,
-      totalKomersial: totalBiayaOperasionalKomersial,
-      totalFiskal: totalBiayaOperasionalFiskal,
-      totalKoreksi: totalBiayaOperasionalFiskal - totalBiayaOperasionalKomersial,
-    },
-    labaOperasional: {
-      komersial: labaOperasionalKomersial,
-      fiskal: labaOperasionalFiskal,
-      koreksi: labaOperasionalFiskal - labaOperasionalKomersial,
-    },
-    pphFinal: {
-      items: pphFinalRows,
-      totalKomersial: pphFinalKomersial,
-      totalFiskal: pphFinalFiskal,
-      totalKoreksi: pphFinalFiskal - pphFinalKomersial,
-    },
-    labaSetelahPajak: {
-      komersial: labaSetelahPajakKomersial,
-      fiskal: labaSetelahPajakFiskal,
-      koreksi: labaSetelahPajakFiskal - labaSetelahPajakKomersial,
-    },
-    pendapatanBiayaLain: {
-      items: pendapatanBiayaLainRows,
-      totalKomersial: totalLainKomersial,
-      totalFiskal: totalLainFiskal,
-      totalKoreksi: totalLainFiskal - totalLainKomersial,
-    },
-    labaBersih: {
-      komersial: labaBersihKomersial,
-      fiskal: labaBersihFiskal,
-      koreksi: labaBersihFiskal - labaBersihKomersial,
-    },
+    pendapatan:           pendapatanSection,
+    biayaLangsung:        biayaLangsungSection,
+    labaKotor,
+    biayaOperasional:     biayaOperasionalSection,
+    labaOperasional,
+    pphFinal:             pphFinalSection,
+    labaSetelahPajak,
+    pendapatanBiayaLain:  pendapatanBiayaLainSection,
+    labaBersih,
   };
 }

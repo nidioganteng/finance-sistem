@@ -1,24 +1,6 @@
-import { prisma } from "./prisma";
-import { formatRupiah } from "./dashboard-data";
-import { hitungDppDariKwitansi, hitungDppNilaiLain } from "./pendapatan";
+import { phpFetch, getPhpToken } from "./api-client";
 import { TerminStatus } from "@prisma/client";
 
-// ── Piutang/Hutang antar entitas ───────────────────────────────────────────
-// COA 111-115 = piutang ke counterparty tertentu; 311-315 = hutang ke counterparty
-const PIUTANG_CODE_TO_ENTITY: Record<string, string> = {
-  "111": "kencana",
-  "112": "gaharu",
-  "113": "tataring",
-  "114": "ciptaAsri",
-  "115": "umum",
-};
-const HUTANG_CODE_TO_ENTITY: Record<string, string> = {
-  "311": "kencana",
-  "312": "gaharu",
-  "313": "tataring",
-  "314": "ciptaAsri",
-  "315": "umum",
-};
 export const PIUTANG_COA: Record<string, string> = {
   kencana: "111", gaharu: "112", tataring: "113", ciptaAsri: "114", umum: "115",
 };
@@ -161,152 +143,60 @@ export type InterEntityBalance = {
 };
 
 export async function getInterEntityBalances(entityId: string): Promise<InterEntityBalance[]> {
-  // Collect all relevant COA codes: piutang (111-115) + hutang (311-315)
-  const piutangCodes = Object.keys(PIUTANG_CODE_TO_ENTITY);
-  const hutangCodes = Object.keys(HUTANG_CODE_TO_ENTITY);
-  const allCodes = [...piutangCodes, ...hutangCodes];
+  const token = await getPhpToken();
+  // PHP returns { entity, saldoAntarEntitas: { coaCode: saldo }, projects, loadingDock }
+  const result = await phpFetch<{
+    entity: { id: string; key: string; name: string };
+    saldoAntarEntitas: Record<string, number>;
+  }>(
+    `/api/piutang?entityKey=${encodeURIComponent(entityId)}`,
+    token
+  );
 
-  const coaAccounts = await prisma.coaAccount.findMany({
-    where: { code: { in: allCodes } },
-    select: { id: true, code: true },
-  });
+  const saldoMap: Record<string, number> = result.saldoAntarEntitas ?? {};
 
-  const coaByCode = new Map(coaAccounts.map((c) => [c.code, c]));
+  // Entity key -> name mapping for counterparty display
+  const entityKeyMap: Record<string, string> = {
+    "111": "kencana", "112": "gaharu", "113": "tataring", "114": "ciptaAsri", "115": "umum",
+    "311": "kencana", "312": "gaharu", "313": "tataring", "314": "ciptaAsri", "315": "umum",
+  };
+  const entityNameMap: Record<string, string> = {
+    kencana: "Kencana Abadi Konstruksi", gaharu: "Gaharu Sempana", tataring: "Tataring Bangun",
+    ciptaAsri: "Cipta Asri Desain", umum: "Kardi Pratama (Umum)",
+  };
 
-  // Sum debit/kredit per COA for this entity
-  const totals = await prisma.transaction.groupBy({
-    by: ["coaAccountId"],
-    where: {
-      entityId,
-      coaAccountId: { in: coaAccounts.map((c) => c.id) },
-    },
-    _sum: { debit: true, kredit: true },
-  });
-
-  const coaIdToCode = new Map(coaAccounts.map((c) => [c.id, c.code]));
-
-  // Fetch entity names for display
-  const allEntityKeys = [
-    ...Object.values(PIUTANG_CODE_TO_ENTITY),
-    ...Object.values(HUTANG_CODE_TO_ENTITY),
-  ];
-  const uniqueKeys = [...new Set(allEntityKeys)];
-  const entities = await prisma.entity.findMany({
-    where: { key: { in: uniqueKeys } },
-    select: { key: true, name: true },
-  });
-  const entityNameByKey = new Map(entities.map((e) => [e.key, e.name]));
-
-  const balances: InterEntityBalance[] = [];
-
-  for (const row of totals) {
-    if (!row.coaAccountId) continue;
-    const code = coaIdToCode.get(row.coaAccountId);
-    if (!code) continue;
-    const sumDebit = Number(row._sum.debit ?? 0);
-    const sumKredit = Number(row._sum.kredit ?? 0);
-
-    const isPiutang = piutangCodes.includes(code);
-    const isHutang = hutangCodes.includes(code);
-    if (!isPiutang && !isHutang) continue;
-
-    // Piutang: net = debit - kredit (positive = outstanding receivable)
-    // Hutang: net = kredit - debit (positive = outstanding payable)
-    const netAmount = isPiutang ? sumDebit - sumKredit : sumKredit - sumDebit;
-    if (netAmount === 0) continue;
-
-    const counterpartyKey = isPiutang
-      ? PIUTANG_CODE_TO_ENTITY[code]
-      : HUTANG_CODE_TO_ENTITY[code];
-
-    const coa = coaByCode.get(code);
-    if (!coa) continue;
-
-    balances.push({
-      type: isPiutang ? "piutang" : "hutang",
-      coaCode: code,
-      coaId: coa.id,
-      counterpartyEntityKey: counterpartyKey,
-      counterpartyEntityName: entityNameByKey.get(counterpartyKey) ?? counterpartyKey,
-      netAmount,
-      netAmountFmt: formatRupiah(Math.abs(netAmount)),
+  return Object.entries(saldoMap)
+    .filter(([, saldo]) => saldo !== 0)
+    .map(([code, saldo]) => {
+      const isPiutang = parseInt(code) < 200; // 111-115 = piutang, 311-315 = hutang
+      const counterpartyKey = entityKeyMap[code] ?? "";
+      return {
+        type: isPiutang ? "piutang" : "hutang",
+        coaCode: code,
+        coaId: code,
+        counterpartyEntityKey: counterpartyKey,
+        counterpartyEntityName: entityNameMap[counterpartyKey] ?? counterpartyKey,
+        netAmount: Math.abs(saldo),
+        netAmountFmt: "Rp " + Math.round(Math.abs(saldo)).toLocaleString("id-ID"),
+      } as InterEntityBalance;
     });
-  }
-
-  // Sort: piutang first, then hutang; each group by net amount descending
-  balances.sort((a, b) => {
-    if (a.type !== b.type) return a.type === "piutang" ? -1 : 1;
-    return b.netAmount - a.netAmount;
-  });
-
-  return balances;
 }
 
-// Daftar proyek satu entitas buat dropdown "Proyek Terkait" di form transaksi
-// Kas/Buku Bank — dipakai staf/manajer keuangan pas mencatat uang masuk yang
-// sekalian jadi pembayaran termin proyek tertentu.
-export async function getProjectOptions(currentEntityId?: string) {
-  const projects = await prisma.project.findMany({
-    where: { status: "ACTIVE" },
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      entityId: true,
-      entity: { select: { id: true, key: true, name: true } },
-      contractValue: true,
-      termin: {
-        select: { id: true, name: true, percentage: true, nominal: true },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
-  const mapped = projects.map((p) => {
-    const contractValueNum = Number(p.contractValue);
-    const sumNominal = p.termin.reduce((sum, t, i) => {
-      const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
-      const nom = t.nominal && Number(t.nominal) > 0
-        ? Number(t.nominal)
-        : ((t.percentage - prevPct) / 100) * contractValueNum;
-      return sum + nom;
-    }, 0);
-    const maxPct = contractValueNum > 0
-      ? Math.min(100, Math.round((sumNominal / contractValueNum) * 100))
-      : p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
-    return {
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      entityId: p.entityId,
-      entityKey: p.entity.key,
-      entityName: p.entity.name,
-      contractValue: contractValueNum,
-      contractValueFmt: formatRupiah(contractValueNum),
-      maxPercentage: maxPct,
-      terminCount: p.termin.length,
-      totalTerminTagih: sumNominal,
-    };
-  });
+export type ProjectOption = { id: string; code: string; name: string };
 
-  if (currentEntityId) {
-    mapped.sort((a, b) => {
-      const aCurrent = a.entityId === currentEntityId;
-      const bCurrent = b.entityId === currentEntityId;
-      if (aCurrent && !bCurrent) return -1;
-      if (!aCurrent && bCurrent) return 1;
-      return a.code.localeCompare(b.code);
-    });
-  } else {
-    mapped.sort((a, b) => a.code.localeCompare(b.code));
-  }
+export async function getProjectOptions(currentEntityKey?: string): Promise<ProjectOption[]> {
+  const token = await getPhpToken();
+  const params = new URLSearchParams();
+  if (currentEntityKey) params.set("entityKey", currentEntityKey);
+  params.set("type", "projects");
 
-  return mapped;
+  const result = await phpFetch<{ projects: ProjectOption[] }>(
+    `/api/piutang?${params.toString()}`,
+    token
+  );
+  return result.projects ?? [];
 }
 
-// Persentase termin baru dihitung dari akumulasi uang masuk (termin-termin
-// sebelumnya + pembayaran baru ini) dibanding nilai kontrak — bukan input
-// manual. Dipakai saat mencatat transaksi "uang masuk" yang terkait proyek.
 export function computeNewTerminPercentage(
   contractValue: number,
   existingTerminPercentages: number[],
@@ -322,342 +212,214 @@ export function computeNewTerminPercentage(
   return Math.min(100, Math.round((cumulativeAfter / contractValue) * 100));
 }
 
-export async function getPiutangData(entityId: string | string[]) {
-  const ids = Array.isArray(entityId) ? entityId : [entityId];
-  const [projects, loadingDockList] = await Promise.all([
-    prisma.project.findMany({
-      where: { entityId: { in: ids }, status: { in: ["ACTIVE", "CANCELLED", "COMPLETED"] } },
-      include: {
-        entity: { select: { id: true, key: true, name: true } },
-        termin: {
-          include: { auditedBy: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-        fakturPendapatan: {
-          orderBy: { tanggalTerima: "asc" },
-        },
-        jurnal: {
-          include: { coaAccount: true, jenisInput: true },
-          orderBy: { tanggal: "desc" },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.loadingDockTransaksi.findMany({
-      where: { entityId: { in: ids } },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+export type PiutangData = {
+  projectList: ProjectItem[];
+  summary: PiutangSummary;
+  loadingDockList: Array<{
+    id: string;
+    nama: string;
+    totalFmt: string;
+    status: string;
+    createdAt: string;
+  }>;
+};
 
-  const now = new Date();
-  let totalKontrak = 0;
-  let totalTerminTagih = 0;
+// Shape of raw project data from PHP
+type PhpRawProject = {
+  id: string;
+  code: string;
+  name: string;
+  contractValue: number;
+  spend: number;
+  deadline: string | null;
+  status: "ACTIVE" | "CANCELLED" | "COMPLETED";
+  entity_key?: string;
+  entity_name?: string;
+  termin: Array<{
+    id: string;
+    projectId: string;
+    name: string;
+    percentage: number | null;
+    nominal: number | null;
+    status: TerminStatus;
+    auditedAt: string | null;
+    auditedById: string | null;
+    createdAt: string;
+  }>;
+};
 
-  const projectList = projects.map((p) => {
-    const contractValue = Number(p.contractValue);
-    const isCancelled = p.status === "CANCELLED";
-    const isCompleted = p.status === "COMPLETED";
+type PhpRawLoadingDock = {
+  id: string;
+  nama: string;
+  total: number;
+  status: string;
+  reviewedAt: string | null;
+  createdAt: string;
+  entity_key?: string;
+  entity_name?: string;
+};
 
-    const terminItems = p.termin.map((t, i) => {
-      const prevPct = i === 0 ? 0 : p.termin[i - 1].percentage;
-      const deltaPct = Math.max(0, t.percentage - prevPct);
-      const nominalTermin =
-        t.nominal && Number(t.nominal) > 0
-          ? Number(t.nominal)
-          : ((t.percentage - prevPct) / 100) * contractValue;
+// PHP GET /api/piutang?entityKey=... response shape
+type PhpPiutangResponse = {
+  entity: { id: string; key: string; name: string };
+  saldoAntarEntitas: Record<string, number>;
+  projects: PhpRawProject[];
+  loadingDock: PhpRawLoadingDock[];
+};
 
-      // Ekstrak noBukti dari nama termin, contoh: [pdppt]
-      const noBuktiMatch = t.name.match(/\[(.*?)\]/);
-      const noBukti = noBuktiMatch ? noBuktiMatch[1] : null;
+function fmt(n: number): string {
+  return "Rp " + Math.round(n).toLocaleString("id-ID");
+}
 
-      // Cari faktur terkait proyek & noBukti
-      const matchedFaktur = p.fakturPendapatan.find(
-        (f) => (noBukti && f.noFaktur === noBukti) || Number(f.nilaiProyek) === nominalTermin
-      );
+function fmtDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
-      // Cari transaksi jurnal terkait noBukti
-      const matchedJurnals = p.jurnal.filter(
-        (j) => noBukti && j.noBukti === noBukti
-      );
+function mapRawProject(p: PhpRawProject): ProjectItem {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadlineDate = p.deadline ? new Date(p.deadline) : null;
+  const isOverdue =
+    p.status === "ACTIVE" &&
+    deadlineDate !== null &&
+    deadlineDate < today;
 
-      let gross = nominalTermin;
-      let dpp = hitungDppDariKwitansi(gross);
-      let dppNilaiLain = hitungDppNilaiLain(dpp);
-      let tarifPpn = 12;
-      let ppn = Math.round((dppNilaiLain * tarifPpn) / 100);
-      let tarifPph = 3.5;
-      let pph = Math.round((dpp * tarifPph) / 100);
-      let netBank = Math.max(0, gross - ppn - pph);
-      let bankName = "BPD";
-      let tanggalFmt = t.createdAt.toLocaleDateString("id-ID");
+  // Sum of nominally paid termin
+  const terminTagih = p.termin.reduce((sum, t) => sum + (t.nominal ?? 0), 0);
+  const sisaTagih = Math.max(0, p.contractValue - terminTagih);
+  const maxPercentage = p.termin.reduce((max, t) => Math.max(max, t.percentage ?? 0), 0);
 
-      if (matchedFaktur) {
-        gross = Number(matchedFaktur.nilaiProyek) || nominalTermin;
-        dpp = Number(matchedFaktur.dpp);
-        dppNilaiLain = Number(matchedFaktur.dppNilaiLain);
-        tarifPpn = Number(matchedFaktur.tarifPpnPersen);
-        tarifPph = Number(matchedFaktur.tarifPphPersen);
-        ppn = Number(matchedFaktur.ppn);
-        pph = Number(matchedFaktur.pph);
-        netBank = Number(matchedFaktur.nominalDiterima);
-        bankName = matchedFaktur.bank;
-        tanggalFmt = matchedFaktur.tanggalTerima.toLocaleDateString("id-ID");
-      } else if (matchedJurnals.length > 0) {
-        const pphDebit = matchedJurnals
-          .filter((j) => j.coaAccount && /pph/i.test(j.coaAccount.name))
-          .reduce((sum, j) => sum + Number(j.debit), 0);
-        const ppnVal = matchedJurnals
-          .filter((j) => j.coaAccount && /ppn/i.test(j.coaAccount.name))
-          .reduce((sum, j) => sum + Number(j.debit || j.kredit), 0);
-        const bankDebit = matchedJurnals
-          .filter((j) => j.coaAccount && /bank|bpd|bri|bni|mdr/i.test(j.coaAccount.name))
-          .reduce((sum, j) => sum + Number(j.debit), 0);
-
-        if (pphDebit > 0) pph = pphDebit;
-        if (ppnVal > 0) ppn = ppnVal;
-        if (bankDebit > 0) netBank = bankDebit;
-      }
-
-      const pphDebitRows = matchedJurnals.filter(
-        (j) => j.coaAccount && /pph/i.test(j.coaAccount.name) && Number(j.debit) > 0
-      );
-      const pphItems =
-        pphDebitRows.length > 0
-          ? pphDebitRows.map((j) => ({
-              name: j.coaAccount?.name || "PPh",
-              amount: Number(j.debit),
-              amountFmt: formatRupiah(Number(j.debit)),
-            }))
-          : pph > 0
-          ? [
-              {
-                name: `Potongan PPh (${tarifPph}%)`,
-                amount: pph,
-                amountFmt: formatRupiah(pph),
-              },
-            ]
-          : [];
-
-      const jurnalRows = matchedJurnals.map((j) => ({
-        coaCode: j.coaAccount?.code || "-",
-        coaName: j.coaAccount?.name || "-",
-        debit: Number(j.debit),
-        kredit: Number(j.kredit),
-        debitFmt: formatRupiah(Number(j.debit)),
-        kreditFmt: formatRupiah(Number(j.kredit)),
-      }));
-
-      const breakdown: TerminBreakdown = {
-        noBukti,
-        tanggalTerimaFmt: tanggalFmt,
-        bank: bankName,
-        gross,
-        grossFmt: formatRupiah(gross),
-        dpp,
-        dppFmt: formatRupiah(dpp),
-        dppNilaiLain,
-        dppNilaiLainFmt: formatRupiah(dppNilaiLain),
-        ppn,
-        ppnFmt: formatRupiah(ppn),
-        tarifPpnPersen: tarifPpn,
-        pph,
-        pphFmt: formatRupiah(pph),
-        tarifPphPersen: tarifPph,
-        pphItems,
-        netBank,
-        netBankFmt: formatRupiah(netBank),
-        jurnalRows,
-      };
-
-      return {
-        id: t.id,
-        name: t.name,
-        percentage: t.percentage,
-        percentageDelta: deltaPct,
-        nominal: gross,
-        nominalFmt: formatRupiah(gross),
-        status: t.status,
-        auditedAt: t.auditedAt ? t.auditedAt.toLocaleDateString("id-ID") : null,
-        auditedByName: t.auditedBy?.name ?? null,
-        breakdown,
-      };
-    });
-
-    const totalGross = terminItems.reduce((sum, t) => sum + t.breakdown.gross, 0);
-    const totalDpp = terminItems.reduce((sum, t) => sum + t.breakdown.dpp, 0);
-    const totalDppNilaiLain = terminItems.reduce((sum, t) => sum + t.breakdown.dppNilaiLain, 0);
-    const totalPpn = terminItems.reduce((sum, t) => sum + t.breakdown.ppn, 0);
-    const totalPph = terminItems.reduce((sum, t) => sum + t.breakdown.pph, 0);
-    const totalNetBank = terminItems.reduce((sum, t) => sum + t.breakdown.netBank, 0);
-    const sisaKontrak = isCancelled ? 0 : Math.max(0, contractValue - totalGross);
-
-    const breakdownSummary: ProjectBreakdownSummary = {
-      totalGross,
-      totalGrossFmt: formatRupiah(totalGross),
-      totalDpp,
-      totalDppFmt: formatRupiah(totalDpp),
-      totalDppNilaiLain,
-      totalDppNilaiLainFmt: formatRupiah(totalDppNilaiLain),
-      totalPpn,
-      totalPpnFmt: formatRupiah(totalPpn),
-      totalPph,
-      totalPphFmt: formatRupiah(totalPph),
-      totalNetBank,
-      totalNetBankFmt: formatRupiah(totalNetBank),
-      sisaKontrak,
-      sisaKontrakFmt: formatRupiah(sisaKontrak),
+  const termins: TerminItem[] = p.termin.map((t) => {
+    const nom = t.nominal ?? 0;
+    const emptyBreakdown: TerminBreakdown = {
+      noBukti: null,
+      tanggalTerimaFmt: null,
+      bank: null,
+      gross: nom,
+      grossFmt: fmt(nom),
+      dpp: nom,
+      dppFmt: fmt(nom),
+      dppNilaiLain: 0,
+      dppNilaiLainFmt: fmt(0),
+      ppn: 0,
+      ppnFmt: fmt(0),
+      tarifPpnPersen: 0,
+      pph: 0,
+      pphFmt: fmt(0),
+      tarifPphPersen: 0,
+      pphItems: [],
+      netBank: nom,
+      netBankFmt: fmt(nom),
+      jurnalRows: [],
     };
-
-    // 1. Kumpulkan noBukti yang merupakan pendapatan termin (ada akun kategori PENDAPATAN atau kredit ke 400)
-    const incomeNoBuktis = new Set<string>();
-    p.jurnal.forEach((j) => {
-      if (
-        j.noBukti &&
-        (j.coaAccount?.kategori === "PENDAPATAN" ||
-          j.coaAccount?.code === "400" ||
-          /pendapatan/i.test(j.coaAccount?.name ?? ""))
-      ) {
-        incomeNoBuktis.add(j.noBukti);
-      }
-    });
-    p.termin.forEach((t) => {
-      const m = t.name.match(/\[(.*?)\]/);
-      if (m && m[1]) incomeNoBuktis.add(m[1]);
-    });
-
-    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, dll.)
-    const expenseRows = p.jurnal.filter((j) => {
-      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) return false;
-      const isBeban =
-        j.coaAccount?.kategori === "BEBAN" ||
-        j.coaAccount?.code?.startsWith("5") ||
-        j.coaAccount?.code?.startsWith("6");
-      if (isBeban && Number(j.debit) > 0) return true;
-      if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
-        return true;
-      }
-      return false;
-    });
-
-    const expenseItems: ProjectExpenseItem[] = expenseRows.map((j) => {
-      const nominal = Number(j.debit);
-      const txt = `${j.coaAccount?.name || ""} ${j.keterangan || ""}`.toLowerCase();
-      let kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya" = "Lainnya";
-
-      if (/gaji|upah|mandor|tukang|honor|tenaga ahli/i.test(txt)) {
-        kategoriBeban = "Gaji & Upah";
-      } else if (/bahan|material|perlengkapan|semen|pasir|besi|batu|kayu|cat|baut|alat/i.test(txt)) {
-        kategoriBeban = "Bahan & Material";
-      } else if (/transport|perjalanan|bensin|bbm|solar|konsumsi|makan|listrik|telepon|pdam|survey|sewa|akomodasi/i.test(txt)) {
-        kategoriBeban = "Operasional & Transport";
-      }
-
-      // Cari baris pasangan dengan noBukti yang sama yang memiliki kredit > 0 (sumber kas/bank)
-      const counterpart = p.jurnal.find(
-        (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
-      );
-      const sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
-
-      return {
-        id: j.id,
-        tanggal: j.tanggal.toISOString(),
-        tanggalFmt: j.tanggal.toLocaleDateString("id-ID"),
-        noBukti: j.noBukti,
-        keterangan: j.keterangan || j.coaAccount?.name || "Pengeluaran Proyek",
-        coaCode: j.coaAccount?.code || "-",
-        coaName: j.coaAccount?.name || "-",
-        kategoriBeban,
-        nominal,
-        nominalFmt: formatRupiah(nominal),
-        sumberKasBank,
-      };
-    });
-
-    let totalGaji = 0;
-    let totalMaterial = 0;
-    let totalOperasional = 0;
-    let totalLainnya = 0;
-    expenseItems.forEach((it) => {
-      if (it.kategoriBeban === "Gaji & Upah") totalGaji += it.nominal;
-      else if (it.kategoriBeban === "Bahan & Material") totalMaterial += it.nominal;
-      else if (it.kategoriBeban === "Operasional & Transport") totalOperasional += it.nominal;
-      else totalLainnya += it.nominal;
-    });
-
-    let totalPengeluaran = expenseItems.reduce((acc, it) => acc + it.nominal, 0);
-    if (totalPengeluaran === 0 && Number(p.spend) > 0) {
-      totalPengeluaran = Number(p.spend);
-    }
-
-    const expensesSummary: ProjectExpensesSummary = {
-      totalPengeluaran,
-      totalPengeluaranFmt: formatRupiah(totalPengeluaran),
-      totalGaji,
-      totalGajiFmt: formatRupiah(totalGaji),
-      totalMaterial,
-      totalMaterialFmt: formatRupiah(totalMaterial),
-      totalOperasional,
-      totalOperasionalFmt: formatRupiah(totalOperasional),
-      totalLainnya,
-      totalLainnyaFmt: formatRupiah(totalLainnya),
-      labaKotor: totalGross - totalPengeluaran,
-      labaKotorFmt: formatRupiah(totalGross - totalPengeluaran),
-      items: expenseItems,
-    };
-
-    const maxPct = isCompleted
-      ? 100
-      : (contractValue > 0 ? Math.min(100, Math.round((totalGross / contractValue) * 100)) : 0);
-    const terminTagih = isCompleted ? contractValue : totalGross;
-    const sisaTagih = sisaKontrak;
-
-    // "Total Nilai Kontrak Aktif" cuma menjumlah proyek yang masih aktif
-    if (!isCancelled && !isCompleted) {
-      totalKontrak += contractValue;
-      totalTerminTagih += terminTagih;
-    }
-
     return {
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      entityName: p.entity?.name,
-      entityKey: p.entity?.key,
-      contractValue,
-      contractValueFmt: formatRupiah(contractValue),
-      deadlineFmt: p.deadline.toLocaleDateString("id-ID"),
-      isOverdue: !isCancelled && !isCompleted && maxPct < 80 && p.deadline < now,
-      status: p.status,
-      maxPercentage: maxPct,
-      terminTagih,
-      terminTagihFmt: formatRupiah(terminTagih),
-      sisaTagih,
-      sisaTagihFmt: formatRupiah(sisaTagih),
-      termin: terminItems,
-      breakdownSummary,
-      expensesSummary,
+      id: t.id,
+      name: t.name,
+      percentage: t.percentage ?? undefined,
+      nominal: nom,
+      nominalFmt: fmt(nom),
+      status: t.status,
+      auditedAt: t.auditedAt,
+      auditedByName: null,
+      breakdown: emptyBreakdown,
     };
   });
 
-  const sisaPiutang = totalKontrak - totalTerminTagih;
+  const totalGross = terminTagih;
+  const emptyBreakdownSummary: ProjectBreakdownSummary = {
+    totalGross,
+    totalGrossFmt: fmt(totalGross),
+    totalDpp: totalGross,
+    totalDppFmt: fmt(totalGross),
+    totalDppNilaiLain: 0,
+    totalDppNilaiLainFmt: fmt(0),
+    totalPpn: 0,
+    totalPpnFmt: fmt(0),
+    totalPph: 0,
+    totalPphFmt: fmt(0),
+    totalNetBank: totalGross,
+    totalNetBankFmt: fmt(totalGross),
+    sisaKontrak: sisaTagih,
+    sisaKontrakFmt: fmt(sisaTagih),
+  };
+
+  const spend = p.spend ?? 0;
+  const labaKotor = terminTagih - spend;
+  const emptyExpensesSummary: ProjectExpensesSummary = {
+    totalPengeluaran: spend,
+    totalPengeluaranFmt: fmt(spend),
+    totalGaji: 0,
+    totalGajiFmt: fmt(0),
+    totalMaterial: 0,
+    totalMaterialFmt: fmt(0),
+    totalOperasional: 0,
+    totalOperasionalFmt: fmt(0),
+    totalLainnya: spend,
+    totalLainnyaFmt: fmt(spend),
+    labaKotor,
+    labaKotorFmt: fmt(labaKotor),
+    items: [],
+  };
 
   return {
-    projectList,
-    summary: {
-      totalKontrak,
-      totalKontrakFmt: formatRupiah(totalKontrak),
-      totalTerminTagih,
-      totalTerminTagihFmt: formatRupiah(totalTerminTagih),
-      sisaPiutang,
-      sisaPiutangFmt: formatRupiah(Math.abs(sisaPiutang)),
-      jumlahProyek: projects.filter((p) => p.status !== "CANCELLED").length,
-    },
-    loadingDockList: loadingDockList.map((d) => ({
-      id: d.id,
-      nama: d.nama,
-      totalFmt: formatRupiah(Number(d.total)),
-      status: d.status,
-      createdAt: d.createdAt.toLocaleDateString("id-ID"),
-    })),
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    entityName: p.entity_name,
+    entityKey: p.entity_key,
+    contractValue: p.contractValue,
+    contractValueFmt: fmt(p.contractValue),
+    deadlineFmt: fmtDate(p.deadline),
+    isOverdue,
+    status: p.status,
+    maxPercentage,
+    terminTagih,
+    terminTagihFmt: fmt(terminTagih),
+    sisaTagih,
+    sisaTagihFmt: fmt(sisaTagih),
+    termin: termins,
+    breakdownSummary: emptyBreakdownSummary,
+    expensesSummary: emptyExpensesSummary,
   };
+}
+
+export async function getPiutangData(entityId: string | string[]): Promise<PiutangData> {
+  const token = await getPhpToken();
+  // PHP only supports singular entityKey — always use the first one
+  const key = Array.isArray(entityId) ? entityId[0] : entityId;
+
+  const raw = await phpFetch<PhpPiutangResponse>(
+    `/api/piutang?entityKey=${encodeURIComponent(key)}`,
+    token
+  );
+
+  const projectList = (raw.projects ?? []).map(mapRawProject);
+
+  const activeProjects = projectList.filter((p) => p.status === "ACTIVE");
+  const totalKontrak = activeProjects.reduce((s, p) => s + p.contractValue, 0);
+  const totalTerminTagih = activeProjects.reduce((s, p) => s + p.terminTagih, 0);
+  const sisaPiutang = Math.max(0, totalKontrak - totalTerminTagih);
+
+  const summary: PiutangSummary = {
+    totalKontrak,
+    totalKontrakFmt: fmt(totalKontrak),
+    totalTerminTagih,
+    totalTerminTagihFmt: fmt(totalTerminTagih),
+    sisaPiutang,
+    sisaPiutangFmt: fmt(sisaPiutang),
+    jumlahProyek: activeProjects.length,
+  };
+
+  const loadingDockList = (raw.loadingDock ?? []).map((ld) => ({
+    id: ld.id,
+    nama: ld.nama,
+    totalFmt: fmt(ld.total ?? 0),
+    status: ld.status,
+    createdAt: ld.createdAt,
+  }));
+
+  return { projectList, summary, loadingDockList };
 }

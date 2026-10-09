@@ -1,48 +1,110 @@
-import { prisma } from "./prisma";
-import { formatRupiah } from "./dashboard-data";
+import { phpFetch, getPhpToken } from "./api-client";
 
-export async function getProfitabilitasData(entityId: string) {
-  const projects = await prisma.project.findMany({
-    where: { entityId },
-    include: { termin: { orderBy: { createdAt: "desc" }, take: 1 } },
-    orderBy: { code: "asc" },
+// ── Shape returned by the PHP backend ────────────────────────────────────────
+type PhpProfitabilitasProject = {
+  id: string;
+  code: string;
+  name: string;
+  contractValue: number;
+  spend: number;
+  profit: number;
+  marginPersen: number;
+  status: string;
+  deadline: string | null;
+  createdAt: string;
+  maxTerminPct: number | null;
+  terminCount: number;
+};
+
+type PhpProfitabilitasResponse = {
+  entityId: string;
+  year: number | null;
+  projects: PhpProfitabilitasProject[];
+  summary: {
+    totalProyek: number;
+    countByStatus: { ACTIVE: number; COMPLETED: number; CANCELLED: number };
+    totalContract: number;
+    totalSpend: number;
+    totalProfit: number;
+    avgMarginPersen: number;
+  };
+};
+
+// ── Shape consumed by the frontend ───────────────────────────────────────────
+export type ProfitabilitasProject = {
+  code: string;
+  name: string;
+  kontrakFmt: string;
+  terpakaiiFmt: string;
+  laba: number;
+  labaFmt: string;
+  labaPositive: boolean;
+  margin: string;
+  terminStatus: string | null;
+  terminPct: number | null;
+};
+
+export type ProfitabilitasData = {
+  projects: ProfitabilitasProject[];
+  summary: {
+    totalKontrakFmt: string;
+    totalTerpakaiiFmt: string;
+    totalLaba: number;
+    totalLabaFmt: string;
+    totalLabaPositive: boolean;
+    avgMargin: string;
+    projectCount: number;
+  };
+};
+
+function fmtRupiah(n: number): string {
+  return "Rp " + Math.round(n).toLocaleString("id-ID");
+}
+
+export async function getProfitabilitasData(entityId: string, year?: number): Promise<ProfitabilitasData> {
+  const token = await getPhpToken();
+  const params = new URLSearchParams();
+  params.set("entityId", entityId);
+  if (year) params.set("year", String(year));
+
+  const raw = await phpFetch<PhpProfitabilitasResponse>(
+    `/api/profitabilitas?${params.toString()}`,
+    token
+  );
+
+  // Transform each project row to the shape the page expects
+  const projects: ProfitabilitasProject[] = raw.projects.map((p) => {
+    const labaPositive = p.profit >= 0;
+    return {
+      code:         p.code,
+      name:         p.name,
+      kontrakFmt:   fmtRupiah(p.contractValue),
+      terpakaiiFmt: fmtRupiah(p.spend),
+      laba:         p.profit,
+      labaFmt:      fmtRupiah(Math.abs(p.profit)),
+      labaPositive,
+      margin:       String(p.marginPersen),
+      // PHP doesn't return a termin status string; expose the percentage only.
+      // terminStatus is used for an ON_TRACK/AT_RISK/NEEDS_AUDIT badge — PHP
+      // doesn't aggregate that per-project, so leave it null here.
+      terminStatus: null,
+      terminPct:    p.maxTerminPct,
+    };
   });
 
-  const totalKontrak = projects.reduce((s, p) => s + Number(p.contractValue), 0);
-  const totalTerpakai = projects.reduce((s, p) => s + Number(p.spend), 0);
-  const totalLaba = totalKontrak - totalTerpakai;
+  const { summary: s } = raw;
+  const totalLabaPositive = s.totalProfit >= 0;
 
   return {
-    projects: projects.map((p) => {
-      const kontrak = Number(p.contractValue);
-      const terpakai = Number(p.spend);
-      const laba = kontrak - terpakai;
-      const margin = kontrak > 0 ? (laba / kontrak) * 100 : 0;
-      const latestTermin = p.termin[0];
-      return {
-        code: p.code,
-        name: p.name,
-        kontrakFmt: formatRupiah(kontrak),
-        terpakaiiFmt: formatRupiah(terpakai),
-        laba,
-        labaFmt: formatRupiah(Math.abs(laba)),
-        labaPositive: laba >= 0,
-        margin: margin.toFixed(1),
-        terminStatus: latestTermin?.status ?? null,
-        terminPct: latestTermin?.percentage ?? null,
-      };
-    }),
+    projects,
     summary: {
-      totalKontrakFmt: formatRupiah(totalKontrak),
-      totalTerpakaiiFmt: formatRupiah(totalTerpakai),
-      totalLaba,
-      totalLabaFmt: formatRupiah(Math.abs(totalLaba)),
-      totalLabaPositive: totalLaba >= 0,
-      avgMargin:
-        projects.length > 0 && totalKontrak > 0
-          ? ((totalLaba / totalKontrak) * 100).toFixed(1)
-          : "0.0",
-      projectCount: projects.length,
+      totalKontrakFmt:   fmtRupiah(s.totalContract),
+      totalTerpakaiiFmt: fmtRupiah(s.totalSpend),
+      totalLaba:         s.totalProfit,
+      totalLabaFmt:      fmtRupiah(Math.abs(s.totalProfit)),
+      totalLabaPositive,
+      avgMargin:         String(s.avgMarginPersen),
+      projectCount:      s.totalProyek,
     },
   };
 }

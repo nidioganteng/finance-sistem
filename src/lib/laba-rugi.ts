@@ -1,181 +1,123 @@
-import { prisma } from "./prisma";
+import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
-import { getPenyusutanSummary } from "./aset-tetap";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
-
-import type { ReportCategory } from "@prisma/client";
 
 export type ReportVersion = "INTERNAL" | "UMUM";
 
-// month opsional (1-12) — kalau diisi, scope laporan ke satu bulan itu saja
-// (dipakai fitur komparasi antar-periode), kalau tidak diisi tetap satu tahun penuh.
-// version (issue #40): "INTERNAL" (default) atau "UMUM"
+export type LabaRugiItem = {
+  code: string;
+  name: string;
+  total: number;
+  totalFmt: string;
+};
+
+export type LabaRugiData = {
+  pendapatanList: LabaRugiItem[];
+  bebanList: LabaRugiItem[];
+  totalPendapatan: number;
+  totalBeban: number;
+  totalPendapatanFmt: string;
+  totalBebanFmt: string;
+  labaBersih: number;
+  labaBersihFmt: string;
+  labaBersihPositive: boolean;
+  penyusutanOtomatis: number;
+  penyusutanOtomatisFmt: string;
+  pendapatanFaktur: number;
+  pendapatanFakturFmt: string;
+  version: ReportVersion;
+};
+
+// PHP item shape: { id, code, name, kategori, debit, kredit, saldo, isAuto? }
+type PhpLRItem = {
+  id: string | null;
+  code: string;
+  name: string;
+  kategori: string;
+  debit: number;
+  kredit: number;
+  saldo: number;
+  isAuto?: boolean;
+};
+
+// PHP response: { entityId, dari, sampai, version, pendapatan, beban, totalPendapatan, totalBeban, labaBersih, bebanPenyusutan }
+type PhpLabaRugiResponse = {
+  entityId: string;
+  dari: string;
+  sampai: string;
+  version: string;
+  pendapatan: PhpLRItem[];
+  beban: PhpLRItem[];
+  totalPendapatan: number;
+  totalBeban: number;
+  labaBersih: number;
+  bebanPenyusutan: number;
+};
+
+function buildDateRange(year: number, month?: number): { dari: string; sampai: string } {
+  if (month) {
+    const lastDay = new Date(year, month, 0).getDate();
+    const mm = String(month).padStart(2, "0");
+    return {
+      dari: `${year}-${mm}-01`,
+      sampai: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+    };
+  }
+  return {
+    dari: `${year}-01-01`,
+    sampai: `${year}-12-31`,
+  };
+}
+
 export async function getLabaRugiData(
   entityId: string,
   year: number,
   month?: number,
   version: ReportVersion | string = "INTERNAL"
-) {
-  const normVersion: ReportVersion = version?.toString().toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const allowedCategories: ReportCategory[] =
-    normVersion === "UMUM" ? ["UMUM", "SEMUA"] : ["INTERNAL", "SEMUA"];
+): Promise<LabaRugiData> {
+  const token = await getPhpToken();
+  const { dari, sampai } = buildDateRange(year, month);
 
-  const { start, end } = month
-    ? { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59) }
-    : { start: new Date(`${year}-01-01`), end: new Date(`${year}-12-31T23:59:59`) };
+  const params = new URLSearchParams();
+  params.set("entityId", entityId);
+  params.set("dari", dari);
+  params.set("sampai", sampai);
+  params.set("version", String(version));
 
-  const [excludedNoBukti, penyusutanSummary] = await Promise.all([
-    getExcludedNoBuktiForVersion(entityId, year, normVersion),
-    getPenyusutanSummary(entityId, year, month),
-  ]);
+  const raw = await phpFetch<PhpLabaRugiResponse>(`/api/laba-rugi?${params.toString()}`, token);
 
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      entityId,
-      tanggal: { gte: start, lte: end },
-      coaAccountId: { not: null },
-      coaAccount: {
-        reportCategory: { in: allowedCategories },
-      },
-      ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
-    },
-    include: { coaAccount: true },
-  });
-
-  const pendapatan = new Map<string, { code: string; name: string; total: number }>();
-  const beban = new Map<string, { code: string; name: string; total: number }>();
-
-  for (const t of transactions) {
-    if (!t.coaAccount) continue;
-    if (t.coaAccount.kategori === "PENDAPATAN") {
-      if (!pendapatan.has(t.coaAccountId!)) {
-        pendapatan.set(t.coaAccountId!, {
-          code: t.coaAccount.code,
-          name: t.coaAccount.name,
-          total: 0,
-        });
-      }
-      pendapatan.get(t.coaAccountId!)!.total += Number(t.kredit);
-    } else if (t.coaAccount.kategori === "BEBAN") {
-      const isMkt = t.coaAccount.code === "628";
-      const code = normVersion === "UMUM" && isMkt ? "150" : t.coaAccount.code;
-      const name = normVersion === "UMUM" && isMkt ? "Kas Titipan" : t.coaAccount.name;
-      const accountKey = normVersion === "UMUM" && isMkt ? "kas_titipan_150" : t.coaAccountId!;
-      if (!beban.has(accountKey)) {
-        beban.set(accountKey, {
-          code,
-          name,
-          total: 0,
-        });
-      }
-      beban.get(accountKey)!.total += Number(t.debit);
-    }
-  }
-
-  // Integrasi Laporan Pendapatan (alur_laporan_pendapata.md bagian 4):
-  // Tarik total Nilai Proyek dari FakturPendapatan untuk periode ini,
-  // menyelesaikan bug link putus di Excel asli klien (yang sebelumnya menghasilkan Rp 0).
-  // Jangan gandakan faktur yang noFaktur-nya sudah tercatat sebagai transaksi jurnal pendapatan.
-  const recordedPendapatanNoBukti = new Set(
-    transactions
-      .filter((t) => t.coaAccount?.kategori === "PENDAPATAN")
-      .map((t) => t.noBukti)
-  );
-
-  const fakturAgg = await prisma.fakturPendapatan.aggregate({
-    where: {
-      entityId,
-      tahunPajak: year,
-      ...(month ? { masaPajak: month } : {}),
-      ...(recordedPendapatanNoBukti.size > 0
-        ? { noFaktur: { notIn: Array.from(recordedPendapatanNoBukti) } }
-        : {}),
-    },
-    _sum: { nilaiProyek: true },
-  });
-  const totalNilaiProyekFaktur = Number(fakturAgg._sum.nilaiProyek ?? 0);
-
-  if (totalNilaiProyekFaktur > 0) {
-    let foundPendapatanKey: string | null = null;
-    for (const [key, val] of pendapatan.entries()) {
-      if (val.code === "400" || /pendapatan/i.test(val.name)) {
-        foundPendapatanKey = key;
-        break;
-      }
-    }
-
-    if (foundPendapatanKey) {
-      pendapatan.get(foundPendapatanKey)!.total += totalNilaiProyekFaktur;
-    } else {
-      const coaPendapatan = await prisma.coaAccount.findFirst({
-        where: {
-          kategori: "PENDAPATAN",
-          OR: [{ code: "400" }, { name: { contains: "pendapatan" } }],
-        },
-      });
-      const key = coaPendapatan?.id ?? "auto_faktur_pendapatan";
-      pendapatan.set(key, {
-        code: coaPendapatan?.code ?? "400",
-        name: coaPendapatan?.name ?? "Pendapatan Proyek (E-Faktur)",
-        total: totalNilaiProyekFaktur,
-      });
-    }
-  }
-
-  // Issue 39 & SRS v2.0: Biaya penyusutan aset dihitung otomatis dan ditarik (linked) dari Modul Aktiva Tetap
-  if (penyusutanSummary.totalBebanPenyusutan > 0) {
-    let foundDepreciationKey: string | null = null;
-    for (const [key, val] of beban.entries()) {
-      if (val.code === "512" || val.code === "540" || /penyusutan/i.test(val.name)) {
-        foundDepreciationKey = key;
-        break;
-      }
-    }
-
-    if (foundDepreciationKey) {
-      beban.get(foundDepreciationKey)!.total = penyusutanSummary.totalBebanPenyusutan;
-    } else {
-      const coaPenyusutan = await prisma.coaAccount.findFirst({
-        where: {
-          kategori: "BEBAN",
-          OR: [{ code: "512" }, { code: "540" }, { name: { contains: "penyusutan" } }],
-        },
-      });
-      const key = coaPenyusutan?.id ?? "auto_depreciation";
-      beban.set(key, {
-        code: coaPenyusutan?.code ?? "512",
-        name: coaPenyusutan?.name ?? "Beban Penyusutan Aset Tetap",
-        total: penyusutanSummary.totalBebanPenyusutan,
-      });
-    }
-  }
-
-  const pendapatanList = Array.from(pendapatan.values()).map((i) => ({
-    ...i,
-    totalFmt: formatRupiah(i.total),
+  const pendapatanList: LabaRugiItem[] = raw.pendapatan.map((item) => ({
+    code: item.code,
+    name: item.name,
+    total: item.saldo,
+    totalFmt: formatRupiah(item.saldo),
   }));
-  const bebanList = Array.from(beban.values()).map((i) => ({
-    ...i,
-    totalFmt: formatRupiah(i.total),
+
+  const bebanList: LabaRugiItem[] = raw.beban.map((item) => ({
+    code: item.code,
+    name: item.name,
+    total: item.saldo,
+    totalFmt: formatRupiah(item.saldo),
   }));
-  const totalPendapatan = pendapatanList.reduce((s, i) => s + i.total, 0);
-  const totalBeban = bebanList.reduce((s, i) => s + i.total, 0);
-  const labaBersih = totalPendapatan - totalBeban;
+
+  const penyusutanOtomatis = raw.bebanPenyusutan ?? 0;
+
+  // pendapatanFaktur: first revenue item (typically "Pendapatan Jasa/Faktur"), fallback to 0
+  const pendapatanFaktur = pendapatanList.length > 0 ? pendapatanList[0].total : 0;
 
   return {
     pendapatanList,
     bebanList,
-    totalPendapatan,
-    totalBeban,
-    totalPendapatanFmt: formatRupiah(totalPendapatan),
-    totalBebanFmt: formatRupiah(totalBeban),
-    labaBersih,
-    labaBersihFmt: formatRupiah(Math.abs(labaBersih)),
-    labaBersihPositive: labaBersih >= 0,
-    penyusutanOtomatis: penyusutanSummary.totalBebanPenyusutan,
-    penyusutanOtomatisFmt: formatRupiah(penyusutanSummary.totalBebanPenyusutan),
-    pendapatanFaktur: totalNilaiProyekFaktur,
-    pendapatanFakturFmt: formatRupiah(totalNilaiProyekFaktur),
-    version: normVersion,
+    totalPendapatan: raw.totalPendapatan,
+    totalBeban: raw.totalBeban,
+    totalPendapatanFmt: formatRupiah(raw.totalPendapatan),
+    totalBebanFmt: formatRupiah(raw.totalBeban),
+    labaBersih: raw.labaBersih,
+    labaBersihFmt: formatRupiah(Math.abs(raw.labaBersih)),
+    labaBersihPositive: raw.labaBersih >= 0,
+    penyusutanOtomatis,
+    penyusutanOtomatisFmt: formatRupiah(penyusutanOtomatis),
+    pendapatanFaktur,
+    pendapatanFakturFmt: formatRupiah(pendapatanFaktur),
+    version: (raw.version as ReportVersion) ?? (version as ReportVersion),
   };
 }

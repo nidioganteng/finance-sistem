@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { formatRupiah } from "./dashboard-data";
 import { getPenyusutanSummary } from "./aset-tetap";
-import { getExcludedNoBuktiForVersion } from "./akuntansi";
+import { getExcludedNoBuktiForVersion, isAutoPostedMirror } from "./akuntansi";
 
 import type { ReportCategory } from "@prisma/client";
 
@@ -47,6 +47,7 @@ export async function getLabaRugiData(
 
   for (const t of transactions) {
     if (!t.coaAccount) continue;
+    if (isAutoPostedMirror(t)) continue;
     if (t.coaAccount.kategori === "PENDAPATAN") {
       if (!pendapatan.has(t.coaAccountId!)) {
         pendapatan.set(t.coaAccountId!, {
@@ -76,20 +77,32 @@ export async function getLabaRugiData(
   // Tarik total Nilai Proyek dari FakturPendapatan untuk periode ini,
   // menyelesaikan bug link putus di Excel asli klien (yang sebelumnya menghasilkan Rp 0).
   // Jangan gandakan faktur yang noFaktur-nya sudah tercatat sebagai transaksi jurnal pendapatan.
-  const recordedPendapatanNoBukti = new Set(
-    transactions
-      .filter((t) => t.coaAccount?.kategori === "PENDAPATAN")
-      .map((t) => t.noBukti)
-  );
+  const recordedPendapatanNoBukti = new Set<string>();
+  const recordedFakturIds = new Set<string>();
+  for (const t of transactions) {
+    if (isAutoPostedMirror(t)) continue;
+    if (t.coaAccount?.kategori === "PENDAPATAN") {
+      if (t.noBukti) recordedPendapatanNoBukti.add(t.noBukti);
+      const extra = t.extraFieldsJson as Record<string, unknown> | null;
+      if (typeof extra?.fakturId === "string") recordedFakturIds.add(extra.fakturId);
+      const rowAny = t as unknown as { fakturId?: string | null };
+      if (rowAny.fakturId) recordedFakturIds.add(rowAny.fakturId);
+    }
+  }
 
   const fakturAgg = await prisma.fakturPendapatan.aggregate({
     where: {
       entityId,
       tahunPajak: year,
       ...(month ? { masaPajak: month } : {}),
-      ...(recordedPendapatanNoBukti.size > 0
-        ? { noFaktur: { notIn: Array.from(recordedPendapatanNoBukti) } }
-        : {}),
+      AND: [
+        ...(recordedPendapatanNoBukti.size > 0
+          ? [{ noFaktur: { notIn: Array.from(recordedPendapatanNoBukti) } }]
+          : []),
+        ...(recordedFakturIds.size > 0
+          ? [{ id: { notIn: Array.from(recordedFakturIds) } }]
+          : []),
+      ],
     },
     _sum: { nilaiProyek: true },
   });

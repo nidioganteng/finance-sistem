@@ -43,7 +43,7 @@ export default async function JurnalPage({
     await Promise.all([
       getJenisInputChips(selectedEntity.id),
       getCoaList(),
-      getProjectOptions(selectedEntity.id),
+      getProjectOptions(selectedEntity.key),
       getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined, page, projectId || undefined),
     ]);
 

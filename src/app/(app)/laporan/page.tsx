@@ -32,7 +32,7 @@ import { getPiutangData } from "@/lib/piutang";
 import { getLaporanUtangAsetData } from "@/lib/laporan-utang-aset";
 import { PiutangView } from "@/components/laporan/PiutangView";
 import { UtangAsetView } from "@/components/laporan/UtangAsetView";
-import { prisma } from "@/lib/prisma";
+import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
@@ -96,6 +96,9 @@ export default async function LaporanPage({
   const entityIds = selectedEntity
     ? [selectedEntity.id]
     : entities.map((e) => e.id);
+  const entityKeysArr = selectedEntity
+    ? [selectedEntity.key]
+    : entities.map((e) => e.key);
 
   // Fetch data based on active tab
   let laporanKeuanganData: Awaited<ReturnType<typeof getLaporanKeuanganData>> | null = null;
@@ -120,7 +123,7 @@ export default async function LaporanPage({
     const [laporan, tax] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
       tab === "laba-rugi"
-        ? getLaporanPajakData(entityIds, currentYear, currentVersion)
+        ? getLaporanPajakData(entityIds, currentYear, currentVersion, selectedEntity?.name ?? "Grup")
         : Promise.resolve(null),
     ]);
     laporanKeuanganData = laporan;
@@ -181,9 +184,9 @@ export default async function LaporanPage({
       kenaikanBersihKas: laporan.kenaikanBersihKas,
     };
   } else if (tab === "piutang") {
-    piutangData = await getPiutangData(entityIds);
+    piutangData = await getPiutangData(entityKeysArr[0] ?? "");
   } else if (tab === "utang-aset") {
-    utangAsetData = await getLaporanUtangAsetData(entityIds, currentYear);
+    utangAsetData = await getLaporanUtangAsetData(entityIds[0] ?? "", currentYear);
   }
 
   // Komparasi antar-periode (bulan vs bulan, atau tahun vs tahun) — jangkauan
@@ -214,17 +217,29 @@ export default async function LaporanPage({
     const periodA = parsePeriod(searchParams.periodA, mode, { year: nowYear, month: nowMonth });
     const periodB = parsePeriod(searchParams.periodB, mode, { year: nowYear - 2, month: nowMonth });
 
-    const dateRange = (p: Period) =>
-      p.month
-        ? { gte: new Date(p.year, p.month - 1, 1), lte: new Date(p.year, p.month, 0, 23, 59, 59) }
-        : { gte: new Date(`${p.year}-01-01`), lte: new Date(`${p.year}-12-31T23:59:59`) };
+    const fmtDate = (p: Period, end: boolean) => {
+      if (p.month) {
+        const lastDay = new Date(p.year, p.month, 0).getDate();
+        return end ? `${p.year}-${String(p.month).padStart(2, "0")}-${lastDay} 23:59:59` : `${p.year}-${String(p.month).padStart(2, "0")}-01 00:00:00`;
+      }
+      return end ? `${p.year}-12-31 23:59:59` : `${p.year}-01-01 00:00:00`;
+    };
 
-    const [labaRugiA, labaRugiB, txCountA, txCountB] = await Promise.all([
+    const phpToken = await getPhpToken();
+    const txCountParams = (p: Period) => {
+      const params = new URLSearchParams({ type: "tx-count", dateFrom: fmtDate(p, false), dateTo: fmtDate(p, true) });
+      entityIds.forEach((id) => params.append("entityIds[]", id));
+      return params.toString();
+    };
+
+    const [labaRugiA, labaRugiB, txRespA, txRespB] = await Promise.all([
       Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month, currentVersion))),
       Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month, currentVersion))),
-      prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodA) } }),
-      prisma.transaction.count({ where: { entityId: { in: entityIds }, tanggal: dateRange(periodB) } }),
+      phpFetch<{ count: number }>(`/api/laporan-keuangan?${txCountParams(periodA)}`, phpToken),
+      phpFetch<{ count: number }>(`/api/laporan-keuangan?${txCountParams(periodB)}`, phpToken),
     ]);
+    const txCountA = txRespA.count ?? 0;
+    const txCountB = txRespB.count ?? 0;
 
     const sumPendapatan = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalPendapatan, 0);
     const sumBeban = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalBeban, 0);
@@ -312,16 +327,6 @@ export default async function LaporanPage({
       komparasiChart = { type: "single", data, years: chartYears };
     }
   }
-
-  const txCount = await prisma.transaction.count({
-    where: {
-      entityId: { in: entityIds },
-      tanggal: {
-        gte: new Date(`${currentYear}-01-01`),
-        lte: new Date(`${currentYear}-12-31T23:59:59`),
-      },
-    },
-  });
 
   const entityLabel = selectedEntity ? selectedEntity.name : "Semua Entitas";
 

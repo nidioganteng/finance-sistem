@@ -5,7 +5,7 @@ import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJurnalTransaksiHistory } from "@/lib/jurnal-transaksi";
 import { getProjectOptions } from "@/lib/piutang";
-import { prisma } from "@/lib/prisma";
+import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { JurnalTransaksiClient } from "@/components/jurnal-transaksi/JurnalTransaksiClient";
@@ -32,16 +32,14 @@ export default async function JurnalTransaksiPage({
 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 
-  const [coaAccounts, { groups, totalPages }, projectOptions] = await Promise.all([
-    prisma.coaAccount.findMany({
-      select: { id: true, code: true, name: true, kategori: true },
-      orderBy: { urutan: "asc" },
-    }),
+  const token = await getPhpToken();
+  const [coaResp, { groups, totalPages }, projectOptions] = await Promise.all([
+    phpFetch<{ data: { id: string; code: string; name: string; kategori: string }[] }>("/api/coa", token),
     getJurnalTransaksiHistory(selectedEntity.id, page, searchParams.dari, searchParams.sampai),
-    getProjectOptions(selectedEntity.id),
+    getProjectOptions(selectedEntity.key),
   ]);
 
-  const coa = coaAccounts.map((c) => ({ id: c.id, code: c.code, name: c.name, kategori: c.kategori }));
+  const coa = (coaResp.data ?? []).map((c) => ({ id: c.id, code: c.code, name: c.name, kategori: c.kategori }));
 
   // Build search params record for pagination href builder (exclude page)
   const spRecord: Record<string, string> = {};

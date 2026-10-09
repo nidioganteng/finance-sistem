@@ -28,7 +28,7 @@ export default async function PiutangPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const data = await getPiutangData(selectedEntity.id);
+  const data = await getPiutangData(selectedEntity.key);
 
   return (
     <PageTransition>

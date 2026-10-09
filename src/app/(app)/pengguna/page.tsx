@@ -33,6 +33,7 @@ export default async function PenggunaPage() {
           status: u.status,
           createdAt: u.createdAt,
           entityAccess: u.entityAccess,
+          entityKeys: u.entityKeys,
         }))}
         allEntities={allEntities}
         viewerRole={role}

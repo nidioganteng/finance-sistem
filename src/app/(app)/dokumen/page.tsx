@@ -30,7 +30,7 @@ export default async function DokumenPage({
         subtitle="Arsip dokumen dan prosedur standar operasional"
       />
       <DokumenClient
-        dokumen={dokumen}
+        dokumen={dokumen as any}
         kategori={kategori}
         canUpload={canUpload}
         canDelete={canDelete}

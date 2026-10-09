@@ -1,5 +1,4 @@
 import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
@@ -29,7 +28,7 @@ export default async function LabaRugiPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const taxData = await getLaporanPajakData(selectedEntity.id, currentYear, currentVersion);
+  const taxData = await getLaporanPajakData(selectedEntity.id, currentYear, currentVersion, selectedEntity.name);
 
   return (
     <PageTransition>

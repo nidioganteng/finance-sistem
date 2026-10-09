@@ -61,9 +61,9 @@ export default async function LogPage({
                 <td className="py-3 px-6 text-[12.5px] text-muted whitespace-nowrap">
                   {new Date(log.createdAt).toLocaleString("id-ID")}
                 </td>
-                <td className="py-3 px-3 font-semibold text-navy-text text-[13px]">{log.actor.name}</td>
+                <td className="py-3 px-3 font-semibold text-navy-text text-[13px]">{log.actor?.name ?? "-"}</td>
                 <td className="py-3 px-3 text-[12px] text-muted">
-                  {log.actor.role ? roleLabel(log.actor.role) : "-"}
+                  {log.actor?.role ? roleLabel(log.actor.role as Parameters<typeof roleLabel>[0]) : "-"}
                 </td>
                 <td className="py-3 px-3">
                   {log.category === "FINANCIAL_CHANGE" ? (

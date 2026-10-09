@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, Fragment } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Role } from "@prisma/client";
@@ -191,6 +192,11 @@ export function PayrollClient({
   // Toast / Error state
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Bersihkan notifikasi error/sukses setiap kali berganti tab utama atau sub-tab
   useEffect(() => {
@@ -787,7 +793,7 @@ export function PayrollClient({
                         </td>
                         <td className="py-3 px-3.5 text-center font-mono">
                           {r.totalPegawai > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-bold text-[11px]">
                               {r.totalPegawai} orang
                             </span>
                           ) : (
@@ -1226,7 +1232,7 @@ export function PayrollClient({
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 p.isActive
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
                                   : "bg-surface-subtle text-muted-faint"
                               }`}
                             >
@@ -1260,7 +1266,7 @@ export function PayrollClient({
                                       });
                                     }
                                   }}
-                                  className="h-7 px-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shadow-2xs"
+                                  className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
                                   title="Hapus Pegawai"
                                 >
                                   <Trash2 size={12} />
@@ -1673,7 +1679,7 @@ export function PayrollClient({
                                       });
                                     }
                                   }}
-                                  className="h-7 px-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shadow-2xs"
+                                  className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
                                 >
                                   <Trash2 size={12} />
                                 </button>
@@ -1746,7 +1752,7 @@ export function PayrollClient({
                         </td>
                         <td className="py-3 px-3.5 text-center font-mono">
                           {r.totalTransaksi > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-bold text-[11px]">
                               {r.totalTransaksi} transaksi
                             </span>
                           ) : (
@@ -2790,9 +2796,9 @@ export function PayrollClient({
       {/* ========================================================= */}
       {/* MODAL 1: FORM TAMBAH / EDIT PEGAWAI TETAP */}
       {/* ========================================================= */}
-      {isPegawaiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden">
+      {mounted && isPegawaiModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <Users size={16} />
@@ -2944,15 +2950,16 @@ export function PayrollClient({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================= */}
       {/* MODAL 2: FORM INPUT / EDIT GAJI BULANAN */}
       {/* ========================================================= */}
-      {isGajiModalOpen && editingGaji && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      {mounted && isGajiModalOpen && editingGaji && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <div>
                 <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
@@ -3162,7 +3169,7 @@ export function PayrollClient({
                         });
                       }
                     }}
-                    className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold cursor-pointer"
                   >
                     Hapus Input Gaji
                   </button>
@@ -3187,15 +3194,16 @@ export function PayrollClient({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================= */}
       {/* MODAL 3: FORM INPUT / EDIT GAJI TENAGA AHLI */}
       {/* ========================================================= */}
-      {isHonorModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      {mounted && isHonorModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <CreditCard size={16} />
@@ -3468,15 +3476,16 @@ export function PayrollClient({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================= */}
       {/* MODAL 4: SLIP GAJI PEGAWAI TETAP */}
       {/* ========================================================= */}
-      {slipModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden">
+      {mounted && slipModalItem && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Slip Header */}
             <div className="p-6 border-b border-border bg-surface-subtle/50 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -3622,15 +3631,16 @@ export function PayrollClient({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================= */}
       {/* MODAL 5: MASTER DATABASE TENAGA AHLI */}
       {/* ========================================================= */}
-      {isMasterAhliModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col">
+      {mounted && isMasterAhliModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <Users size={16} />
@@ -3754,7 +3764,8 @@ export function PayrollClient({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

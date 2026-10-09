@@ -382,12 +382,20 @@ export async function getLaporanPendapatanData(
     fPph: number
   ) {
     const trimmed = noFaktur.trim().toLowerCase();
-    const matches = matchingTransactions.filter(
+    const rawMatches = matchingTransactions.filter(
       (tx) =>
         (tx.fakturId && tx.fakturId === fakturId) ||
         (tx.noBukti && tx.noBukti.trim().toLowerCase() === trimmed) ||
         (tx.keterangan && tx.keterangan.toLowerCase().includes(trimmed))
     );
+
+    // Prioritaskan transaksi asli (jurnalTransaksi) dan abaikan salinan autoPostedFromJurnal ke Buku Bank
+    // agar nilai nominal masuk, PPN, dan PPh tidak terhitung dua kali lipat
+    const nonAutoPosted = rawMatches.filter((tx) => {
+      const extra = tx.extraFieldsJson as any;
+      return !extra?.autoPostedFromJurnal;
+    });
+    const matches = nonAutoPosted.length > 0 ? nonAutoPosted : rawMatches;
 
     if (matches.length > 0) {
       // 1. Nominal masuk bank (Debit ke Kas/Bank/Aset)

@@ -54,7 +54,7 @@ export default async function LabaRugiPage({
       />
 
       <div className="flex flex-col gap-6">
-        <ValidasiPajak3ArahCard data={validasi3Arah} />
+        <ValidasiPajak3ArahCard data={validasi3Arah} entityName={selectedEntity.name} />
         <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
       </div>
     </PageTransition>

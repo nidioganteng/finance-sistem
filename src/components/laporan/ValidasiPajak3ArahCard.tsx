@@ -5,10 +5,10 @@ import type { ValidasiPajak3ArahResult } from "@/lib/validasi-pajak-3arah";
 
 export function ValidasiPajak3ArahCard({
   data,
-  entityName,
+  entityName = "Entitas Terpilih",
 }: {
   data: ValidasiPajak3ArahResult;
-  entityName: string;
+  entityName?: string;
 }) {
   return (
     <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 sm:p-6 shadow-xs space-y-4">

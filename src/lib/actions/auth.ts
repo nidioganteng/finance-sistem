@@ -1,8 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { phpFetch, ApiError } from "@/lib/api-client";
 
 export async function registerUser(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
@@ -17,13 +16,16 @@ export async function registerUser(formData: FormData) {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 10);
-    await prisma.user.create({
-      data: { name, email, passwordHash, status: "PENDING" },
+    await phpFetch("/api/auth/register", null, {
+      method: "POST",
+      body: JSON.stringify({ name, email, password }),
     });
-  } catch (e: any) {
-    if (e?.code === "P2002") {
-      return { error: "Email sudah terdaftar. Gunakan email lain atau login." };
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 409) {
+        return { error: "Email sudah terdaftar. Gunakan email lain atau login." };
+      }
+      return { error: e.message };
     }
     return { error: "Terjadi kesalahan. Coba lagi." };
   }

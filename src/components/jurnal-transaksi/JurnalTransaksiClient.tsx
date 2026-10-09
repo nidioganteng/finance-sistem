@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil, Briefcase, TrendingUp } from "lucide-react";
+import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil, Briefcase, TrendingUp, Receipt, Sparkles } from "lucide-react";
 import { saveJurnalTransaksi, deleteJurnalTransaksi } from "@/lib/actions/jurnal-transaksi";
 import { PaginationNav } from "@/components/shared/PaginationNav";
 import { CoaCombobox } from "@/components/shared/CoaCombobox";
@@ -24,6 +24,26 @@ export type ProjectOption = {
   totalTerminTagih?: number;
 };
 
+export type FakturOption = {
+  id: string;
+  noFaktur: string;
+  namaRekanan: string;
+  namaJkp: string;
+  dpp: number;
+  dppNilaiLain: number;
+  ppn: number;
+  pph: number;
+  nilaiProyek: number;
+  labaSetelahPajak: number;
+  nominalDiterima: number;
+  bank?: string | null;
+  projectId?: string | null;
+  projectCode?: string | null;
+  projectName?: string | null;
+  tahunPajak: number;
+  masaPajak: number;
+};
+
 type CoaRow = {
   uid: string;
   coaAccountId: string;
@@ -43,12 +63,13 @@ function fmtNum(raw: string) {
 }
 
 export function JurnalTransaksiClient({
-  entityKey, coa, history, projectOptions = [], page, totalPages, dari = "", sampai = "",
+  entityKey, coa, history, projectOptions = [], fakturOptions = [], page, totalPages, dari = "", sampai = "",
 }: {
   entityKey: string;
   coa: CoaOption[];
   history: JurnalTransaksiGroup[];
   projectOptions?: ProjectOption[];
+  fakturOptions?: FakturOption[];
   page: number;
   totalPages: number;
   dari?: string;
@@ -70,6 +91,7 @@ export function JurnalTransaksiClient({
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
   const [projectId, setProjectId] = useState("");
+  const [fakturId, setFakturId] = useState("");
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -81,9 +103,65 @@ export function JurnalTransaksiClient({
   const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && validRowCount >= 1 && !isPending;
 
   const selectedProject = projectOptions?.find((p) => p.id === projectId);
+  const selectedFaktur = fakturOptions?.find((f) => f.id === fakturId);
   const isOtherEntity = selectedProject?.entityKey && selectedProject.entityKey !== entityKey;
   const currentEntityProjects = (projectOptions ?? []).filter((p) => !p.entityKey || p.entityKey === entityKey);
   const otherEntityProjects = (projectOptions ?? []).filter((p) => p.entityKey && p.entityKey !== entityKey);
+
+  // Filter faktur berdasarkan proyek jika proyek dipilih
+  const currentProjectFakturs = projectId
+    ? (fakturOptions ?? []).filter((f) => f.projectId === projectId)
+    : [];
+  const otherFakturs = projectId
+    ? (fakturOptions ?? []).filter((f) => f.projectId !== projectId)
+    : (fakturOptions ?? []);
+
+  // Mapping prioritas kode bank per entitas (BPD diutamakan untuk dinas/pemda, disusul BRI, BNI, Mandiri)
+  const entityBankCodes: Record<string, string[]> = {
+    gaharu: ["22", "21", "23", "24"],      // BPD GS, BRI GS, BNI GS, MDR GS
+    kencana: ["12", "11", "13", "14"],     // BPD KAK, BRI KAK, BNI KAK, MDR KAK
+    tataring: ["31", "32"],                // BPD TB, BNI TB
+    ciptaAsri: ["41"],                     // BPD CAD
+    umum: ["51"],                          // BPD KP
+  };
+
+  // Default COA Accounts untuk automasi E-Faktur:
+  // Pilih akun Bank sesuai entitas yang sedang dibuka (bukan Kas dan bukan entitas lain)
+  const targetBankCodes = entityBankCodes[entityKey] || [];
+  const fakturBankName = selectedFaktur?.bank?.trim().toLowerCase();
+
+  const defaultBankAcc =
+    // 1. Jika ada preferensi bank dari faktur (misal "BRI" atau "BPD"), pilih bank entitas ini yang cocok
+    (fakturBankName
+      ? targetBankCodes
+          .map((code) => coa.find((c) => c.code === code))
+          .find((c) => c && c.name.toLowerCase().includes(fakturBankName))
+      : undefined) ||
+    // 2. Ambil bank utama entitas ini berdasarkan daftar kode bank resmi
+    targetBankCodes
+      .map((code) => coa.find((c) => c.code === code))
+      .find(Boolean) ||
+    // 3. Fallback: cari akun bank yang mengandung suffix entitas (GS, KAK, TB, CAD, KP)
+    coa.find(
+      (c) =>
+        /bpd|bri|bni|mdr|bank/i.test(c.name) &&
+        (entityKey === "gaharu" ? /gs|gaharu/i.test(c.name) :
+         entityKey === "kencana" ? /kak|kencana/i.test(c.name) :
+         entityKey === "tataring" ? /tb|tataring/i.test(c.name) :
+         entityKey === "ciptaAsri" ? /cad|cipta/i.test(c.name) :
+         entityKey === "umum" ? /kp/i.test(c.name) : true)
+    ) ||
+    // 4. Fallback umum: akun Bank pertama (bukan kas)
+    coa.find((c) => /^(11|12|13|14|21|22|23|24|31|32|41|51)$/.test(c.code) || /bpd|bri|bni|bank/i.test(c.name)) ||
+    coa[0];
+
+  const defaultPphAcc = coa.find((c) => c.code === "534" || /pph final|pasal 4 ayat 2/i.test(c.name))
+    || coa.find((c) => c.code.startsWith("53") && /pph/i.test(c.name))
+    || coa.find((c) => /pph/i.test(c.name));
+  const defaultPendapatanAcc = coa.find((c) => c.code === "400" || c.code === "410" || (c.code.startsWith("4") && /pendapatan/i.test(c.name)))
+    || coa.find((c) => c.kategori === "PENDAPATAN")
+    || coa.find((c) => c.code.startsWith("4"));
+  const defaultPpnAcc = coa.find((c) => c.code === "535" || /ppn/i.test(c.name));
 
   // Hitung nominal uang masuk / termin dari baris yang diisi:
   // 1. Prioritas pendapatan (kredit akun kategori PENDAPATAN atau kode 4xx)
@@ -134,6 +212,115 @@ export function JurnalTransaksiClient({
     });
   }
 
+  function handleFakturChange(newFakturId: string) {
+    setFakturId(newFakturId);
+    if (!newFakturId) return;
+    const selFaktur = (fakturOptions ?? []).find((f) => f.id === newFakturId);
+    if (!selFaktur) return;
+
+    // Otomatis isi kode proyek jika E-Faktur terdaftar di suatu proyek
+    if (selFaktur.projectId) {
+      setProjectId(selFaktur.projectId);
+    }
+
+    // Default keterangan transaksi pencairan faktur
+    const ketFaktur = `Pencairan Faktur ${selFaktur.noFaktur} - ${selFaktur.namaRekanan}`;
+    setCoaRows((prev) => {
+      if (prev.length > 0 && (!prev[0].keterangan.trim() || prev[0].keterangan.startsWith("Pendapatan Termin") || prev[0].keterangan.startsWith("Pencairan Faktur"))) {
+        const [first, ...rest] = prev;
+        return [{ ...first, keterangan: ketFaktur }, ...rest];
+      }
+      return prev;
+    });
+  }
+
+  function applyFakturRows() {
+    if (!selectedFaktur) return;
+    const pphVal = selectedFaktur.pph || 0;
+    const ppnVal = selectedFaktur.ppn || 0;
+    const dppVal = selectedFaktur.dpp || 0;
+
+    // Nilai Pendapatan bruto (nilaiProyek, atau dpp + ppn, atau dpp)
+    const pendapatanVal = selectedFaktur.nilaiProyek > 0
+      ? selectedFaktur.nilaiProyek
+      : (dppVal > 0 ? (ppnVal > 0 ? dppVal + ppnVal : dppVal) : 0);
+
+    // Nilai Bank (Netto yang masuk rekening):
+    // Jika ada labaSetelahPajak di faktur, gunakan itu. Jika tidak, sisa pendapatan dikurangi PPN dan PPh.
+    const nettoVal = selectedFaktur.labaSetelahPajak > 0
+      ? selectedFaktur.labaSetelahPajak
+      : (pendapatanVal > 0 ? Math.max(0, pendapatanVal - ppnVal - pphVal) : 0);
+
+    const ketBase = `Pencairan Faktur ${selectedFaktur.noFaktur} - ${selectedFaktur.namaRekanan}`;
+    const rows: CoaRow[] = [];
+
+    // Baris 1: Kas / Bank (Debit) - Netto yang masuk rekening (dapat disesuaikan)
+    rows.push({
+      uid: uid(),
+      coaAccountId: defaultBankAcc?.id ?? "",
+      keterangan: `${ketBase} (Bank)`,
+      arah: "debit",
+      nominalRaw: nettoVal > 0 ? fmtNum(String(nettoVal)) : "",
+    });
+
+    // Baris 2: PPN (Debit) - potongan / perlakuan PPN sesuai faktur
+    rows.push({
+      uid: uid(),
+      coaAccountId: defaultPpnAcc?.id ?? "",
+      keterangan: `PPN Faktur ${selectedFaktur.noFaktur}`,
+      arah: "debit",
+      nominalRaw: ppnVal > 0 ? fmtNum(String(ppnVal)) : "",
+    });
+
+    // Baris 3: PPh Final (Debit) - potongan PPh Final Pasal 4 Ayat 2 sesuai faktur
+    rows.push({
+      uid: uid(),
+      coaAccountId: defaultPphAcc?.id ?? "",
+      keterangan: `Potongan PPh Final - ${selectedFaktur.noFaktur}`,
+      arah: "debit",
+      nominalRaw: pphVal > 0 ? fmtNum(String(pphVal)) : "",
+    });
+
+    // Baris 4: Pendapatan (Kredit) - nilai pekerjaan / pendapatan proyek
+    rows.push({
+      uid: uid(),
+      coaAccountId: defaultPendapatanAcc?.id ?? "",
+      keterangan: `${ketBase} (Pendapatan)`,
+      arah: "kredit",
+      nominalRaw: pendapatanVal > 0 ? fmtNum(String(pendapatanVal)) : "",
+    });
+
+    setCoaRows(rows);
+  }
+
+  function addPphRow() {
+    if (!selectedFaktur || selectedFaktur.pph <= 0) return;
+    setCoaRows((prev) => [
+      ...prev,
+      {
+        uid: uid(),
+        coaAccountId: defaultPphAcc?.id ?? "",
+        keterangan: `Potongan PPh Final - ${selectedFaktur.noFaktur}`,
+        arah: "debit",
+        nominalRaw: fmtNum(String(selectedFaktur.pph)),
+      },
+    ]);
+  }
+
+  function addPpnRow() {
+    if (!selectedFaktur || selectedFaktur.ppn <= 0) return;
+    setCoaRows((prev) => [
+      ...prev,
+      {
+        uid: uid(),
+        coaAccountId: defaultPpnAcc?.id ?? "",
+        keterangan: `PPN Faktur ${selectedFaktur.noFaktur}`,
+        arah: "debit",
+        nominalRaw: fmtNum(String(selectedFaktur.ppn)),
+      },
+    ]);
+  }
+
   function applyAutoKeterangan() {
     if (!autoKeterangan) return;
     setCoaRows((prev) =>
@@ -142,7 +329,7 @@ export function JurnalTransaksiClient({
   }
 
   function resetForm() {
-    setNoBukti(""); setTanggal(todayStr()); setProjectId("");
+    setNoBukti(""); setTanggal(todayStr()); setProjectId(""); setFakturId("");
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -153,6 +340,7 @@ export function JurnalTransaksiClient({
     setNoBukti(group.noBukti);
     setTanggal(group.tanggalRaw.slice(0, 10));
     setProjectId(group.projectId ?? "");
+    setFakturId(group.fakturId ?? "");
     setCoaRows(group.rows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
@@ -191,6 +379,7 @@ export function JurnalTransaksiClient({
     fd.set("noBukti", noBukti);
     fd.set("tanggal", tanggal);
     if (projectId) fd.set("projectId", projectId);
+    if (fakturId) fd.set("fakturId", fakturId);
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
@@ -311,57 +500,184 @@ export function JurnalTransaksiClient({
               </div>
             </div>
 
-            {/* Integrasi Kode Proyek Sidamon & Simulasi Termin */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
-                  <Briefcase size={12} className="text-muted-faint" />
-                  Proyek Terkait (Sidamon)
-                  {isOtherEntity && (
-                    <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
-                      Lintas Entitas
-                    </span>
-                  )}
-                </label>
-                {selectedProject && (
-                  <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
-                    Termin Ke-{nextTerminKe}
-                  </span>
-                )}
+            {/* Integrasi E-Faktur & Proyek Sidamon */}
+            <div className="mb-5 flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* 1. E-Faktur Terkait */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
+                      <Receipt size={12} className="text-muted-faint" />
+                      E-Faktur Terkait (Opsional)
+                    </label>
+                    {selectedFaktur && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40">
+                        DPP: Rp {Math.round(selectedFaktur.dpp).toLocaleString("id-ID")}
+                      </span>
+                    )}
+                  </div>
+
+                  <select
+                    value={fakturId}
+                    onChange={(e) => handleFakturChange(e.target.value)}
+                    className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
+                  >
+                    <option value="">— Tanpa E-Faktur —</option>
+                    {currentProjectFakturs.length > 0 && (
+                      <optgroup label="E-Faktur Proyek Ini">
+                        {currentProjectFakturs.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.noFaktur} · {f.namaRekanan} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherFakturs.length > 0 && (
+                      <optgroup label={currentProjectFakturs.length > 0 ? "E-Faktur Lainnya" : "Daftar E-Faktur"}>
+                        {otherFakturs.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.noFaktur} · {f.namaRekanan} {f.projectCode ? `[${f.projectCode}]` : ""} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <p className="text-[10.5px] text-muted-faint">
+                    Pilih E-Faktur untuk mengisi otomatis proyek terkait serta menarik data PPN & PPh.
+                  </p>
+                </div>
+
+                {/* 2. Proyek Terkait (Sidamon) */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
+                      <Briefcase size={12} className="text-muted-faint" />
+                      Proyek Terkait (Sidamon)
+                      {isOtherEntity && (
+                        <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
+                          Lintas Entitas
+                        </span>
+                      )}
+                    </label>
+                    {selectedProject && (
+                      <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
+                        Termin Ke-{nextTerminKe}
+                      </span>
+                    )}
+                  </div>
+
+                  <select
+                    value={projectId}
+                    onChange={(e) => handleProjectChange(e.target.value)}
+                    className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
+                  >
+                    <option value="">— Bukan transaksi proyek —</option>
+                    {currentEntityProjects.length > 0 && (
+                      <optgroup label="Proyek Entitas Ini">
+                        {currentEntityProjects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.code}] {p.name} · Kontrak: {p.contractValueFmt ?? "-"} · Progres: {p.maxPercentage ?? 0}%
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherEntityProjects.length > 0 && (
+                      <optgroup label="Proyek Entitas Lain (Lintas Entitas)">
+                        {otherEntityProjects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.code}] {p.name} ({p.entityName ?? p.entityKey}) · Kontrak: {p.contractValueFmt ?? "-"}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <p className="text-[10.5px] text-muted-faint">
+                    Sinkronisasi termin otomatis ke Kontrol Piutang & Laporan Pendapatan.
+                  </p>
+                </div>
               </div>
 
-              <select
-                value={projectId}
-                onChange={(e) => handleProjectChange(e.target.value)}
-                className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
-              >
-                <option value="">— Bukan transaksi proyek —</option>
-                {currentEntityProjects.length > 0 && (
-                  <optgroup label="Proyek Entitas Ini">
-                    {currentEntityProjects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name} · Kontrak: {p.contractValueFmt ?? "-"} · Progres: {p.maxPercentage ?? 0}%
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {otherEntityProjects.length > 0 && (
-                  <optgroup label="Proyek Entitas Lain (Lintas Entitas)">
-                    {otherEntityProjects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name} ({p.entityName ?? p.entityKey}) · Kontrak: {p.contractValueFmt ?? "-"}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+              {/* Card E-Faktur Terpilih & Aksi Tarik Data */}
+              {selectedFaktur && (
+                <div className="rounded-[12px] border border-blue-200/80 dark:border-blue-800/40 bg-blue-50/40 dark:bg-blue-950/20 p-3.5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-[12px]">
+                    <div className="flex items-center gap-2">
+                      <Receipt size={15} className="text-blue-600 dark:text-blue-400 flex-none" />
+                      <span className="font-bold font-mono text-[12px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                        {selectedFaktur.noFaktur}
+                      </span>
+                      <span className="font-semibold text-navy-text">
+                        {selectedFaktur.namaRekanan}
+                      </span>
+                      <span className="text-[10.5px] text-muted-faint">
+                        ({selectedFaktur.namaJkp || `Masa ${selectedFaktur.masaPajak}/${selectedFaktur.tahunPajak}`})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={applyFakturRows}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-blue-600 hover:bg-blue-700 text-white text-[11.5px] font-bold shadow-sm transition-colors"
+                      title="Otomatis buat 4 baris: Bank, PPN, PPh Final, dan Pendapatan"
+                    >
+                      <Sparkles size={13} /> Tarik ke Baris Jurnal (4 Baris Seimbang)
+                    </button>
+                  </div>
 
-              {!selectedProject ? (
-                <p className="text-[10.5px] text-muted-faint mt-1">
-                  Opsional. Hubungkan transaksi ke proyek Sidamon untuk sinkronisasi termin otomatis ke Kontrol Piutang & Laporan Pendapatan.
-                </p>
-              ) : (
-                <div className="mt-2.5 rounded-[12px] border border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-950/10 p-3.5 flex flex-col gap-3">
+                  {/* 4 Metrik E-Faktur */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold">DPP (Pendapatan)</span>
+                      <span className="font-bold text-navy-text">Rp {Math.round(selectedFaktur.dpp).toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold">PPN</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400">Rp {Math.round(selectedFaktur.ppn).toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold">Potongan PPh</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">Rp {Math.round(selectedFaktur.pph).toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold">Estimasi Netto Cair</span>
+                      <span className="font-bold text-status-green">
+                        Rp {Math.round(selectedFaktur.labaSetelahPajak > 0 ? selectedFaktur.labaSetelahPajak : selectedFaktur.dpp - selectedFaktur.pph).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quick add chips */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-muted-faint text-[10.5px]">Tambah satuan baris:</span>
+                      {selectedFaktur.pph > 0 && (
+                        <button
+                          type="button"
+                          onClick={addPphRow}
+                          className="px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors font-medium text-[10.5px]"
+                        >
+                          + Baris PPh (Rp {Math.round(selectedFaktur.pph).toLocaleString("id-ID")})
+                        </button>
+                      )}
+                      {selectedFaktur.ppn > 0 && (
+                        <button
+                          type="button"
+                          onClick={addPpnRow}
+                          className="px-2 py-0.5 rounded border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors font-medium text-[10.5px]"
+                        >
+                          + Baris PPN (Rp {Math.round(selectedFaktur.ppn).toLocaleString("id-ID")})
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-faint italic">
+                      *Tarik 4 baris: Debit Bank (Netto) + Debit PPN + Debit PPh Final = Kredit Pendapatan
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Rincian & Simulasi Termin Proyek jika Proyek Terpilih */}
+              {selectedProject && (
+                <div className="rounded-[12px] border border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-950/10 p-3.5 flex flex-col gap-3">
                   {/* Top Header Row of Project Info */}
                   <div className="flex items-center justify-between flex-wrap gap-2 text-[12px]">
                     <div className="flex items-center gap-1.5">
@@ -593,7 +909,7 @@ export function JurnalTransaksiClient({
                 </button>
               </td>
               <td className="py-2 px-1.5">NO. BUKTI</td>
-              <td className="py-2 px-1.5 whitespace-nowrap">PROYEK</td>
+              <td className="py-2 px-1.5 whitespace-nowrap">PROYEK / E-FAKTUR</td>
               <td className="py-2 px-1.5">AKUN</td>
               <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5 text-right text-blue-500">DEBIT</td>
@@ -614,16 +930,28 @@ export function JurnalTransaksiClient({
                         <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
                         <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{group.noBukti}</td>
                         <td className="py-2.5 px-1.5 whitespace-nowrap">
-                          {group.project ? (
-                            <span
-                              className="inline-flex items-center gap-1 text-[10.5px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md"
-                              title={group.project.name}
-                            >
-                              {group.project.code}
-                            </span>
-                          ) : (
-                            <span className="text-muted-faint text-[12px]">—</span>
-                          )}
+                          <div className="flex flex-col gap-1 items-start">
+                            {group.project ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10.5px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md"
+                                title={group.project.name}
+                              >
+                                {group.project.code}
+                              </span>
+                            ) : null}
+                            {group.faktur ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 border border-blue-200 dark:border-blue-500/30 px-1.5 py-0.5 rounded"
+                                title={`E-Faktur: ${group.faktur.noFaktur} (${group.faktur.namaRekanan})`}
+                              >
+                                <Receipt size={9} className="text-blue-500 flex-none" />
+                                {group.faktur.noFaktur}
+                              </span>
+                            ) : null}
+                            {!group.project && !group.faktur && (
+                              <span className="text-muted-faint text-[12px]">—</span>
+                            )}
+                          </div>
                         </td>
                       </>
                     ) : (

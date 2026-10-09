@@ -8,6 +8,7 @@ import {
   isLabaDitahan,
   hitungSaldoAkhir,
   getExcludedNoBuktiForVersion,
+  isAutoPostedMirror,
 } from "./akuntansi";
 import { getPenyusutanSummary } from "./aset-tetap";
 
@@ -57,12 +58,13 @@ export async function getNeracaData(
       coaAccount: { reportCategory: { in: allowedCategories } },
       ...(excludedNoBukti.length > 0 ? { noBukti: { notIn: excludedNoBukti } } : {}),
     },
-    select: { coaAccountId: true, debit: true, kredit: true },
+    select: { coaAccountId: true, debit: true, kredit: true, extraFieldsJson: true },
   });
 
   const totalsByAccount = new Map<string, { debit: number; kredit: number }>();
   for (const t of transactions) {
     if (!t.coaAccountId) continue;
+    if (isAutoPostedMirror(t)) continue;
     const cur = totalsByAccount.get(t.coaAccountId) ?? { debit: 0, kredit: 0 };
     cur.debit += Number(t.debit);
     cur.kredit += Number(t.kredit);

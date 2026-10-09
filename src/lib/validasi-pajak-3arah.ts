@@ -26,6 +26,8 @@ export interface ValidasiPajak3ArahResult {
   items: ValidasiPajakItem[];
 }
 
+export type ValidasiPajak3ArahData = ValidasiPajak3ArahResult;
+
 /**
  * Validasi 3-Arah (Issue 88):
  * Membandingkan nilai Dasar Pengenaan Pajak / Omzet, PPN, dan PPh Final antara:
@@ -34,13 +36,16 @@ export interface ValidasiPajak3ArahResult {
  * 3. Laporan Laba Rugi & Neraca
  */
 export async function getValidasiPajak3Arah(
-  entityIds: string[],
-  year: number
+  entityIds: string[] | string,
+  year: number,
+  version: string = "INTERNAL"
 ): Promise<ValidasiPajak3ArahResult> {
+  const ids = Array.isArray(entityIds) ? entityIds : [entityIds];
+
   // 1. Data dari Laporan Pendapatan (Faktur)
   const fakturs = await prisma.fakturPendapatan.findMany({
     where: {
-      entityId: { in: entityIds },
+      entityId: { in: ids },
       tahunPajak: year,
     },
     select: {
@@ -63,7 +68,7 @@ export async function getValidasiPajak3Arah(
   // 2. Data dari Jurnal Umum (Transaksi Aktual yang bukan mirror Buku Bank)
   const txRows = await prisma.transaction.findMany({
     where: {
-      entityId: { in: entityIds },
+      entityId: { in: ids },
       tanggal: {
         gte: new Date(`${year}-01-01`),
         lte: new Date(`${year}-12-31T23:59:59`),
@@ -114,8 +119,8 @@ export async function getValidasiPajak3Arah(
   let totalLrPpn = 0;
   let totalLrPph = 0;
 
-  for (const eid of entityIds) {
-    const lr = await getLabaRugiData(eid, year, undefined, "INTERNAL");
+  for (const eid of ids) {
+    const lr = await getLabaRugiData(eid, year, undefined, version);
     totalLrDpp += lr.totalPendapatan;
 
     for (const b of lr.bebanList) {

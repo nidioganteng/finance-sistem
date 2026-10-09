@@ -16,7 +16,7 @@ export default async function CoaPage() {
   return (
     <PageTransition>
       <PageHeader title="Bagan Akun" subtitle="Kelola daftar akun keuangan (Chart of Accounts)" />
-      <CoaClient initialCoa={coa} canDelete={true} />
+      <CoaClient initialCoa={coa as any} canDelete={true} />
     </PageTransition>
   );
 }

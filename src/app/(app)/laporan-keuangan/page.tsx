@@ -1,5 +1,4 @@
 import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
@@ -41,7 +40,7 @@ export default async function LaporanKeuanganPage({
 
   const [data, taxData, arusKasPresisiData] = await Promise.all([
     getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
-    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion),
+    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion, selectedEntity.name),
     tab === "arus-kas"
       ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
       : Promise.resolve(null),

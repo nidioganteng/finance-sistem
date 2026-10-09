@@ -41,7 +41,7 @@ export default async function LaporanHutangPiutangPage({
   const isGrup = !selectedEntity || selectedKey === "grup";
 
   const [entityData, grupData] = await Promise.all([
-    selectedEntity ? getLaporanHutangPiutangEntityData(selectedEntity.id, currentYear) : null,
+    selectedEntity ? getLaporanHutangPiutangEntityData(selectedEntity.key, currentYear) : null,
     isGrup && canGrup ? getLaporanHutangPiutangGrupData(currentYear) : null,
   ]);
 

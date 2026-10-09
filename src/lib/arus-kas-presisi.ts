@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { getPenyusutanSummary } from "./aset-tetap";
+import { isAutoPostedMirror } from "./akuntansi";
 import type { ReportVersion } from "./laba-rugi";
 
 export interface ArusKasRow {
@@ -114,7 +115,7 @@ export async function getArusKasPresisiData(
     }),
   ]);
 
-  const activeTx = transactions;
+  const activeTx = transactions.filter((t) => !isAutoPostedMirror(t));
 
   // Map Saldo Awal per CoaAccount ID & Code
   const saldoAwalMap = new Map<string, number>();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { getLaporanPendapatanData } from "@/lib/pendapatan";
 import { generateLaporanPendapatanExcel } from "@/lib/pendapatan-excel";
 
@@ -19,24 +19,27 @@ export async function GET(req: NextRequest) {
   const masaPajakParam = searchParams.get("masaPajak");
   const masaPajak = masaPajakParam ? parseInt(masaPajakParam) : null;
 
+  const token = await getPhpToken().catch(() => null);
+  if (!token) return new NextResponse("Unauthorized", { status: 401 });
+
   let targetEntityId = entityId;
 
   if (!targetEntityId && entityKey) {
-    const ent = await prisma.entity.findUnique({
-      where: { key: entityKey },
-      select: { id: true, key: true },
-    });
-    if (ent) targetEntityId = ent.id;
+    try {
+      const ent = await phpFetch<{ id: string; key: string }>(`/api/entities?key=${encodeURIComponent(entityKey)}`, token);
+      if (ent?.id) targetEntityId = ent.id;
+    } catch { /* entity not found */ }
   }
 
   if (!targetEntityId) {
     return new NextResponse("Entity ID is required", { status: 400 });
   }
 
-  const entity = await prisma.entity.findUnique({
-    where: { id: targetEntityId },
-    select: { id: true, key: true, name: true },
-  });
+  let entity: { id: string; key: string; name: string } | null = null;
+  try {
+    const all = await phpFetch<{ id: string; key: string; name: string }[]>("/api/entities", token);
+    entity = (Array.isArray(all) ? all : []).find((e) => e.id === targetEntityId) ?? null;
+  } catch { /* ignore */ }
 
   if (!entity) {
     return new NextResponse("Entity not found", { status: 404 });

@@ -33,7 +33,11 @@ export async function createAsetTetapAction(data: AsetTetapInput) {
   if (!data.kode.trim()) throw new Error("Kode/Tagging aset wajib diisi.");
   if (!data.nama.trim()) throw new Error("Nama aset wajib diisi.");
   if (data.hargaPerolehan <= 0) throw new Error("Harga perolehan harus lebih dari 0.");
-  if (data.umurBulan <= 0) throw new Error("Umur ekonomis harus lebih dari 0 bulan.");
+  if (data.kategori !== "TANAH" && data.umurBulan <= 0) {
+    throw new Error("Umur ekonomis harus lebih dari 0 bulan.");
+  }
+
+  const umurBulanFinal = data.kategori === "TANAH" ? 0 : data.umurBulan;
 
   const created = await prisma.asetTetap.create({
     data: {
@@ -43,8 +47,8 @@ export async function createAsetTetapAction(data: AsetTetapInput) {
       kategori: data.kategori || "KENDARAAN",
       tanggalPerolehan: new Date(data.tanggalPerolehan),
       hargaPerolehan: data.hargaPerolehan,
-      nilaiResidu: data.nilaiResidu ?? 0,
-      umurBulan: data.umurBulan,
+      nilaiResidu: data.kategori === "TANAH" ? data.hargaPerolehan : (data.nilaiResidu ?? 0),
+      umurBulan: umurBulanFinal,
       metode: "GARIS_LURUS",
       keterangan: data.keterangan?.trim() || null,
     },

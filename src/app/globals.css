@@ -13,6 +13,7 @@
 :root {
   --color-navy: 15 23 41;
   --color-navy-text: 15 23 42;
+  --color-navy-soft: 100 116 139;
   --color-brand: 59 111 237;
   --color-brand-hover: 41 82 196;
   --color-brand-soft: 109 94 245;
@@ -39,6 +40,7 @@
 :root.dark {
   --color-navy: 65 96 158;
   --color-navy-text: 241 245 249;
+  --color-navy-soft: 148 163 184;
   --color-surface-page: 10 14 24;
   --color-surface-card: 17 24 39;
   --color-surface-subtle: 23 31 46;

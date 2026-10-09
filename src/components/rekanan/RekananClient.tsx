@@ -214,7 +214,7 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
         {canManage && (
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-navy hover:opacity-90 text-white text-xs font-bold rounded-xl transition-opacity shadow-xs cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             Tambah Rekanan Baru
@@ -237,7 +237,7 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
               onClick={() => setSelectedTipe(tab.key)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
                 selectedTipe === tab.key
-                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                  ? "bg-navy text-white border-navy shadow-xs"
                   : "bg-surface-card text-navy-soft border-border-soft hover:bg-surface-hover hover:text-navy-text"
               }`}
             >
@@ -671,7 +671,7 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-navy hover:opacity-90 rounded-xl transition-opacity shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {isPending ? "Menyimpan..." : "Simpan Rekanan"}
                 </button>

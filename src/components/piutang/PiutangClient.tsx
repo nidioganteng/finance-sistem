@@ -965,7 +965,13 @@ export function PiutangClient({
                                                           </span>
                                                         </td>
                                                         <td className="py-2.5 px-3 whitespace-nowrap">
-                                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-surface-subtle text-muted-stronger border border-border">
+                                                          <span
+                                                            className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                                                              exp.sumberKasBank.startsWith("Talangan")
+                                                                ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 font-semibold"
+                                                                : "bg-surface-subtle text-muted-stronger border-border"
+                                                            }`}
+                                                          >
                                                             {exp.sumberKasBank}
                                                           </span>
                                                         </td>
@@ -1140,45 +1146,57 @@ export function PiutangClient({
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Gross (Kwitansi) */}
-                  <div className="p-3 rounded-xl bg-surface-subtle border border-border-subtle">
-                    <div className="text-[11px] text-muted-faint font-medium">Nilai Kwitansi / Bruto Pendapatan</div>
-                    <div className="text-base font-bold font-mono text-navy-text mt-0.5">
+                  <div className="p-3 rounded-xl bg-surface-subtle border border-border-subtle min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-muted-faint font-medium truncate">Nilai Kwitansi / Bruto Pendapatan</div>
+                    <div
+                      className="text-base font-bold font-mono text-navy-text mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.grossFmt || selectedTerminForModal.termin.nominalFmt}
+                    >
                       {selectedTerminForModal.termin.breakdown?.grossFmt || selectedTerminForModal.termin.nominalFmt}
                     </div>
-                    <div className="text-[10px] text-muted-faint mt-1">
+                    <div className="text-[10px] text-muted-faint mt-1 truncate">
                       Kredit Akun 400 (Pendapatan diakui)
                     </div>
                   </div>
 
                   {/* DPP Dasar & DPP Nilai Lain */}
-                  <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
-                    <div className="text-[11px] text-blue-800 dark:text-blue-300 font-medium">Dasar Pengenaan Pajak (DPP)</div>
-                    <div className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-blue-800 dark:text-blue-300 font-medium truncate">Dasar Pengenaan Pajak (DPP)</div>
+                    <div
+                      className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.dppFmt || "Rp 0"}
+                    >
                       {selectedTerminForModal.termin.breakdown?.dppFmt || "Rp 0"}
                     </div>
-                    <div className="text-[10px] text-blue-700/80 dark:text-blue-400 mt-1">
+                    <div className="text-[10px] text-blue-700/80 dark:text-blue-400 mt-1 truncate">
                       DPP Nilai Lain (11/12): <span className="font-mono font-semibold">{selectedTerminForModal.termin.breakdown?.dppNilaiLainFmt || "Rp 0"}</span>
                     </div>
                   </div>
 
                   {/* PPN Terutang */}
-                  <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-                    <div className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">PPN Terutang (12%)</div>
-                    <div className="text-base font-bold font-mono text-amber-900 dark:text-amber-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-amber-800 dark:text-amber-300 font-medium truncate">PPN Terutang (12%)</div>
+                    <div
+                      className="text-base font-bold font-mono text-amber-900 dark:text-amber-200 mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.ppnFmt || "Rp 0"}
+                    >
                       {selectedTerminForModal.termin.breakdown?.ppnFmt || "Rp 0"}
                     </div>
-                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400 mt-1">
+                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400 mt-1 truncate">
                       12% × DPP Nilai Lain (= 11% × DPP Dasar)
                     </div>
                   </div>
 
                   {/* Potongan PPh */}
-                  <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40">
-                    <div className="text-[11px] text-purple-800 dark:text-purple-300 font-medium">Potongan Pajak (PPh)</div>
-                    <div className="text-base font-bold font-mono text-purple-900 dark:text-purple-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40 min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-purple-800 dark:text-purple-300 font-medium truncate">Potongan Pajak (PPh)</div>
+                    <div
+                      className="text-base font-bold font-mono text-purple-900 dark:text-purple-200 mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.pphFmt || "Rp 0"}
+                    >
                       {selectedTerminForModal.termin.breakdown?.pphFmt || "Rp 0"}
                     </div>
-                    <div className="text-[10px] text-purple-700/80 dark:text-purple-400 mt-1">
+                    <div className="text-[10px] text-purple-700/80 dark:text-purple-400 mt-1 truncate">
                       {selectedTerminForModal.termin.breakdown?.pphItems && selectedTerminForModal.termin.breakdown.pphItems.length > 0 ? (
                         selectedTerminForModal.termin.breakdown.pphItems.map((p, idx) => (
                           <span key={idx} className="mr-2">
@@ -1193,22 +1211,25 @@ export function PiutangClient({
                 </div>
 
                 {/* Net Kas Masuk Bank */}
-                <div className="mt-3 p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                <div className="mt-3 p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between min-w-0 gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
                       <Landmark size={18} />
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200 truncate">
                         Bersih Diterima di Rekening Bank
                       </div>
-                      <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400">
+                      <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400 truncate">
                         {selectedTerminForModal.termin.breakdown?.bank || "Kas / Bank"}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold font-mono text-indigo-900 dark:text-indigo-100">
+                  <div className="text-right min-w-0 shrink-0">
+                    <div
+                      className="text-lg font-bold font-mono text-indigo-900 dark:text-indigo-100 truncate"
+                      title={selectedTerminForModal.termin.breakdown?.netBankFmt || selectedTerminForModal.termin.nominalFmt}
+                    >
                       {selectedTerminForModal.termin.breakdown?.netBankFmt || selectedTerminForModal.termin.nominalFmt}
                     </div>
                     <div className="text-[10px] text-indigo-600 dark:text-indigo-400">

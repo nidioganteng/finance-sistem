@@ -9,26 +9,28 @@ function AkunTable({ rows, emptyMsg }: { rows: Row[]; emptyMsg: string }) {
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[560px]">
+      <table className="w-full text-sm min-w-[640px]">
         <thead>
-          <tr className="border-b border-surface-hover text-left">
-            <th className="py-3 px-5 text-[11px] font-bold text-muted-faint uppercase">Kode</th>
+          <tr className="border-b border-surface-hover text-left bg-surface-subtle/50">
+            <th className="py-3 px-5 text-[11px] font-bold text-muted-faint uppercase w-20">Kode</th>
             <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Nama Akun</th>
-            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Masuk</th>
-            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Keluar</th>
-            <th className="py-3 px-5 text-[11px] font-bold text-muted-faint uppercase text-right">Saldo Bersih</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Saldo Awal</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Penambahan</th>
+            <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Pengurangan</th>
+            <th className="py-3 px-5 text-[11px] font-bold text-muted-faint uppercase text-right">Saldo Akhir</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.code} className="border-b border-surface-subtle hover:bg-surface-hover/30">
-              <td className="py-3 px-5 font-mono text-[12px] text-muted">{r.code}</td>
+            <tr key={r.code} className="border-b border-surface-subtle hover:bg-surface-hover/30 transition-colors">
+              <td className="py-3 px-5 font-mono text-[12px] font-semibold text-muted">{r.code}</td>
               <td className="py-3 px-3 font-semibold text-navy-text text-[13px]">{r.name}</td>
+              <td className="py-3 px-3 text-right tabular-nums text-[13px] font-medium text-muted">{r.saldoAwalFmt}</td>
               <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-green font-medium">{r.masukFmt}</td>
               <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-red font-medium">{r.keluarFmt}</td>
               <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold">
-                <span className={r.saldoPositif ? "text-status-green" : "text-status-red"}>
-                  {r.saldoPositif ? "+" : "-"}{r.saldoFmt}
+                <span className={r.saldoPositif ? "text-navy-text font-black" : "text-status-red font-black"}>
+                  {r.saldoFmt}
                 </span>
               </td>
             </tr>
@@ -44,24 +46,24 @@ export function UtangAsetView({ data }: { data: Data }) {
     <div className="flex flex-col gap-5">
       {/* KPI ringkasan */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-surface-card border border-border-soft rounded-[16px] p-5">
+        <div className="bg-surface-card border border-border-soft rounded-[16px] p-5 shadow-xs">
           <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Total Aset Bersih</div>
-          <div className="text-[18px] font-extrabold text-status-green tabular-nums">{data.aset.totalFmt}</div>
-          <div className="text-[12px] text-muted mt-0.5">{data.aset.rows.length} akun aset</div>
+          <div className="text-[20px] font-black text-status-green tabular-nums">{data.aset.totalFmt}</div>
+          <div className="text-[12px] text-muted mt-0.5 font-medium">{data.aset.rows.length} akun aset</div>
         </div>
-        <div className="bg-surface-card border border-border-soft rounded-[16px] p-5">
-          <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Total Utang</div>
-          <div className={`text-[18px] font-extrabold tabular-nums ${data.utang.total > 0 ? "text-status-red" : "text-status-green"}`}>
+        <div className="bg-surface-card border border-border-soft rounded-[16px] p-5 shadow-xs">
+          <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Total Kewajiban Utang</div>
+          <div className={`text-[20px] font-black tabular-nums ${data.utang.total > 0 ? "text-status-red" : "text-status-green"}`}>
             {data.utang.totalFmt}
           </div>
-          <div className="text-[12px] text-muted mt-0.5">{data.utang.rows.length} akun kewajiban</div>
+          <div className="text-[12px] text-muted mt-0.5 font-medium">{data.utang.rows.length} akun kewajiban lengkap</div>
         </div>
-        <div className="bg-surface-card border border-border-soft rounded-[16px] p-5">
-          <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Aset Bersih – Utang</div>
-          <div className={`text-[18px] font-extrabold tabular-nums ${data.networthPositif ? "text-status-green" : "text-status-red"}`}>
+        <div className="bg-surface-card border border-border-soft rounded-[16px] p-5 shadow-xs">
+          <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Aset Bersih – Utang (Ekuitas)</div>
+          <div className={`text-[22px] font-black tabular-nums ${data.networthPositif ? "text-status-green" : "text-status-red"}`}>
             {data.networthPositif ? "+" : "-"}{data.networthFmt}
           </div>
-          <div className="text-[12px] text-muted mt-0.5">ekuitas bersih {data.year}</div>
+          <div className="text-[12px] text-muted mt-0.5 font-medium">Posisi ekuitas bersih tahun {data.year}</div>
         </div>
       </div>
 

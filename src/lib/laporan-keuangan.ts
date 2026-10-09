@@ -10,7 +10,11 @@ import {
   getExcludedNoBuktiForVersion,
   isAutoPostedMirror,
 } from "./akuntansi";
-import { calculateAsetDepreciation } from "./aset-tetap";
+import {
+  calculateAsetDepreciation,
+  STANDAR_KATEGORI_ASET,
+  type RekapKategoriAset,
+} from "./aset-tetap";
 
 export type CoaLine = {
   code: string;
@@ -107,6 +111,29 @@ export async function getLaporanKeuanganData(
   const totalHargaPerolehanAset = activeAssets.reduce((s, a) => s + a.hargaPerolehanNum, 0);
   const totalBebanPenyusutanAset = activeAssets.reduce((s, a) => s + a.bebanPeriodeIni, 0);
   const totalAkumulasiPenyusutanAset = activeAssets.reduce((s, a) => s + a.akumulasiPenyusutan, 0);
+
+  // Agregasi 4 Kategori Utama Aktiva Tetap untuk Neraca (Issue 88 Poin 3)
+  const rekapPerKategoriAset: RekapKategoriAset[] = STANDAR_KATEGORI_ASET.map((kat) => {
+    const groupAssets = activeAssets.filter((a) => a.kategoriStandar === kat.key);
+    const hp = groupAssets.reduce((s, a) => s + a.hargaPerolehanNum, 0);
+    const ak = groupAssets.reduce((s, a) => s + a.akumulasiPenyusutan, 0);
+    const bp = groupAssets.reduce((s, a) => s + a.bebanPeriodeIni, 0);
+    const nb = hp - ak;
+
+    return {
+      kategori: kat.key,
+      label: kat.label,
+      totalHargaPerolehan: hp,
+      totalAkumulasiPenyusutan: ak,
+      totalBebanPenyusutan: bp,
+      totalNilaiBuku: nb,
+      totalHargaPerolehanFmt: formatRupiah(hp),
+      totalAkumulasiPenyusutanFmt: formatRupiah(ak),
+      totalBebanPenyusutanFmt: formatRupiah(bp),
+      totalNilaiBukuFmt: formatRupiah(nb),
+      jumlahAset: groupAssets.length,
+    };
+  });
 
   // ── Laba Rugi ──────────────────────────────────────────────────────
   const pendapatan: CoaLine[] = [];
@@ -375,6 +402,7 @@ export async function getLaporanKeuanganData(
     // ── Neraca
     aktivaLancar,
     aktivaTetap,
+    rekapPerKategoriAset,
     totalAktivaLancar,
     totalAktivaTetap,
     totalAktiva,

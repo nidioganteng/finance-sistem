@@ -108,16 +108,9 @@ async function resolveCrossingDebitCoa(
   const coa = primaryRowCoaId ? await prisma.coaAccount.findUnique({ where: { id: primaryRowCoaId } }) : null;
   if (!coa) return null;
 
-  if (coa.kategori === "BEBAN") {
-    return {
-      coaAccountId: coa.id,
-      role: "BEBAN",
-    };
-  }
-
   return {
     coaAccountId: coa.id,
-    role: "PIUTANG",
+    role: coa.kategori === "BEBAN" ? "BEBAN" : "PIUTANG",
   };
 }
 

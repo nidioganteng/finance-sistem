@@ -447,8 +447,18 @@ export function JurnalTransaksiClient({
         </div>
         <button
           onClick={() => { if (panelOpen && !editingGroup) { setPanelOpen(false); resetForm(); } else openPanel(); }}
-          className="px-7 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity">
-          {panelOpen && !editingGroup ? "Tutup Form" : "+ Entry Jurnal"}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer">
+          {panelOpen && !editingGroup ? (
+            <>
+              <X size={14} className="flex-none" />
+              <span>Tutup Form</span>
+            </>
+          ) : (
+            <>
+              <Plus size={14} className="flex-none" />
+              <span>Entry Jurnal</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -625,21 +635,21 @@ export function JurnalTransaksiClient({
 
                   {/* 4 Metrik E-Faktur */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
-                      <span className="text-muted-faint block text-[10px] uppercase font-bold">DPP (Pendapatan)</span>
-                      <span className="font-bold text-navy-text">Rp {Math.round(selectedFaktur.dpp).toLocaleString("id-ID")}</span>
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle min-w-0 overflow-hidden" title={`DPP: Rp ${Math.round(selectedFaktur.dpp).toLocaleString("id-ID")}`}>
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold truncate">DPP (Pendapatan)</span>
+                      <span className="font-bold font-mono text-navy-text truncate block">Rp {Math.round(selectedFaktur.dpp).toLocaleString("id-ID")}</span>
                     </div>
-                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
-                      <span className="text-muted-faint block text-[10px] uppercase font-bold">PPN</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">Rp {Math.round(selectedFaktur.ppn).toLocaleString("id-ID")}</span>
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle min-w-0 overflow-hidden" title={`PPN: Rp ${Math.round(selectedFaktur.ppn).toLocaleString("id-ID")}`}>
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold truncate">PPN</span>
+                      <span className="font-bold font-mono text-blue-600 dark:text-blue-400 truncate block">Rp {Math.round(selectedFaktur.ppn).toLocaleString("id-ID")}</span>
                     </div>
-                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
-                      <span className="text-muted-faint block text-[10px] uppercase font-bold">Potongan PPh</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">Rp {Math.round(selectedFaktur.pph).toLocaleString("id-ID")}</span>
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle min-w-0 overflow-hidden" title={`Potongan PPh: Rp ${Math.round(selectedFaktur.pph).toLocaleString("id-ID")}`}>
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold truncate">Potongan PPh</span>
+                      <span className="font-bold font-mono text-amber-600 dark:text-amber-400 truncate block">Rp {Math.round(selectedFaktur.pph).toLocaleString("id-ID")}</span>
                     </div>
-                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle">
-                      <span className="text-muted-faint block text-[10px] uppercase font-bold">Estimasi Netto Cair</span>
-                      <span className="font-bold text-status-green">
+                    <div className="bg-surface-card p-2 rounded-[8px] border border-border-subtle min-w-0 overflow-hidden" title={`Estimasi Netto: Rp ${Math.round(selectedFaktur.labaSetelahPajak > 0 ? selectedFaktur.labaSetelahPajak : selectedFaktur.dpp - selectedFaktur.pph).toLocaleString("id-ID")}`}>
+                      <span className="text-muted-faint block text-[10px] uppercase font-bold truncate">Estimasi Netto Cair</span>
+                      <span className="font-bold font-mono text-status-green truncate block">
                         Rp {Math.round(selectedFaktur.labaSetelahPajak > 0 ? selectedFaktur.labaSetelahPajak : selectedFaktur.dpp - selectedFaktur.pph).toLocaleString("id-ID")}
                       </span>
                     </div>

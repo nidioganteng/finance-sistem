@@ -37,6 +37,7 @@ const config: Config = {
           // dibikin lebih terang (lihat :root.dark di globals.css).
           DEFAULT: withOpacity("--color-navy"),
           text: withOpacity("--color-navy-text"),
+          soft: withOpacity("--color-navy-soft"),
         },
         brand: {
           DEFAULT: "#3b6fed",

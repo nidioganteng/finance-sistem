@@ -486,10 +486,10 @@ export async function saveJurnalTransaksi(formData: FormData) {
         }
       }
     }
+  }
 
-    if (projectId) {
-      await syncProjectSpend(projectId);
-    }
+  if (projectId) {
+    await syncProjectSpend(projectId);
   }
 
   logActivity(

@@ -193,10 +193,16 @@ export async function getInterEntityBalances(entityId: string): Promise<InterEnt
     ...Object.values(HUTANG_CODE_TO_ENTITY),
   ];
   const uniqueKeys = [...new Set(allEntityKeys)];
-  const entities = await prisma.entity.findMany({
-    where: { key: { in: uniqueKeys } },
-    select: { key: true, name: true },
-  });
+  const [entities, currentEntity] = await Promise.all([
+    prisma.entity.findMany({
+      where: { key: { in: uniqueKeys } },
+      select: { key: true, name: true },
+    }),
+    prisma.entity.findUnique({
+      where: { id: entityId },
+      select: { key: true },
+    }),
+  ]);
   const entityNameByKey = new Map(entities.map((e) => [e.key, e.name]));
 
   const balances: InterEntityBalance[] = [];
@@ -220,6 +226,9 @@ export async function getInterEntityBalances(entityId: string): Promise<InterEnt
     const counterpartyKey = isPiutang
       ? PIUTANG_CODE_TO_ENTITY[code]
       : HUTANG_CODE_TO_ENTITY[code];
+
+    // Jangan sertakan akun piutang/hutang ke entitas sendiri
+    if (currentEntity && counterpartyKey === currentEntity.key) continue;
 
     const coa = coaByCode.get(code);
     if (!coa) continue;
@@ -326,7 +335,7 @@ export function computeNewTerminPercentage(
 
 export async function getPiutangData(entityId: string | string[]) {
   const ids = Array.isArray(entityId) ? entityId : [entityId];
-  const [projects, loadingDockList] = await Promise.all([
+  const [projects, loadingDockList, allEntities] = await Promise.all([
     prisma.project.findMany({
       where: { entityId: { in: ids }, status: { in: ["ACTIVE", "CANCELLED", "COMPLETED"] } },
       include: {
@@ -339,7 +348,11 @@ export async function getPiutangData(entityId: string | string[]) {
           orderBy: { tanggalTerima: "asc" },
         },
         jurnal: {
-          include: { coaAccount: true, jenisInput: true },
+          include: {
+            coaAccount: true,
+            jenisInput: true,
+            entity: { select: { id: true, key: true, name: true } },
+          },
           orderBy: { tanggal: "desc" },
         },
       },
@@ -349,7 +362,12 @@ export async function getPiutangData(entityId: string | string[]) {
       where: { entityId: { in: ids } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.entity.findMany({
+      select: { id: true, key: true, name: true },
+    }),
   ]);
+
+  const entityNameByKey = new Map(allEntities.map((e) => [e.key, e.name]));
 
   const now = new Date();
   let totalKontrak = 0;
@@ -566,30 +584,80 @@ export async function getPiutangData(entityId: string | string[]) {
       if (m && m[1]) incomeNoBuktis.add(m[1]);
     });
 
-    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, Pajak Proyek, dll.)
-    const expenseRows = projectJurnal.filter((j) => {
-      // Jika transaksi ini merupakan penerimaan termin:
-      // Hanya sertakan potongan pajak proyek (PPh/PPN/Pajak), abaikan kas/bank masuk atau piutang.
+    // 2. Kumpulkan baris pengeluaran proyek (Beban: Pembelian Material, Upah/Gaji, Operasional, Pajak Proyek,
+    //    serta sinkronisasi talangan lintas entitas tanpa double counting)
+    const seenCrossKeys = new Set<string>();
+    type ExpenseRow = typeof projectJurnal[number] & { sumberKasBankCustom?: string };
+    const expenseRows: ExpenseRow[] = [];
+
+    // Prioritas 1: Crossing entries di entitas pemilik proyek (talangan dari entitas lain yang dicatat ke proyek ini)
+    for (const j of projectJurnal) {
+      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) continue;
+      const extra = j.extraFieldsJson as Record<string, unknown> | null;
+      if (j.entityId === p.entityId && extra?.isCrossingEntry && Number(j.debit) > 0) {
+        const fromKey = typeof extra.crossingFromEntityKey === "string" ? extra.crossingFromEntityKey : "";
+        const fromName = entityNameByKey.get(fromKey) || fromKey;
+        const rekNama = typeof extra.crossingFromRekeningNama === "string" ? extra.crossingFromRekeningNama : "";
+        const sumberKasBankCustom = `Talangan ${fromName}${rekNama ? ` (${rekNama})` : ""}`;
+        expenseRows.push(Object.assign(j, { sumberKasBankCustom }));
+
+        if (typeof extra.crossingGroupId === "string") seenCrossKeys.add(extra.crossingGroupId);
+        if (j.noBukti) seenCrossKeys.add(j.noBukti);
+      }
+    }
+
+    // Prioritas 2: Transaksi normal di entitas proyek sendiri (dan potongan pajak penerimaan termin)
+    for (const j of projectJurnal) {
+      const extra = j.extraFieldsJson as Record<string, unknown> | null;
+      // Jika penerimaan termin: hanya potongan pajak proyek
       if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
         const isTaxDeduction =
           Number(j.debit) > 0 &&
           (j.coaAccount?.kategori === "BEBAN" ||
             /pph|pajak|ppn|bupot/i.test(j.coaAccount?.name ?? "") ||
             /pph|pajak|ppn|potongan/i.test(j.keterangan ?? ""));
-        return isTaxDeduction;
+        if (isTaxDeduction) {
+          expenseRows.push(j);
+        }
+        continue;
       }
 
-      // Untuk transaksi non-pendapatan termin:
-      const isBeban =
-        j.coaAccount?.kategori === "BEBAN" ||
-        j.coaAccount?.code?.startsWith("5") ||
-        j.coaAccount?.code?.startsWith("6");
-      if (isBeban && Number(j.debit) > 0) return true;
-      if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
-        return true;
+      // Transaksi normal non-crossing di entitas proyek
+      if (j.entityId === p.entityId && !extra?.isCrossingEntry) {
+        const isBeban =
+          j.coaAccount?.kategori === "BEBAN" ||
+          j.coaAccount?.code?.startsWith("5") ||
+          j.coaAccount?.code?.startsWith("6");
+        if (isBeban && Number(j.debit) > 0) {
+          expenseRows.push(j);
+        } else if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
+          expenseRows.push(j);
+        }
       }
-      return false;
-    });
+    }
+
+    // Prioritas 3: Transaksi pengeluaran dari entitas rekanan untuk proyek ini
+    // (jika belum tercakup oleh crossing entry di entitas proyek)
+    for (const j of projectJurnal) {
+      if (j.noBukti && incomeNoBuktis.has(j.noBukti)) continue;
+      if (j.entityId !== p.entityId && Number(j.debit) > 0) {
+        const extra = j.extraFieldsJson as Record<string, unknown> | null;
+        const gid = typeof extra?.crossingGroupId === "string" ? extra.crossingGroupId : null;
+        if (gid && seenCrossKeys.has(gid)) continue;
+        if (j.noBukti && seenCrossKeys.has(j.noBukti)) continue;
+
+        const counterpart = projectJurnal.find(
+          (c) => c.noBukti === j.noBukti && c.entityId === j.entityId && Number(c.kredit) > 0 && c.id !== j.id
+        );
+        const rekNama = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
+        const fromEntityName = j.entity?.name || "Entitas Rekanan";
+        const sumberKasBankCustom = `Talangan ${fromEntityName} (${rekNama})`;
+
+        expenseRows.push(Object.assign(j, { sumberKasBankCustom }));
+        if (gid) seenCrossKeys.add(gid);
+        if (j.noBukti) seenCrossKeys.add(j.noBukti);
+      }
+    }
 
     const expenseItems: ProjectExpenseItem[] = expenseRows.map((j) => {
       const nominal = Number(j.debit);
@@ -604,19 +672,24 @@ export async function getPiutangData(entityId: string | string[]) {
         kategoriBeban = "Bahan & Material";
       } else if (/transport|perjalanan|bensin|bbm|solar|konsumsi|makan|listrik|telepon|pdam|survey|sewa|akomodasi/i.test(txt)) {
         kategoriBeban = "Operasional & Transport";
+      } else if (j.sumberKasBankCustom) {
+        kategoriBeban = "Operasional & Transport";
       }
 
       // Cari baris pasangan dengan noBukti yang sama yang memiliki kredit > 0 (sumber kas/bank)
-      const counterpart = projectJurnal.find(
-        (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
-      );
-      let sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
-      if (
-        counterpart &&
-        (counterpart.coaAccount?.kategori === "PENDAPATAN" ||
-          /pendapatan/i.test(counterpart.coaAccount?.name ?? ""))
-      ) {
-        sumberKasBank = "Potongan Penerimaan Termin";
+      let sumberKasBank = j.sumberKasBankCustom;
+      if (!sumberKasBank) {
+        const counterpart = projectJurnal.find(
+          (c) => c.noBukti === j.noBukti && Number(c.kredit) > 0 && c.id !== j.id
+        );
+        sumberKasBank = counterpart?.coaAccount?.name || counterpart?.jenisInput?.nama || "Kas / Bank";
+        if (
+          counterpart &&
+          (counterpart.coaAccount?.kategori === "PENDAPATAN" ||
+            /pendapatan/i.test(counterpart.coaAccount?.name ?? ""))
+        ) {
+          sumberKasBank = "Potongan Penerimaan Termin";
+        }
       }
 
       return {
@@ -729,14 +802,17 @@ export async function getPiutangData(entityId: string | string[]) {
 
 /**
  * Sinkronisasi kolom `spend` pada model Project dengan data Jurnal Umum.
- * Menghitung akumulasi pengeluaran riil termasuk potongan pajak proyek (Issue 85).
+ * Menghitung akumulasi pengeluaran riil termasuk potongan pajak proyek dan talangan lintas entitas.
  */
 export async function syncProjectSpend(projectId: string): Promise<number> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
       jurnal: {
-        include: { coaAccount: true },
+        include: {
+          coaAccount: true,
+          entity: { select: { id: true, key: true, name: true } },
+        },
       },
     },
   });
@@ -758,8 +834,23 @@ export async function syncProjectSpend(projectId: string): Promise<number> {
     }
   });
 
+  const seenCrossKeys = new Set<string>();
   let totalSpend = 0;
+
+  // Prioritas 1: Crossing entries di entitas pemilik proyek (talangan dari entitas lain)
   for (const j of projectJurnal) {
+    if (j.noBukti && incomeNoBuktis.has(j.noBukti)) continue;
+    const extra = j.extraFieldsJson as Record<string, unknown> | null;
+    if (j.entityId === project.entityId && extra?.isCrossingEntry && Number(j.debit) > 0) {
+      totalSpend += Number(j.debit);
+      if (typeof extra.crossingGroupId === "string") seenCrossKeys.add(extra.crossingGroupId);
+      if (j.noBukti) seenCrossKeys.add(j.noBukti);
+    }
+  }
+
+  // Prioritas 2: Transaksi normal di entitas proyek sendiri (dan potongan pajak penerimaan termin)
+  for (const j of projectJurnal) {
+    const extra = j.extraFieldsJson as Record<string, unknown> | null;
     if (j.noBukti && incomeNoBuktis.has(j.noBukti)) {
       const isTaxDeduction =
         Number(j.debit) > 0 &&
@@ -767,7 +858,10 @@ export async function syncProjectSpend(projectId: string): Promise<number> {
           /pph|pajak|ppn|bupot/i.test(j.coaAccount?.name ?? "") ||
           /pph|pajak|ppn|potongan/i.test(j.keterangan ?? ""));
       if (isTaxDeduction) totalSpend += Number(j.debit);
-    } else {
+      continue;
+    }
+
+    if (j.entityId === project.entityId && !extra?.isCrossingEntry) {
       const isBeban =
         j.coaAccount?.kategori === "BEBAN" ||
         j.coaAccount?.code?.startsWith("5") ||
@@ -777,6 +871,22 @@ export async function syncProjectSpend(projectId: string): Promise<number> {
       } else if (Number(j.debit) > 0 && !/bank|kas|piutang/i.test(j.coaAccount?.name ?? "")) {
         totalSpend += Number(j.debit);
       }
+    }
+  }
+
+  // Prioritas 3: Transaksi pengeluaran dari entitas rekanan untuk proyek ini
+  // (jika belum tercakup oleh crossing entry di entitas proyek)
+  for (const j of projectJurnal) {
+    if (j.noBukti && incomeNoBuktis.has(j.noBukti)) continue;
+    if (j.entityId !== project.entityId && Number(j.debit) > 0) {
+      const extra = j.extraFieldsJson as Record<string, unknown> | null;
+      const gid = typeof extra?.crossingGroupId === "string" ? extra.crossingGroupId : null;
+      if (gid && seenCrossKeys.has(gid)) continue;
+      if (j.noBukti && seenCrossKeys.has(j.noBukti)) continue;
+
+      totalSpend += Number(j.debit);
+      if (gid) seenCrossKeys.add(gid);
+      if (j.noBukti) seenCrossKeys.add(j.noBukti);
     }
   }
 

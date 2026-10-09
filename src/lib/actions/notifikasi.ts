@@ -1,34 +1,29 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { revalidatePath } from "next/cache";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
 export async function markAllNotifikasiRead() {
-  const session = await getServerSession(authOptions);
-  if (!session) return;
-
-  await prisma.notifikasi.updateMany({
-    where: { targetRole: session.user.role, read: false },
-    data: { read: true },
-  });
-
-  revalidatePath("/notifikasi");
-  revalidatePath("/dashboard");
+  try {
+    const token = await getPhpToken();
+    await phpFetch("/api/notifikasi/read-all", token, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) return;
+    // silent fail — same behavior as original
+  }
 }
 
 export async function markNotifikasiRead(id: string) {
-  const session = await getServerSession(authOptions);
-  if (!session) return;
-
-  // Notifikasi ditarget ke role (bukan per-user), jadi scoped ke targetRole
-  // biar user nggak bisa nandain notifikasi role lain sebagai dibaca.
-  await prisma.notifikasi.updateMany({
-    where: { id, targetRole: session.user.role },
-    data: { read: true },
-  });
-
-  revalidatePath("/notifikasi");
-  revalidatePath("/dashboard");
+  try {
+    const token = await getPhpToken();
+    await phpFetch("/api/notifikasi/read", token, {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) return;
+    // silent fail — same behavior as original
+  }
 }

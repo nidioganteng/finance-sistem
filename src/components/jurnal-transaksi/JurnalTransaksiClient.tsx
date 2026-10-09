@@ -198,42 +198,58 @@ export function JurnalTransaksiClient({
 
   function applyFakturRows() {
     if (!selectedFaktur) return;
-    const pphVal = selectedFaktur.pph;
-    const dppVal = selectedFaktur.dpp;
+    const pphVal = selectedFaktur.pph || 0;
+    const ppnVal = selectedFaktur.ppn || 0;
+    const dppVal = selectedFaktur.dpp || 0;
+
+    // Nilai Pendapatan bruto (nilaiProyek, atau dpp + ppn, atau dpp)
+    const pendapatanVal = selectedFaktur.nilaiProyek > 0
+      ? selectedFaktur.nilaiProyek
+      : (dppVal > 0 ? (ppnVal > 0 ? dppVal + ppnVal : dppVal) : 0);
+
+    // Nilai Bank (Netto yang masuk rekening):
+    // Jika ada labaSetelahPajak di faktur, gunakan itu. Jika tidak, sisa pendapatan dikurangi PPN dan PPh.
     const nettoVal = selectedFaktur.labaSetelahPajak > 0
       ? selectedFaktur.labaSetelahPajak
-      : Math.max(0, dppVal - pphVal);
+      : (pendapatanVal > 0 ? Math.max(0, pendapatanVal - ppnVal - pphVal) : 0);
 
     const ketBase = `Pencairan Faktur ${selectedFaktur.noFaktur} - ${selectedFaktur.namaRekanan}`;
     const rows: CoaRow[] = [];
 
-    // Baris 1: Kas / Bank (Debit) Netto Diterima
+    // Baris 1: Kas / Bank (Debit) - Netto yang masuk rekening (dapat disesuaikan)
     rows.push({
       uid: uid(),
       coaAccountId: defaultBankAcc?.id ?? "",
-      keterangan: `${ketBase} (Netto)`,
+      keterangan: `${ketBase} (Bank)`,
       arah: "debit",
-      nominalRaw: fmtNum(String(nettoVal)),
+      nominalRaw: nettoVal > 0 ? fmtNum(String(nettoVal)) : "",
     });
 
-    // Baris 2: Potongan PPh (Debit) jika ada
-    if (pphVal > 0) {
-      rows.push({
-        uid: uid(),
-        coaAccountId: defaultPphAcc?.id ?? "",
-        keterangan: `Potongan PPh Final - ${selectedFaktur.noFaktur}`,
-        arah: "debit",
-        nominalRaw: fmtNum(String(pphVal)),
-      });
-    }
+    // Baris 2: PPN (Debit) - potongan / perlakuan PPN sesuai faktur
+    rows.push({
+      uid: uid(),
+      coaAccountId: defaultPpnAcc?.id ?? "",
+      keterangan: `PPN Faktur ${selectedFaktur.noFaktur}`,
+      arah: "debit",
+      nominalRaw: ppnVal > 0 ? fmtNum(String(ppnVal)) : "",
+    });
 
-    // Baris 3: Pendapatan Proyek (Kredit) DPP
+    // Baris 3: PPh Final (Debit) - potongan PPh Final Pasal 4 Ayat 2 sesuai faktur
+    rows.push({
+      uid: uid(),
+      coaAccountId: defaultPphAcc?.id ?? "",
+      keterangan: `Potongan PPh Final - ${selectedFaktur.noFaktur}`,
+      arah: "debit",
+      nominalRaw: pphVal > 0 ? fmtNum(String(pphVal)) : "",
+    });
+
+    // Baris 4: Pendapatan (Kredit) - nilai pekerjaan / pendapatan proyek
     rows.push({
       uid: uid(),
       coaAccountId: defaultPendapatanAcc?.id ?? "",
-      keterangan: `${ketBase} (DPP)`,
+      keterangan: `${ketBase} (Pendapatan)`,
       arah: "kredit",
-      nominalRaw: fmtNum(String(dppVal)),
+      nominalRaw: pendapatanVal > 0 ? fmtNum(String(pendapatanVal)) : "",
     });
 
     setCoaRows(rows);
@@ -563,9 +579,9 @@ export function JurnalTransaksiClient({
                       type="button"
                       onClick={applyFakturRows}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-blue-600 hover:bg-blue-700 text-white text-[11.5px] font-bold shadow-sm transition-colors"
-                      title="Otomatis isi baris Kas/Bank, Potongan PPh, dan Pendapatan secara seimbang"
+                      title="Otomatis buat 4 baris: Bank, PPN, PPh Final, dan Pendapatan"
                     >
-                      <Sparkles size={13} /> Tarik ke Baris Jurnal (Seimbang)
+                      <Sparkles size={13} /> Tarik ke Baris Jurnal (4 Baris Seimbang)
                     </button>
                   </div>
 
@@ -615,7 +631,7 @@ export function JurnalTransaksiClient({
                       )}
                     </div>
                     <span className="text-[10px] text-muted-faint italic">
-                      *Tarik seimbang: Debit Kas/Bank (Netto) + Debit PPh = Kredit Pendapatan (DPP)
+                      *Tarik 4 baris: Debit Bank (Netto) + Debit PPN + Debit PPh Final = Kredit Pendapatan
                     </span>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 import { phpFetch, getPhpToken } from "./api-client";
-import { TerminStatus } from "@prisma/client";
+import { TerminStatus } from "@/types/app-enums";
 
 export const PIUTANG_COA: Record<string, string> = {
   kencana: "111", gaharu: "112", tataring: "113", ciptaAsri: "114", umum: "115",
@@ -289,13 +289,13 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
     deadlineDate !== null &&
     deadlineDate < today;
 
-  // Sum of nominally paid termin
-  const terminTagih = p.termin.reduce((sum, t) => sum + (t.nominal ?? 0), 0);
-  const sisaTagih = Math.max(0, p.contractValue - terminTagih);
-  const maxPercentage = p.termin.reduce((max, t) => Math.max(max, t.percentage ?? 0), 0);
+  // Sum of nominally paid termin (PHP PDO may return DECIMAL as string, so coerce)
+  const terminTagih = p.termin.reduce((sum, t) => sum + (Number(t.nominal) || 0), 0);
+  const sisaTagih = Math.max(0, Number(p.contractValue) - terminTagih);
+  const maxPercentage = p.termin.reduce((max, t) => Math.max(max, Number(t.percentage) || 0), 0);
 
   const termins: TerminItem[] = p.termin.map((t) => {
-    const nom = t.nominal ?? 0;
+    const nom = Number(t.nominal) || 0;
     const emptyBreakdown: TerminBreakdown = {
       noBukti: null,
       tanggalTerimaFmt: null,
@@ -348,7 +348,7 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
     sisaKontrakFmt: fmt(sisaTagih),
   };
 
-  const spend = p.spend ?? 0;
+  const spend = Number(p.spend) || 0;
   const labaKotor = terminTagih - spend;
   const emptyExpensesSummary: ProjectExpensesSummary = {
     totalPengeluaran: spend,
@@ -374,8 +374,8 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
     name: p.name,
     entityName: p.entity_name,
     entityKey: p.entity_key,
-    contractValue: p.contractValue,
-    contractValueFmt: fmt(p.contractValue),
+    contractValue: Number(p.contractValue) || 0,
+    contractValueFmt: fmt(Number(p.contractValue) || 0),
     deadlineFmt: fmtDate(p.deadline),
     isOverdue,
     status: p.status,

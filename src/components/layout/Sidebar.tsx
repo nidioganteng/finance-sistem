@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 import {
   LayoutGrid,
   FileText,

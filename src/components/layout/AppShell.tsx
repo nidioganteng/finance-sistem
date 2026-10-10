@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 import { Sidebar } from "./Sidebar";
 
 export function AppShell({

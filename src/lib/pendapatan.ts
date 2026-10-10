@@ -245,6 +245,11 @@ export interface LaporanPendapatanData {
     id: string;
     nama: string;
   }>;
+  rekananOptions: Array<{
+    id: string;
+    nama: string;
+    npwp: string | null;
+  }>;
 }
 
 export async function getLaporanPendapatanData(
@@ -899,5 +904,22 @@ export async function getLaporanPendapatanData(
       };
     }),
     bankOptions: defaultBankList,
+    rekananOptions: (
+      await prisma.rekanan.findMany({
+        where: {
+          OR: [{ entityId: null }, { entityId: entity.id }],
+        },
+        orderBy: { nama: "asc" },
+        select: {
+          id: true,
+          nama: true,
+          npwp: true,
+        },
+      })
+    ).map((r) => ({
+      id: r.id,
+      nama: r.nama,
+      npwp: r.npwp ?? null,
+    })),
   };
 }

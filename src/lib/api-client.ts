@@ -40,7 +40,8 @@ export async function phpFetch<T = unknown>(
 export async function getPhpToken(): Promise<string> {
   const { getServerSession } = await import("next-auth");
   const { authOptions } = await import("./auth");
+  const { redirect } = await import("next/navigation");
   const session = await getServerSession(authOptions);
-  if (!session?.user?.phpToken) throw new ApiError(401, "Belum login.");
-  return session.user.phpToken;
+  if (!session?.user?.phpToken) redirect("/login");
+  return session.user.phpToken as string;
 }

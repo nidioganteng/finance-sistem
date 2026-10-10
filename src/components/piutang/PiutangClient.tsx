@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { TerminStatus } from "@prisma/client";
+import { TerminStatus } from "@/types/app-enums";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 import {

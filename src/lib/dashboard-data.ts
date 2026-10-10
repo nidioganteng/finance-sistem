@@ -1,5 +1,5 @@
 import { phpFetch, getPhpToken } from "./api-client";
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 
 export function formatRupiah(n: number) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");

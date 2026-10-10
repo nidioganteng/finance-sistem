@@ -1,6 +1,6 @@
 import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
-import { AsetTetap } from "@prisma/client";
+import { AsetTetap } from "@/types/app-enums";
 
 export type AsetTetapWithDepreciation = AsetTetap & {
   hargaPerolehanNum: number;
@@ -135,8 +135,8 @@ export async function getPenyusutanSummary(
       nama: row.nama,
       kategori: row.kategori,
       tanggalPerolehan: new Date(row.tanggalPerolehan),
-      hargaPerolehan: hargaPerolehan as unknown as import("@prisma/client").Prisma.Decimal,
-      nilaiResidu: nilaiResidu as unknown as import("@prisma/client").Prisma.Decimal,
+      hargaPerolehan,
+      nilaiResidu,
       umurBulan: row.umurBulan,
       metode: row.metode,
       keterangan: row.keterangan ?? null,

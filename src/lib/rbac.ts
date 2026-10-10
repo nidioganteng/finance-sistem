@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 
 export type NavSubItem = {
   label: string;

@@ -69,6 +69,8 @@ if ($method === 'GET' && $sub_action === null) {
         // Indeks termin per projectId
         $termin_by_project = [];
         foreach ($all_termin as $t) {
+            $t['nominal']     = (float)$t['nominal'];
+            $t['percentage']  = (float)$t['percentage'];
             $termin_by_project[$t['projectId']][] = $t;
         }
 

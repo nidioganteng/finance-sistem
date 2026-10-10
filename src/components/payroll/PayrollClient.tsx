@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 import {
   Users,
   Award,

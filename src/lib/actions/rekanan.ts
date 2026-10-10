@@ -1,12 +1,9 @@
 "use server";
 
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
+import { RekananTipe } from "@/types/app-enums";
 
-export type RekananTipe =
-  | "VENDOR"
-  | "KLIEN"
-  | "TENAGA_AHLI"
-  | "SUBKONTRAKTOR";
+export type { RekananTipe };
 
 export type RekananInput = {
   nama: string;

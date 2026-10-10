@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RekananTipe } from "@prisma/client";
+import { RekananTipe } from "@/types/app-enums";
 import {
   RekananItem,
   createRekananAction,
@@ -42,6 +42,11 @@ const TIPE_BADGE: Record<RekananTipe, { label: string; badgeClass: string; icon:
     label: "Tenaga Ahli",
     badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200",
     icon: UserCheck,
+  },
+  SUBKONTRAKTOR: {
+    label: "Subkontraktor",
+    badgeClass: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200",
+    icon: Briefcase,
   },
   LAINNYA: {
     label: "Lainnya",

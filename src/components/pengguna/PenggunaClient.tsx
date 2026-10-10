@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, X, ChevronDown } from "lucide-react";
 import { approveUser, rejectUser, updateUserEntities, deactivateUser, activateUser } from "@/lib/actions/pengguna";
 import { roleLabel } from "@/lib/rbac";
-import { Role, UserStatus } from "@prisma/client";
+import { Role, UserStatus } from "@/types/app-enums";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
 type EntityItem = { id: string; name: string; key: string };

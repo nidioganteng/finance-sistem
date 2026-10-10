@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CoaKategori, ReportType, ReportCategory } from "@prisma/client";
+import { CoaKategori, ReportType, ReportCategory } from "@/types/app-enums";
 import { createCOA, updateCOA, deleteCOA } from "@/lib/actions/coa";
 import { Pencil, Trash2, Plus, X, Check } from "lucide-react";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";

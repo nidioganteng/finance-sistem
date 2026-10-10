@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   AsetTetapWithDepreciation,
   PenyusutanSummary,
+  STANDAR_KATEGORI_ASET,
+  getKategoriLabel,
 } from "@/lib/aset-tetap";
 import {
   createAsetTetapAction,
@@ -29,14 +31,10 @@ import {
 } from "lucide-react";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
-const KATEGORI_OPTIONS = [
-  { value: "KENDARAAN", label: "Kendaraan" },
-  { value: "PERALATAN", label: "Peralatan & Perlengkapan" },
-  { value: "MESIN", label: "Mesin & Alat Berat" },
-  { value: "GEDUNG", label: "Gedung & Bangunan" },
-  { value: "INVENTARIS", label: "Inventaris Kantor" },
-  { value: "LAINNYA", label: "Aset Lainnya" },
-];
+const KATEGORI_OPTIONS = STANDAR_KATEGORI_ASET.map((k) => ({
+  value: k.key,
+  label: k.label,
+}));
 
 export function AktivaTetapManager({
   summary,
@@ -77,7 +75,10 @@ export function AktivaTetapManager({
       asset.kode.toLowerCase().includes(search.toLowerCase()) ||
       asset.nama.toLowerCase().includes(search.toLowerCase()) ||
       (asset.keterangan && asset.keterangan.toLowerCase().includes(search.toLowerCase()));
-    const matchKategori = selectedKategori === "ALL" || asset.kategori === selectedKategori;
+    const matchKategori =
+      selectedKategori === "ALL" ||
+      asset.kategoriStandar === selectedKategori ||
+      asset.kategori === selectedKategori;
     return matchSearch && matchKategori;
   });
 
@@ -100,7 +101,7 @@ export function AktivaTetapManager({
     setEditingAsset(asset);
     setKode(asset.kode);
     setNama(asset.nama);
-    setKategori(asset.kategori);
+    setKategori(asset.kategoriStandar || asset.kategori);
     setTanggalPerolehan(new Date(asset.tanggalPerolehan).toISOString().slice(0, 10));
     setHargaPerolehan(asset.hargaPerolehanNum);
     setNilaiResidu(asset.nilaiResiduNum);
@@ -109,6 +110,19 @@ export function AktivaTetapManager({
     setKeterangan(asset.keterangan || "");
     setFormError(null);
     setIsModalOpen(true);
+  };
+
+  const handleKategoriChange = (newKat: string) => {
+    setKategori(newKat);
+    if (newKat === "TANAH") {
+      setUmurBulan(0);
+      setUmurTahun(0);
+      setNilaiResidu(hargaPerolehan);
+    } else if (umurBulan === 0) {
+      setUmurBulan(48);
+      setUmurTahun(4);
+      setNilaiResidu(0);
+    }
   };
 
   const handleUmurTahunChange = (thn: number) => {
@@ -137,7 +151,7 @@ export function AktivaTetapManager({
       setFormError("Harga perolehan harus lebih dari Rp 0.");
       return;
     }
-    if (umurBulan <= 0) {
+    if (kategori !== "TANAH" && umurBulan <= 0) {
       setFormError("Umur ekonomis harus lebih dari 0 bulan.");
       return;
     }
@@ -278,6 +292,80 @@ export function AktivaTetapManager({
         </div>
       </div>
 
+      {/* ── Ringkasan 4 Kategori Aktiva Tetap Standar (Issue 88 Poin 3) ── */}
+      {summary.rekapPerKategori && summary.rekapPerKategori.length > 0 && (
+        <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 shadow-xs">
+          <div className="flex items-center justify-between mb-3.5">
+            <div>
+              <h3 className="text-[13px] font-bold text-navy-text uppercase tracking-wider">
+                Standarisasi 4 Kategori Aktiva Tetap
+              </h3>
+              <p className="text-[12px] text-muted-faint mt-0.5">
+                Total per kategori disajikan terintegrasi ke Bagian II Aktiva Tetap Neraca
+              </p>
+            </div>
+            {selectedKategori !== "ALL" && (
+              <button
+                onClick={() => setSelectedKategori("ALL")}
+                className="text-[11.5px] font-bold text-brand hover:underline"
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {summary.rekapPerKategori.map((rekap) => {
+              const isSelected = selectedKategori === rekap.kategori;
+              return (
+                <button
+                  type="button"
+                  key={rekap.kategori}
+                  onClick={() =>
+                    setSelectedKategori(isSelected ? "ALL" : rekap.kategori)
+                  }
+                  className={`text-left p-3.5 rounded-[16px] border transition-all ${
+                    isSelected
+                      ? "bg-brand/5 border-brand ring-1 ring-brand shadow-xs"
+                      : "bg-surface-base border-border-soft hover:border-brand/40 hover:bg-surface-hover/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-[12.5px] text-navy-text">
+                      {rekap.label}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11px] font-semibold text-muted-faint">
+                      {rekap.jumlahAset} unit
+                    </span>
+                  </div>
+                  <div className="text-[14px] font-extrabold text-navy-text tabular-nums">
+                    {rekap.totalNilaiBukuFmt}
+                  </div>
+                  <div className="text-[11px] text-muted-faint mt-1 flex items-center justify-between">
+                    <span>Perolehan:</span>
+                    <span className="font-mono text-muted-strong">
+                      {rekap.totalHargaPerolehanFmt}
+                    </span>
+                  </div>
+                  {rekap.kategori !== "TANAH" ? (
+                    <div className="text-[11px] text-muted-faint mt-0.5 flex items-center justify-between">
+                      <span>Akumulasi:</span>
+                      <span className="font-mono text-status-amber">
+                        ({rekap.totalAkumulasiPenyusutanFmt})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-[10.5px] text-blue-600 dark:text-blue-400 mt-0.5 italic">
+                      Tidak disusutkan (PSAK 16)
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Info Banner Otomatisasi (Issue 39 & SRS v2.0) ── */}
       <div className="bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/25 rounded-[18px] p-4 flex items-start gap-3.5">
         <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 flex items-center justify-center flex-none mt-0.5">
@@ -366,7 +454,8 @@ export function AktivaTetapManager({
               ) : (
                 filteredAssets.map((asset) => {
                   const katLabel =
-                    KATEGORI_OPTIONS.find((k) => k.value === asset.kategori)?.label || asset.kategori;
+                    asset.kategoriLabel ||
+                    getKategoriLabel(asset.kategoriStandar || asset.kategori);
 
                   return (
                     <tr
@@ -387,9 +476,15 @@ export function AktivaTetapManager({
                         {asset.hargaPerolehanFmt}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11.5px] font-semibold text-muted-strong">
-                          {asset.umurBulan} bln ({asset.umurTahun} th)
-                        </span>
+                        {asset.kategoriStandar === "TANAH" ? (
+                          <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11px] font-semibold text-muted-faint">
+                            Tidak disusutkan
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11.5px] font-semibold text-muted-strong">
+                            {asset.umurBulan} bln ({asset.umurTahun} th)
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-5 text-right text-[12px] text-muted-strong tabular-nums whitespace-nowrap">
                         {asset.penyusutanPerBulanFmt}
@@ -499,7 +594,7 @@ export function AktivaTetapManager({
                   </label>
                   <select
                     value={kategori}
-                    onChange={(e) => setKategori(e.target.value)}
+                    onChange={(e) => handleKategoriChange(e.target.value)}
                     className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand"
                   >
                     {KATEGORI_OPTIONS.map((k) => (
@@ -565,51 +660,72 @@ export function AktivaTetapManager({
                     type="number"
                     min="0"
                     step="1000"
-                    value={nilaiResidu || ""}
+                    disabled={kategori === "TANAH"}
+                    value={kategori === "TANAH" ? hargaPerolehan : (nilaiResidu || "")}
                     onChange={(e) => setNilaiResidu(Number(e.target.value))}
                     placeholder="0"
-                    className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums"
+                    className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums disabled:opacity-60 disabled:cursor-not-allowed"
                   />
-                  <span className="text-[10.5px] text-muted-faint">Biarkan 0 jika disusutkan habis</span>
+                  <span className="text-[10.5px] text-muted-faint">
+                    {kategori === "TANAH"
+                      ? "Tanah tidak memiliki nilai residu terpisah"
+                      : "Biarkan 0 jika disusutkan habis"}
+                  </span>
                 </div>
 
                 <div>
                   <label className="block text-[11.5px] font-bold text-muted-strong uppercase mb-1">
-                    Umur Ekonomis *
+                    Umur Ekonomis {kategori === "TANAH" ? "(N/A)" : "*"}
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={umurTahun || ""}
-                        onChange={(e) => handleUmurTahunChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums pr-8"
-                      />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-faint font-semibold">
-                        th
-                      </span>
+                  {kategori === "TANAH" ? (
+                    <div className="px-3 py-2 bg-surface-subtle border border-border-soft rounded-xl text-[12px] text-muted-faint italic flex items-center h-[38px]">
+                      Tidak disusutkan (PSAK 16)
                     </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={umurBulan || ""}
-                        onChange={(e) => handleUmurBulanChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums pr-9"
-                      />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-faint font-semibold">
-                        bln
-                      </span>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={umurTahun || ""}
+                          onChange={(e) => handleUmurTahunChange(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums pr-8"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-faint font-semibold">
+                          th
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={umurBulan || ""}
+                          onChange={(e) => handleUmurBulanChange(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums pr-9"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-faint font-semibold">
+                          bln
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
               {/* Live Preview Box */}
-              {hargaPerolehan > 0 && (
+              {kategori === "TANAH" ? (
+                <div className="p-3 bg-blue-50/60 dark:bg-blue-500/10 rounded-xl border border-blue-200 dark:border-blue-500/20 text-[12px] flex flex-col gap-1">
+                  <div className="font-bold text-navy-text flex items-center justify-between">
+                    <span>Klasifikasi: Aset Tanah (PSAK 16)</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-semibold">Tidak Disusutkan</span>
+                  </div>
+                  <div className="text-muted-faint text-[11.5px]">
+                    Nilai buku tercatat utuh sebesar harga perolehan: {formatRupiah(hargaPerolehan)}.
+                  </div>
+                </div>
+              ) : hargaPerolehan > 0 ? (
                 <div className="p-3 bg-surface-subtle/70 rounded-xl border border-border-soft text-[12px] flex flex-col gap-1">
                   <div className="font-bold text-navy-text flex items-center justify-between">
                     <span>Estimasi Penyusutan Garis Lurus:</span>
@@ -619,7 +735,7 @@ export function AktivaTetapManager({
                     Beban tahunan: {formatRupiah(Math.round(livePenyusutanTahun))} • Basis susut: {formatRupiah(liveDepreciable)}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               <div>
                 <label className="block text-[11.5px] font-bold text-muted-strong uppercase mb-1">

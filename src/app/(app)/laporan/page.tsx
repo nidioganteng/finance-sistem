@@ -33,6 +33,8 @@ import { getLaporanUtangAsetData } from "@/lib/laporan-utang-aset";
 import { PiutangView } from "@/components/laporan/PiutangView";
 import { UtangAsetView } from "@/components/laporan/UtangAsetView";
 import { phpFetch, getPhpToken } from "@/lib/api-client";
+import { getValidasiPajak3Arah, type ValidasiPajak3ArahData } from "@/lib/validasi-pajak-3arah";
+import { ValidasiPajak3ArahCard } from "@/components/laporan/ValidasiPajak3ArahCard";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
@@ -109,6 +111,7 @@ export default async function LaporanPage({
   let piutangData: Awaited<ReturnType<typeof getPiutangData>> | null = null;
   let utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null = null;
   let taxData: Awaited<ReturnType<typeof getLaporanPajakData>> | null = null;
+  let validasiPajak3Arah: ValidasiPajak3ArahData | null = null;
 
   if (tab === "ringkasan") {
     const [laporan, jData, bData] = await Promise.all([
@@ -120,14 +123,18 @@ export default async function LaporanPage({
     jurnalData = jData;
     bankData = bData;
   } else if (tab === "laba-rugi" || tab === "neraca") {
-    const [laporan, tax] = await Promise.all([
+    const [laporan, tax, validasi3Arah] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
       tab === "laba-rugi"
         ? getLaporanPajakData(entityIds, currentYear, currentVersion, selectedEntity?.name ?? "Grup")
         : Promise.resolve(null),
+      tab === "laba-rugi"
+        ? getValidasiPajak3Arah(entityIds, currentYear, currentVersion)
+        : Promise.resolve(null),
     ]);
     laporanKeuanganData = laporan;
     taxData = tax;
+    validasiPajak3Arah = validasi3Arah;
   } else if (tab === "arus-kas") {
     const [laporan, allArusKas, presisi] = await Promise.all([
       getLaporanKeuanganData(entityIds, currentYear, currentVersion),
@@ -468,15 +475,23 @@ export default async function LaporanPage({
       )}
 
       {tab === "laba-rugi" && laporanKeuanganData && (
-        taxData ? (
-          <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
-        ) : (
-          <LabaRugiView
-            data={laporanKeuanganData}
-            year={currentYear}
-            entityName={entityLabel}
-          />
-        )
+        <div className="flex flex-col gap-6">
+          {validasiPajak3Arah && (
+            <ValidasiPajak3ArahCard
+              data={validasiPajak3Arah}
+              entityName={entityLabel}
+            />
+          )}
+          {taxData ? (
+            <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
+          ) : (
+            <LabaRugiView
+              data={laporanKeuanganData}
+              year={currentYear}
+              entityName={entityLabel}
+            />
+          )}
+        </div>
       )}
 
       {tab === "neraca" && laporanKeuanganData && (

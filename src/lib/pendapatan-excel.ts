@@ -95,8 +95,8 @@ export async function generateLaporanPendapatanExcel(
       f.namaRekanan,
       f.namaJkp,
       f.namaBulan,
-      f.tanggalTerima,
-      f.bank,
+      f.tanggalTerima || "-",
+      f.bank || "-",
       f.dpp,
       f.dppNilaiLain,
       `${f.tarifPpnPersen}%`,
@@ -291,6 +291,12 @@ export async function generateLaporanPendapatanExcel(
     { key: "ppnRekap", width: 20 },
     { key: "pajakTerlapor", width: 20 },
     { key: "selisihPajak", width: 20 },
+    { key: "pphRekap", width: 20 },
+    { key: "pphTerlapor", width: 20 },
+    { key: "selisihPph", width: 20 },
+    { key: "totalPajakRekap", width: 22 },
+    { key: "totalPajakTerlapor", width: 22 },
+    { key: "selisihTotalPajak", width: 22 },
     { key: "status", width: 18 },
     { key: "keterangan", width: 35 },
   ];
@@ -308,8 +314,14 @@ export async function generateLaporanPendapatanExcel(
     "DPP TERLAPOR (SPT)",
     "SELISIH DPP",
     "PPN REKAP FAKTUR",
-    "PAJAK TERLAPOR (SPT)",
+    "PPN TERLAPOR (SPT)",
     "SELISIH PPN",
+    "PPH REKAP FAKTUR",
+    "PPH TERLAPOR (SPT)",
+    "SELISIH PPH",
+    "TOTAL PAJAK REKAP",
+    "TOTAL PAJAK SPT",
+    "SELISIH TOTAL PAJAK",
     "STATUS AUDIT",
     "CATATAN / TINDAK LANJUT",
   ]);
@@ -331,19 +343,25 @@ export async function generateLaporanPendapatanExcel(
       rec.ppnRekap,
       rec.pajakTerlapor,
       rec.selisihPajak,
+      rec.pphRekap,
+      rec.pphTerlapor,
+      rec.selisihPph,
+      rec.totalPajakRekap,
+      rec.totalPajakTerlapor,
+      rec.selisihTotalPajak,
       rec.status === "MATCH" ? "SESUAI" : rec.status === "BELUM_DILAPORKAN" ? "BELUM LAPOR" : "SELISIH",
       rec.keterangan,
     ]);
     row.height = 20;
     row.getCell(1).alignment = { vertical: "middle", horizontal: "center" };
 
-    [3, 4, 5, 6, 7, 8].forEach((colIdx) => {
+    [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].forEach((colIdx) => {
       const c = row.getCell(colIdx);
       c.numFmt = accountingFmt;
       c.alignment = { vertical: "middle", horizontal: "right" };
     });
 
-    const statusCell = row.getCell(9);
+    const statusCell = row.getCell(15);
     statusCell.alignment = { vertical: "middle", horizontal: "center" };
     if (rec.status === "MATCH") {
       statusCell.font = { bold: true, color: { argb: "FF16A34A" } }; // Green
@@ -358,6 +376,49 @@ export async function generateLaporanPendapatanExcel(
         right: { style: "thin", color: { argb: "FFE2E8F0" } },
       };
     });
+  });
+
+  // Footer Total Lapis 3
+  const totDppRekap = data.rekonsiliasiList.reduce((s, r) => s + r.dppRekap, 0);
+  const totDppTerlapor = data.rekonsiliasiList.reduce((s, r) => s + r.dppTerlapor, 0);
+  const totSelisihDpp = totDppRekap - totDppTerlapor;
+  const totPpnRekap = data.rekonsiliasiList.reduce((s, r) => s + r.ppnRekap, 0);
+  const totPpnTerlapor = data.rekonsiliasiList.reduce((s, r) => s + r.pajakTerlapor, 0);
+  const totSelisihPpn = totPpnRekap - totPpnTerlapor;
+  const totPphRekap = data.rekonsiliasiList.reduce((s, r) => s + r.pphRekap, 0);
+  const totPphTerlapor = data.rekonsiliasiList.reduce((s, r) => s + r.pphTerlapor, 0);
+  const totSelisihPph = totPphRekap - totPphTerlapor;
+  const totPajakRekapAll = totPpnRekap + totPphRekap;
+  const totPajakTerlaporAll = totPpnTerlapor + totPphTerlapor;
+  const totSelisihPajakAll = totPajakRekapAll - totPajakTerlaporAll;
+
+  const aFooter = wsAudit.addRow([
+    "",
+    "TOTAL",
+    totDppRekap,
+    totDppTerlapor,
+    totSelisihDpp,
+    totPpnRekap,
+    totPpnTerlapor,
+    totSelisihPpn,
+    totPphRekap,
+    totPphTerlapor,
+    totSelisihPph,
+    totPajakRekapAll,
+    totPajakTerlaporAll,
+    totSelisihPajakAll,
+    "",
+    "",
+  ]);
+  aFooter.height = 24;
+  aFooter.eachCell((cell, colNumber) => {
+    cell.font = { bold: true, size: 10, color: { argb: "FF0F172A" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+    if (colNumber >= 3 && colNumber <= 14) {
+      cell.numFmt = accountingFmt;
+      cell.alignment = { vertical: "middle", horizontal: "right" };
+    }
+    cell.border = { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } };
   });
 
   const buffer = await workbook.xlsx.writeBuffer();

@@ -6,7 +6,7 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X, Plus } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
@@ -287,9 +287,19 @@ export function KasScreenClient({
 
         <button
           onClick={() => setPanelOpen((v) => !v)}
-          className="px-7 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold"
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
         >
-          {panelOpen ? "Tutup Form" : "+ Transaksi Baru"}
+          {panelOpen ? (
+            <>
+              <X className="w-4 h-4 flex-none" />
+              <span>Tutup Form</span>
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4 flex-none" />
+              <span>Transaksi Baru</span>
+            </>
+          )}
         </button>
       </div>
 

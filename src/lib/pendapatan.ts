@@ -225,6 +225,11 @@ export interface LaporanPendapatanData {
     id: string;
     nama: string;
   }>;
+  rekananOptions: Array<{
+    id: string;
+    nama: string;
+    npwp: string | null;
+  }>;
 }
 
 // ─── Raw shapes returned directly by PHP ────────────────────────────────────
@@ -603,6 +608,10 @@ export async function getLaporanPendapatanData(
       tarifList,
       projectOptions,
       bankOptions,
+      rekananOptions: await phpFetch<{ data: Array<{ id: string; nama: string; npwp: string | null }> }>(
+        `/api/rekanan?entityId=${encodeURIComponent(entity.id)}`,
+        token
+      ).then((r) => r.data).catch(() => []),
     };
   } catch {
     return null;

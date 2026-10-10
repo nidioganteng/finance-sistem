@@ -31,7 +31,7 @@ define('DB_NAME',     env('DB_NAME',     'finance_sistem'));
 
 // ── JWT ──────────────────────────────────────────────────────────────────────
 define('JWT_SECRET',     env('JWT_SECRET',     'dev_secret_ganti_di_produksi'));
-define('JWT_EXPIRES_IN', env('JWT_EXPIRES_IN', '8h'));
+define('JWT_EXPIRES_IN', env('JWT_EXPIRES_IN', '30d'));
 
 // ── App ──────────────────────────────────────────────────────────────────────
 define('FRONTEND_URL', env('FRONTEND_URL', 'http://localhost:3000'));

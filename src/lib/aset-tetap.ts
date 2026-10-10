@@ -2,6 +2,44 @@ import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
 import { AsetTetap } from "@/types/app-enums";
 
+// 4 kategori aktiva tetap standar PSAK 16
+export const STANDAR_KATEGORI_ASET = [
+  { key: "TANAH",     label: "Tanah" },
+  { key: "BANGUNAN",  label: "Bangunan & Gedung" },
+  { key: "KENDARAAN", label: "Kendaraan" },
+  { key: "PERALATAN", label: "Peralatan & Inventaris" },
+];
+
+export function getKategoriLabel(kategori: string): string {
+  return STANDAR_KATEGORI_ASET.find((k) => k.key === kategori)?.label ?? kategori;
+}
+
+function normalizeKategori(raw: string): string {
+  const map: Record<string, string> = {
+    TANAH: "TANAH",
+    BANGUNAN: "BANGUNAN",
+    GEDUNG: "BANGUNAN",
+    KENDARAAN: "KENDARAAN",
+    PERALATAN: "PERALATAN",
+    MESIN: "PERALATAN",
+    INVENTARIS: "PERALATAN",
+    LAINNYA: "PERALATAN",
+  };
+  return map[(raw ?? "").toUpperCase()] ?? "PERALATAN";
+}
+
+export type RekapKategoriAset = {
+  kategori: string;
+  label: string;
+  jumlahAset: number;
+  totalHargaPerolehan: number;
+  totalHargaPerolehanFmt: string;
+  totalAkumulasiPenyusutan: number;
+  totalAkumulasiPenyusutanFmt: string;
+  totalNilaiBuku: number;
+  totalNilaiBukuFmt: string;
+};
+
 export type AsetTetapWithDepreciation = AsetTetap & {
   hargaPerolehanNum: number;
   nilaiResiduNum: number;
@@ -16,6 +54,8 @@ export type AsetTetapWithDepreciation = AsetTetap & {
   nilaiBukuFmt: string;
   tanggalPerolehanFmt: string;
   umurTahun: number;
+  kategoriStandar: string;
+  kategoriLabel: string;
 };
 
 export type PenyusutanSummary = {
@@ -28,6 +68,7 @@ export type PenyusutanSummary = {
   totalBebanPenyusutanFmt: string;
   totalAkumulasiPenyusutanFmt: string;
   totalNilaiBukuFmt: string;
+  rekapPerKategori: RekapKategoriAset[];
   year: number;
   month?: number;
 };
@@ -84,6 +125,7 @@ export function calculateAsetDepreciation(
     year: "numeric",
   });
 
+  const kat = normalizeKategori(asset.kategori);
   return {
     ...asset,
     hargaPerolehanNum: hargaPerolehan,
@@ -99,6 +141,8 @@ export function calculateAsetDepreciation(
     nilaiBukuFmt: formatRupiah(nilaiBuku),
     tanggalPerolehanFmt: tglStr,
     umurTahun: Number((umurBulan / 12).toFixed(1)),
+    kategoriStandar: kat,
+    kategoriLabel: getKategoriLabel(kat),
   };
 }
 
@@ -156,6 +200,8 @@ export async function getPenyusutanSummary(
       nilaiBukuFmt: formatRupiah(row.nilaiBuku),
       tanggalPerolehanFmt: tglFmt(row.tanggalPerolehan),
       umurTahun: Number((row.umurBulan / 12).toFixed(1)),
+      kategoriStandar: normalizeKategori(row.kategori),
+      kategoriLabel: getKategoriLabel(normalizeKategori(row.kategori)),
     };
   });
 
@@ -163,6 +209,24 @@ export async function getPenyusutanSummary(
   const totalBebanPenyusutan = assets.reduce((s, a) => s + a.bebanPeriodeIni, 0);
   const totalAkumulasiPenyusutan = assets.reduce((s, a) => s + a.akumulasiPenyusutan, 0);
   const totalNilaiBuku = assets.reduce((s, a) => s + a.nilaiBuku, 0);
+
+  const rekapPerKategori: RekapKategoriAset[] = STANDAR_KATEGORI_ASET.map((kat) => {
+    const group = assets.filter((a) => a.kategoriStandar === kat.key);
+    const totalHP = group.reduce((s, a) => s + a.hargaPerolehanNum, 0);
+    const totalAkum = group.reduce((s, a) => s + a.akumulasiPenyusutan, 0);
+    const totalNB = group.reduce((s, a) => s + a.nilaiBuku, 0);
+    return {
+      kategori: kat.key,
+      label: kat.label,
+      jumlahAset: group.length,
+      totalHargaPerolehan: totalHP,
+      totalHargaPerolehanFmt: formatRupiah(totalHP),
+      totalAkumulasiPenyusutan: totalAkum,
+      totalAkumulasiPenyusutanFmt: formatRupiah(totalAkum),
+      totalNilaiBuku: totalNB,
+      totalNilaiBukuFmt: formatRupiah(totalNB),
+    };
+  });
 
   return {
     assets,
@@ -174,6 +238,7 @@ export async function getPenyusutanSummary(
     totalBebanPenyusutanFmt: formatRupiah(totalBebanPenyusutan),
     totalAkumulasiPenyusutanFmt: formatRupiah(totalAkumulasiPenyusutan),
     totalNilaiBukuFmt: formatRupiah(totalNilaiBuku),
+    rekapPerKategori,
     year,
     month,
   };

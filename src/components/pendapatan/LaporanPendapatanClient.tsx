@@ -121,6 +121,7 @@ export function LaporanPendapatanClient({
   const [showRekananDropdown, setShowRekananDropdown] = useState(false);
   const [matchedRekananMaster, setMatchedRekananMaster] = useState<RekananItem | null>(null);
   const [isSearchingRekanan, setIsSearchingRekanan] = useState(false);
+  const [selectedRekananNpwpId, setSelectedRekananNpwpId] = useState<string>("");
 
   // Form state for Rekonsiliasi
   const [formRecon, setFormRecon] = useState({
@@ -313,6 +314,7 @@ export function LaporanPendapatanClient({
   }
 
   function handleSelectRekanan(r: RekananItem) {
+    setSelectedRekananNpwpId(r.id);
     setFormFaktur((prev) => ({
       ...prev,
       namaRekanan: r.nama,
@@ -325,6 +327,7 @@ export function LaporanPendapatanClient({
   function openCreateFakturModal() {
     setEditingFaktur(null);
     setSelectedTerminId("");
+    setSelectedRekananNpwpId("");
     setShowManualDppFallback(false);
     setMatchedRekananMaster(null);
     setRekananSuggestions([]);
@@ -366,7 +369,12 @@ export function LaporanPendapatanClient({
       setSelectedTerminId("");
       setShowManualDppFallback(true);
     }
-    setMatchedRekananMaster(null);
+    const cleanFakturNpwp = (f.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
+    const matchedRek = (data.rekananOptions || []).find(
+      (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanFakturNpwp
+    );
+    setSelectedRekananNpwpId(matchedRek?.id || "");
+    setMatchedRekananMaster((matchedRek as any) ?? null);
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
     setFormFaktur({
@@ -1695,19 +1703,60 @@ export function LaporanPendapatanClient({
                       </span>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="00.000.000.0-000.000"
-                    value={formFaktur.npwp}
-                    onChange={(e) => handleNpwpChange(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {matchedRekananMaster && (
+                  <div className="space-y-1.5">
+                    {data.rekananOptions && data.rekananOptions.length > 0 && (
+                      <select
+                        value={selectedRekananNpwpId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setSelectedRekananNpwpId(id);
+                          if (!id) return;
+                          const sel = data.rekananOptions.find((r) => r.id === id);
+                          if (sel) {
+                            setFormFaktur((prev) => ({
+                              ...prev,
+                              npwp: sel.npwp || prev.npwp,
+                              namaRekanan: sel.nama || prev.namaRekanan,
+                            }));
+                            setMatchedRekananMaster(sel as any);
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 text-xs border border-blue-200 dark:border-blue-500/30 rounded-xl bg-surface-subtle text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                      >
+                        <option value="">-- Pilih dari Master Rekanan (Opsional) --</option>
+                        {data.rekananOptions.map((r) => (
+                          <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
+                            {r.npwp ? `[${r.npwp}] ${r.nama}` : `[Tanpa NPWP] ${r.nama}`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      required
+                      placeholder="00.000.000.0-000.000"
+                      value={formFaktur.npwp}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const cleanVal = val.replace(/[\s.\-_/]/g, "").toLowerCase();
+                        const matchInOptions = (data.rekananOptions || []).find(
+                          (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanVal
+                        );
+                        setSelectedRekananNpwpId(matchInOptions ? matchInOptions.id : "");
+                        handleNpwpChange(val);
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  {matchedRekananMaster ? (
                     <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate">Auto-Fill: {matchedRekananMaster.nama}</span>
                     </div>
+                  ) : (
+                    <span className="text-[10px] text-muted-faint mt-0.5 block">
+                      Pilih dari dropdown di atas atau ketik manual NPWP di sini.
+                    </span>
                   )}
                 </div>
 

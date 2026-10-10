@@ -267,7 +267,36 @@ function NeracaTab({
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
             <SectionHeader color="blue" label="II. Aktiva Tetap" />
             <div className="divide-y divide-surface-subtle">
-              {data.aktivaTetap.length === 0 ? (
+              {data.rekapPerKategoriAset && data.rekapPerKategoriAset.length === 4 ? (
+                <>
+                  {data.rekapPerKategoriAset.map((rekap, idx) => {
+                    const hasVal = rekap.totalHargaPerolehan > 0;
+                    return (
+                      <ItemRow
+                        key={rekap.kategori}
+                        code={String(idx + 1)}
+                        name={rekap.label}
+                        amount={hasVal ? formatRupiah(rekap.totalHargaPerolehan) : "-"}
+                        amountClass={hasVal ? "text-navy-text" : "text-muted-faint"}
+                      />
+                    );
+                  })}
+                  {(() => {
+                    const totalAkm = Math.max(
+                      data.rekapPerKategoriAset.reduce((s, r) => s + r.totalAkumulasiPenyusutan, 0),
+                      data.aktivaTetap.find((a) => a.isContra || a.code === "1001" || /penyusutan/i.test(a.name))?.saldo ?? 0
+                    );
+                    return (
+                      <ItemRow
+                        code="1001"
+                        name="Akumulasi Penyusutan (Pengurang)"
+                        amount={totalAkm > 0 ? `(${formatRupiah(totalAkm)})` : "-"}
+                        amountClass="text-status-amber"
+                      />
+                    );
+                  })()}
+                </>
+              ) : data.aktivaTetap.length === 0 ? (
                 <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva tetap.</p>
               ) : (
                 data.aktivaTetap.map((item) => (

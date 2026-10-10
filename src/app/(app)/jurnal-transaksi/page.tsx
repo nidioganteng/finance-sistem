@@ -40,6 +40,7 @@ export default async function JurnalTransaksiPage({
   ]);
 
   const coa = (coaResp.data ?? []).map((c) => ({ id: c.id, code: c.code, name: c.name, kategori: c.kategori }));
+  const fakturOptions: never[] = [];
 
   // Build search params record for pagination href builder (exclude page)
   const spRecord: Record<string, string> = {};
@@ -64,6 +65,7 @@ export default async function JurnalTransaksiPage({
         coa={coa}
         history={groups}
         projectOptions={projectOptions}
+        fakturOptions={fakturOptions}
         page={page}
         totalPages={totalPages}
         dari={searchParams.dari ?? ""}

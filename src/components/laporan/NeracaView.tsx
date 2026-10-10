@@ -2,12 +2,14 @@
 
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import type { CoaLine } from "@/lib/laporan-keuangan";
-import { getMetricValueFontSize } from "@/lib/dashboard-data";
+import type { RekapKategoriAset } from "@/lib/aset-tetap";
+import { getMetricValueFontSize, formatRupiah } from "@/lib/dashboard-data";
 
 interface NeracaViewProps {
   data: {
     aktivaLancar?: CoaLine[];
     aktivaTetap?: CoaLine[];
+    rekapPerKategoriAset?: RekapKategoriAset[];
     totalAktivaLancar?: number;
     totalAktivaTetap?: number;
     totalAktivaLancarFmt?: string;
@@ -51,6 +53,19 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
   const totalTetapFmt = data.totalAktivaTetapFmt ?? "Rp 0";
   const totalEkuitasFmt = data.totalEkuitasFmt ?? data.totalModalDanLabaFmt ?? data.totalPassivaFmt;
 
+  const rekapKategoriList = data.rekapPerKategoriAset && data.rekapPerKategoriAset.length === 4
+    ? data.rekapPerKategoriAset
+    : [
+        { kategori: "TANAH" as const, label: "Tanah", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+        { kategori: "BANGUNAN" as const, label: "Bangunan", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+        { kategori: "KENDARAAN" as const, label: "Kendaraan", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+        { kategori: "PERALATAN_KANTOR" as const, label: "Peralatan Kantor", totalHargaPerolehan: 0, totalHargaPerolehanFmt: "-", totalAkumulasiPenyusutan: 0, totalBebanPenyusutan: 0, totalNilaiBuku: 0, totalAkumulasiPenyusutanFmt: "Rp 0", totalBebanPenyusutanFmt: "Rp 0", totalNilaiBukuFmt: "Rp 0", jumlahAset: 0 },
+      ];
+
+  const totalAkumulasiDariKategori = rekapKategoriList.reduce((s, r) => s + r.totalAkumulasiPenyusutan, 0);
+  const akmCoa = aktivaTetap.find((a) => a.isContra || a.code === "1001" || /penyusutan/i.test(a.name));
+  const totalAkumulasiAktivaTetap = Math.max(totalAkumulasiDariKategori, akmCoa?.saldo ?? 0);
+
   return (
     <div className="flex flex-col gap-6">
       {/* ── Header Laporan Resmi ── */}
@@ -82,14 +97,33 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
         </div>
       </div>
 
-      {/* ── Warning jika tidak seimbang ── */}
+      {/* ── Warning jika tidak seimbang (Issue 88 Poin 4: nominal selisih diperbesar dan dipertegas) ── */}
       {!data.neracaBalanced && (
-        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[16px] px-5 py-4">
-          <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
-          <div className="text-[13px] text-red-700 dark:text-red-400">
-            <span className="font-extrabold">Neraca Belum Seimbang:</span> Terdapat perbedaan sebesar{" "}
-            <span className="font-bold">Rp {Math.round(selisih).toLocaleString("id-ID")}</span> antara Total Aktiva (
-            {data.totalAsetFmt}) dan Total Pasiva ({data.totalPassivaFmt}).
+        <div className="bg-red-500/10 border-2 border-red-500/70 dark:border-red-500/50 rounded-[22px] p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-500/20 text-[11px] font-extrabold text-red-700 dark:text-red-300 uppercase tracking-wider mb-1">
+                Perhatian: Neraca Belum Seimbang
+              </div>
+              <h3 className="text-[15px] sm:text-[16px] font-black text-navy-text">
+                Terdapat Selisih Saldo Antara Total Aktiva & Total Pasiva
+              </h3>
+              <p className="text-[12.5px] text-muted-strong mt-0.5">
+                Total Aktiva: <span className="font-bold text-navy-text">{data.totalAsetFmt}</span> · Total Pasiva:{" "}
+                <span className="font-bold text-navy-text">{data.totalPassivaFmt}</span>
+              </p>
+            </div>
+          </div>
+          <div className="bg-surface-card border-2 border-red-300 dark:border-red-500/30 rounded-2xl px-5 py-3.5 flex flex-col items-start sm:items-end shrink-0 shadow-xs">
+            <span className="text-[11.5px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">
+              Nominal Selisih:
+            </span>
+            <span className="text-[26px] sm:text-[30px] font-black text-status-red tabular-nums leading-none mt-1">
+              Rp {Math.round(selisih).toLocaleString("id-ID")}
+            </span>
           </div>
         </div>
       )}
@@ -121,10 +155,10 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
         </div>
 
         <div
-          className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden ${
+          className={`rounded-[20px] border p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden flex flex-col justify-between ${
             data.neracaBalanced
               ? "bg-green-50/50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
-              : "bg-red-50/50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
+              : "bg-red-50/70 dark:bg-red-500/15 border-2 border-red-400 dark:border-red-500/40"
           }`}
         >
           <div className="text-[12px] font-bold uppercase tracking-wider mb-2 truncate">
@@ -132,11 +166,21 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
               Status Keseimbangan
             </span>
           </div>
-          <div className={`text-[19px] sm:text-[20px] font-extrabold truncate ${data.neracaBalanced ? "text-status-green" : "text-status-red"}`}>
-            {data.neracaBalanced ? "100% Balanced" : "Selisih Saldo"}
-          </div>
-          <div className="text-[11.5px] text-muted mt-2 truncate">
-            {data.neracaBalanced ? "Aktiva = Pasiva Seimbang" : `Perbedaan Rp ${Math.round(selisih).toLocaleString("id-ID")}`}
+          <div className="min-w-0">
+            <div
+              className={`font-black truncate tabular-nums ${
+                data.neracaBalanced
+                  ? "text-[20px] text-status-green"
+                  : "text-[22px] sm:text-[24px] text-status-red"
+              }`}
+            >
+              {data.neracaBalanced
+                ? "100% Balanced"
+                : `Rp ${Math.round(selisih).toLocaleString("id-ID")}`}
+            </div>
+            <div className="text-[11.5px] font-bold text-muted mt-1.5 truncate">
+              {data.neracaBalanced ? "Aktiva = Pasiva Seimbang" : "Nominal Selisih Saldo"}
+            </div>
           </div>
         </div>
       </div>
@@ -195,7 +239,7 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
             </div>
           </div>
 
-          {/* II. Aktiva Tetap */}
+          {/* II. Aktiva Tetap (Format Standar SAK: Perolehan per Kategori + Akumulasi Penyusutan) */}
           <div className="bg-surface-card rounded-[22px] border border-border-soft shadow-xs overflow-hidden">
             <div className="px-6 py-3.5 border-b border-cyan-100 dark:border-cyan-500/20 bg-cyan-50/50 dark:bg-cyan-500/10 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -204,42 +248,89 @@ export function NeracaView({ data, year, entityName }: NeracaViewProps) {
                   II. Aktiva Tetap
                 </span>
               </div>
-              <span className="text-[11px] font-bold text-muted-faint">{aktivaTetap.length} Akun</span>
+              <span className="text-[11px] font-bold text-muted-faint">
+                Total per Kategori Aset
+              </span>
             </div>
 
             <div className="divide-y divide-surface-subtle">
-              {aktivaTetap.length === 0 ? (
-                <p className="py-4 px-6 text-[12.5px] text-muted-faint italic">Tidak ada akun aktiva tetap.</p>
-              ) : (
-                aktivaTetap.map((item) => (
+              {/* 1. Baris Kategori Aset Tetap: Tanah, Bangunan, Kendaraan, Peralatan Kantor */}
+              {rekapKategoriList.map((rekap) => {
+                const hasValue = rekap.totalHargaPerolehan > 0;
+                return (
                   <div
-                    key={item.code}
+                    key={rekap.kategori}
                     className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors"
                   >
                     <div className="flex items-baseline gap-2 min-w-0">
-                      <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
-                      <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
-                      {item.isContra && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                          Pengurang
+                      <span className="text-[13px] font-semibold text-navy-text truncate">
+                        {rekap.label}
+                      </span>
+                      {rekap.jumlahAset > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-subtle text-muted-faint font-semibold">
+                          {rekap.jumlahAset} aset
                         </span>
                       )}
                     </div>
                     <span
                       className={`text-[13px] font-bold tabular-nums shrink-0 whitespace-nowrap ${
-                        item.isContra ? "text-status-amber" : "text-navy-text"
+                        hasValue ? "text-navy-text" : "text-muted-faint"
                       }`}
                     >
+                      {hasValue ? formatRupiah(rekap.totalHargaPerolehan) : "-"}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* 2. Akun Aktiva Tetap Lain dari COA di luar 100 & 1001 jika ada */}
+              {aktivaTetap
+                .filter(
+                  (item) =>
+                    item.code !== "100" &&
+                    item.code !== "1001" &&
+                    !/aktiva tetap|aset tetap/i.test(item.name) &&
+                    !item.isContra
+                )
+                .map((item) => (
+                  <div
+                    key={item.code}
+                    className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors bg-surface-subtle/20"
+                  >
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <code className="text-[11px] font-mono text-muted-faint shrink-0">[{item.code}]</code>
+                      <span className="text-[13px] font-semibold text-navy-text truncate">{item.name}</span>
+                    </div>
+                    <span className="text-[13px] font-bold tabular-nums text-navy-text shrink-0 whitespace-nowrap">
                       {item.saldoFmt}
                     </span>
                   </div>
-                ))
-              )}
+                ))}
+
+              {/* 3. Baris Akumulasi Penyusutan (Pengurang / Kontra Aset) */}
+              <div className="px-6 py-3 flex items-baseline justify-between hover:bg-surface-hover/30 transition-colors bg-amber-50/20 dark:bg-amber-500/5">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-[13px] font-semibold text-navy-text truncate">
+                    Akumulasi Penyusutan
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                    Pengurang
+                  </span>
+                </div>
+                <span className="text-[13px] font-bold tabular-nums text-status-amber shrink-0 whitespace-nowrap">
+                  {totalAkumulasiAktivaTetap > 0
+                    ? `(${formatRupiah(totalAkumulasiAktivaTetap)})`
+                    : "-"}
+                </span>
+              </div>
             </div>
 
-            <div className="px-6 py-3 bg-cyan-50/40 dark:bg-cyan-500/10 border-t border-cyan-100 dark:border-cyan-500/20 flex items-center justify-between">
-              <span className="text-[12.5px] font-bold text-cyan-950 dark:text-cyan-300">Total Aktiva Tetap (Net)</span>
-              <span className="text-[13.5px] font-extrabold text-cyan-700 dark:text-cyan-400 tabular-nums whitespace-nowrap">
+            {/* Subtotal Footer: Total Aktiva Tetap (Net) */}
+            <div className="px-6 py-3.5 bg-cyan-50/40 dark:bg-cyan-500/10 border-t border-cyan-100 dark:border-cyan-500/20 flex items-center justify-between">
+              <span className="text-[12.5px] font-extrabold text-cyan-950 dark:text-cyan-300 uppercase tracking-wider">
+                Total Aktiva Tetap
+              </span>
+              <span className="text-[14px] font-black text-cyan-700 dark:text-cyan-400 tabular-nums whitespace-nowrap">
                 {totalTetapFmt}
               </span>
             </div>

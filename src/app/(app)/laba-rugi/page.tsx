@@ -8,7 +8,9 @@ import { YearSelect } from "@/components/shared/YearSelect";
 import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
 import { getLaporanPajakData } from "@/lib/pajak";
+import { getValidasiPajak3Arah } from "@/lib/validasi-pajak-3arah";
 import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
+import { ValidasiPajak3ArahCard } from "@/components/laporan/ValidasiPajak3ArahCard";
 
 export default async function LabaRugiPage({
   searchParams,
@@ -28,7 +30,10 @@ export default async function LabaRugiPage({
     return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
   }
 
-  const taxData = await getLaporanPajakData(selectedEntity.id, currentYear, currentVersion, selectedEntity.name);
+  const [taxData, validasi3Arah] = await Promise.all([
+    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion, selectedEntity.name),
+    getValidasiPajak3Arah(selectedEntity.id, currentYear, currentVersion),
+  ]);
 
   return (
     <PageTransition>
@@ -47,7 +52,10 @@ export default async function LabaRugiPage({
         }
       />
 
-      <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
+      <div className="flex flex-col gap-6">
+        <ValidasiPajak3ArahCard data={validasi3Arah} entityName={selectedEntity.name} />
+        <LabaRugiUmumView data={taxData} entityKey={selectedKey} version={currentVersion} />
+      </div>
     </PageTransition>
   );
 }

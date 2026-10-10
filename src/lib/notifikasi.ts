@@ -1,4 +1,4 @@
-import { NotifikasiType, Role } from "@prisma/client";
+import { NotifikasiType, Role } from "@/types/app-enums";
 import { phpFetch, getPhpToken } from "./api-client";
 
 const LABELS_CEO: Partial<Record<NotifikasiType, string>> = {

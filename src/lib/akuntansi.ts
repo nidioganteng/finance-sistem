@@ -1,5 +1,5 @@
 import { phpFetch, getPhpToken } from "./api-client";
-import { CoaKategori } from "@prisma/client";
+import { CoaKategori } from "@/types/app-enums";
 
 // Debet-normal: saldo bertambah saat debet, berkurang saat kredit.
 const DEBET_NORMAL: CoaKategori[] = [CoaKategori.ASET, CoaKategori.BEBAN];

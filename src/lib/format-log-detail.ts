@@ -1,6 +1,6 @@
 import { formatRupiah } from "./dashboard-data";
 import { roleLabel } from "./rbac";
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 
 export function formatLogDetail(detail: unknown, action: string = ""): string {
   if (!detail) return "-";

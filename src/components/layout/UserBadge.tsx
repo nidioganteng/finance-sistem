@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { roleLabel } from "@/lib/rbac";
-import { Role } from "@prisma/client";
+import { Role } from "@/types/app-enums";
 import { motion } from "framer-motion";
 import { useState } from "react";
 

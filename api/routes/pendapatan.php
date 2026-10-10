@@ -47,6 +47,9 @@ if ($method === 'GET' && $sub_action === null) {
         $f['nominalDiterima']      = (float)$f['nominalDiterima'];
         $f['tarifPpnPersen']       = (float)$f['tarifPpnPersen'];
         $f['tarifPphPersen']       = (float)$f['tarifPphPersen'];
+        $f['ceklisPpn']            = (bool)$f['ceklisPpn'];
+        $f['ceklisPph']            = (bool)$f['ceklisPph'];
+        $f['ceklisBuktiPotong']    = (bool)$f['ceklisBuktiPotong'];
     }
     unset($f);
 
@@ -66,6 +69,7 @@ if ($method === 'GET' && $sub_action === null) {
     foreach ($rekonsiliasi as &$r) {
         $r['dppTerlapor']   = (float)$r['dppTerlapor'];
         $r['pajakTerlapor'] = (float)$r['pajakTerlapor'];
+        $r['pphTerlapor']   = (float)($r['pphTerlapor'] ?? 0);
     }
     unset($r);
 
@@ -132,6 +136,47 @@ if ($method === 'GET' && $sub_action === 'projects') {
     }
 
     json_response($result);
+}
+
+// ─── GET /api/pendapatan/faktur?entityId=... ────────────────────────────────
+// Returns all faktur for entity (no year filter) — used by jurnal-transaksi dropdown.
+if ($method === 'GET' && $sub_action === 'faktur') {
+    $entity_id = $_GET['entityId'] ?? null;
+    if (!$entity_id) error_response('entityId diperlukan.', 400);
+
+    $pdo  = get_pdo();
+    $stmt = $pdo->prepare(
+        'SELECT f.id, f.noFaktur, f.namaRekanan, f.namaJkp,
+                f.dpp, f.dppNilaiLain, f.ppn, f.pph,
+                f.nilaiProyek, f.labaSetelahPajak, f.nominalDiterima,
+                f.bank, f.projectId, f.tahunPajak, f.masaPajak,
+                p.code AS project_code, p.name AS project_name
+           FROM FakturPendapatan f
+           LEFT JOIN Project p ON f.projectId = p.id
+          WHERE f.entityId = ?
+          ORDER BY f.tahunPajak DESC, f.masaPajak DESC, f.createdAt DESC'
+    );
+    $stmt->execute([$entity_id]);
+    $rows = $stmt->fetchAll();
+
+    foreach ($rows as &$f) {
+        $f['dpp']               = (float)$f['dpp'];
+        $f['dppNilaiLain']      = (float)$f['dppNilaiLain'];
+        $f['ppn']               = (float)$f['ppn'];
+        $f['pph']               = (float)$f['pph'];
+        $f['nilaiProyek']       = (float)$f['nilaiProyek'];
+        $f['labaSetelahPajak']  = (float)$f['labaSetelahPajak'];
+        $f['nominalDiterima']   = (float)$f['nominalDiterima'];
+        $f['ceklisPpn']         = (bool)($f['ceklisPpn'] ?? false);
+        $f['ceklisPph']         = (bool)($f['ceklisPph'] ?? false);
+        $f['ceklisBuktiPotong'] = (bool)($f['ceklisBuktiPotong'] ?? false);
+        $f['projectCode']       = $f['project_code'] ?? null;
+        $f['projectName']       = $f['project_name'] ?? null;
+        unset($f['project_code'], $f['project_name']);
+    }
+    unset($f);
+
+    json_response(['data' => $rows]);
 }
 
 // ─── Helper: hitung pajak dari input faktur ──────────────────────────────────
@@ -270,6 +315,33 @@ if ($method === 'DELETE' && $sub_action === 'faktur' && $record_id !== null) {
     json_response(['message' => 'Faktur pendapatan berhasil dihapus.']);
 }
 
+// ─── PATCH /api/pendapatan/faktur/:id  body: {field, value} ──────────────────
+// Toggle ceklis dokumen fisik (ceklisPpn, ceklisPph, ceklisBuktiPotong)
+if ($method === 'PATCH' && $sub_action === 'faktur' && $record_id !== null) {
+    $field = $body['field'] ?? null; // 'ppn' | 'pph' | 'buktiPotong'
+    $value = isset($body['value']) ? (bool)$body['value'] : null;
+
+    $map = ['ppn' => 'ceklisPpn', 'pph' => 'ceklisPph', 'buktiPotong' => 'ceklisBuktiPotong'];
+    if (!isset($map[$field])) error_response("Field tidak valid. Gunakan: ppn, pph, buktiPotong.", 400);
+    if ($value === null) error_response("value diperlukan.", 400);
+
+    $col = $map[$field];
+    $pdo = get_pdo();
+
+    $stmt = $pdo->prepare("SELECT id FROM FakturPendapatan WHERE id = ?");
+    $stmt->execute([$record_id]);
+    if (!$stmt->fetch()) error_response('Faktur tidak ditemukan.', 404);
+
+    $pdo->prepare("UPDATE FakturPendapatan SET `$col` = ? WHERE id = ?")
+        ->execute([$value ? 1 : 0, $record_id]);
+
+    log_activity($user['id'], "faktur_pendapatan.toggle_ceklis.$field", 'FINANCIAL_CHANGE', [
+        'fakturId' => $record_id, 'field' => $col, 'value' => $value,
+    ]);
+
+    json_response(['message' => 'Status ceklis diperbarui.', 'field' => $col, 'value' => $value]);
+}
+
 // ─── POST /api/pendapatan/rekonsiliasi ───────────────────────────────────────
 if ($method === 'POST' && $sub_action === 'rekonsiliasi') {
     $required = ['entityId','year','month','dppTerlapor','pajakTerlapor'];
@@ -285,11 +357,12 @@ if ($method === 'POST' && $sub_action === 'rekonsiliasi') {
     // UPSERT: INSERT ... ON DUPLICATE KEY UPDATE
     $pdo->prepare(
         'INSERT INTO RekonsiliasiPajakBulanan
-         (id, entityId, year, month, dppTerlapor, pajakTerlapor, keterangan, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         (id, entityId, year, month, dppTerlapor, pajakTerlapor, pphTerlapor, keterangan, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            dppTerlapor   = VALUES(dppTerlapor),
            pajakTerlapor = VALUES(pajakTerlapor),
+           pphTerlapor   = VALUES(pphTerlapor),
            keterangan    = VALUES(keterangan),
            updatedAt     = VALUES(updatedAt)'
     )->execute([
@@ -299,6 +372,7 @@ if ($method === 'POST' && $sub_action === 'rekonsiliasi') {
         (int)$body['month'],
         (float)$body['dppTerlapor'],
         (float)$body['pajakTerlapor'],
+        (float)($body['pphTerlapor'] ?? 0),
         $body['keterangan'] ?? null,
         $now,
     ]);

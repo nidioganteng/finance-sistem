@@ -33,14 +33,25 @@ export default async function JurnalTransaksiPage({
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
 
   const token = await getPhpToken();
-  const [coaResp, { groups, totalPages }, projectOptions] = await Promise.all([
+  const [coaResp, { groups, totalPages }, projectOptions, fakturResp] = await Promise.all([
     phpFetch<{ data: { id: string; code: string; name: string; kategori: string }[] }>("/api/coa", token),
     getJurnalTransaksiHistory(selectedEntity.id, page, searchParams.dari, searchParams.sampai),
     getProjectOptions(selectedEntity.key),
+    phpFetch<{ data: Array<{
+      id: string; noFaktur: string; namaRekanan: string; namaJkp: string;
+      dpp: number; dppNilaiLain: number; ppn: number; pph: number;
+      nilaiProyek: number; labaSetelahPajak: number; nominalDiterima: number;
+      bank?: string | null; projectId?: string | null;
+      projectCode?: string | null; projectName?: string | null;
+      tahunPajak: number; masaPajak: number;
+    }> }>(
+      `/api/pendapatan/faktur?entityId=${encodeURIComponent(selectedEntity.id)}`,
+      token
+    ).catch(() => ({ data: [] })),
   ]);
 
   const coa = (coaResp.data ?? []).map((c) => ({ id: c.id, code: c.code, name: c.name, kategori: c.kategori }));
-  const fakturOptions: never[] = [];
+  const fakturOptions = fakturResp.data ?? [];
 
   // Build search params record for pagination href builder (exclude page)
   const spRecord: Record<string, string> = {};

@@ -43,5 +43,5 @@ export async function getPhpToken(): Promise<string> {
   const { redirect } = await import("next/navigation");
   const session = await getServerSession(authOptions);
   if (!session?.user?.phpToken) redirect("/login");
-  return session.user.phpToken as string;
+  return session!.user.phpToken as string;
 }

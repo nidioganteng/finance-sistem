@@ -22,6 +22,9 @@ export type FakturPendapatanInput = {
   nominalDiterima: number;
   projectId?: string | null;
   bankTransactionId?: string | null;
+  ceklisPpn?: boolean;
+  ceklisPph?: boolean;
+  ceklisBuktiPotong?: boolean;
 };
 
 export type RekonsiliasiPajakInput = {
@@ -30,6 +33,7 @@ export type RekonsiliasiPajakInput = {
   month: number;
   dppTerlapor: number;
   pajakTerlapor: number;
+  pphTerlapor?: number;
   keterangan?: string;
 };
 
@@ -66,6 +70,24 @@ export async function deleteFakturPendapatanAction(id: string) {
   try {
     await phpFetch(`/api/pendapatan/faktur/${id}`, token, {
       method: "DELETE",
+    });
+    return { success: true };
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    return { error: "Terjadi kesalahan." };
+  }
+}
+
+export async function toggleCeklisDokumenFakturAction(
+  id: string,
+  field: "ppn" | "pph" | "buktiPotong",
+  value: boolean
+) {
+  const token = await getPhpToken();
+  try {
+    await phpFetch(`/api/pendapatan/faktur/${id}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ field, value }),
     });
     return { success: true };
   } catch (e) {

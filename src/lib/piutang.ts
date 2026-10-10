@@ -79,7 +79,7 @@ export type ProjectExpenseItem = {
   keterangan: string;
   coaCode: string;
   coaName: string;
-  kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Lainnya";
+  kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Pajak Proyek" | "Lainnya";
   nominal: number;
   nominalFmt: string;
   sumberKasBank: string;
@@ -94,6 +94,8 @@ export type ProjectExpensesSummary = {
   totalMaterialFmt: string;
   totalOperasional: number;
   totalOperasionalFmt: string;
+  totalPajak: number;
+  totalPajakFmt: string;
   totalLainnya: number;
   totalLainnyaFmt: string;
   labaKotor: number;
@@ -357,6 +359,8 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
     totalMaterialFmt: fmt(0),
     totalOperasional: 0,
     totalOperasionalFmt: fmt(0),
+    totalPajak: 0,
+    totalPajakFmt: fmt(0),
     totalLainnya: spend,
     totalLainnyaFmt: fmt(spend),
     labaKotor,

@@ -105,6 +105,13 @@ export interface FakturPendapatanItem {
   nominalDiterimaFmt: string;
   pekerjaanPerusahaanFmt: string;
   pekerjaanYangDipinjamFmt: string;
+  ceklisPpn: boolean;
+  ceklisPph: boolean;
+  ceklisBuktiPotong: boolean;
+  isRealized: boolean;
+  selisihBank: number;
+  selisihBankFmt: string;
+  balanceStatus: "BALANCE" | "SELISIH" | "BELUM_CAIR";
 }
 
 export interface RekapBulananItem {
@@ -139,6 +146,12 @@ export interface RekonsiliasiPajakItem {
   ppnRekap: number;
   pajakTerlapor: number;
   selisihPajak: number;
+  pphRekap: number;
+  pphTerlapor: number;
+  selisihPph: number;
+  totalPajakRekap: number;
+  totalPajakTerlapor: number;
+  selisihTotalPajak: number;
   keterangan: string;
   status: "MATCH" | "SELISIH" | "BELUM_DILAPORKAN";
 
@@ -148,6 +161,12 @@ export interface RekonsiliasiPajakItem {
   ppnRekapFmt: string;
   pajakTerlaporFmt: string;
   selisihPajakFmt: string;
+  pphRekapFmt: string;
+  pphTerlaporFmt: string;
+  selisihPphFmt: string;
+  totalPajakRekapFmt: string;
+  totalPajakTerlaporFmt: string;
+  selisihTotalPajakFmt: string;
 }
 
 export interface LaporanPendapatanData {
@@ -262,6 +281,9 @@ type RawFaktur = {
   bankTransactionId: string | null;
   createdAt: string;
   entity_name: string;
+  ceklisPpn: boolean | number;
+  ceklisPph: boolean | number;
+  ceklisBuktiPotong: boolean | number;
 };
 
 type RawRekonsiliasi = {
@@ -271,6 +293,7 @@ type RawRekonsiliasi = {
   month: number;
   dppTerlapor: number;
   pajakTerlapor: number;
+  pphTerlapor?: number;
   keterangan: string | null;
 };
 
@@ -342,6 +365,13 @@ function makeFakturItem(f: RawFaktur): FakturPendapatanItem {
     nominalDiterimaFmt: formatRupiah(f.nominalDiterima),
     pekerjaanPerusahaanFmt: formatRupiah(f.pekerjaanPerusahaan),
     pekerjaanYangDipinjamFmt: formatRupiah(f.pekerjaanYangDipinjam),
+    ceklisPpn: Boolean(f.ceklisPpn),
+    ceklisPph: Boolean(f.ceklisPph),
+    ceklisBuktiPotong: Boolean(f.ceklisBuktiPotong),
+    isRealized: f.nominalDiterima > 0,
+    selisihBank: 0,
+    selisihBankFmt: formatRupiah(0),
+    balanceStatus: f.nominalDiterima > 0 ? "BALANCE" : "BELUM_CAIR",
   };
 }
 
@@ -506,6 +536,12 @@ export async function getLaporanPendapatanData(
       const pajakTerlapor = rekon?.pajakTerlapor ?? 0;
       const selisihDpp = rekap.dpp - dppTerlapor;
       const selisihPajak = rekap.ppn - pajakTerlapor;
+      const pphRekap = rekap.pph;
+      const pphTerlapor = 0; // not tracked separately in RekonsiliasiPajakBulanan
+      const selisihPph = pphRekap - pphTerlapor;
+      const totalPajakRekap = rekap.ppn + pphRekap;
+      const totalPajakTerlapor = pajakTerlapor + pphTerlapor;
+      const selisihTotalPajak = totalPajakRekap - totalPajakTerlapor;
       let status: RekonsiliasiPajakItem["status"] = "BELUM_DILAPORKAN";
       if (rekon) {
         status = selisihDpp === 0 && selisihPajak === 0 ? "MATCH" : "SELISIH";
@@ -519,6 +555,12 @@ export async function getLaporanPendapatanData(
         ppnRekap: rekap.ppn,
         pajakTerlapor,
         selisihPajak,
+        pphRekap,
+        pphTerlapor,
+        selisihPph,
+        totalPajakRekap,
+        totalPajakTerlapor,
+        selisihTotalPajak,
         keterangan: rekon?.keterangan ?? "",
         status,
         dppRekapFmt: formatRupiah(rekap.dpp),
@@ -527,6 +569,12 @@ export async function getLaporanPendapatanData(
         ppnRekapFmt: formatRupiah(rekap.ppn),
         pajakTerlaporFmt: formatRupiah(pajakTerlapor),
         selisihPajakFmt: formatRupiah(selisihPajak),
+        pphRekapFmt: formatRupiah(pphRekap),
+        pphTerlaporFmt: formatRupiah(pphTerlapor),
+        selisihPphFmt: formatRupiah(selisihPph),
+        totalPajakRekapFmt: formatRupiah(totalPajakRekap),
+        totalPajakTerlaporFmt: formatRupiah(totalPajakTerlapor),
+        selisihTotalPajakFmt: formatRupiah(selisihTotalPajak),
       };
     });
 

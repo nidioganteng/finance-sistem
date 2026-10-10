@@ -81,7 +81,10 @@ $routes = [
     'pajak'             => 'pajak',
     'laporan-keuangan'  => 'laporan-keuangan',
     'daftar-akun'       => 'daftar-akun',
-    'tarifpajak'        => 'tarifpajak',
+    'tarifpajak'            => 'tarifpajak',
+    'validasi-pajak-3arah'  => 'validasi-pajak-3arah',
+    'rekanan'               => 'rekanan',
+    'payroll'               => 'payroll',
 ];
 
 // ── Dispatch ─────────────────────────────────────────────────────────────────

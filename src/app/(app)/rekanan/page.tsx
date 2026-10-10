@@ -7,11 +7,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { RekananClient } from "@/components/rekanan/RekananClient";
 
-export const metadata = {
-  title: "Rekanan | SIMATRA",
-  description: "Database terpusat identitas Rekanan, Vendor, Klien, dan Tenaga Ahli",
-};
-
 export default async function RekananPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {

@@ -50,9 +50,9 @@ type DockItem = {
 };
 
 const STATUS_BADGE: Record<TerminStatus, string> = {
-  ON_TRACK:    "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
-  AT_RISK:     "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400",
-  NEEDS_AUDIT: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
+  ON_TRACK:    "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+  AT_RISK:     "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+  NEEDS_AUDIT: "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
 };
 const STATUS_LABEL: Record<TerminStatus, string> = {
   ON_TRACK:    "On Track",
@@ -698,14 +698,14 @@ export function PiutangClient({
                                             <>
                                               <div className="rounded-xl border border-border overflow-hidden">
                                                 <div className="overflow-x-auto">
-                                                  <table className="w-full min-w-[760px] text-left text-xs">
+                                                  <table className="w-full min-w-[800px] text-left text-xs">
                                                     <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                                                       <tr>
                                                         <th className="py-2.5 px-3.5">Termin & Bukti Bayar</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Kwitansi Bruto</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(-) Potongan Pajak</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">(=) Net Masuk Bank</th>
-                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[210px]">Status & Aksi</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Kwitansi Bruto</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[170px]">(-) Potongan Pajak</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[145px]">(=) Net Masuk Bank</th>
+                                                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[190px]">Status & Aksi</th>
                                                       </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-border bg-surface-card">
@@ -716,7 +716,9 @@ export function PiutangClient({
                                                             {/* Kolom 1: Termin & Dokumen */}
                                                             <td className="py-3 px-3.5">
                                                               <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="font-bold text-navy-text text-sm">{t.name}</span>
+                                                                <span className="font-bold text-navy-text text-sm">
+                                                                  {t.name.replace(/\s*\[.*?\]\s*$/, "")}
+                                                                </span>
                                                                 {t.percentage !== undefined && (
                                                                   <span className="text-[10.5px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                                                     +{t.percentageDelta ?? t.percentage}% (Pagu {t.percentage}%)
@@ -736,21 +738,21 @@ export function PiutangClient({
                                                             </td>
 
                                                             {/* Kolom 2: Bruto Kwitansi */}
-                                                            <td className="py-3 px-3.5 text-right">
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                                                               <div className="font-mono font-bold text-navy-text text-sm">
                                                                 {t.nominalFmt}
                                                               </div>
-                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                              <div className="text-[11px] text-muted-faint mt-0.5 whitespace-nowrap">
                                                                 Nilai tagihan bruto
                                                               </div>
                                                             </td>
 
                                                             {/* Kolom 3: Potongan Pajak */}
-                                                            <td className="py-3 px-3.5 text-right">
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                                                               <div className="font-mono font-semibold text-amber-700 dark:text-amber-300 text-sm">
                                                                 {formatRupiah(totalPajak)}
                                                               </div>
-                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                              <div className="text-[11px] text-muted-faint mt-0.5 whitespace-nowrap">
                                                                 {t.breakdown ? (
                                                                   <span>PPN: {t.breakdown.ppnFmt} · PPh: {t.breakdown.pphFmt}</span>
                                                                 ) : (
@@ -760,18 +762,18 @@ export function PiutangClient({
                                                             </td>
 
                                                             {/* Kolom 4: Net Masuk Bank */}
-                                                            <td className="py-3 px-3.5 text-right">
+                                                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                                                               <div className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
                                                                 {t.breakdown?.netBankFmt || t.nominalFmt}
                                                               </div>
-                                                              <div className="text-[11px] text-muted-faint mt-0.5">
+                                                              <div className="text-[11px] text-muted-faint mt-0.5 whitespace-nowrap">
                                                                 {t.breakdown?.bank ? `Masuk ke ${t.breakdown.bank}` : "Bersih rekening bank"}
                                                               </div>
                                                             </td>
 
                                                             {/* Kolom 5: Status & Aksi */}
                                                             <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                                                              <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                                              <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
                                                                 {isManajer && t.status !== "ON_TRACK" && (
                                                                   <button
                                                                     type="button"
@@ -780,10 +782,11 @@ export function PiutangClient({
                                                                       handleAudit(t.id);
                                                                     }}
                                                                     disabled={isPending}
-                                                                    className="px-2 py-1 rounded-lg bg-navy text-white text-[10.5px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap hover:bg-navy-light transition-colors shadow-2xs"
-                                                                    title="Tandai termin telah diaudit"
+                                                                    className="h-7 px-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap transition-colors shadow-2xs"
+                                                                    title="Verifikasi dan tandai termin telah diaudit (status kembali ke On Track)"
                                                                   >
-                                                                    <CheckCircle size={10} /> Audit
+                                                                    <CheckCircle size={12} className="text-emerald-600 dark:text-emerald-400" />
+                                                                    <span>Audit</span>
                                                                   </button>
                                                                 )}
 
@@ -796,7 +799,7 @@ export function PiutangClient({
                                                                         handleStatusChange(t.id, e.target.value as TerminStatus)
                                                                       }
                                                                       disabled={isPending}
-                                                                      className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-lg border border-border/80 cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
+                                                                      className={`no-custom-chevron h-7 text-[11px] font-bold pl-2.5 pr-6 py-0.5 rounded-lg border cursor-pointer whitespace-nowrap appearance-none transition-colors shadow-2xs ${STATUS_BADGE[t.status]}`}
                                                                       title="Klik untuk mengubah status termin"
                                                                     >
                                                                       <option value="ON_TRACK" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">On Track</option>
@@ -806,7 +809,7 @@ export function PiutangClient({
                                                                     <ChevronDown size={11} className="absolute right-1.5 pointer-events-none text-current opacity-70" />
                                                                   </div>
                                                                 ) : (
-                                                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg whitespace-nowrap ${STATUS_BADGE[t.status]}`}>
+                                                                  <span className={`h-7 inline-flex items-center text-[11px] font-bold px-2.5 rounded-lg whitespace-nowrap border ${STATUS_BADGE[t.status]}`}>
                                                                     {STATUS_LABEL[t.status]}
                                                                   </span>
                                                                 )}
@@ -817,10 +820,11 @@ export function PiutangClient({
                                                                     e.stopPropagation();
                                                                     setSelectedTerminForModal({ project: p, termin: t });
                                                                   }}
-                                                                  className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                                                                  className="h-7 px-2.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/40 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                                                                   title="Lihat rincian lengkap formula perpajakan & jurnal akuntansi termin ini"
                                                                 >
-                                                                  <FileText size={11} /> Breakdown Pajak
+                                                                  <FileText size={12} />
+                                                                  <span>Breakdown Pajak</span>
                                                                 </button>
                                                               </div>
                                                             </td>
@@ -833,13 +837,13 @@ export function PiutangClient({
                                                         <td className="py-3 px-3.5 text-navy-text font-bold">
                                                           Total Termin Cair ({p.termin.length} Termin):
                                                         </td>
-                                                        <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm">
+                                                        <td className="py-3 px-3.5 text-right font-mono text-navy-text text-sm whitespace-nowrap">
                                                           {p.breakdownSummary?.totalGrossFmt ?? p.terminTagihFmt}
                                                         </td>
-                                                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 text-sm">
+                                                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 text-sm whitespace-nowrap">
                                                           {formatRupiah((p.breakdownSummary?.totalPpn ?? 0) + (p.breakdownSummary?.totalPph ?? 0))}
                                                         </td>
-                                                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 text-sm">
+                                                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 text-sm whitespace-nowrap">
                                                           {p.breakdownSummary?.totalNetBankFmt ?? p.terminTagihFmt}
                                                         </td>
                                                         <td className="py-3 px-3.5" />
@@ -912,6 +916,11 @@ export function PiutangClient({
                                                 <strong className="font-mono text-navy-text">{p.expensesSummary?.totalOperasionalFmt ?? "Rp 0"}</strong>
                                               </div>
                                               <div className="flex items-center gap-1.5">
+                                                <Receipt size={12} className="text-rose-600" />
+                                                <span className="text-muted-faint">Pajak:</span>
+                                                <strong className="font-mono text-navy-text">{p.expensesSummary?.totalPajakFmt ?? "Rp 0"}</strong>
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
                                                 <FileText size={12} className="text-purple-600" />
                                                 <span className="text-muted-faint">Lainnya:</span>
                                                 <strong className="font-mono text-navy-text">{p.expensesSummary?.totalLainnyaFmt ?? "Rp 0"}</strong>
@@ -954,6 +963,8 @@ export function PiutangClient({
                                                               ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
                                                               : exp.kategoriBeban === "Operasional & Transport"
                                                               ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                                              : exp.kategoriBeban === "Pajak Proyek"
+                                                              ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
                                                               : "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
                                                           }`}>
                                                             {exp.kategoriBeban}
@@ -963,7 +974,13 @@ export function PiutangClient({
                                                           </span>
                                                         </td>
                                                         <td className="py-2.5 px-3 whitespace-nowrap">
-                                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-surface-subtle text-muted-stronger border border-border">
+                                                          <span
+                                                            className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                                                              exp.sumberKasBank.startsWith("Talangan")
+                                                                ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 font-semibold"
+                                                                : "bg-surface-subtle text-muted-stronger border-border"
+                                                            }`}
+                                                          >
                                                             {exp.sumberKasBank}
                                                           </span>
                                                         </td>
@@ -1086,7 +1103,7 @@ export function PiutangClient({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-navy-text">
-                    Rincian Termin & Perpajakan ({selectedTerminForModal.termin.name})
+                    Rincian Termin & Perpajakan ({selectedTerminForModal.termin.name.replace(/\s*\[.*?\]\s*$/, "")})
                   </h3>
                   <p className="text-xs text-muted-faint">
                     Proyek: <span className="font-semibold text-muted-stronger">{selectedTerminForModal.project.code}</span> – {selectedTerminForModal.project.name}
@@ -1138,45 +1155,57 @@ export function PiutangClient({
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Gross (Kwitansi) */}
-                  <div className="p-3 rounded-xl bg-surface-subtle border border-border-subtle">
-                    <div className="text-[11px] text-muted-faint font-medium">Nilai Kwitansi / Bruto Pendapatan</div>
-                    <div className="text-base font-bold font-mono text-navy-text mt-0.5">
+                  <div className="p-3 rounded-xl bg-surface-subtle border border-border-subtle min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-muted-faint font-medium truncate">Nilai Kwitansi / Bruto Pendapatan</div>
+                    <div
+                      className="text-base font-bold font-mono text-navy-text mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.grossFmt || selectedTerminForModal.termin.nominalFmt}
+                    >
                       {selectedTerminForModal.termin.breakdown?.grossFmt || selectedTerminForModal.termin.nominalFmt}
                     </div>
-                    <div className="text-[10px] text-muted-faint mt-1">
+                    <div className="text-[10px] text-muted-faint mt-1 truncate">
                       Kredit Akun 400 (Pendapatan diakui)
                     </div>
                   </div>
 
                   {/* DPP Dasar & DPP Nilai Lain */}
-                  <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
-                    <div className="text-[11px] text-blue-800 dark:text-blue-300 font-medium">Dasar Pengenaan Pajak (DPP)</div>
-                    <div className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-blue-800 dark:text-blue-300 font-medium truncate">Dasar Pengenaan Pajak (DPP)</div>
+                    <div
+                      className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.dppFmt || "Rp 0"}
+                    >
                       {selectedTerminForModal.termin.breakdown?.dppFmt || "Rp 0"}
                     </div>
-                    <div className="text-[10px] text-blue-700/80 dark:text-blue-400 mt-1">
+                    <div className="text-[10px] text-blue-700/80 dark:text-blue-400 mt-1 truncate">
                       DPP Nilai Lain (11/12): <span className="font-mono font-semibold">{selectedTerminForModal.termin.breakdown?.dppNilaiLainFmt || "Rp 0"}</span>
                     </div>
                   </div>
 
                   {/* PPN Terutang */}
-                  <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-                    <div className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">PPN Terutang (12%)</div>
-                    <div className="text-base font-bold font-mono text-amber-900 dark:text-amber-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-amber-800 dark:text-amber-300 font-medium truncate">PPN Terutang (12%)</div>
+                    <div
+                      className="text-base font-bold font-mono text-amber-900 dark:text-amber-200 mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.ppnFmt || "Rp 0"}
+                    >
                       {selectedTerminForModal.termin.breakdown?.ppnFmt || "Rp 0"}
                     </div>
-                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400 mt-1">
+                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400 mt-1 truncate">
                       12% × DPP Nilai Lain (= 11% × DPP Dasar)
                     </div>
                   </div>
 
                   {/* Potongan PPh */}
-                  <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40">
-                    <div className="text-[11px] text-purple-800 dark:text-purple-300 font-medium">Potongan Pajak (PPh)</div>
-                    <div className="text-base font-bold font-mono text-purple-900 dark:text-purple-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-800/40 min-w-0 overflow-hidden">
+                    <div className="text-[11px] text-purple-800 dark:text-purple-300 font-medium truncate">Potongan Pajak (PPh)</div>
+                    <div
+                      className="text-base font-bold font-mono text-purple-900 dark:text-purple-200 mt-0.5 truncate block"
+                      title={selectedTerminForModal.termin.breakdown?.pphFmt || "Rp 0"}
+                    >
                       {selectedTerminForModal.termin.breakdown?.pphFmt || "Rp 0"}
                     </div>
-                    <div className="text-[10px] text-purple-700/80 dark:text-purple-400 mt-1">
+                    <div className="text-[10px] text-purple-700/80 dark:text-purple-400 mt-1 truncate">
                       {selectedTerminForModal.termin.breakdown?.pphItems && selectedTerminForModal.termin.breakdown.pphItems.length > 0 ? (
                         selectedTerminForModal.termin.breakdown.pphItems.map((p, idx) => (
                           <span key={idx} className="mr-2">
@@ -1191,22 +1220,25 @@ export function PiutangClient({
                 </div>
 
                 {/* Net Kas Masuk Bank */}
-                <div className="mt-3 p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                <div className="mt-3 p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between min-w-0 gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
                       <Landmark size={18} />
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200 truncate">
                         Bersih Diterima di Rekening Bank
                       </div>
-                      <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400">
+                      <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400 truncate">
                         {selectedTerminForModal.termin.breakdown?.bank || "Kas / Bank"}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold font-mono text-indigo-900 dark:text-indigo-100">
+                  <div className="text-right min-w-0 shrink-0">
+                    <div
+                      className="text-lg font-bold font-mono text-indigo-900 dark:text-indigo-100 truncate"
+                      title={selectedTerminForModal.termin.breakdown?.netBankFmt || selectedTerminForModal.termin.nominalFmt}
+                    >
                       {selectedTerminForModal.termin.breakdown?.netBankFmt || selectedTerminForModal.termin.nominalFmt}
                     </div>
                     <div className="text-[10px] text-indigo-600 dark:text-indigo-400">

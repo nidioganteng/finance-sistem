@@ -13,6 +13,7 @@
 :root {
   --color-navy: 15 23 41;
   --color-navy-text: 15 23 42;
+  --color-navy-soft: 100 116 139;
   --color-brand: 59 111 237;
   --color-brand-hover: 41 82 196;
   --color-brand-soft: 109 94 245;
@@ -39,6 +40,7 @@
 :root.dark {
   --color-navy: 65 96 158;
   --color-navy-text: 241 245 249;
+  --color-navy-soft: 148 163 184;
   --color-surface-page: 10 14 24;
   --color-surface-card: 17 24 39;
   --color-surface-subtle: 23 31 46;
@@ -108,3 +110,9 @@ select {
 :root.dark select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
 }
+
+select.no-custom-chevron {
+  background-image: none !important;
+  padding-right: 1.5rem !important;
+}
+

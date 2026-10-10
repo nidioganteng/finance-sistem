@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createKasTransaction, replaceKasTransaction, generateNoBukti } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { CoaCombobox } from "./CoaCombobox";
-import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, Zap, Briefcase, TrendingUp, ArrowRightLeft } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, Zap, Briefcase, TrendingUp, ArrowRightLeft, Sparkles } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
 type ProjectOption = {
@@ -618,9 +618,10 @@ export function KasTransactionForm({
                     <button
                       type="button"
                       onClick={() => setKeterangan(autoKeterangan)}
-                      className="self-start text-left text-[11px] font-semibold text-brand hover:underline flex items-center gap-1"
+                      className="self-start text-left text-[11px] font-semibold text-brand hover:underline flex items-center gap-1.5"
                     >
-                      ⚡ Gunakan keterangan: &quot;{autoKeterangan}&quot;
+                      <Sparkles size={12} className="text-brand shrink-0" />
+                      <span>Gunakan keterangan: &quot;{autoKeterangan}&quot;</span>
                     </button>
                   )}
                 </div>

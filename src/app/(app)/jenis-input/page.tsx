@@ -10,7 +10,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function JenisInputPage() {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
-  if (role !== "STAF_KEUANGAN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
+  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN") redirect("/dashboard");
 
   const [data, entities] = await Promise.all([
     getJenisInputList(),

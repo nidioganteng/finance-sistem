@@ -2286,7 +2286,7 @@ export function LaporanPendapatanClient({
               </div>
 
               {/* Form Grid 4: Jenis Proyek & Porsi Pekerjaan */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
                     Jenis Proyek <span className="text-rose-500">*</span>
@@ -2346,7 +2346,7 @@ export function LaporanPendapatanClient({
               </div>
 
               {/* Form Grid 5: Realisasi Pencairan Kas Bank */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
                     Tanggal Terima Dana di Bank <span className="text-[10px] text-navy-soft font-normal">(Opsional jika belum cair)</span>

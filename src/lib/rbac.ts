@@ -176,7 +176,6 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Bagan Akun", href: "/coa", icon: "landmark" },
         { label: "Rekanan", href: "/rekanan", icon: "users" },
         { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
-        { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
         { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },

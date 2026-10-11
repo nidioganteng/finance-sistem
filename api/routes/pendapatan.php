@@ -197,7 +197,7 @@ function hitung_pajak_faktur(array $b): array {
 // ─── POST /api/pendapatan/faktur ─────────────────────────────────────────────
 if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
     $required = ['entityId','npwp','noFaktur','masaPajak','tahunPajak','namaRekanan','namaJkp',
-                 'dpp','dppNilaiLain','tarifPpnPersen','tarifPphPersen','tanggalTerima','bank','nominalDiterima'];
+                 'dpp','dppNilaiLain','tarifPpnPersen','tarifPphPersen'];
     foreach ($required as $field) {
         if (!isset($body[$field]) || $body[$field] === '') {
             error_response("Field '$field' diperlukan.", 400);
@@ -236,9 +236,9 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
         (int)($body['kodeJenisProyek'] ?? 1),
         (float)($body['pekerjaanPerusahaan'] ?? 0),
         (float)($body['pekerjaanYangDipinjam'] ?? 0),
-        $body['tanggalTerima'],
-        $body['bank'],
-        (float)$body['nominalDiterima'],
+        !empty($body['tanggalTerima']) ? $body['tanggalTerima'] : null,
+        !empty($body['bank']) ? $body['bank'] : null,
+        isset($body['nominalDiterima']) && $body['nominalDiterima'] !== '' ? (float)$body['nominalDiterima'] : null,
         $body['projectId'] ?? null,
         $body['bankTransactionId'] ?? null,
         $user['id'],

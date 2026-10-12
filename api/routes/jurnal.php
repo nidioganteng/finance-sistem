@@ -91,6 +91,19 @@ if ($method === 'GET' && $sub === '') {
     $stmt_count->execute($params);
     $total_count = (int)$stmt_count->fetchColumn();
 
+    // Hitung total debit & kredit dari SEMUA data (bukan hanya halaman ini)
+    $sum_sql = "SELECT COALESCE(SUM(t.debit),0) as sum_debit, COALESCE(SUM(t.kredit),0) as sum_kredit
+                FROM `Transaction` t
+                LEFT JOIN JenisInputTransaksi ji ON t.jenisInputId = ji.id
+                LEFT JOIN CoaAccount c ON t.coaAccountId = c.id
+                WHERE $where_sql";
+    $stmt_sum = $pdo->prepare($sum_sql);
+    $stmt_sum->execute($params);
+    $sum_row          = $stmt_sum->fetch(PDO::FETCH_ASSOC);
+    $global_debit     = (float)$sum_row['sum_debit'];
+    $global_kredit    = (float)$sum_row['sum_kredit'];
+    $global_balanced  = round($global_debit * 100) === round($global_kredit * 100);
+
     // Fetch halaman
     $sql = "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit,
                    t.extraFieldsJson, t.projectId,
@@ -262,13 +275,11 @@ if ($method === 'GET' && $sub === '') {
         ];
     }
 
-    $is_balanced = round($total_debit * 100) === round($total_kredit * 100);
-
     json_response([
         'rows'         => $result_rows,
-        'totalDebit'   => $total_debit,
-        'totalKredit'  => $total_kredit,
-        'isBalanced'   => $is_balanced,
+        'totalDebit'   => $global_debit,
+        'totalKredit'  => $global_kredit,
+        'isBalanced'   => $global_balanced,
         'totalCount'   => $total_count,
         'totalPages'   => max(1, (int)ceil($total_count / $page_size)),
         'page'         => $page,

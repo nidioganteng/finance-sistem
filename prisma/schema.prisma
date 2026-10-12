@@ -408,6 +408,7 @@ model Rekanan {
   npwp         String?     // NPWP resmi (15/16 digit)
   nik          String?     // NIK KTP (16 digit)
   tipe         RekananTipe @default(VENDOR)
+  ptkp         String?     @default("TK/0") // Status PTKP untuk Tenaga Ahli (TK/0, K/0, dll)
   kategori     String?     // Sub-kategori (Subkon, Konsultan, Dinas, Supplier, dll)
   alamat       String?     @db.Text
   telepon      String?
@@ -503,11 +504,13 @@ model HonorTenagaAhli {
   nik              String   // NIK KTP Tenaga Ahli (16 digit)
   nama             String   // Nama Tenaga Ahli
   npwp             String?  // NPWP Tenaga Ahli jika ada
+  ptkp             String?  @default("TK/0") // Status PTKP (TK/0, K/0, dll)
   uraian           String   // Deskripsi pekerjaan / jasa keahlian
   tanggal          DateTime // Tanggal pembayaran
   bulan            Int      // 1 - 12
   tahun            Int      // e.g. 2026
   nominalHonor     Decimal  @db.Decimal(18, 2) // Nilai bruto
+  jenisPph         String?  @default("PPh 21") // "PPh 21" | "PPh 23"
   tarifPph21Persen Decimal  @default(2.50) @db.Decimal(5, 2)
   pph21            Decimal  @default(0.00) @db.Decimal(18, 2) // Nilai pajak dipotong
   nominalBersih    Decimal  @db.Decimal(18, 2) // Net diterima

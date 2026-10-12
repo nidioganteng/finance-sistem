@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, ChevronDown } from "lucide-react";
+import { Check, X, UserCheck, UserX, ShieldCheck, Building2, Clock, Users } from "lucide-react";
 import { approveUser, rejectUser, updateUserEntities, deactivateUser, activateUser } from "@/lib/actions/pengguna";
 import { roleLabel } from "@/lib/rbac";
 import { Role, UserStatus } from "@/types/app-enums";
@@ -13,7 +13,6 @@ type UserItem = {
   id: string;
   name: string;
   email: string;
-  // PHP returns role/status as plain strings; accept string but cast where enum is required
   role: string | null;
   status: string;
   createdAt: Date | string;
@@ -21,26 +20,36 @@ type UserItem = {
   entityKeys?: string[];
 };
 
-const STATUS_BADGE: Record<UserStatus, string> = {
-  PENDING: "bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
-  ACTIVE: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
-  INACTIVE: "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400",
+const STATUS_STYLE: Record<UserStatus, { dot: string; text: string; bg: string }> = {
+  PENDING: { dot: "bg-yellow-400", text: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-500/15" },
+  ACTIVE:  { dot: "bg-green-400",  text: "text-green-700 dark:text-green-400",   bg: "bg-green-50 dark:bg-green-500/15"   },
+  INACTIVE:{ dot: "bg-gray-400",   text: "text-gray-500 dark:text-gray-400",     bg: "bg-gray-100 dark:bg-gray-500/15"    },
 };
-const STATUS_LABEL: Record<UserStatus, string> = {
-  PENDING: "Menunggu",
-  ACTIVE: "Aktif",
-  INACTIVE: "Nonaktif",
-};
+const STATUS_LABEL: Record<UserStatus, string> = { PENDING: "Menunggu", ACTIVE: "Aktif", INACTIVE: "Nonaktif" };
 
-const ROLE_OPTS_SUPER: Role[] = ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
-const ROLE_OPTS_MANAGER: Role[] = ["MANAJER_KEUANGAN", "STAF_KEUANGAN", "MANAGER_ADMIN", "ADMIN_SIDAMON"];
+const ROLE_OPTS_SUPER:   Role[] = ["SUPER_ADMIN","MANAJER_KEUANGAN","STAF_KEUANGAN","MANAGER_ADMIN","ADMIN_SIDAMON"];
+const ROLE_OPTS_MANAGER: Role[] = ["MANAJER_KEUANGAN","STAF_KEUANGAN","MANAGER_ADMIN","ADMIN_SIDAMON"];
 
 const FILTER_TABS = [
-  { key: "semua", label: "Semua" },
-  { key: "PENDING", label: "Menunggu Approval" },
-  { key: "ACTIVE", label: "Aktif" },
-  { key: "INACTIVE", label: "Nonaktif" },
+  { key: "semua",    label: "Semua",             icon: Users },
+  { key: "PENDING",  label: "Menunggu Approval",  icon: Clock },
+  { key: "ACTIVE",   label: "Aktif",              icon: UserCheck },
+  { key: "INACTIVE", label: "Nonaktif",           icon: UserX },
 ];
+
+function getInitial(name: string) {
+  return name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  "bg-blue-500","bg-purple-500","bg-emerald-500","bg-rose-500",
+  "bg-amber-500","bg-cyan-500","bg-indigo-500","bg-pink-500",
+];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
 
 export function PenggunaClient({
   users,
@@ -54,302 +63,324 @@ export function PenggunaClient({
   const router = useRouter();
   const roleOpts = viewerRole === "SUPER_ADMIN" ? ROLE_OPTS_SUPER : ROLE_OPTS_MANAGER;
   const [filter, setFilter] = useState("semua");
-  const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [editEntityId, setEditEntityId] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<Role>("STAF_KEUANGAN");
+  const [approvingUser, setApprovingUser] = useState<UserItem | null>(null);
+  const [editingUser, setEditingUser]     = useState<UserItem | null>(null);
+  const [selectedRole, setSelectedRole]   = useState<Role>("STAF_KEUANGAN");
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const filtered = filter === "semua" ? users : users.filter((u) => u.status === filter);
+  const counts = {
+    semua:    users.length,
+    PENDING:  users.filter(u => u.status === "PENDING").length,
+    ACTIVE:   users.filter(u => u.status === "ACTIVE").length,
+    INACTIVE: users.filter(u => u.status === "INACTIVE").length,
+  };
+  const filtered = filter === "semua" ? users : users.filter(u => u.status === filter);
 
   function toggleEntity(id: string) {
-    setSelectedEntities((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedEntities(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
-  function startApprove(user: UserItem) {
-    setApprovingId(user.id);
-    setEditEntityId(null);
+  function openApprove(user: UserItem) {
+    setApprovingUser(user);
+    setEditingUser(null);
     setSelectedRole("STAF_KEUANGAN");
-    setSelectedEntities(user.entityAccess.map((a) => a.entity.id));
+    setSelectedEntities(user.entityAccess.map(a => a.entity.id));
     setError(null);
   }
 
-  function startEditEntities(user: UserItem) {
-    setEditEntityId(user.id);
-    setApprovingId(null);
-    setSelectedEntities(user.entityAccess.map((a) => a.entity.id));
+  function openEdit(user: UserItem) {
+    setEditingUser(user);
+    setApprovingUser(null);
+    setSelectedEntities(user.entityAccess.map(a => a.entity.id));
     setError(null);
   }
+
+  function closeModal() { setApprovingUser(null); setEditingUser(null); setError(null); }
 
   async function handleApprove(userId: string) {
     startTransition(async () => {
       try {
         await approveUser(userId, selectedRole, selectedEntities);
-        router.refresh();
-        setApprovingId(null);
-      } catch (e: any) {
-        setError(e.message);
-      }
+        router.refresh(); closeModal();
+      } catch (e: any) { setError(e.message); }
     });
   }
 
   async function handleReject(userId: string) {
     if (!confirm("Tolak pendaftaran pengguna ini?")) return;
-    startTransition(async () => {
-      await rejectUser(userId);
-      router.refresh();
-      setApprovingId(null);
-    });
+    startTransition(async () => { await rejectUser(userId); router.refresh(); closeModal(); });
   }
 
   async function handleUpdateEntities(userId: string) {
     startTransition(async () => {
       try {
         await updateUserEntities(userId, selectedEntities);
-        router.refresh();
-        setEditEntityId(null);
-      } catch (e: any) {
-        setError(e.message);
-      }
+        router.refresh(); closeModal();
+      } catch (e: any) { setError(e.message); }
     });
   }
 
   async function handleDeactivate(userId: string) {
     if (!confirm("Nonaktifkan pengguna ini?")) return;
-    startTransition(async () => {
-      await deactivateUser(userId);
-      router.refresh();
-    });
+    startTransition(async () => { await deactivateUser(userId); router.refresh(); });
   }
 
   async function handleActivate(userId: string) {
-    startTransition(async () => {
-      await activateUser(userId);
-      router.refresh();
-    });
+    startTransition(async () => { await activateUser(userId); router.refresh(); });
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      {error && (
-        <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
-      )}
+  const modalUser = approvingUser ?? editingUser;
 
-      <div className="flex items-center gap-1 p-1 bg-surface-subtle rounded-xl w-fit">
-        {FILTER_TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setFilter(t.key)}
-            className={`px-4 py-2 rounded-[10px] text-[13px] font-semibold transition-colors ${
-              filter === t.key ? "bg-navy text-white" : "text-muted-stronger hover:bg-surface-hover"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+  return (
+    <div className="flex flex-col gap-5 relative">
+      <LoadingOverlay visible={isPending} />
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1.5 p-1 bg-surface-subtle rounded-[14px] w-fit">
+        {FILTER_TABS.map(t => {
+          const Icon = t.icon;
+          const count = counts[t.key as keyof typeof counts];
+          return (
+            <button
+              key={t.key}
+              onClick={() => setFilter(t.key)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12.5px] font-semibold transition-colors ${
+                filter === t.key
+                  ? "bg-navy text-white shadow-sm"
+                  : "text-muted-stronger hover:bg-surface-hover"
+              }`}
+            >
+              <Icon size={13} className="flex-none" />
+              {t.label}
+              {count > 0 && (
+                <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
+                  filter === t.key ? "bg-white/20 text-white" : "bg-surface-card text-muted-stronger"
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="relative bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <LoadingOverlay visible={isPending} />
-        <div className="overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0">
-        <table className="w-full text-sm min-w-[700px]">
-          <thead>
-            <tr className="border-b border-surface-hover text-left">
-              <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Nama</th>
-              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Email</th>
-              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Role</th>
-              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Akses Entitas</th>
-              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase">Status</th>
-              <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-10 text-center text-sm text-muted">
-                  Tidak ada pengguna untuk filter ini.
-                </td>
-              </tr>
-            )}
-            {filtered.map((user) => (
-              <>
-                <tr key={user.id} className="border-b border-surface-subtle hover:bg-surface-hover/30 transition-colors">
-                  <td className="py-3 px-6">
-                    <div className="font-semibold text-navy-text">{user.name}</div>
-                    <div className="text-[11.5px] text-muted">
-                      Bergabung {new Date(user.createdAt).toLocaleDateString("id-ID")}
+      {/* User Cards */}
+      {filtered.length === 0 ? (
+        <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center text-[13px] text-muted-faint">
+          Tidak ada pengguna untuk filter ini.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {filtered.map(user => {
+            const st = STATUS_STYLE[user.status as UserStatus];
+            return (
+              <div key={user.id} className="bg-surface-card border border-border-soft rounded-[20px] p-5 flex flex-col gap-4 hover:border-border transition-colors">
+                {/* Top: avatar + name + status */}
+                <div className="flex items-start gap-3.5">
+                  <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center text-white font-bold text-[13px] flex-none ${avatarColor(user.name)}`}>
+                    {getInitial(user.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[14px] font-bold text-navy-text leading-snug truncate">{user.name}</p>
+                      {st && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold ${st.bg} ${st.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                          {STATUS_LABEL[user.status as UserStatus] ?? user.status}
+                        </span>
+                      )}
                     </div>
-                  </td>
-                  <td className="py-3 px-3 text-[12.5px] text-muted-stronger">{user.email}</td>
-                  <td className="py-3 px-3 text-[12.5px] text-muted">
-                    {user.role ? roleLabel(user.role as Role) : "-"}
-                  </td>
-                  <td className="py-3 px-3">
+                    <p className="text-[12px] text-muted-faint truncate mt-0.5">{user.email}</p>
+                  </div>
+                </div>
+
+                {/* Role + Entity */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={12} className="text-muted-faint flex-none" />
+                    <span className="text-[12px] text-muted-stronger font-semibold">
+                      {user.role ? roleLabel(user.role as Role) : <span className="text-muted-faint italic">Belum ditetapkan</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Building2 size={12} className="text-muted-faint flex-none mt-0.5" />
                     <div className="flex flex-wrap gap-1">
                       {user.entityAccess.length === 0 ? (
-                        <span className="text-[12px] text-muted">-</span>
+                        <span className="text-[11.5px] text-muted-faint italic">Belum ada akses entitas</span>
                       ) : (
-                        user.entityAccess.map((a) => (
-                          <span key={a.entity.id} className="text-[10.5px] font-semibold px-2 py-0.5 rounded bg-surface-hover text-muted-stronger">
+                        user.entityAccess.map(a => (
+                          <span key={a.entity.id} className="text-[11px] font-semibold px-2 py-0.5 rounded-[6px] bg-surface-subtle text-muted-stronger border border-border-soft">
                             {a.entity.name}
                           </span>
                         ))
                       )}
                     </div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${STATUS_BADGE[user.status as UserStatus] ?? ""}`}>
-                      {STATUS_LABEL[user.status as UserStatus] ?? user.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-6 text-right">
-                    <div className="flex items-center gap-2 justify-end flex-wrap">
-                      {user.status === "PENDING" && (
-                        <>
-                          <button
-                            onClick={() => startApprove(user)}
-                            className="px-3 py-1.5 rounded-lg bg-navy text-white text-[12px] font-semibold active:scale-95 transition-transform"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReject(user.id)}
-                            disabled={isPending}
-                            className="px-3 py-1.5 rounded-lg border border-border text-[12px] text-muted-stronger"
-                          >
-                            Tolak
-                          </button>
-                        </>
-                      )}
-                      {user.status === "ACTIVE" && (
-                        <>
-                          <button
-                            onClick={() => startEditEntities(user)}
-                            className="px-3 py-1.5 rounded-lg border border-border text-[12px] font-semibold text-muted-stronger"
-                          >
-                            Edit Akses
-                          </button>
-                          <button
-                            onClick={() => handleDeactivate(user.id)}
-                            disabled={isPending}
-                            className="px-3 py-1.5 rounded-lg border border-border text-[12px] text-muted"
-                          >
-                            Nonaktifkan
-                          </button>
-                        </>
-                      )}
-                      {user.status === "INACTIVE" && (
-                        <button
-                          onClick={() => handleActivate(user.id)}
-                          disabled={isPending}
-                          className="px-3 py-1.5 rounded-lg border border-border text-[12px] font-semibold text-muted-stronger"
-                        >
-                          Aktifkan
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
 
-                {approvingId === user.id && (
-                  <tr key={`approve-${user.id}`} className="border-b border-border bg-surface-subtle">
-                    <td colSpan={6} className="px-6 py-4">
-                      <div className="flex flex-col gap-3">
-                        <div className="text-sm font-bold text-navy-text">Approve: {user.name}</div>
-                        <div className="flex items-center gap-4 flex-wrap">
-                          <div>
-                            <label className="text-[12px] font-semibold text-muted-stronger block mb-1">Role</label>
-                            <select
-                              value={selectedRole}
-                              onChange={(e) => setSelectedRole(e.target.value as Role)}
-                              className="px-3 py-2 rounded-xl border border-border text-sm bg-surface-card"
-                            >
-                              {roleOpts.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[12px] font-semibold text-muted-stronger block mb-1">Akses Entitas</label>
-                            <div className="flex flex-wrap gap-2">
-                              {allEntities.map((e) => (
-                                <label key={e.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedEntities.includes(e.id)}
-                                    onChange={() => toggleEntity(e.id)}
-                                    className="rounded"
-                                  />
-                                  {e.name}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleApprove(user.id)}
-                            disabled={isPending}
-                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform"
-                          >
-                            <Check size={14} /> Konfirmasi Approve
-                          </button>
-                          <button
-                            onClick={() => setApprovingId(null)}
-                            className="px-4 py-2 rounded-[10px] border border-border text-sm"
-                          >
-                            Batal
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-
-                {editEntityId === user.id && (
-                  <tr key={`edit-${user.id}`} className="border-b border-border bg-surface-subtle">
-                    <td colSpan={6} className="px-6 py-4">
-                      <div className="flex flex-col gap-3">
-                        <div className="text-sm font-bold text-navy-text">Edit Akses Entitas: {user.name}</div>
-                        <div className="flex flex-wrap gap-3">
-                          {allEntities.map((e) => (
-                            <label key={e.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedEntities.includes(e.id)}
-                                onChange={() => toggleEntity(e.id)}
-                                className="rounded"
-                              />
-                              {e.name}
-                            </label>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleUpdateEntities(user.id)}
-                            disabled={isPending}
-                            className="px-4 py-2 rounded-[10px] bg-navy text-white text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform"
-                          >
-                            <Check size={14} /> Simpan
-                          </button>
-                          <button
-                            onClick={() => setEditEntityId(null)}
-                            className="px-4 py-2 rounded-[10px] border border-border text-sm"
-                          >
-                            Batal
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </>
-            ))}
-          </tbody>
-        </table>
+                {/* Divider + Actions */}
+                <div className="border-t border-border-soft pt-3 flex items-center gap-2 flex-wrap">
+                  {user.status === "PENDING" && (
+                    <>
+                      <button
+                        onClick={() => openApprove(user)}
+                        className="flex-1 h-8 rounded-[9px] bg-navy text-white text-[12px] font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                      >
+                        <UserCheck size={12} /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(user.id)}
+                        disabled={isPending}
+                        className="h-8 px-3 rounded-[9px] border border-border-soft text-[12px] text-status-red font-semibold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                      >
+                        Tolak
+                      </button>
+                    </>
+                  )}
+                  {user.status === "ACTIVE" && (
+                    <>
+                      <button
+                        onClick={() => openEdit(user)}
+                        className="flex-1 h-8 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
+                      >
+                        Edit Akses
+                      </button>
+                      <button
+                        onClick={() => handleDeactivate(user.id)}
+                        disabled={isPending}
+                        className="h-8 px-3 rounded-[9px] border border-border-soft text-[12px] text-muted hover:bg-surface-hover transition-colors"
+                      >
+                        Nonaktifkan
+                      </button>
+                    </>
+                  )}
+                  {user.status === "INACTIVE" && (
+                    <button
+                      onClick={() => handleActivate(user.id)}
+                      disabled={isPending}
+                      className="flex-1 h-8 rounded-[9px] bg-navy text-white text-[12px] font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                    >
+                      <UserCheck size={12} /> Aktifkan
+                    </button>
+                  )}
+                  <p className="w-full text-[10.5px] text-muted-faint text-right">
+                    Bergabung {new Date(user.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
+
+      {/* Modal: Approve / Edit Entitas */}
+      {modalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={closeModal} />
+          <div className="relative bg-surface-card border border-border-soft rounded-[20px] shadow-2xl w-full max-w-md overflow-hidden">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-soft">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center text-white font-bold text-[12px] flex-none ${avatarColor(modalUser.name)}`}>
+                  {getInitial(modalUser.name)}
+                </div>
+                <div>
+                  <p className="text-[13.5px] font-bold text-navy-text leading-tight">{modalUser.name}</p>
+                  <p className="text-[11px] text-muted-faint">{approvingUser ? "Approve Pengguna" : "Edit Akses Entitas"}</p>
+                </div>
+              </div>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-stronger">
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4">
+              {error && (
+                <div className="px-3.5 py-2.5 rounded-[10px] bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-status-red text-[12px]">
+                  {error}
+                </div>
+              )}
+
+              {/* Role select — hanya saat approve */}
+              {approvingUser && (
+                <div>
+                  <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider block mb-1.5">
+                    Role
+                  </label>
+                  <select
+                    value={selectedRole}
+                    onChange={e => setSelectedRole(e.target.value as Role)}
+                    className="w-full h-9 px-3 rounded-[10px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand"
+                  >
+                    {roleOpts.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Entity checkboxes */}
+              <div>
+                <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider block mb-2">
+                  Akses Entitas
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {allEntities.map(e => {
+                    const checked = selectedEntities.includes(e.id);
+                    return (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => toggleEntity(e.id)}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] border text-left transition-colors ${
+                          checked
+                            ? "border-brand bg-brand/5 text-navy-text"
+                            : "border-border-soft bg-surface-subtle text-muted-stronger hover:bg-surface-hover"
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-[4px] border flex items-center justify-center flex-none transition-colors ${
+                          checked ? "bg-navy border-navy" : "border-border bg-surface-input"
+                        }`}>
+                          {checked && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className="text-[12.5px] font-semibold">{e.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center gap-2 pt-1 border-t border-border-soft">
+                <button
+                  onClick={closeModal}
+                  className="h-9 px-4 rounded-[10px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => approvingUser ? handleApprove(approvingUser.id) : handleUpdateEntities(editingUser!.id)}
+                  disabled={isPending}
+                  className="flex-1 h-9 rounded-[10px] bg-navy text-white text-[12.5px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  <Check size={13} />
+                  {approvingUser ? "Konfirmasi Approve" : "Simpan Akses"}
+                </button>
+                {approvingUser && (
+                  <button
+                    onClick={() => handleReject(approvingUser.id)}
+                    disabled={isPending}
+                    className="h-9 px-3 rounded-[10px] border border-red-200 dark:border-red-500/30 text-status-red text-[12px] font-semibold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                  >
+                    Tolak
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

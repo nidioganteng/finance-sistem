@@ -4402,46 +4402,31 @@ export function PayrollClient({
                 );
               })()}
 
-              {/* Tanggal & No Bukti */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">
-                    Tanggal Pembayaran *
-                  </label>
-                  <input
-                    type="date"
-                    name="tanggal"
-                    required
-                    value={modalHonorTanggal}
-                    onChange={(e) => {
-                      const newDate = e.target.value;
-                      setModalHonorTanggal(newDate);
-                      const parts = newDate.split("-");
-                      if (parts.length === 3) {
-                        const y = parseInt(parts[0], 10);
-                        const m = parseInt(parts[1], 10);
-                        if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
-                          setModalHonorTahun(y);
-                          setModalHonorBulan(m);
-                        }
+              {/* Tanggal Pembayaran */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Tanggal Pembayaran *
+                </label>
+                <input
+                  type="date"
+                  name="tanggal"
+                  required
+                  value={modalHonorTanggal}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    setModalHonorTanggal(newDate);
+                    const parts = newDate.split("-");
+                    if (parts.length === 3) {
+                      const y = parseInt(parts[0], 10);
+                      const m = parseInt(parts[1], 10);
+                      if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+                        setModalHonorTahun(y);
+                        setModalHonorBulan(m);
                       }
-                    }}
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">
-                    No. Bukti / Voucher (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    name="noBukti"
-                    value={modalHonorNoBukti}
-                    onChange={(e) => setModalHonorNoBukti(e.target.value)}
-                    placeholder="Contoh: BKK-091"
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                  />
-                </div>
+                    }
+                  }}
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
               </div>
 
               {/* Uraian Tugas */}

@@ -30,6 +30,18 @@ type JurnalRow = {
   arahLaporan: string[];
 };
 
+function fmtDateShort(s: string) {
+  if (!s) return "—";
+  const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+  return isNaN(d.getTime()) ? s.slice(0, 10) : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+}
+function fmtDateFull(s: string) {
+  if (!s) return "";
+  const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+  return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) +
+    (d.getHours() || d.getMinutes() ? ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
+}
+
 const ARAH_LABEL: Record<string, string> = {
   JURNAL_UMUM: "Jurnal", BUKU_BESAR: "Buku Besar",
   LAPORAN_KEUANGAN: "Lap. Keuangan", PIUTANG: "Piutang", PAJAK: "Pajak",
@@ -139,7 +151,14 @@ export function JurnalTable({
                 key={r.id}
                 className={`border-b border-surface-subtle ${r.isKasEntry ? "bg-surface-subtle/40" : ""}`}
               >
-                <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
+                <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">
+                  <div className="relative group/dt inline-block">
+                    <span>{fmtDateShort(r.tanggal)}</span>
+                    <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                      {fmtDateFull(r.tanggal)}
+                    </div>
+                  </div>
+                </td>
                 <td className="py-2.5 px-1.5 text-[11.5px] text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                 <td className="py-2.5 px-1.5">
                   <span

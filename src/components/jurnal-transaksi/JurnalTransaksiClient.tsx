@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil, Briefcase, TrendingUp, Receipt, Sparkles } from "lucide-react";
+import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, ChevronDown, X, ArrowUpDown, Pencil, TrendingUp, Receipt, Sparkles } from "lucide-react";
 import { saveJurnalTransaksi, deleteJurnalTransaksi } from "@/lib/actions/jurnal-transaksi";
 import { PaginationNav } from "@/components/shared/PaginationNav";
 import { CoaCombobox } from "@/components/shared/CoaCombobox";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { formatRupiah } from "@/lib/dashboard-data";
 import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
 
@@ -62,6 +63,38 @@ function fmtNum(raw: string) {
   return n > 0 ? n.toLocaleString("id-ID") : "";
 }
 
+function toDateStr(d: Date) { return d.toISOString().slice(0, 10); }
+function fmtDateShort(s: string) {
+  if (!s) return "—";
+  const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+  return isNaN(d.getTime()) ? s.slice(0, 10) : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+}
+function fmtDateFull(s: string) {
+  if (!s) return "";
+  const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+  return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) +
+    (d.getHours() || d.getMinutes() ? ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
+}
+
+const PRESET_OPTIONS = [
+  { key: "bulan-ini", label: "Bulan Ini" },
+  { key: "bulan-lalu", label: "1 Bulan Lalu" },
+  { key: "3-bulan", label: "3 Bulan Lalu" },
+  { key: "6-bulan", label: "6 Bulan Lalu" },
+  { key: "custom", label: "Custom..." },
+] as const;
+type PresetKey = typeof PRESET_OPTIONS[number]["key"];
+
+function getPresetRange(key: PresetKey): { dari: string; sampai: string } {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  if (key === "bulan-ini") return { dari: toDateStr(new Date(y, m, 1)), sampai: toDateStr(new Date(y, m + 1, 0)) };
+  if (key === "bulan-lalu") return { dari: toDateStr(new Date(y, m - 1, 1)), sampai: toDateStr(new Date(y, m, 0)) };
+  if (key === "3-bulan") return { dari: toDateStr(new Date(y, m - 2, 1)), sampai: toDateStr(new Date(y, m + 1, 0)) };
+  if (key === "6-bulan") return { dari: toDateStr(new Date(y, m - 5, 1)), sampai: toDateStr(new Date(y, m + 1, 0)) };
+  return { dari: "", sampai: "" };
+}
+
 export function JurnalTransaksiClient({
   entityKey, coa, history, projectOptions = [], fakturOptions = [], page, totalPages, dari = "", sampai = "",
 }: {
@@ -86,7 +119,35 @@ export function JurnalTransaksiClient({
 
   const [filterDari, setFilterDari] = useState(dari);
   const [filterSampai, setFilterSampai] = useState(sampai);
-  const isFiltered = !!dari || !!sampai;
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [activePreset, setActivePreset] = useState<PresetKey>(() => {
+    if (!dari && !sampai) return "bulan-ini";
+    for (const opt of PRESET_OPTIONS) {
+      if (opt.key === "custom") continue;
+      const range = getPresetRange(opt.key);
+      if (range.dari === dari && range.sampai === sampai) return opt.key;
+    }
+    return "custom";
+  });
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const isNonDefault = activePreset !== "bulan-ini";
+  const activeLabel = PRESET_OPTIONS.find((o) => o.key === activePreset)?.label ?? "Bulan Ini";
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!dari && !sampai) applyPreset("bulan-ini"); }, []);
 
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
@@ -356,6 +417,20 @@ export function JurnalTransaksiClient({
     setCoaRows((prev) => prev.map((r) => r.uid === rowUid ? { ...r, ...patch } : r));
   }
 
+  function applyPreset(key: PresetKey) {
+    setActivePreset(key);
+    setDropdownOpen(false);
+    if (key === "custom") return;
+    const range = getPresetRange(key);
+    setFilterDari(range.dari);
+    setFilterSampai(range.sampai);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("dari", range.dari);
+    params.set("sampai", range.sampai);
+    params.delete("page");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   function applyDateFilter() {
     const params = new URLSearchParams(searchParams.toString());
     if (filterDari) params.set("dari", filterDari); else params.delete("dari");
@@ -425,64 +500,74 @@ export function JurnalTransaksiClient({
   return (
     <div className="flex flex-col gap-5">
 
-      {/* Filter tanggal */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <CalendarDays size={14} className="text-muted-faint flex-none" />
-        <input type="date" value={filterDari} onChange={(e) => setFilterDari(e.target.value)}
-          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none" />
-        <span className="text-[12px] text-muted-faint">—</span>
-        <input type="date" value={filterSampai} onChange={(e) => setFilterSampai(e.target.value)}
-          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none" />
-        <button onClick={applyDateFilter} className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold">Terapkan</button>
-        {isFiltered && (
-          <button onClick={resetDateFilter} className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover">
-            <X size={11} /> Reset
-          </button>
-        )}
-      </div>
-
-      {/* Toolbar */}
+      {/* Filter + Toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] border border-border-soft bg-surface-card text-[12.5px] font-semibold text-muted-stronger">
-          <PenLine size={13} className="text-brand" /> Jurnal transaksi manual
-        </div>
-        <button
-          onClick={() => { if (panelOpen && !editingGroup) { setPanelOpen(false); resetForm(); } else openPanel(); }}
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer">
-          {panelOpen && !editingGroup ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-[10px] border border-border-soft bg-surface-card hover:bg-surface-hover text-[12.5px] font-semibold text-muted-stronger transition-colors min-w-[130px] justify-between"
+            >
+              <span>{activeLabel}</span>
+              <ChevronDown size={13} className={`text-muted-faint transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute left-0 top-full mt-1 z-20 min-w-[160px] bg-surface-card border border-border-soft rounded-[12px] shadow-xl overflow-hidden py-1">
+                {PRESET_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => applyPreset(opt.key)}
+                    className={`w-full text-left px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
+                      activePreset === opt.key ? "text-brand bg-brand/5" : "text-muted-stronger hover:bg-surface-hover"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {activePreset === "custom" && (
             <>
-              <X size={14} className="flex-none" />
-              <span>Tutup Form</span>
-            </>
-          ) : (
-            <>
-              <Plus size={14} className="flex-none" />
-              <span>Entry Jurnal</span>
+              <DatePicker value={filterDari} onChange={setFilterDari} placeholder="Dari" className="w-[140px]" />
+              <DatePicker value={filterSampai} onChange={setFilterSampai} placeholder="Sampai" className="w-[140px]" />
+              <button onClick={applyDateFilter} className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold">Terapkan</button>
             </>
           )}
+          {isNonDefault && activePreset !== "custom" && (
+            <button
+              onClick={() => applyPreset("bulan-ini")}
+              className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
+            >
+              <X size={11} /> Reset
+            </button>
+          )}
+        </div>
+        <button
+          onClick={openPanel}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer">
+          <Plus size={14} className="flex-none" />
+          <span>Entry Jurnal</span>
         </button>
       </div>
 
       {/* Form panel */}
       {panelOpen && (
-        <div className="bg-surface-card border border-border rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-[10px] bg-brand/10 flex items-center justify-center flex-none">
-                <PenLine size={15} className="text-brand" />
-              </div>
-              <div>
-                <h2 className="text-[14.5px] font-bold text-navy-text">
-                  {editingGroup ? `Edit Jurnal – ${editingGroup.noBukti}` : "Entry Jurnal Baru"}
-                </h2>
-                <p className="text-[11.5px] text-muted">Tambah baris akun sesuai kebutuhan jurnal</p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => { setPanelOpen(false); resetForm(); }} />
+          <div className="relative w-full max-w-5xl max-h-[92vh] bg-surface-card shadow-2xl rounded-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
+              <h2 className="text-[15px] font-bold text-navy-text">
+                {editingGroup ? `Edit Jurnal – ${editingGroup.noBukti}` : "Entry Jurnal Baru"}
+              </h2>
+              <button onClick={() => { setPanelOpen(false); resetForm(); }}
+                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger">
+                <X size={16} />
+              </button>
             </div>
-            <button onClick={() => { setPanelOpen(false); resetForm(); }}
-              className="p-1.5 rounded-lg text-muted-faint hover:text-navy-text hover:bg-surface-hover transition-colors">
-              <X size={16} />
-            </button>
-          </div>
+            <div className="flex-1 overflow-y-auto p-6">
 
           {feedback && (
             <div className={`flex items-start gap-2.5 rounded-[12px] px-4 py-3 mb-4 text-[13px] ${
@@ -506,8 +591,7 @@ export function JurnalTransaksiClient({
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">Tanggal</label>
-                <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
-                  className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
+                <DatePicker value={tanggal} onChange={setTanggal} required />
               </div>
             </div>
 
@@ -518,7 +602,6 @@ export function JurnalTransaksiClient({
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
-                      <Receipt size={12} className="text-muted-faint" />
                       E-Faktur Terkait (Opsional)
                     </label>
                     {selectedFaktur && (
@@ -533,7 +616,7 @@ export function JurnalTransaksiClient({
                     onChange={(e) => handleFakturChange(e.target.value)}
                     className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
                   >
-                    <option value="">— Tanpa E-Faktur —</option>
+                    <option value="">Tanpa E-Faktur</option>
                     {currentProjectFakturs.length > 0 && (
                       <optgroup label="E-Faktur Proyek Ini">
                         {currentProjectFakturs.map((f) => (
@@ -553,16 +636,12 @@ export function JurnalTransaksiClient({
                       </optgroup>
                     )}
                   </select>
-                  <p className="text-[10.5px] text-muted-faint">
-                    Pilih E-Faktur untuk mengisi otomatis proyek terkait serta menarik data PPN & PPh.
-                  </p>
                 </div>
 
                 {/* 2. Proyek Terkait (Sidamon) */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
-                      <Briefcase size={12} className="text-muted-faint" />
                       Proyek Terkait (Sidamon)
                       {isOtherEntity && (
                         <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
@@ -582,7 +661,7 @@ export function JurnalTransaksiClient({
                     onChange={(e) => handleProjectChange(e.target.value)}
                     className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand transition-colors truncate"
                   >
-                    <option value="">— Bukan transaksi proyek —</option>
+                    <option value="">Bukan transaksi proyek</option>
                     {currentEntityProjects.length > 0 && (
                       <optgroup label="Proyek Entitas Ini">
                         {currentEntityProjects.map((p) => (
@@ -602,9 +681,6 @@ export function JurnalTransaksiClient({
                       </optgroup>
                     )}
                   </select>
-                  <p className="text-[10.5px] text-muted-faint">
-                    Sinkronisasi termin otomatis ke Kontrol Piutang & Laporan Pendapatan.
-                  </p>
                 </div>
               </div>
 
@@ -900,6 +976,8 @@ export function JurnalTransaksiClient({
               </div>
             </div>
           </form>
+            </div>
+          </div>
         </div>
       )}
 
@@ -938,7 +1016,14 @@ export function JurnalTransaksiClient({
                     className={`border-b align-top hover:bg-surface-hover/30 group transition-colors ${rowIdx === group.rows.length - 1 ? "border-border" : "border-surface-subtle"}`}>
                     {rowIdx === 0 ? (
                       <>
-                        <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
+                        <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">
+                          <div className="relative group/dt inline-block">
+                            <span>{fmtDateShort(group.tanggalRaw || group.tanggal)}</span>
+                            <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                              {fmtDateFull(group.tanggalRaw || group.tanggal)}
+                            </div>
+                          </div>
+                        </td>
                         <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{group.noBukti}</td>
                         <td className="py-2.5 px-1.5 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">

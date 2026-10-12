@@ -77,16 +77,26 @@ type PayrollData = {
     totalTunjanganTransportFmt: string;
     totalInsentif: number;
     totalInsentifFmt: string;
+    totalTunjanganBpjs: number;
+    totalTunjanganBpjsFmt?: string;
+    totalTunjanganPph: number;
+    totalTunjanganPphFmt?: string;
+    totalThr: number;
+    totalThrFmt?: string;
     totalBpjsKesehatan: number;
     totalBpjsKesehatanFmt: string;
     totalBpjsKetenagakerjaan: number;
     totalBpjsKetenagakerjaanFmt: string;
+    totalPotonganBpjs: number;
+    totalPotonganBpjsFmt?: string;
     totalPotonganLain: number;
     totalPotonganLainFmt: string;
     totalPph21: number;
     totalPph21Fmt: string;
     totalGajiKotor: number;
     totalGajiKotorFmt: string;
+    totalGajiTerlaporPajak: number;
+    totalGajiTerlaporPajakFmt?: string;
     totalGajiBersih: number;
     totalGajiBersihFmt: string;
   };
@@ -170,6 +180,100 @@ export function PayrollClient({
     pegawai: PegawaiItem;
     gaji?: GajiBulananItem | null;
   } | null>(null);
+
+  // Controlled state untuk Modal Gaji Bulanan (Dinamis Bulan, Tahun, Otomatisasi Transport, Dual Total)
+  const [modalGajiBulan, setModalGajiBulan] = useState<number>(selectedMonth);
+  const [modalGajiTahun, setModalGajiTahun] = useState<number>(selectedYear);
+  const [modalGajiPegawaiId, setModalGajiPegawaiId] = useState<string>("");
+  const [modalGajiPokok, setModalGajiPokok] = useState<number>(0);
+  const [modalTunjanganJabatan, setModalTunjanganJabatan] = useState<number>(0);
+  const [modalHariKerja, setModalHariKerja] = useState<number>(20);
+  const [modalTarifTransport, setModalTarifTransport] = useState<number>(15000);
+  const [modalTunjanganTransport, setModalTunjanganTransport] = useState<number>(300000);
+  const [modalInsentif, setModalInsentif] = useState<number>(0);
+  const [modalTunjanganLainnya, setModalTunjanganLainnya] = useState<number>(0);
+  const [modalThr, setModalThr] = useState<number>(0);
+  const [modalTunjanganBpjs, setModalTunjanganBpjs] = useState<number>(0);
+  const [modalTunjanganBpjsKes, setModalTunjanganBpjsKes] = useState<number>(0);
+  const [modalTunjanganBpjsTk, setModalTunjanganBpjsTk] = useState<number>(0);
+  const [modalTunjanganPph, setModalTunjanganPph] = useState<number>(0);
+  const [modalPotonganBpjs, setModalPotonganBpjs] = useState<number>(0);
+  const [modalBpjsKes, setModalBpjsKes] = useState<number>(0);
+  const [modalBpjsTk, setModalBpjsTk] = useState<number>(0);
+  const [modalPph21, setModalPph21] = useState<number>(0);
+  const [modalPotonganLain, setModalPotonganLain] = useState<number>(0);
+  const [modalCatatan, setModalCatatan] = useState<string>("");
+
+  // Sinkronisasi state form modal gaji bulanan saat modal dibuka atau pegawai berubah
+  useEffect(() => {
+    if (editingGaji) {
+      const p = editingGaji.pegawai;
+      const g = editingGaji.gaji;
+      setModalGajiPegawaiId(p.id);
+      setModalGajiBulan(g?.bulan ?? selectedMonth);
+      setModalGajiTahun(g?.tahun ?? selectedYear);
+      setModalGajiPokok(g ? g.gajiPokok : p.gajiPokok);
+      // Poin 3: Tunjangan Jabatan terisi otomatis dari master data jika belum ada input bulanan
+      setModalTunjanganJabatan(g ? g.tunjanganJabatan : (p.tunjanganJabatan ?? 0));
+      // Poin 2: Hari kerja & tarif harian (default 15.000, fleksibel diedit per bulan)
+      const hk = g?.hariKerja ?? 20;
+      const tarif = g?.tarifTransportHarian ?? 15000;
+      setModalHariKerja(hk);
+      setModalTarifTransport(tarif);
+      setModalTunjanganTransport(g?.tunjanganTransport ?? (hk * tarif));
+      const tLain = g ? (g.tunjanganLainnya || g.insentif) : 0;
+      setModalInsentif(tLain);
+      setModalTunjanganLainnya(tLain);
+      setModalThr(g?.thr ?? 0);
+      setModalTunjanganBpjsKes(g?.tunjanganBpjsKes ?? 0);
+      setModalTunjanganBpjsTk(g?.tunjanganBpjsTk ?? 0);
+      setModalTunjanganBpjs(
+        g?.tunjanganBpjs ?? ((g?.tunjanganBpjsKes ?? 0) + (g?.tunjanganBpjsTk ?? 0))
+      );
+      setModalTunjanganPph(g?.tunjanganPph ?? 0);
+      setModalPotonganBpjs(
+        g?.potonganBpjs ?? ((g?.bpjsKesehatan ?? 0) + (g?.bpjsKetenagakerjaan ?? 0))
+      );
+      setModalBpjsKes(g?.bpjsKesehatan ?? 0);
+      setModalBpjsTk(g?.bpjsKetenagakerjaan ?? 0);
+      setModalPph21(g?.pph21 ?? 0);
+      setModalPotonganLain(g?.potonganLain ?? 0);
+      setModalCatatan(g?.catatan ?? "");
+    }
+  }, [editingGaji, selectedMonth, selectedYear]);
+
+  function handleSelectPegawaiInModal(pegawaiId: string) {
+    const target = data.pegawaiList.find((p) => p.id === pegawaiId);
+    if (!target) return;
+    setEditingGaji({ pegawai: target, gaji: target.currentGaji });
+    setModalGajiPegawaiId(target.id);
+    const g = target.currentGaji;
+    setModalGajiPokok(g ? g.gajiPokok : target.gajiPokok);
+    setModalTunjanganJabatan(g ? g.tunjanganJabatan : (target.tunjanganJabatan ?? 0));
+    const hk = g?.hariKerja ?? 20;
+    const tarif = g?.tarifTransportHarian ?? modalTarifTransport ?? 15000;
+    setModalHariKerja(hk);
+    setModalTarifTransport(tarif);
+    setModalTunjanganTransport(g?.tunjanganTransport ?? (hk * tarif));
+    const tLain = g ? (g.tunjanganLainnya || g.insentif) : 0;
+    setModalInsentif(tLain);
+    setModalTunjanganLainnya(tLain);
+    setModalThr(g?.thr ?? 0);
+    setModalTunjanganBpjsKes(g?.tunjanganBpjsKes ?? 0);
+    setModalTunjanganBpjsTk(g?.tunjanganBpjsTk ?? 0);
+    setModalTunjanganBpjs(
+      g?.tunjanganBpjs ?? ((g?.tunjanganBpjsKes ?? 0) + (g?.tunjanganBpjsTk ?? 0))
+    );
+    setModalTunjanganPph(g?.tunjanganPph ?? 0);
+    setModalPotonganBpjs(
+      g?.potonganBpjs ?? ((g?.bpjsKesehatan ?? 0) + (g?.bpjsKetenagakerjaan ?? 0))
+    );
+    setModalBpjsKes(g?.bpjsKesehatan ?? 0);
+    setModalBpjsTk(g?.bpjsKetenagakerjaan ?? 0);
+    setModalPph21(g?.pph21 ?? 0);
+    setModalPotonganLain(g?.potonganLain ?? 0);
+    setModalCatatan(g?.catatan ?? "");
+  }
 
   const [isHonorModalOpen, setIsHonorModalOpen] = useState(false);
   const [editingHonor, setEditingHonor] = useState<HonorTenagaAhliItem | null>(null);
@@ -507,56 +611,103 @@ export function PayrollClient({
           </div>
 
           {/* Stat Cards Pegawai */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-            <div className="p-4 rounded-2xl border border-border bg-surface-card">
-              <div className="text-[11px] font-medium text-muted-faint">
-                Pegawai Terdaftar ({BULAN_NAMES[selectedMonth - 1]})
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-medium text-muted-faint truncate">
+                  Pegawai Terdaftar ({BULAN_NAMES[selectedMonth - 1]})
+                </div>
+                <div className="text-xl font-bold font-mono text-navy-text mt-1">
+                  {data.summaryBulanIni.totalPegawaiInput} / {data.summaryBulanIni.totalPegawaiAktif}
+                </div>
               </div>
-              <div className="text-xl font-bold font-mono text-navy-text mt-1">
-                {data.summaryBulanIni.totalPegawaiInput} / {data.summaryBulanIni.totalPegawaiAktif}
-              </div>
-              <div className="text-[10px] text-muted-faint mt-1">
+              <div className="text-[10px] text-muted-faint mt-1 truncate">
                 Sudah diinput dari total aktif
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-border bg-surface-card">
-              <div className="text-[11px] font-medium text-muted-faint">
-                Gaji Pokok Total
+            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-medium text-muted-faint truncate">
+                  Gaji Pokok Total
+                </div>
+                <div className="text-xl font-bold font-mono text-navy-text mt-1">
+                  {data.summaryBulanIni.totalGajiPokokFmt}
+                </div>
               </div>
-              <div className="text-xl font-bold font-mono text-navy-text mt-1">
-                {data.summaryBulanIni.totalGajiPokokFmt}
-              </div>
-              <div className="text-[10px] text-muted-faint mt-1">
+              <div className="text-[10px] text-muted-faint mt-1 truncate">
                 Gaji pokok bulan {BULAN_NAMES[selectedMonth - 1]}
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-border bg-surface-card">
-              <div className="text-[11px] font-medium text-muted-faint">
-                Tunjangan & Insentif
+            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-medium text-muted-faint truncate">
+                  Tunjangan, THR & Insentif
+                </div>
+                <div className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300 mt-1">
+                  {formatRupiah(
+                    data.summaryBulanIni.totalTunjanganJabatan +
+                      data.summaryBulanIni.totalTunjanganTransport +
+                      data.summaryBulanIni.totalInsentif +
+                      (data.summaryBulanIni.totalThr ?? 0) +
+                      (data.summaryBulanIni.totalTunjanganBpjs ?? 0) +
+                      (data.summaryBulanIni.totalTunjanganPph ?? 0)
+                  )}
+                </div>
               </div>
-              <div className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300 mt-1">
-                {formatRupiah(
-                  data.summaryBulanIni.totalTunjanganJabatan +
-                    data.summaryBulanIni.totalTunjanganTransport +
-                    data.summaryBulanIni.totalInsentif
-                )}
-              </div>
-              <div className="text-[10px] text-muted-faint mt-1">
-                Jabatan, transport, dan insentif
+              <div className="text-[10px] text-muted-faint mt-1 truncate">
+                Jabatan, transport, THR & tunjangan
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-border bg-surface-card">
-              <div className="text-[11px] font-medium text-muted-faint">
-                Total Gaji Bersih (THP)
+            <div className="p-4 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-semibold text-blue-800 dark:text-blue-300 flex items-center justify-between gap-1.5">
+                  <span className="truncate">Total Terlapor Pajak</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-mono font-bold whitespace-nowrap shrink-0">
+                    SPT PPh 21
+                  </span>
+                </div>
+                <div className="text-xl font-bold font-mono text-blue-900 dark:text-blue-200 mt-1">
+                  {data.summaryBulanIni.totalGajiTerlaporPajakFmt || formatRupiah(data.summaryBulanIni.totalGajiTerlaporPajak)}
+                </div>
               </div>
-              <div className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300 mt-1">
-                {data.summaryBulanIni.totalGajiBersihFmt}
+              <div className="text-[10px] text-blue-700/80 dark:text-blue-300/70 mt-1 flex items-center justify-between gap-1">
+                <span className="truncate">Total bruto pelaporan SPT Masa</span>
+                <span className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap shrink-0">
+                  Ditanggung
+                </span>
               </div>
-              <div className="text-[10px] text-muted-faint mt-1">
-                Total ditransfer ke rekening pegawai
+            </div>
+
+            <div className="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between gap-1.5">
+                  <span className="truncate">Total Gaji Bersih</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 font-mono font-bold whitespace-nowrap shrink-0">
+                    Kas / GL 511
+                  </span>
+                </div>
+                <div className="text-xl font-bold font-mono text-emerald-800 dark:text-emerald-200 mt-1">
+                  {data.summaryBulanIni.totalGajiBersihFmt}
+                </div>
+              </div>
+              <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/70 mt-1 flex items-center justify-between gap-1">
+                <span className="truncate">Setelah BPJS & kasbon</span>
+                {data.penyesuaianJurnal.pegawai.isSinkronBulan ? (
+                  <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 font-mono whitespace-nowrap shrink-0">
+                    ✓ Balance
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setPegawaiSubTab("penyesuaian")}
+                    className="text-[9px] font-bold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer whitespace-nowrap shrink-0"
+                    title={`Selisih Akun 511: ${data.penyesuaianJurnal.pegawai.selisihBulanFmt}`}
+                  >
+                    ⚠️ Cek Jurnal
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -564,15 +715,15 @@ export function PayrollClient({
           {/* Sub-Tab Content 1: Gaji Bulanan */}
           {pegawaiSubTab === "gaji" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text">
-                    Daftar Gaji Pegawai Tetap – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
-                  </h3>
-                  <p className="text-xs text-muted-faint">
-                    Entitas: {data.entity?.name} · Masukkan atau sesuaikan komponen tunjangan, insentif, dan potongan
-                  </p>
-                </div>
+                <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-navy-text">
+                      Daftar Gaji Pegawai Tetap – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
+                    </h3>
+                    <p className="text-xs text-muted-faint">
+                      Entitas: {data.entity?.name} · Masukkan atau sesuaikan komponen tunjangan, insentif, dan potongan
+                    </p>
+                  </div>
 
                 {isManager && (
                   <button
@@ -594,25 +745,30 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[960px] text-left text-xs">
+                <table className="w-full min-w-[1100px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">Pegawai</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Gaji Pokok</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">Tunj. Jabatan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">Tunj. Transport</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">Insentif</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Total Kotor</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">BPJS</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[105px]">Gaji Pokok</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[95px]">Tunj. Jabatan</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[115px]">Tunj. Transport</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[95px]">Insentif/Lain</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[85px]">THR</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200">
+                        Terlapor Pajak (Bruto)
+                      </th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[85px]">BPJS</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[80px]">PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Net (THP)</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Aksi</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200">
+                        Gaji Bersih (THP)
+                      </th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredPegawaiList.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-8 text-center text-muted-faint">
+                        <td colSpan={11} className="py-8 text-center text-muted-faint">
                           Belum ada pegawai terdaftar pada entitas ini. Silakan klik "Tambah Pegawai".
                         </td>
                       </tr>
@@ -632,6 +788,17 @@ export function PayrollClient({
                                 <span className="px-1.5 py-0.2 rounded bg-surface-subtle font-mono text-[10px]">
                                   {p.statusKeluarga}
                                 </span>
+                                {p.masaKerja && (
+                                  <>
+                                    <span>·</span>
+                                    <span
+                                      className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-mono text-[10px] font-medium border border-amber-200 dark:border-amber-800/60"
+                                      title={`Mulai Bekerja: ${p.tanggalMasukFmt ?? "-"}`}
+                                    >
+                                      Masa Kerja: {p.masaKerja}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
 
@@ -640,24 +807,47 @@ export function PayrollClient({
                             </td>
 
                             <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              {gaji ? gaji.tunjanganJabatanFmt : "Rp 0"}
+                              {gaji
+                                ? gaji.tunjanganJabatanFmt
+                                : p.tunjanganJabatanFmt || formatRupiah(p.tunjanganJabatan)}
                             </td>
 
                             <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              {gaji ? gaji.tunjanganTransportFmt : "Rp 0"}
+                              <div>{gaji ? gaji.tunjanganTransportFmt : "Rp 0"}</div>
+                              {gaji && gaji.hariKerja > 0 && (
+                                <div className="text-[10px] text-muted-faint font-sans">
+                                  {gaji.hariKerja} hr × {formatRupiah(gaji.tarifTransportHarian || 15000)}
+                                </div>
+                              )}
                             </td>
 
                             <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              {gaji ? gaji.insentifFmt : "Rp 0"}
+                              {gaji
+                                ? formatRupiah(
+                                    (gaji.insentif || 0) +
+                                      (gaji.tunjanganBpjs || 0) +
+                                      (gaji.tunjanganPph || 0)
+                                  )
+                                : "Rp 0"}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
-                              {gaji ? gaji.totalGajiKotorFmt : p.gajiPokokFmt}
+                            <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
+                              {gaji ? (gaji.thrFmt || formatRupiah(gaji.thr || 0)) : "Rp 0"}
+                            </td>
+
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/30 dark:bg-blue-950/15 whitespace-nowrap">
+                              {gaji
+                                ? (gaji.totalGajiTerlaporPajakFmt || gaji.totalGajiKotorFmt)
+                                : p.gajiPokokFmt}
                             </td>
 
                             <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
                               {gaji
-                                ? formatRupiah(gaji.bpjsKesehatan + gaji.bpjsKetenagakerjaan)
+                                ? (gaji.potonganBpjsFmt ||
+                                    formatRupiah(
+                                      gaji.potonganBpjs ||
+                                        (gaji.bpjsKesehatan + gaji.bpjsKetenagakerjaan)
+                                    ))
                                 : "Rp 0"}
                             </td>
 
@@ -665,7 +855,7 @@ export function PayrollClient({
                               {gaji ? gaji.pph21Fmt : "Rp 0"}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/15 whitespace-nowrap">
                               {gaji ? gaji.totalGajiBersihFmt : p.gajiPokokFmt}
                             </td>
 
@@ -705,7 +895,7 @@ export function PayrollClient({
                     <tfoot className="bg-surface-subtle border-t border-border font-bold text-xs">
                       <tr>
                         <td className="py-3 px-3.5 text-navy-text whitespace-nowrap">
-                          Total ({data.summaryBulanIni.totalPegawaiInput} Pegawai Terinput):
+                          Total ({data.summaryBulanIni.totalPegawaiInput} Terinput):
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
                           {data.summaryBulanIni.totalGajiPokokFmt}
@@ -717,21 +907,31 @@ export function PayrollClient({
                           {data.summaryBulanIni.totalTunjanganTransportFmt}
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap">
-                          {data.summaryBulanIni.totalInsentifFmt}
+                          {formatRupiah(
+                            data.summaryBulanIni.totalInsentif +
+                              (data.summaryBulanIni.totalTunjanganBpjs ?? 0) +
+                              (data.summaryBulanIni.totalTunjanganPph ?? 0)
+                          )}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
-                          {data.summaryBulanIni.totalGajiKotorFmt}
+                        <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap">
+                          {data.summaryBulanIni.totalThrFmt || formatRupiah(data.summaryBulanIni.totalThr ?? 0)}
+                        </td>
+                        <td className="py-3 px-3.5 text-right font-mono text-blue-900 dark:text-blue-200 bg-blue-50/40 dark:bg-blue-950/20 whitespace-nowrap">
+                          {data.summaryBulanIni.totalGajiTerlaporPajakFmt ||
+                            formatRupiah(data.summaryBulanIni.totalGajiTerlaporPajak)}
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
-                          {formatRupiah(
-                            data.summaryBulanIni.totalBpjsKesehatan +
-                              data.summaryBulanIni.totalBpjsKetenagakerjaan
-                          )}
+                          {data.summaryBulanIni.totalPotonganBpjsFmt ||
+                            formatRupiah(
+                              data.summaryBulanIni.totalPotonganBpjs ||
+                                (data.summaryBulanIni.totalBpjsKesehatan +
+                                  data.summaryBulanIni.totalBpjsKetenagakerjaan)
+                            )}
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
                           {data.summaryBulanIni.totalPph21Fmt}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right font-mono text-emerald-800 dark:text-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 whitespace-nowrap">
                           {data.summaryBulanIni.totalGajiBersihFmt}
                         </td>
                         <td className="py-3 px-3.5" />
@@ -758,18 +958,22 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-left text-xs">
+                <table className="w-full min-w-[1020px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">Bulan</th>
                       <th className="py-2.5 px-3.5 text-center">Jml Pegawai</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Gaji Pokok</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">Tunjangan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">Insentif</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Total Kotor</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">Insentif/THR</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200">
+                        Terlapor Pajak (Bruto)
+                      </th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">BPJS</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Net (THP)</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200">
+                        Gaji Bersih (THP)
+                      </th>
                       <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Aksi</th>
                     </tr>
                   </thead>
@@ -807,10 +1011,10 @@ export function PayrollClient({
                           {r.totalTunjanganFmt}
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                          {r.totalInsentifFmt}
+                          {formatRupiah((r.totalInsentif || 0) + (r.totalThr || 0))}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
-                          {r.totalGajiKotorFmt}
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/30 dark:bg-blue-950/15 whitespace-nowrap">
+                          {r.totalGajiTerlaporPajakFmt || r.totalGajiKotorFmt}
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
                           {r.totalBpjsFmt}
@@ -818,7 +1022,7 @@ export function PayrollClient({
                         <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
                           {r.totalPph21Fmt}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/15 whitespace-nowrap">
                           {r.totalGajiBersihFmt}
                         </td>
                         <td className="py-3 px-3.5 text-center whitespace-nowrap">
@@ -854,12 +1058,18 @@ export function PayrollClient({
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
                         {formatRupiah(
-                          data.rekapBulananPegawai.reduce((s, r) => s + r.totalInsentif, 0)
+                          data.rekapBulananPegawai.reduce(
+                            (s, r) => s + (r.totalInsentif || 0) + (r.totalThr || 0),
+                            0
+                          )
                         )}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/40 dark:bg-blue-950/20 whitespace-nowrap">
                         {formatRupiah(
-                          data.rekapBulananPegawai.reduce((s, r) => s + r.totalGajiKotor, 0)
+                          data.rekapBulananPegawai.reduce(
+                            (s, r) => s + (r.totalGajiTerlaporPajak || r.totalGajiKotor),
+                            0
+                          )
                         )}
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
@@ -872,7 +1082,7 @@ export function PayrollClient({
                           data.rekapBulananPegawai.reduce((s, r) => s + r.totalPph21, 0)
                         )}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 whitespace-nowrap">
                         {formatRupiah(
                           data.rekapBulananPegawai.reduce((s, r) => s + r.totalGajiBersih, 0)
                         )}
@@ -1185,7 +1395,7 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-xs">
+                <table className="w-full min-w-[960px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">NIK / Kode</th>
@@ -1194,6 +1404,8 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5">Status PTKP</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">PTKP Tahunan</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Gaji Pokok Standar</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Tunj. Jabatan Master</th>
+                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Mulai Bekerja / Masa Kerja</th>
                       <th className="py-2.5 px-3.5 text-center">Status</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
                     </tr>
@@ -1201,7 +1413,7 @@ export function PayrollClient({
                   <tbody className="divide-y divide-border">
                     {filteredPegawaiList.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-muted-faint">
+                        <td colSpan={10} className="py-8 text-center text-muted-faint">
                           Tidak ada data karyawan ditemukan.
                         </td>
                       </tr>
@@ -1227,6 +1439,21 @@ export function PayrollClient({
                           </td>
                           <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text">
                             {p.gajiPokokFmt}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
+                            {p.tunjanganJabatanFmt || formatRupiah(p.tunjanganJabatan)}
+                          </td>
+                          <td className="py-3 px-3.5 whitespace-nowrap">
+                            {p.tanggalMasukFmt ? (
+                              <div>
+                                <div className="font-semibold text-navy-text text-xs">{p.tanggalMasukFmt}</div>
+                                <div className="text-[10px] font-mono text-muted-stronger">
+                                  Masa Kerja: <span className="text-emerald-700 dark:text-emerald-400 font-bold">{p.masaKerja}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-faint text-[11px]">-</span>
+                            )}
                           </td>
                           <td className="py-3 px-3.5 text-center">
                             <span
@@ -2803,6 +3030,9 @@ export function PayrollClient({
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <Users size={16} />
                 <span>{editingPegawai ? "Edit Data Pegawai Tetap" : "Tambah Pegawai Tetap Baru"}</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-navy/10 text-navy font-sans">
+                  {data.entity?.name}
+                </span>
               </h3>
               <button
                 onClick={() => setIsPegawaiModalOpen(false)}
@@ -2914,9 +3144,43 @@ export function PayrollClient({
                   type="number"
                   name="gajiPokok"
                   required
-                  defaultValue={editingPegawai?.gajiPokok ?? 0}
+                  defaultValue={editingPegawai?.gajiPokok ? editingPegawai.gajiPokok : ""}
+                  placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">Tunjangan Jabatan Rutin (Rp)</label>
+                <input
+                  type="number"
+                  name="tunjanganJabatan"
+                  defaultValue={editingPegawai?.tunjanganJabatan ? editingPegawai.tunjanganJabatan : ""}
+                  placeholder="0"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
+                <p className="text-[10px] text-muted-faint mt-0.5">
+                  Disimpan permanen di master data dan otomatis terisi saat input gaji bulanan tanpa perlu ketik ulang.
+                </p>
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Bulan & Tahun Mulai Bekerja (Tanggal Masuk)
+                </label>
+                <input
+                  type="date"
+                  name="tanggalMasuk"
+                  defaultValue={
+                    editingPegawai?.tanggalMasuk
+                      ? new Date(editingPegawai.tanggalMasuk).toISOString().split("T")[0]
+                      : ""
+                  }
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
+                <p className="text-[10px] text-muted-faint mt-0.5">
+                  Mencatat tanggal/bulan/tahun mulai bekerja (misalnya masuk tahun 2014) untuk histori dan otomatis menghitung masa kerja karyawan.
+                </p>
               </div>
 
               <div className="flex items-center gap-2 pt-1">
@@ -2957,246 +3221,552 @@ export function PayrollClient({
       {/* ========================================================= */}
       {/* MODAL 2: FORM INPUT / EDIT GAJI BULANAN */}
       {/* ========================================================= */}
-      {mounted && isGajiModalOpen && editingGaji && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
-              <div>
-                <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                  <CreditCard size={16} />
-                  <span>Komponen Gaji: {editingGaji.pegawai.nama}</span>
-                </h3>
-                <p className="text-[11px] text-muted-faint mt-0.5">
-                  Periode: {BULAN_NAMES[selectedMonth - 1]} {selectedYear} · {editingGaji.pegawai.jabatan}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsGajiModalOpen(false)}
-                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      {mounted && isGajiModalOpen && editingGaji && typeof document !== "undefined" && (() => {
+        const liveTotalBpjs = Number(modalBpjsKes || 0) + Number(modalBpjsTk || 0);
+        const liveTotalTunjanganBpjs =
+          Number(modalTunjanganBpjsKes || 0) + Number(modalTunjanganBpjsTk || 0);
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const fd = new FormData(form);
-                startTransition(async () => {
-                  try {
-                    await saveGajiBulananAction(fd);
-                    setSuccessMsg(`Gaji ${editingGaji.pegawai.nama} bulan ${BULAN_NAMES[selectedMonth - 1]} berhasil disimpan.`);
-                    setIsGajiModalOpen(false);
-                    router.refresh();
-                  } catch (err: unknown) {
-                    setErrorMsg((err as Error).message);
-                  }
-                });
-              }}
-              className="p-5 space-y-4 text-xs overflow-y-auto flex-1"
-            >
-              <input type="hidden" name="pegawaiId" value={editingGaji.pegawai.id} />
-              <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
-              <input type="hidden" name="bulan" value={selectedMonth} />
-              <input type="hidden" name="tahun" value={selectedYear} />
+        const liveTotalGajiKotor =
+          Number(modalGajiPokok || 0) +
+          Number(modalTunjanganJabatan || 0) +
+          Number(modalTunjanganTransport || 0) +
+          Number(modalTunjanganLainnya || 0) +
+          Number(modalThr || 0) +
+          liveTotalTunjanganBpjs +
+          Number(modalTunjanganPph || 0);
 
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Pilih Pegawai Terdaftar *
-                </label>
-                <select
-                  value={editingGaji.pegawai.id}
-                  onChange={(e) => {
-                    const sel = data.pegawaiList.find((p) => p.id === e.target.value);
-                    if (sel) {
-                      setEditingGaji({ pegawai: sel, gaji: sel.currentGaji });
-                    }
-                  }}
-                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
-                >
-                  {data.pegawaiList.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nama} – {p.jabatan} {p.currentGaji ? "(Sudah Ada Data Bulan Ini)" : "(Belum Diinput)"}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        const liveTotalGajiTerlaporPajak = liveTotalGajiKotor;
 
-              <div className="p-3 rounded-xl bg-surface-subtle border border-border flex items-center justify-between">
+        // Potongan yang riil dipotong dari karyawan: BPJS (Kes + TK) dan Potongan Lain
+        // PPh 21 TIDAK dipotong dari karyawan karena 100% ditanggung perusahaan
+        const liveTotalPotonganKaryawan =
+          liveTotalBpjs + Number(modalPotonganLain || 0);
+
+        const liveTotalGajiBersih = Math.max(
+          0,
+          Number(modalGajiPokok || 0) +
+            Number(modalTunjanganJabatan || 0) +
+            Number(modalTunjanganTransport || 0) +
+            Number(modalTunjanganLainnya || 0) +
+            Number(modalThr || 0) -
+            liveTotalPotonganKaryawan
+        );
+
+        return createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+            <div className="w-full max-w-xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
                 <div>
-                  <span className="text-[11px] text-muted-faint block">NIK & Status Pajak (Terkunci)</span>
-                  <strong className="text-navy-text font-mono">
-                    {editingGaji.pegawai.nik}
-                  </strong>
-                  <div className="text-[11px] text-muted-faint">
-                    {editingGaji.pegawai.statusKeluarga} (PTKP: {editingGaji.pegawai.ptkpFmt})
-                  </div>
+                  <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                    <CreditCard size={16} />
+                    <span>Komponen Gaji: {editingGaji.pegawai.nama}</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-navy/10 text-navy font-sans">
+                      {data.entity?.name}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-muted-faint mt-0.5">
+                    Periode: {BULAN_NAMES[modalGajiBulan - 1]} {modalGajiTahun} · {editingGaji.pegawai.jabatan}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-muted-faint block">Gaji Pokok Master</span>
-                  <strong className="text-navy-text font-mono">
-                    {editingGaji.pegawai.gajiPokokFmt}
-                  </strong>
-                </div>
+                <button
+                  onClick={() => setIsGajiModalOpen(false)}
+                  className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              {/* Penghasilan / Pendapatan */}
-              <div className="space-y-2.5">
-                <h4 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-muted-stronger">
-                  A. Komponen Penghasilan (Kotor)
-                </h4>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Gaji Pokok (Bulan ini)</label>
-                    <input
-                      type="number"
-                      name="gajiPokok"
-                      required
-                      defaultValue={editingGaji.gaji?.gajiPokok ?? editingGaji.pegawai.gajiPokok}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Tunjangan Jabatan</label>
-                    <input
-                      type="number"
-                      name="tunjanganJabatan"
-                      defaultValue={editingGaji.gaji?.tunjanganJabatan ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Tunjangan Transport & Makan</label>
-                    <input
-                      type="number"
-                      name="tunjanganTransport"
-                      defaultValue={editingGaji.gaji?.tunjanganTransport ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Insentif / Bonus / Lembur</label>
-                    <input
-                      type="number"
-                      name="insentif"
-                      defaultValue={editingGaji.gaji?.insentif ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Potongan */}
-              <div className="space-y-2.5 pt-2 border-t border-border">
-                <h4 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-rose-700 dark:text-rose-400">
-                  B. Komponen Potongan
-                </h4>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">BPJS Kesehatan (Potongan)</label>
-                    <input
-                      type="number"
-                      name="bpjsKesehatan"
-                      defaultValue={editingGaji.gaji?.bpjsKesehatan ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">BPJS Ketenagakerjaan</label>
-                    <input
-                      type="number"
-                      name="bpjsKetenagakerjaan"
-                      defaultValue={editingGaji.gaji?.bpjsKetenagakerjaan ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Potongan PPh 21 (Pajak)</label>
-                    <input
-                      type="number"
-                      name="pph21"
-                      defaultValue={editingGaji.gaji?.pph21 ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-navy-text block mb-1">Potongan Lainnya / Kasbon</label>
-                    <input
-                      type="number"
-                      name="potonganLain"
-                      defaultValue={editingGaji.gaji?.potonganLain ?? 0}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Catatan / Keterangan</label>
-                <input
-                  type="text"
-                  name="catatan"
-                  defaultValue={editingGaji.gaji?.catatan ?? ""}
-                  placeholder="Opsional: Keterangan lembur / penyesuaian"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-border">
-                {editingGaji.gaji && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm("Hapus data input gaji bulan ini untuk pegawai ini?")) {
-                        startTransition(async () => {
-                          try {
-                            await deleteGajiBulananAction(editingGaji.gaji!.id);
-                            setSuccessMsg("Input gaji bulan ini berhasil dihapus.");
-                            setIsGajiModalOpen(false);
-                            router.refresh();
-                          } catch (err: unknown) {
-                            setErrorMsg((err as Error).message);
-                          }
-                        });
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const fd = new FormData(form);
+                  startTransition(async () => {
+                    try {
+                      await saveGajiBulananAction(fd);
+                      setSuccessMsg(
+                        `Gaji ${editingGaji.pegawai.nama} periode ${BULAN_NAMES[modalGajiBulan - 1]} ${modalGajiTahun} berhasil disimpan.`
+                      );
+                      setIsGajiModalOpen(false);
+                      if (modalGajiBulan !== selectedMonth || modalGajiTahun !== selectedYear) {
+                        router.push(`${pathname}?tab=pegawai&year=${modalGajiTahun}&month=${modalGajiBulan}`);
+                      } else {
+                        router.refresh();
                       }
-                    }}
-                    className="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold cursor-pointer"
-                  >
-                    Hapus Input Gaji
-                  </button>
-                )}
+                    } catch (err: unknown) {
+                      setErrorMsg((err as Error).message);
+                    }
+                  });
+                }}
+                className="p-5 space-y-4 text-xs overflow-y-auto flex-1"
+              >
+                <input type="hidden" name="pegawaiId" value={modalGajiPegawaiId} />
+                <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
+                <input type="hidden" name="tunjanganBpjs" value={modalTunjanganBpjsKes + modalTunjanganBpjsTk} />
+                <input type="hidden" name="potonganBpjs" value={modalBpjsKes + modalBpjsTk} />
+                <input type="hidden" name="insentif" value={modalTunjanganLainnya} />
 
-                <div className="flex items-center gap-2 ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setIsGajiModalOpen(false)}
-                    className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
-                  >
-                    {isPending ? "Menyimpan..." : "Simpan Gaji Pegawai"}
-                  </button>
+                {/* 1. Pemilihan Periode Bulan & Tahun Dinamis */}
+                <div className="p-3.5 rounded-xl bg-surface-subtle border border-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-navy-text text-xs">
+                      Periode Bulan & Tahun Transaksi *
+                    </span>
+                    <span className="text-[10px] text-muted-faint font-medium">
+                      Bebas pilih bulan lalu / berjalan / mendatang
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-muted-stronger block mb-1">Bulan Transaksi</label>
+                      <select
+                        name="bulan"
+                        value={modalGajiBulan}
+                        onChange={(e) => setModalGajiBulan(Number(e.target.value))}
+                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                      >
+                        {BULAN_NAMES.map((mName, idx) => (
+                          <option key={idx + 1} value={idx + 1}>
+                            Bulan {idx + 1} – {mName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-stronger block mb-1">Tahun Transaksi</label>
+                      <input
+                        type="number"
+                        name="tahun"
+                        value={modalGajiTahun}
+                        onChange={(e) => setModalGajiTahun(Number(e.target.value) || selectedYear)}
+                        min={2000}
+                        max={2100}
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+
+                {/* Pemilihan Pegawai */}
+                <div>
+                  <label className="font-semibold text-navy-text block mb-1">
+                    Pilih Pegawai Terdaftar *
+                  </label>
+                  <select
+                    value={modalGajiPegawaiId}
+                    onChange={(e) => handleSelectPegawaiInModal(e.target.value)}
+                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                  >
+                    {data.pegawaiList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nama} – {p.jabatan} {p.currentGaji ? "(Sudah Ada Data Bulan Ini)" : "(Belum Diinput)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Master Pegawai Summary Card */}
+                <div className="p-3 rounded-xl bg-surface-subtle border border-border grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] text-muted-faint block">NIK & PTKP</span>
+                    <strong className="text-navy-text font-mono text-[11px]">
+                      {editingGaji.pegawai.nik}
+                    </strong>
+                    <div className="text-[10px] text-muted-faint">
+                      {editingGaji.pegawai.statusKeluarga} (PTKP: {editingGaji.pegawai.ptkpFmt})
+                    </div>
+                    {editingGaji.pegawai.masaKerja && (
+                      <div className="text-[10px] text-muted-stronger mt-1">
+                        Masa Kerja: <span className="font-semibold text-emerald-700 dark:text-emerald-400 font-mono">{editingGaji.pegawai.masaKerja}</span>
+                        {editingGaji.pegawai.tanggalMasukFmt && (
+                          <span className="text-muted-faint text-[9px] block">
+                            (Sejak {editingGaji.pegawai.tanggalMasukFmt})
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-muted-faint block">Gaji Pokok & Tunj. Jabatan Master</span>
+                    <strong className="text-navy-text font-mono text-[11px] block">
+                      Pokok: {editingGaji.pegawai.gajiPokokFmt}
+                    </strong>
+                    <span className="text-[10px] text-muted-stronger font-mono">
+                      Jabatan: {editingGaji.pegawai.tunjanganJabatanFmt || formatRupiah(editingGaji.pegawai.tunjanganJabatan)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Penghasilan / Pendapatan */}
+                <div className="space-y-2.5">
+                  <h4 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-muted-stronger">
+                    A. Komponen Penghasilan & Tunjangan (Bruto)
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Gaji Pokok (Bulan ini) *</label>
+                      <input
+                        type="number"
+                        name="gajiPokok"
+                        required
+                        value={modalGajiPokok || ""}
+                        onChange={(e) => setModalGajiPokok(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">
+                        Tunjangan Jabatan (Rutin)
+                      </label>
+                      <input
+                        type="number"
+                        name="tunjanganJabatan"
+                        value={modalTunjanganJabatan || ""}
+                        onChange={(e) => setModalTunjanganJabatan(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <span className="text-[10px] text-muted-faint block mt-0.5">
+                        Otomatis terisi dari master data karyawan
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. Otomatisasi Tunjangan Transport (Hari Kerja x Tarif Harian Dinamis/Editable) */}
+                  <div className="p-3 rounded-xl bg-surface-subtle/80 border border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-navy-text block text-xs">
+                        Otomatisasi Tunjangan Transport
+                      </label>
+                      <span className="text-[10px] text-muted-faint font-mono">
+                        Hari Kerja × Tarif Harian
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[10px] text-muted-stronger block mb-0.5">Hari Kerja (Hari)</label>
+                        <input
+                          type="number"
+                          name="hariKerja"
+                          min={0}
+                          max={31}
+                          value={modalHariKerja || ""}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            setModalHariKerja(val);
+                            setModalTunjanganTransport(val * modalTarifTransport);
+                          }}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-stronger block mb-0.5">Tarif Harian (Rp)</label>
+                        <input
+                          type="number"
+                          name="tarifTransportHarian"
+                          min={0}
+                          value={modalTarifTransport || ""}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            setModalTarifTransport(val);
+                            setModalTunjanganTransport(modalHariKerja * val);
+                          }}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-navy-text font-semibold block mb-0.5">
+                          Total Transport (Rp)
+                        </label>
+                        <input
+                          type="number"
+                          name="tunjanganTransport"
+                          value={modalTunjanganTransport || ""}
+                          onChange={(e) => setModalTunjanganTransport(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-navy-text font-bold font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-faint">
+                      💡 Tarif harian fleksibel dapat diedit per bulan (misal bulan ini Rp 15.000/hari, bulan depan Rp 20.000/hari).
+                    </p>
+                  </div>
+
+                  {/* 3. Komponen Tunjangan Tambahan */}
+                  <div className="space-y-2.5 pt-2 border-t border-border/60">
+                    <h5 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-muted-stronger">
+                      Komponen Tunjangan Tambahan
+                    </h5>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Kesehatan</label>
+                        <input
+                          type="number"
+                          name="tunjanganBpjsKes"
+                          value={modalTunjanganBpjsKes || ""}
+                          onChange={(e) => setModalTunjanganBpjsKes(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Tunjangan BPJS Kesehatan ditanggung pemberi kerja
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Ketenagakerjaan</label>
+                        <input
+                          type="number"
+                          name="tunjanganBpjsTk"
+                          value={modalTunjanganBpjsTk || ""}
+                          onChange={(e) => setModalTunjanganBpjsTk(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Tunjangan BPJS TK ditanggung pemberi kerja
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan THR</label>
+                        <input
+                          type="number"
+                          name="thr"
+                          value={modalThr || ""}
+                          onChange={(e) => setModalThr(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Tunjangan Hari Raya
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan PPh</label>
+                        <input
+                          type="number"
+                          name="tunjanganPph"
+                          value={modalTunjanganPph || ""}
+                          onChange={(e) => setModalTunjanganPph(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Subsidi PPh 21 kantor
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan Lainnya</label>
+                        <input
+                          type="number"
+                          name="tunjanganLainnya"
+                          value={modalTunjanganLainnya || ""}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            setModalTunjanganLainnya(val);
+                            setModalInsentif(val);
+                          }}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Insentif / lembur / bonus
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Potongan */}
+                <div className="space-y-2.5 pt-2 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-rose-700 dark:text-rose-400">
+                      B. Komponen Potongan (Deductions)
+                    </h4>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 font-semibold">
+                      ✓ PPh 21 Ditanggung Perusahaan (Rp 0 Dipotong dari Karyawan)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Potongan BPJS Kesehatan</label>
+                      <input
+                        type="number"
+                        name="bpjsKesehatan"
+                        value={modalBpjsKes || ""}
+                        onChange={(e) => setModalBpjsKes(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <span className="text-[10px] text-muted-faint block mt-0.5">
+                        BPJS Kesehatan pegawai
+                      </span>
+                    </div>
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Potongan BPJS TK</label>
+                      <input
+                        type="number"
+                        name="bpjsKetenagakerjaan"
+                        value={modalBpjsTk || ""}
+                        onChange={(e) => setModalBpjsTk(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <span className="text-[10px] text-muted-faint block mt-0.5">
+                        BPJS Ketenagakerjaan
+                      </span>
+                    </div>
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Potongan Lain</label>
+                      <input
+                        type="number"
+                        name="potonganLain"
+                        value={modalPotonganLain || ""}
+                        onChange={(e) => setModalPotonganLain(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <span className="text-[10px] text-muted-faint block mt-0.5">
+                        Kasbon / pinjaman
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* PPh 21 Ditanggung Perusahaan Card */}
+                  <div className="p-2.5 rounded-xl bg-surface-subtle border border-border flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-navy-text text-xs">
+                        Pelaporan PPh 21 (SPT Pajak)
+                      </div>
+                      <div className="text-[10px] text-muted-faint">
+                        PPh 21 ditanggung perusahaan sehingga <strong className="text-emerald-700 dark:text-emerald-400">tidak memotong Take Home Pay</strong> karyawan.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        name="pph21"
+                        value={modalPph21 || ""}
+                        onChange={(e) => setModalPph21(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-32 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right"
+                      />
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded border border-amber-200 dark:border-amber-800 whitespace-nowrap">
+                        Beban Kantor
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Dual Total Live Preview Card */}
+                <div className="p-3.5 rounded-2xl border border-border bg-surface-subtle/50 space-y-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-stronger flex items-center justify-between">
+                    <span>Perbandingan Dual Total (Live Preview)</span>
+                    <span className="text-[10px] text-muted-faint font-normal font-sans">Otomatis dihitung</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Dual Total 1: Terlapor Pajak */}
+                    <div className="p-2.5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/30">
+                      <div className="text-[10px] font-semibold text-blue-800 dark:text-blue-300 flex items-center justify-between">
+                        <span>Bruto Terlapor Pajak</span>
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-mono font-bold">
+                          SPT PPh 21
+                        </span>
+                      </div>
+                      <div className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-1">
+                        {formatRupiah(liveTotalGajiTerlaporPajak)}
+                      </div>
+                      <div className="text-[9px] text-blue-700/80 dark:text-blue-300/70 mt-0.5">
+                        Dasar pelaporan SPT Masa Pajak
+                      </div>
+                    </div>
+
+                    {/* Dual Total 2: Take Home Pay */}
+                    <div className="p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/30">
+                      <div className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                        <span>Gaji Bersih (THP)</span>
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 font-mono font-bold">
+                          Kas / GL 511
+                        </span>
+                      </div>
+                      <div className="text-base font-bold font-mono text-emerald-800 dark:text-emerald-200 mt-1">
+                        {formatRupiah(liveTotalGajiBersih)}
+                      </div>
+                      <div className="text-[9px] text-emerald-700/80 dark:text-emerald-300/70 mt-0.5">
+                        Dana riil keluar dari rekening
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-navy-text block mb-1">Catatan / Keterangan</label>
+                  <input
+                    type="text"
+                    name="catatan"
+                    value={modalCatatan}
+                    onChange={(e) => setModalCatatan(e.target.value)}
+                    placeholder="Opsional: Keterangan lembur / penyesuaian"
+                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-border">
+                  {editingGaji.gaji && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("Hapus data input gaji bulan ini untuk pegawai ini?")) {
+                          startTransition(async () => {
+                            try {
+                              await deleteGajiBulananAction(editingGaji.gaji!.id);
+                              setSuccessMsg("Input gaji bulan ini berhasil dihapus.");
+                              setIsGajiModalOpen(false);
+                              router.refresh();
+                            } catch (err: unknown) {
+                              setErrorMsg((err as Error).message);
+                            }
+                          });
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold cursor-pointer"
+                    >
+                      Hapus Input Gaji
+                    </button>
+                  )}
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsGajiModalOpen(false)}
+                      className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+                    >
+                      {isPending ? "Menyimpan..." : "Simpan Gaji Pegawai"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* ========================================================= */}
       {/* MODAL 3: FORM INPUT / EDIT GAJI TENAGA AHLI */}
@@ -3450,7 +4020,7 @@ export function PayrollClient({
                   type="number"
                   name="nominalHonor"
                   required
-                  defaultValue={editingHonor?.nominalHonor ?? 0}
+                  defaultValue={editingHonor?.nominalHonor ? editingHonor.nominalHonor : ""}
                   placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold"
                 />
@@ -3510,7 +4080,7 @@ export function PayrollClient({
             {/* Slip Content */}
             <div className="p-6 space-y-5 text-xs">
               {/* Employee info */}
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-surface-subtle border border-border">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3.5 rounded-xl bg-surface-subtle border border-border">
                 <div>
                   <span className="text-muted-faint block text-[11px]">Nama Pegawai</span>
                   <strong className="text-navy-text text-sm">{slipModalItem.pegawaiNama}</strong>
@@ -3522,6 +4092,12 @@ export function PayrollClient({
                 <div>
                   <span className="text-muted-faint block text-[11px]">Jabatan</span>
                   <span className="text-navy-text">{slipModalItem.pegawaiJabatan}</span>
+                </div>
+                <div>
+                  <span className="text-muted-faint block text-[11px]">Mulai / Masa Kerja</span>
+                  <span className="text-navy-text font-semibold">
+                    {slipModalItem.pegawaiMasaKerja || "-"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-faint block text-[11px]">Periode Penggajian</span>
@@ -3546,16 +4122,57 @@ export function PayrollClient({
                       <span className="font-mono">{slipModalItem.tunjanganJabatanFmt}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">Tunjangan Transport:</span>
+                      <span className="text-muted-faint">
+                        Tunjangan Transport
+                        {slipModalItem.hariKerja > 0 && (
+                          <span className="text-[10px] text-muted-faint ml-1">
+                            ({slipModalItem.hariKerja} hr × {formatRupiah(slipModalItem.tarifTransportHarian || 15000)})
+                          </span>
+                        )}:
+                      </span>
                       <span className="font-mono">{slipModalItem.tunjanganTransportFmt}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">Insentif / Bonus:</span>
-                      <span className="font-mono">{slipModalItem.insentifFmt}</span>
+                      <span className="text-muted-faint">Tunjangan Lainnya:</span>
+                      <span className="font-mono">{slipModalItem.tunjanganLainnyaFmt || slipModalItem.insentifFmt}</span>
                     </div>
+                    {slipModalItem.thr > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-faint">Tunjangan THR:</span>
+                        <span className="font-mono">{slipModalItem.thrFmt}</span>
+                      </div>
+                    )}
+                    {slipModalItem.tunjanganBpjsKes > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-faint">Tunjangan BPJS Kesehatan:</span>
+                        <span className="font-mono">{slipModalItem.tunjanganBpjsKesFmt}</span>
+                      </div>
+                    )}
+                    {slipModalItem.tunjanganBpjsTk > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-faint">Tunjangan BPJS Ketenagakerjaan:</span>
+                        <span className="font-mono">{slipModalItem.tunjanganBpjsTkFmt}</span>
+                      </div>
+                    )}
+                    {slipModalItem.tunjanganBpjsKes === 0 &&
+                      slipModalItem.tunjanganBpjsTk === 0 &&
+                      slipModalItem.tunjanganBpjs > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-faint">Tunjangan BPJS Kes/TK:</span>
+                          <span className="font-mono">{slipModalItem.tunjanganBpjsFmt}</span>
+                        </div>
+                      )}
+                    {slipModalItem.tunjanganPph > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-faint">Tunjangan PPh:</span>
+                        <span className="font-mono">{slipModalItem.tunjanganPphFmt}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between pt-1 border-t border-border font-bold">
-                      <span>Total Gaji Kotor:</span>
-                      <span className="font-mono text-navy-text">{slipModalItem.totalGajiKotorFmt}</span>
+                      <span className="text-blue-900 dark:text-blue-300">Total Bruto Terlapor Pajak:</span>
+                      <span className="font-mono text-blue-900 dark:text-blue-300">
+                        {slipModalItem.totalGajiTerlaporPajakFmt || slipModalItem.totalGajiKotorFmt}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -3567,28 +4184,33 @@ export function PayrollClient({
                   </h4>
                   <div className="space-y-1.5 text-[11px]">
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">BPJS Kesehatan:</span>
-                      <span className="font-mono">{slipModalItem.bpjsKesehatanFmt}</span>
+                      <span className="text-muted-faint">Potongan BPJS Kesehatan:</span>
+                      <span className="font-mono">
+                        {slipModalItem.bpjsKesehatanFmt || formatRupiah(slipModalItem.bpjsKesehatan)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">BPJS Ketenagakerjaan:</span>
-                      <span className="font-mono">{slipModalItem.bpjsKetenagakerjaanFmt}</span>
+                      <span className="text-muted-faint">Potongan BPJS TK:</span>
+                      <span className="font-mono">
+                        {slipModalItem.bpjsKetenagakerjaanFmt || formatRupiah(slipModalItem.bpjsKetenagakerjaan)}
+                      </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-muted-faint">Potongan PPh 21:</span>
-                      <span className="font-mono">{slipModalItem.pph21Fmt}</span>
+                      <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold text-[10px]">
+                        Rp 0 (Ditanggung Kantor)
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">Potongan Lainnya:</span>
+                      <span className="text-muted-faint">Potongan Lainnya / Kasbon:</span>
                       <span className="font-mono">{slipModalItem.potonganLainFmt}</span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-border font-bold text-rose-700 dark:text-rose-400">
-                      <span>Total Potongan:</span>
+                      <span>Total Potongan Karyawan:</span>
                       <span className="font-mono">
                         {formatRupiah(
-                          slipModalItem.bpjsKesehatan +
-                            slipModalItem.bpjsKetenagakerjaan +
-                            slipModalItem.pph21 +
+                          (slipModalItem.potonganBpjs ||
+                            slipModalItem.bpjsKesehatan + slipModalItem.bpjsKetenagakerjaan) +
                             slipModalItem.potonganLain
                         )}
                       </span>
@@ -3597,18 +4219,30 @@ export function PayrollClient({
                 </div>
               </div>
 
-              {/* Net Take Home Pay */}
-              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-semibold block">
-                    TOTAL DITERIMA (TAKE HOME PAY)
+              {/* Dual Total Comparison Cards di Slip Gaji */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
+                  <span className="text-[10px] text-blue-800 dark:text-blue-300 font-semibold block">
+                    TOTAL BRUTO TERLAPOR PAJAK
                   </span>
-                  <span className="text-[10px] text-muted-faint">
-                    Ditransfer ke rekening pegawai
+                  <div className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-0.5">
+                    {slipModalItem.totalGajiTerlaporPajakFmt || slipModalItem.totalGajiKotorFmt}
+                  </div>
+                  <span className="text-[9px] text-blue-700/80 dark:text-blue-300/70">
+                    Dasar SPT Masa PPh 21
                   </span>
                 </div>
-                <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">
-                  {slipModalItem.totalGajiBersihFmt}
+
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                  <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-semibold block">
+                    TOTAL DITERIMA (TAKE HOME PAY)
+                  </span>
+                  <div className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-300 mt-0.5">
+                    {slipModalItem.totalGajiBersihFmt}
+                  </div>
+                  <span className="text-[9px] text-emerald-700/80 dark:text-emerald-300/70">
+                    Ditransfer riil ke pegawai
+                  </span>
                 </div>
               </div>
 

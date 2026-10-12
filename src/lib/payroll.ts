@@ -77,8 +77,14 @@ export type GajiBulananItem = {
   tunjanganTransportFmt: string;
   insentif: number;
   insentifFmt: string;
+  tunjanganLainnya: number;
+  tunjanganLainnyaFmt: string;
   tunjanganBpjs: number;
   tunjanganBpjsFmt: string;
+  tunjanganBpjsKes: number;
+  tunjanganBpjsKesFmt: string;
+  tunjanganBpjsTk: number;
+  tunjanganBpjsTkFmt: string;
   tunjanganPph: number;
   tunjanganPphFmt: string;
   thr: number;
@@ -401,7 +407,10 @@ export async function getPayrollData(
       const tarif = Number(currentGajiRaw.tarifTransportHarian ?? 15000);
       const tt = Number(currentGajiRaw.tunjanganTransport);
       const ins = Number(currentGajiRaw.insentif);
-      const tBpjs = Number(currentGajiRaw.tunjanganBpjs ?? 0);
+      const tLainnya = Number((currentGajiRaw as any).tunjanganLainnya ?? ins);
+      const tBpjsKes = Number((currentGajiRaw as any).tunjanganBpjsKes ?? 0);
+      const tBpjsTk = Number((currentGajiRaw as any).tunjanganBpjsTk ?? 0);
+      const tBpjs = Number(currentGajiRaw.tunjanganBpjs ?? (tBpjsKes + tBpjsTk));
       const tPph = Number(currentGajiRaw.tunjanganPph ?? 0);
       const thr = Number(currentGajiRaw.thr ?? 0);
       const bpjsKes = Number(currentGajiRaw.bpjsKesehatan);
@@ -410,7 +419,7 @@ export async function getPayrollData(
       const pot = Number(currentGajiRaw.potonganLain);
       const pph = Number(currentGajiRaw.pph21);
       const kotor = Number(currentGajiRaw.totalGajiKotor);
-      const terlapor = Number(currentGajiRaw.totalGajiTerlaporPajak ?? (gp + tj + tt + ins + tBpjs + tPph + thr));
+      const terlapor = Number(currentGajiRaw.totalGajiTerlaporPajak ?? (gp + tj + tt + tLainnya + tBpjs + tPph + thr));
       const bersih = Number(currentGajiRaw.totalGajiBersih);
 
       currentGaji = {
@@ -434,8 +443,14 @@ export async function getPayrollData(
         tunjanganTransportFmt: formatRupiah(tt),
         insentif: ins,
         insentifFmt: formatRupiah(ins),
+        tunjanganLainnya: tLainnya,
+        tunjanganLainnyaFmt: formatRupiah(tLainnya),
         tunjanganBpjs: tBpjs,
         tunjanganBpjsFmt: formatRupiah(tBpjs),
+        tunjanganBpjsKes: tBpjsKes,
+        tunjanganBpjsKesFmt: formatRupiah(tBpjsKes),
+        tunjanganBpjsTk: tBpjsTk,
+        tunjanganBpjsTkFmt: formatRupiah(tBpjsTk),
         tunjanganPph: tPph,
         tunjanganPphFmt: formatRupiah(tPph),
         thr: thr,
@@ -520,7 +535,10 @@ export async function getPayrollData(
     totalTunjanganJabatan: gajiBulanIni.reduce((s, g) => s + g.tunjanganJabatan, 0),
     totalTunjanganTransport: gajiBulanIni.reduce((s, g) => s + g.tunjanganTransport, 0),
     totalInsentif: gajiBulanIni.reduce((s, g) => s + g.insentif, 0),
+    totalTunjanganLainnya: gajiBulanIni.reduce((s, g) => s + (g.tunjanganLainnya || g.insentif), 0),
     totalTunjanganBpjs: gajiBulanIni.reduce((s, g) => s + g.tunjanganBpjs, 0),
+    totalTunjanganBpjsKes: gajiBulanIni.reduce((s, g) => s + g.tunjanganBpjsKes, 0),
+    totalTunjanganBpjsTk: gajiBulanIni.reduce((s, g) => s + g.tunjanganBpjsTk, 0),
     totalTunjanganPph: gajiBulanIni.reduce((s, g) => s + g.tunjanganPph, 0),
     totalThr: gajiBulanIni.reduce((s, g) => s + g.thr, 0),
     totalBpjsKesehatan: gajiBulanIni.reduce((s, g) => s + g.bpjsKesehatan, 0),

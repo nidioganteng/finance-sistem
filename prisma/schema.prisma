@@ -435,20 +435,22 @@ model Rekanan {
 
 // Sub-Modul Pegawai Tetap (Khusus Per Entitas Usaha)
 model Pegawai {
-  id             String                @id @default(cuid())
-  entityId       String
-  nik            String                // NIK KTP atau Kode Karyawan
-  nama           String
-  jabatan        String
-  statusKeluarga String                @default("TK/0") // TK/0, TK/1, K/0, K/1, K/2, K/3, dll
-  ptkp           Decimal               @default(54000000.00) @db.Decimal(18, 2)
-  gajiPokok      Decimal               @default(0.00) @db.Decimal(18, 2)
-  isActive       Boolean               @default(true)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id               String                @id @default(cuid())
+  entityId         String
+  nik              String                // NIK KTP atau Kode Karyawan
+  nama             String
+  jabatan          String
+  statusKeluarga   String                @default("TK/0") // TK/0, TK/1, K/0, K/1, K/2, K/3, dll
+  ptkp             Decimal               @default(54000000.00) @db.Decimal(18, 2)
+  gajiPokok        Decimal               @default(0.00) @db.Decimal(18, 2)
+  tunjanganJabatan Decimal               @default(0.00) @db.Decimal(18, 2) // Tunjangan Jabatan di Master Data
+  tanggalMasuk     DateTime?             // Tanggal/Bulan/Tahun Mulai Bekerja (Histori & Masa Kerja)
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
-  entity         Entity                @relation(fields: [entityId], references: [id])
-  gajiBulanan    GajiPegawaiBulanan[]
+  entity           Entity                @relation(fields: [entityId], references: [id])
+  gajiBulanan      GajiPegawaiBulanan[]
 
   @@index([entityId])
   @@index([nik])
@@ -457,27 +459,37 @@ model Pegawai {
 
 // Rekapitulasi & Komponen Variabel Bulanan Pegawai Tetap
 model GajiPegawaiBulanan {
-  id                  String   @id @default(cuid())
-  pegawaiId           String
-  entityId            String
-  bulan               Int      // 1 - 12
-  tahun               Int      // e.g. 2026
-  gajiPokok           Decimal  @db.Decimal(18, 2)
-  tunjanganJabatan    Decimal  @default(0.00) @db.Decimal(18, 2)
-  tunjanganTransport  Decimal  @default(0.00) @db.Decimal(18, 2)
-  insentif            Decimal  @default(0.00) @db.Decimal(18, 2)
-  bpjsKesehatan       Decimal  @default(0.00) @db.Decimal(18, 2)
-  bpjsKetenagakerjaan Decimal  @default(0.00) @db.Decimal(18, 2)
-  potonganLain        Decimal  @default(0.00) @db.Decimal(18, 2)
-  pph21               Decimal  @default(0.00) @db.Decimal(18, 2)
-  totalGajiKotor      Decimal  @db.Decimal(18, 2) // Pokok + Tunjangan + Insentif
-  totalGajiBersih     Decimal  @db.Decimal(18, 2) // Take Home Pay
-  catatan             String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  pegawaiId              String
+  entityId               String
+  bulan                  Int      // 1 - 12
+  tahun                  Int      // e.g. 2026
+  gajiPokok              Decimal  @db.Decimal(18, 2)
+  tunjanganJabatan       Decimal  @default(0.00) @db.Decimal(18, 2)
+  hariKerja              Int      @default(0) // Input Hari Kerja riil
+  tarifTransportHarian   Decimal  @default(15000.00) @db.Decimal(18, 2) // Tarif Harian Transport (default Rp 15.000)
+  tunjanganTransport     Decimal  @default(0.00) @db.Decimal(18, 2) // Hasil Hari Kerja x Tarif
+  insentif               Decimal  @default(0.00) @db.Decimal(18, 2)
+  tunjanganLainnya       Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan Lainnya / Insentif
+  tunjanganBpjs          Decimal  @default(0.00) @db.Decimal(18, 2) // Total Tunjangan BPJS
+  tunjanganBpjsKes       Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan BPJS Kesehatan
+  tunjanganBpjsTk        Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan BPJS Ketenagakerjaan
+  tunjanganPph           Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan PPh 21
+  thr                    Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan Hari Raya
+  bpjsKesehatan          Decimal  @default(0.00) @db.Decimal(18, 2) // Potongan BPJS Kesehatan Karyawan
+  bpjsKetenagakerjaan    Decimal  @default(0.00) @db.Decimal(18, 2) // Potongan BPJS Ketenagakerjaan Karyawan
+  potonganBpjs           Decimal  @default(0.00) @db.Decimal(18, 2) // Total Potongan BPJS Karyawan
+  potonganLain           Decimal  @default(0.00) @db.Decimal(18, 2) // Potongan Lain / Kasbon
+  pph21                  Decimal  @default(0.00) @db.Decimal(18, 2) // PPh 21 (Ditanggung Perusahaan)
+  totalGajiKotor         Decimal  @db.Decimal(18, 2) // Pokok + Tunjangan + Insentif + THR
+  totalGajiTerlaporPajak Decimal  @default(0.00) @db.Decimal(18, 2) // Bruto Pajak SPT PPh 21
+  totalGajiBersih        Decimal  @db.Decimal(18, 2) // Take Home Pay riil
+  catatan                String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  pegawai             Pegawai  @relation(fields: [pegawaiId], references: [id], onDelete: Cascade)
-  entity              Entity   @relation(fields: [entityId], references: [id])
+  pegawai                Pegawai  @relation(fields: [pegawaiId], references: [id], onDelete: Cascade)
+  entity                 Entity   @relation(fields: [entityId], references: [id])
 
   @@unique([pegawaiId, bulan, tahun])
   @@index([entityId, tahun, bulan])

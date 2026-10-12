@@ -352,7 +352,7 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   let nik = (formData.get("nik") as string)?.trim();
   let nama = (formData.get("nama") as string)?.trim();
   let npwp = (formData.get("npwp") as string)?.trim() || null;
-  const ptkp = (formData.get("ptkp") as string)?.trim() || "TK/0";
+  let ptkp = (formData.get("ptkp") as string)?.trim() || "";
   const uraian = (formData.get("uraian") as string)?.trim();
   const tanggalStr = formData.get("tanggal") as string;
   const nominalHonor = Number(formData.get("nominalHonor")) || 0;
@@ -363,7 +363,7 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   let namaProyek = (formData.get("namaProyek") as string)?.trim() || null;
   const noBukti = (formData.get("noBukti") as string)?.trim() || null;
 
-  // Jika rekananId dipilih, ambil NIK, Nama, dan NPWP dari database rekanan jika belum terisi
+  // Jika rekananId dipilih, ambil NIK, Nama, NPWP, dan PTKP dari database rekanan jika belum terisi
   let finalRekananId = rekananId;
   if (rekananId) {
     const r = await prisma.rekanan.findUnique({ where: { id: rekananId } });
@@ -371,8 +371,10 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
       nama = nama || r.nama;
       nik = nik || r.nik || "";
       npwp = npwp || r.npwp;
+      ptkp = ptkp || r.ptkp || "TK/0";
     }
   }
+  ptkp = ptkp || "TK/0";
 
   if (!entityId || !nik || !nama || !uraian || !tanggalStr || nominalHonor <= 0) {
     throw new Error("Entitas, Tenaga Ahli (NIK & Nama), Uraian Tugas, Tanggal, dan Nominal Honor (> 0) wajib diisi.");
@@ -669,6 +671,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
   const nama = (formData.get("nama") as string)?.trim();
   const nik = (formData.get("nik") as string)?.trim();
   const npwp = (formData.get("npwp") as string)?.trim() || null;
+  const ptkp = (formData.get("ptkp") as string)?.trim() || "TK/0";
   const kategori = (formData.get("kategori") as string)?.trim() || null;
   const entityId = (formData.get("entityId") as string)?.trim() || null;
 
@@ -689,6 +692,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
         nama,
         nik: cleanNik,
         npwp,
+        ptkp,
         kategori,
         entityId: entityId || null,
       },
@@ -713,6 +717,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
         nama,
         nik: cleanNik,
         npwp,
+        ptkp,
         tipe: "TENAGA_AHLI",
         kategori,
         entityId: entityId || null,

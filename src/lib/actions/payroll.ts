@@ -694,7 +694,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
         npwp,
         ptkp,
         kategori,
-        entityId: entityId || null,
+        entityId: null, // Global holding-wide (berlaku lintas entitas grup)
       },
     });
     await logActivity(
@@ -704,7 +704,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
       { rekananId: id }
     );
   } else {
-    // Cek apakah NIK sudah pernah terdaftar di Rekanan
+    // Cek apakah NIK sudah pernah terdaftar di Rekanan (unifikasi holding)
     const existing = await prisma.rekanan.findFirst({
       where: { tipe: "TENAGA_AHLI", nik: cleanNik },
     });
@@ -720,7 +720,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
         ptkp,
         tipe: "TENAGA_AHLI",
         kategori,
-        entityId: entityId || null,
+        entityId: null, // Global holding-wide (berlaku lintas entitas grup)
       },
     });
     await logActivity(

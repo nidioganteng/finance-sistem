@@ -826,25 +826,7 @@ export function PayrollClient({
                       Entitas: {data.entity?.name} · Masukkan atau sesuaikan komponen tunjangan, insentif, dan potongan
                     </p>
                   </div>
-
-                {isManager && (
-                  <button
-                    onClick={() => {
-                      const targetPegawai = data.pegawaiList.find((p) => !p.currentGaji) || data.pegawaiList[0];
-                      if (targetPegawai) {
-                        setEditingGaji({ pegawai: targetPegawai, gaji: targetPegawai.currentGaji });
-                        setIsGajiModalOpen(true);
-                      } else {
-                        setErrorMsg("Belum ada pegawai terdaftar di entitas ini. Silakan tambahkan pegawai terlebih dahulu.");
-                      }
-                    }}
-                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                  >
-                    <Plus size={14} />
-                    <span>Input Gaji Pegawai</span>
-                  </button>
-                )}
-              </div>
+                </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px] text-left text-xs">
@@ -1972,22 +1954,6 @@ export function PayrollClient({
                       ))}
                     </select>
                   </div>
-
-                  {isManager && (
-                    <button
-                      onClick={() => {
-                        if (data.rekananTenagaAhli.length === 0) {
-                          setErrorMsg("Belum ada tenaga ahli terdaftar di entitas ini. Silakan tambahkan tenaga ahli terlebih dahulu.");
-                          return;
-                        }
-                        openHonorModal();
-                      }}
-                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                    >
-                      <Plus size={14} />
-                      <span>Input Gaji Tenaga Ahli</span>
-                    </button>
-                  )}
                 </div>
               </div>
 

@@ -890,6 +890,19 @@ export async function syncProjectSpend(projectId: string): Promise<number> {
     }
   }
 
+  // Prioritas 4: Realisasi honor tenaga ahli yang dibebankan ke proyek ini (Issue 98)
+  const honorTenagaAhli = await prisma.honorTenagaAhli.findMany({
+    where: { projectId },
+    select: { id: true, nominalHonor: true, noBukti: true },
+  });
+
+  for (const h of honorTenagaAhli) {
+    if (h.noBukti && (seenCrossKeys.has(h.noBukti) || projectJurnal.some((j) => j.noBukti === h.noBukti))) {
+      continue;
+    }
+    totalSpend += Number(h.nominalHonor);
+  }
+
   await prisma.project.update({
     where: { id: projectId },
     data: { spend: totalSpend },

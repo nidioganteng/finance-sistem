@@ -31,6 +31,7 @@ export async function createPegawaiAction(formData: FormData) {
   const statusKeluarga = (formData.get("statusKeluarga") as string)?.trim() || "TK/0";
   const ptkp = Number(formData.get("ptkp")) || 54000000;
   const gajiPokok = Number(formData.get("gajiPokok")) || 0;
+  const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
   const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
 
   if (!entityId || !nik || !nama) {
@@ -54,6 +55,7 @@ export async function createPegawaiAction(formData: FormData) {
       statusKeluarga,
       ptkp,
       gajiPokok,
+      tunjanganJabatan,
       isActive,
     },
   });
@@ -79,6 +81,7 @@ export async function updatePegawaiAction(formData: FormData) {
   const statusKeluarga = (formData.get("statusKeluarga") as string)?.trim() || "TK/0";
   const ptkp = Number(formData.get("ptkp")) || 54000000;
   const gajiPokok = Number(formData.get("gajiPokok")) || 0;
+  const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
   const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
 
   if (!id || !nik || !nama) {
@@ -107,6 +110,7 @@ export async function updatePegawaiAction(formData: FormData) {
       statusKeluarga,
       ptkp,
       gajiPokok,
+      tunjanganJabatan,
       isActive,
     },
   });
@@ -157,16 +161,40 @@ export async function saveGajiBulananAction(formData: FormData) {
   const tahun = Number(formData.get("tahun"));
   const gajiPokok = Number(formData.get("gajiPokok")) || 0;
   const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
-  const tunjanganTransport = Number(formData.get("tunjanganTransport")) || 0;
+  const hariKerja = Number(formData.get("hariKerja")) || 0;
+  const tarifTransportHarian = Number(formData.get("tarifTransportHarian")) || 15000;
+  
+  // Otomatisasi Tunjangan Transport: jika tunjanganTransport manual kosong/0 tapi hariKerja diisi
+  let tunjanganTransport = Number(formData.get("tunjanganTransport"));
+  if (isNaN(tunjanganTransport) || tunjanganTransport === 0) {
+    if (hariKerja > 0) {
+      tunjanganTransport = hariKerja * tarifTransportHarian;
+    } else {
+      tunjanganTransport = 0;
+    }
+  }
+
   const insentif = Number(formData.get("insentif")) || 0;
+  const tunjanganBpjs = Number(formData.get("tunjanganBpjs")) || 0;
+  const tunjanganPph = Number(formData.get("tunjanganPph")) || 0;
+  const thr = Number(formData.get("thr")) || 0;
+
   const bpjsKesehatan = Number(formData.get("bpjsKesehatan")) || 0;
   const bpjsKetenagakerjaan = Number(formData.get("bpjsKetenagakerjaan")) || 0;
+  let potonganBpjs = Number(formData.get("potonganBpjs")) || 0;
+  if (potonganBpjs === 0 && (bpjsKesehatan > 0 || bpjsKetenagakerjaan > 0)) {
+    potonganBpjs = bpjsKesehatan + bpjsKetenagakerjaan;
+  }
+
   const potonganLain = Number(formData.get("potonganLain")) || 0;
   const pph21 = Number(formData.get("pph21")) || 0;
   const catatan = (formData.get("catatan") as string)?.trim() || null;
 
   if (!pegawaiId || !entityId || !bulan || !tahun) {
     throw new Error("Pegawai, Entitas, Bulan, dan Tahun wajib diisi.");
+  }
+  if (bulan < 1 || bulan > 12) {
+    throw new Error("Bulan harus antara 1 sampai 12.");
   }
 
   const pegawai = await prisma.pegawai.findUnique({
@@ -175,10 +203,17 @@ export async function saveGajiBulananAction(formData: FormData) {
   });
   if (!pegawai) throw new Error("Pegawai tidak ditemukan.");
 
-  const totalGajiKotor = gajiPokok + tunjanganJabatan + tunjanganTransport + insentif;
+  // Dual Total:
+  // 1. Total Gaji Kotor / Terlapor Pajak (Bruto SPT PPh 21)
+  const totalGajiKotor =
+    gajiPokok + tunjanganJabatan + tunjanganTransport + insentif + tunjanganBpjs + tunjanganPph + thr;
+  const totalGajiTerlaporPajak =
+    gajiPokok + tunjanganJabatan + tunjanganTransport + insentif + tunjanganBpjs + tunjanganPph + thr;
+
+  // 2. Total Gaji Bersih (Take Home Pay yang ditransfer riil ke karyawan)
   const totalGajiBersih = Math.max(
     0,
-    totalGajiKotor - bpjsKesehatan - bpjsKetenagakerjaan - potonganLain - pph21
+    gajiPokok + tunjanganJabatan + tunjanganTransport + insentif + thr - potonganBpjs - potonganLain - pph21
   );
 
   const gaji = await prisma.gajiPegawaiBulanan.upsert({
@@ -192,13 +227,20 @@ export async function saveGajiBulananAction(formData: FormData) {
     update: {
       gajiPokok,
       tunjanganJabatan,
+      hariKerja,
+      tarifTransportHarian,
       tunjanganTransport,
       insentif,
+      tunjanganBpjs,
+      tunjanganPph,
+      thr,
       bpjsKesehatan,
       bpjsKetenagakerjaan,
+      potonganBpjs,
       potonganLain,
       pph21,
       totalGajiKotor,
+      totalGajiTerlaporPajak,
       totalGajiBersih,
       catatan,
     },
@@ -209,13 +251,20 @@ export async function saveGajiBulananAction(formData: FormData) {
       tahun,
       gajiPokok,
       tunjanganJabatan,
+      hariKerja,
+      tarifTransportHarian,
       tunjanganTransport,
       insentif,
+      tunjanganBpjs,
+      tunjanganPph,
+      thr,
       bpjsKesehatan,
       bpjsKetenagakerjaan,
+      potonganBpjs,
       potonganLain,
       pph21,
       totalGajiKotor,
+      totalGajiTerlaporPajak,
       totalGajiBersih,
       catatan,
     },

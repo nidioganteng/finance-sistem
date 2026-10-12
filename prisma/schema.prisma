@@ -408,6 +408,7 @@ model Rekanan {
   npwp         String?     // NPWP resmi (15/16 digit)
   nik          String?     // NIK KTP (16 digit)
   tipe         RekananTipe @default(VENDOR)
+  ptkp         String?     @default("TK/0") // Status PTKP untuk Tenaga Ahli (TK/0, K/0, dll)
   kategori     String?     // Sub-kategori (Subkon, Konsultan, Dinas, Supplier, dll)
   alamat       String?     @db.Text
   telepon      String?

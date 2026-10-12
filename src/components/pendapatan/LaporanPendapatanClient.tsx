@@ -51,6 +51,7 @@ import {
 } from "@/lib/actions/pendapatan";
 import { searchRekananAction, type RekananItem } from "@/lib/actions/rekanan";
 import { formatRupiah } from "@/lib/dashboard-data";
+import { DatePicker } from "@/components/shared/DatePicker";
 
 interface Props {
   data: LaporanPendapatanData;
@@ -551,93 +552,74 @@ export function LaporanPendapatanClient({
   }`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* TOOLBAR: FILTERS & ACTIONS */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-surface-card p-3.5 sm:p-4 rounded-2xl border border-border-soft shadow-xs">
-        {/* Left: Filter Controls & Audit Status Badge */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Filter Pill: Tahun */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-subtle/80 border border-border-soft text-xs text-navy-text">
-            <Calendar className="w-3.5 h-3.5 text-navy-soft" />
-            <span className="font-medium text-navy-soft">Tahun:</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filter Tahun */}
+          <div className="flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text">
+            <Calendar size={13} className="text-muted-faint flex-none" />
+            <span className="text-muted font-medium">Tahun</span>
             <select
               value={data.year}
               onChange={(e) => handleFilterChange(undefined, Number(e.target.value))}
-              className="bg-transparent font-bold text-navy-text focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent font-bold text-navy-text focus:outline-none cursor-pointer"
             >
               {[2024, 2025, 2026, 2027].map((yr) => (
-                <option key={yr} value={yr} className="bg-surface-card text-navy-text">
-                  {yr}
-                </option>
+                <option key={yr} value={yr} className="bg-surface-card text-navy-text">{yr}</option>
               ))}
             </select>
           </div>
 
-          {/* Filter Pill: Masa Pajak */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-subtle/80 border border-border-soft text-xs text-navy-text">
-            <Filter className="w-3.5 h-3.5 text-navy-soft" />
-            <span className="font-medium text-navy-soft">Masa Pajak:</span>
+          {/* Filter Masa Pajak */}
+          <div className="flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text">
+            <Filter size={13} className="text-muted-faint flex-none" />
+            <span className="text-muted font-medium">Masa Pajak</span>
             <select
               value={data.masaPajak ?? ""}
-              onChange={(e) =>
-                handleFilterChange(
-                  undefined,
-                  undefined,
-                  e.target.value ? Number(e.target.value) : null
-                )
-              }
-              className="bg-transparent font-bold text-navy-text focus:outline-none cursor-pointer pr-1"
+              onChange={(e) => handleFilterChange(undefined, undefined, e.target.value ? Number(e.target.value) : null)}
+              className="bg-transparent font-bold text-navy-text focus:outline-none cursor-pointer"
             >
-              <option value="" className="bg-surface-card text-navy-text">Semua Masa (12 Bulan)</option>
+              <option value="" className="bg-surface-card text-navy-text">Semua (12 Bulan)</option>
               {NAMA_BULAN.map((m, idx) => (
-                <option key={idx + 1} value={idx + 1} className="bg-surface-card text-navy-text">
-                  Bulan {idx + 1} ({m})
-                </option>
+                <option key={idx + 1} value={idx + 1} className="bg-surface-card text-navy-text">{m}</option>
               ))}
             </select>
           </div>
 
-          <div className="h-5 w-px bg-border-soft hidden sm:block" />
-
-          {/* Audit SPT Status Badge */}
+          {/* Audit status badge */}
           {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>
-                <strong className="font-semibold text-navy-soft">Audit SPT:</strong> Match 100% Sesuai
-              </span>
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 text-[12px] font-semibold text-green-700 dark:text-green-400">
+              <CheckCircle2 size={13} className="text-green-600 dark:text-green-400 flex-none" />
+              Audit SPT: Match 100% Sesuai
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs">
-              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-              <span>
-                <strong className="font-semibold text-navy-soft">Audit SPT:</strong> {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih
-              </span>
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-[12px] font-semibold text-status-red">
+              <AlertTriangle size={13} className="text-status-red flex-none" />
+              {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih
             </div>
           )}
         </div>
 
-        {/* Right: Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <a
             href={exportUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-xs"
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-[10px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Ekspor Excel</span>
+            <FileSpreadsheet size={14} className="text-emerald-600 dark:text-emerald-400 flex-none" />
+            Ekspor Excel
           </a>
-
           {canEdit && (
             <button
               onClick={openCreateFakturModal}
-              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-xl bg-navy text-white hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 h-9 px-5 rounded-[10px] bg-navy text-white text-[12.5px] font-bold hover:opacity-90 transition-opacity cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Input E-Faktur</span>
+              <Plus size={14} />
+              Input E-Faktur
             </button>
           )}
         </div>
@@ -646,153 +628,117 @@ export function LaporanPendapatanClient({
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 6 KPI SUMMARY METRICS */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {/* KPI 1 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Nilai Proyek (111%)
-            </span>
-            <TrendingUp className="w-4 h-4 text-blue-500 shrink-0 ml-1" />
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="bg-surface-card border border-border-soft rounded-[18px] p-4 flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-none bg-blue-50 dark:bg-blue-500/20">
+            <TrendingUp size={17} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalNilaiProyekFmt}>
-            {data.kpiSummary.totalNilaiProyekFmt}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Nilai Proyek (111%)</p>
+            <p className="text-[17px] font-extrabold text-navy-text truncate leading-tight mt-0.5" title={data.kpiSummary.totalNilaiProyekFmt}>{data.kpiSummary.totalNilaiProyekFmt}</p>
+            <p className="text-[10.5px] text-muted-faint truncate mt-0.5">Pendapatan di Laba Rugi</p>
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            Diakui sebagai Pendapatan di Laba Rugi
-          </p>
         </div>
 
-        {/* KPI 2 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Total DPP
-            </span>
-            <FileText className="w-4 h-4 text-indigo-500 shrink-0 ml-1" />
+        <div className="bg-surface-card border border-border-soft rounded-[18px] p-4 flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-none bg-indigo-50 dark:bg-indigo-500/20">
+            <FileText size={17} className="text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalDppFmt}>
-            {data.kpiSummary.totalDppFmt}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Total DPP</p>
+            <p className="text-[17px] font-extrabold text-navy-text truncate leading-tight mt-0.5" title={data.kpiSummary.totalDppFmt}>{data.kpiSummary.totalDppFmt}</p>
+            <p className="text-[10.5px] text-muted-faint truncate mt-0.5">Nilai Lain: {data.totalPeriod.dppNilaiLainFmt}</p>
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            DPP Nilai Lain: {data.totalPeriod.dppNilaiLainFmt}
-          </p>
         </div>
 
-        {/* KPI 3 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Kewajiban Pajak
-            </span>
-            <Receipt className="w-4 h-4 text-purple-500 shrink-0 ml-1" />
+        <div className="bg-surface-card border border-border-soft rounded-[18px] p-4 flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-none bg-purple-50 dark:bg-purple-500/20">
+            <Receipt size={17} className="text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalPajakFmt}>
-            {data.kpiSummary.totalPajakFmt}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Kewajiban Pajak</p>
+            <p className="text-[17px] font-extrabold text-navy-text truncate leading-tight mt-0.5" title={data.kpiSummary.totalPajakFmt}>{data.kpiSummary.totalPajakFmt}</p>
+            <p className="text-[10.5px] text-muted-faint truncate mt-0.5">PPN: {data.totalPeriod.ppnFmt} | PPh: {data.totalPeriod.pphFmt}</p>
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            PPN: {data.totalPeriod.ppnFmt} | PPh: {data.totalPeriod.pphFmt}
-          </p>
         </div>
 
-        {/* KPI 4 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Laba Stlh Pajak
-            </span>
-            <Wallet className="w-4 h-4 text-emerald-500 shrink-0 ml-1" />
+        <div className="bg-surface-card border border-border-soft rounded-[18px] p-4 flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-none bg-emerald-50 dark:bg-emerald-500/20">
+            <Wallet size={17} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate" title={data.kpiSummary.totalLabaSetelahPajakFmt}>
-            {data.kpiSummary.totalLabaSetelahPajakFmt}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Laba Stlh Pajak</p>
+            <p className="text-[17px] font-extrabold text-emerald-600 dark:text-emerald-400 truncate leading-tight mt-0.5" title={data.kpiSummary.totalLabaSetelahPajakFmt}>{data.kpiSummary.totalLabaSetelahPajakFmt}</p>
+            <p className="text-[10.5px] text-muted-faint truncate mt-0.5">Margin bersih setelah pajak</p>
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            Margin bersih setelah PPN & PPh
-          </p>
         </div>
 
-        {/* KPI 5 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Total Dana Cair
-            </span>
-            <Building2 className="w-4 h-4 text-sky-500 shrink-0 ml-1" />
+        <div className="bg-surface-card border border-border-soft rounded-[18px] p-4 flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-none bg-sky-50 dark:bg-sky-500/20">
+            <Building2 size={17} className="text-sky-600 dark:text-sky-400" />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalNominalDiterimaFmt}>
-            {data.kpiSummary.totalNominalDiterimaFmt}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Total Dana Cair</p>
+            <p className="text-[17px] font-extrabold text-navy-text truncate leading-tight mt-0.5" title={data.kpiSummary.totalNominalDiterimaFmt}>{data.kpiSummary.totalNominalDiterimaFmt}</p>
+            <p className="text-[10.5px] text-muted-faint truncate mt-0.5">{data.totalPeriod.jumlahFaktur} faktur tercatat</p>
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            {data.totalPeriod.jumlahFaktur} faktur tercatat
-          </p>
         </div>
 
-        {/* KPI 6 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Audit SPT Pajak
-            </span>
-            <Scale className="w-4 h-4 text-amber-500 shrink-0 ml-1" />
+        <div className="bg-surface-card border border-border-soft rounded-[18px] p-4 flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center flex-none ${data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? "bg-emerald-50 dark:bg-emerald-500/20" : "bg-amber-50 dark:bg-amber-500/20"}`}>
+            <Scale size={17} className={data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"} />
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? "Match 100%" : `${data.kpiSummary.jumlahBulanSelisih} Bulan Beda`}>
-            {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
-              <span className="text-emerald-600 dark:text-emerald-400">Match 100%</span>
-            ) : (
-              <span className="text-rose-600 dark:text-rose-400">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>
-            )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Audit SPT Pajak</p>
+            <p className="text-[17px] font-extrabold truncate leading-tight mt-0.5">
+              {data.kpiSummary.statusAudit === "SEMUA_SESUAI"
+                ? <span className="text-emerald-600 dark:text-emerald-400">Match 100%</span>
+                : <span className="text-status-red">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>}
+            </p>
+            <p className="text-[10.5px] text-muted-faint truncate mt-0.5">Selisih: {data.kpiSummary.totalSelisihPajakFmt}</p>
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            Selisih Pajak: {data.kpiSummary.totalSelisihPajakFmt}
-          </p>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 3 LAYER TABS NAVIGATION */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex border-b border-border-soft bg-surface-card rounded-t-2xl px-4 pt-2">
+      <div className="flex items-center gap-1.5 p-1 bg-surface-subtle rounded-[14px] w-fit">
         <button
           onClick={() => setActiveTab("faktur")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === "faktur"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-navy-soft hover:text-navy-text"
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12.5px] font-semibold transition-colors ${
+            activeTab === "faktur" ? "bg-navy text-white shadow-sm" : "text-muted-stronger hover:bg-surface-hover"
           }`}
         >
-          <Receipt className="w-4 h-4" />
-          <span>Lapis 1: Daftar E-Faktur & Total Periode</span>
-          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
-            {filteredFaktur.length}
-          </span>
+          <Receipt size={13} className="flex-none" />
+          Lapis 1: E-Faktur
+          <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
+            activeTab === "faktur" ? "bg-white/20 text-white" : "bg-surface-card text-muted-stronger"
+          }`}>{filteredFaktur.length}</span>
         </button>
 
         <button
           onClick={() => setActiveTab("rekap-bulanan")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === "rekap-bulanan"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-navy-soft hover:text-navy-text"
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12.5px] font-semibold transition-colors ${
+            activeTab === "rekap-bulanan" ? "bg-navy text-white shadow-sm" : "text-muted-stronger hover:bg-surface-hover"
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Lapis 2: Rekap Bulanan (Jan - Des)</span>
+          <Layers size={13} className="flex-none" />
+          Lapis 2: Rekap Bulanan
         </button>
 
         <button
           onClick={() => setActiveTab("rekonsiliasi")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === "rekonsiliasi"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-navy-soft hover:text-navy-text"
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12.5px] font-semibold transition-colors ${
+            activeTab === "rekonsiliasi" ? "bg-navy text-white shadow-sm" : "text-muted-stronger hover:bg-surface-hover"
           }`}
         >
-          <Scale className="w-4 h-4" />
-          <span>Lapis 3: Rekonsiliasi Audit Pajak (Faktur vs SPT)</span>
+          <Scale size={13} className="flex-none" />
+          Lapis 3: Rekonsiliasi
           {data.kpiSummary.jumlahBulanSelisih > 0 && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold">
-              {data.kpiSummary.jumlahBulanSelisih}
-            </span>
+            <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
+              activeTab === "rekonsiliasi" ? "bg-white/20 text-white" : "bg-red-100 dark:bg-red-500/20 text-status-red"
+            }`}>{data.kpiSummary.jumlahBulanSelisih}</span>
           )}
         </button>
       </div>
@@ -801,7 +747,7 @@ export function LaporanPendapatanClient({
       {/* TAB 1: LAPIS 1 - DAFTAR E-FAKTUR & TOTAL PERIODE */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "faktur" && (
-        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 space-y-4">
           {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-80">
@@ -928,27 +874,27 @@ export function LaporanPendapatanClient({
                       <td className="p-3 text-right font-mono text-navy-soft">
                         {f.dppNilaiLainFmt}
                       </td>
-                      <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
+                      <td className="p-3 text-right font-mono text-muted-stronger" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
                         {f.ppnFmt}
                         {f.isRealized && f.tarifPpnPersen !== 12 && (
-                          <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPpnPersen}%)</span>
+                          <span className="ml-1 text-[10px] text-muted-faint font-sans">({f.tarifPpnPersen}%)</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
+                      <td className="p-3 text-right font-mono text-muted-stronger" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
                         {f.pphFmt}
                         {f.isRealized && f.tarifPphPersen !== 3.5 && (
-                          <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPphPersen}%)</span>
+                          <span className="ml-1 text-[10px] text-muted-faint font-sans">({f.tarifPphPersen}%)</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-500/10">
+                      <td className="p-3 text-right font-mono font-bold text-navy-text">
                         {f.nilaiProyekFmt}
                       </td>
-                      <td className="p-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/10">
+                      <td className="p-3 text-right font-mono font-semibold text-status-green">
                         {f.labaSetelahPajakFmt}
                       </td>
                       <td className="p-3 text-right font-mono font-medium">
                         {f.isRealized ? (
-                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{f.nominalDiterimaFmt}</span>
+                          <span className="text-navy-text font-semibold">{f.nominalDiterimaFmt}</span>
                         ) : (
                           <span className="text-muted-faint text-[11px] italic">Belum Cair</span>
                         )}
@@ -1081,18 +1027,10 @@ export function LaporanPendapatanClient({
                   <td className="p-3 text-right font-mono text-navy-soft">
                     {data.totalPeriod.dppNilaiLainFmt}
                   </td>
-                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                    {data.totalPeriod.ppnFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                    {data.totalPeriod.pphFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/15">
-                    {data.totalPeriod.nilaiProyekFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-500/15">
-                    {data.totalPeriod.labaSetelahPajakFmt}
-                  </td>
+                  <td className="p-3 text-right font-mono">{data.totalPeriod.ppnFmt}</td>
+                  <td className="p-3 text-right font-mono">{data.totalPeriod.pphFmt}</td>
+                  <td className="p-3 text-right font-mono">{data.totalPeriod.nilaiProyekFmt}</td>
+                  <td className="p-3 text-right font-mono text-status-green">{data.totalPeriod.labaSetelahPajakFmt}</td>
                   <td className="p-3 text-right font-mono">
                     {data.totalPeriod.nominalDiterimaFmt}
                   </td>
@@ -1108,7 +1046,7 @@ export function LaporanPendapatanClient({
       {/* TAB 2: LAPIS 2 - REKAP BULANAN */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "rekap-bulanan" && (
-        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-navy-text">
@@ -1177,18 +1115,10 @@ export function LaporanPendapatanClient({
                     <td className="p-3 text-right font-mono text-navy-soft">
                       {b.dppNilaiLainFmt}
                     </td>
-                    <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                      {b.ppnFmt}
-                    </td>
-                    <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                      {b.pphFmt}
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-500/10">
-                      {b.nilaiProyekFmt}
-                    </td>
-                    <td className="p-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/10">
-                      {b.labaSetelahPajakFmt}
-                    </td>
+                    <td className="p-3 text-right font-mono text-muted-stronger">{b.ppnFmt}</td>
+                    <td className="p-3 text-right font-mono text-muted-stronger">{b.pphFmt}</td>
+                    <td className="p-3 text-right font-mono font-bold text-navy-text">{b.nilaiProyekFmt}</td>
+                    <td className="p-3 text-right font-mono font-semibold text-status-green">{b.labaSetelahPajakFmt}</td>
                     <td className="p-3 text-right font-mono">
                       {b.nominalDiterimaFmt}
                     </td>
@@ -1221,18 +1151,10 @@ export function LaporanPendapatanClient({
                   <td className="p-3 text-right font-mono text-navy-soft">
                     {data.totalTahunanRekap.dppNilaiLainFmt}
                   </td>
-                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                    {data.totalTahunanRekap.ppnFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                    {data.totalTahunanRekap.pphFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/15">
-                    {data.totalTahunanRekap.nilaiProyekFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-500/15">
-                    {data.totalTahunanRekap.labaSetelahPajakFmt}
-                  </td>
+                  <td className="p-3 text-right font-mono">{data.totalTahunanRekap.ppnFmt}</td>
+                  <td className="p-3 text-right font-mono">{data.totalTahunanRekap.pphFmt}</td>
+                  <td className="p-3 text-right font-mono">{data.totalTahunanRekap.nilaiProyekFmt}</td>
+                  <td className="p-3 text-right font-mono text-status-green">{data.totalTahunanRekap.labaSetelahPajakFmt}</td>
                   <td className="p-3 text-right font-mono">
                     {data.totalTahunanRekap.nominalDiterimaFmt}
                   </td>
@@ -1248,7 +1170,7 @@ export function LaporanPendapatanClient({
       {/* TAB 3: LAPIS 3 - REKONSILIASI AUDIT PAJAK (FAKTUR VS SPT) */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "rekonsiliasi" && (
-        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+        <div className="bg-surface-card rounded-[20px] border border-border-soft p-5 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 p-4 rounded-xl bg-surface-subtle border border-border-soft">
             <div className="flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
@@ -1281,16 +1203,16 @@ export function LaporanPendapatanClient({
                   <th className="p-3 text-center w-10">Bulan</th>
                   <th className="p-3">Nama Masa</th>
                   <th className="p-3 text-right">DPP Rekap Faktur</th>
-                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">DPP Terlapor (SPT)</th>
+                  <th className="p-3 text-right">DPP Terlapor (SPT)</th>
                   <th className="p-3 text-right">Selisih DPP</th>
                   <th className="p-3 text-right">PPN Rekap Faktur</th>
-                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">PPN Terlapor (SPT)</th>
+                  <th className="p-3 text-right">PPN Terlapor (SPT)</th>
                   <th className="p-3 text-right">Selisih PPN</th>
                   <th className="p-3 text-right">PPh Rekap Faktur</th>
-                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">PPh Terlapor (SPT)</th>
+                  <th className="p-3 text-right">PPh Terlapor (SPT)</th>
                   <th className="p-3 text-right">Selisih PPh</th>
                   <th className="p-3 text-right">Total Pajak Rekap</th>
-                  <th className="p-3 text-right bg-blue-50/50 dark:bg-blue-500/10">Total Pajak SPT</th>
+                  <th className="p-3 text-right">Total Pajak SPT</th>
                   <th className="p-3 text-right">Selisih Total Pajak</th>
                   <th className="p-3 text-center">Status Audit</th>
                   <th className="p-3">Catatan / Tindak Lanjut</th>
@@ -1301,11 +1223,7 @@ export function LaporanPendapatanClient({
                 {data.rekonsiliasiList.map((rec) => {
                   const isMatch = rec.status === "MATCH";
                   const isUnreported = rec.status === "BELUM_DILAPORKAN";
-                  const rowAlertBg = isMatch
-                    ? ""
-                    : isUnreported
-                    ? "bg-amber-50/30 dark:bg-amber-500/10"
-                    : "bg-rose-50/40 dark:bg-rose-500/10";
+                  const rowAlertBg = !isMatch && !isUnreported ? "bg-rose-50/40 dark:bg-rose-500/10" : "";
 
                   return (
                     <tr
@@ -1318,63 +1236,29 @@ export function LaporanPendapatanClient({
                       <td className="p-3 font-semibold text-navy-text">
                         {rec.namaBulan}
                       </td>
+                      <td className="p-3 text-right font-mono text-muted-stronger">{rec.dppRekapFmt}</td>
+                      <td className="p-3 text-right font-mono text-navy-text">{rec.dppTerlaporFmt}</td>
                       <td className="p-3 text-right font-mono">
-                        {rec.dppRekapFmt}
-                      </td>
-                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
-                        {rec.dppTerlaporFmt}
-                      </td>
-                      <td className="p-3 text-right font-mono">
-                        <span
-                          className={`font-semibold ${
-                            Math.abs(rec.selisihDpp) > 0.01
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}
-                        >
+                        <span className={`font-semibold ${Math.abs(rec.selisihDpp) > 0.01 ? "text-status-red" : "text-muted-stronger"}`}>
                           {rec.selisihDppFmt}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                        {rec.ppnRekapFmt}
-                      </td>
-                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
-                        {rec.pajakTerlaporFmt}
-                      </td>
+                      <td className="p-3 text-right font-mono text-muted-stronger">{rec.ppnRekapFmt}</td>
+                      <td className="p-3 text-right font-mono text-navy-text">{rec.pajakTerlaporFmt}</td>
                       <td className="p-3 text-right font-mono">
-                        <span
-                          className={`font-semibold ${
-                            Math.abs(rec.selisihPajak) > 0.01
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}
-                        >
+                        <span className={`font-semibold ${Math.abs(rec.selisihPajak) > 0.01 ? "text-status-red" : "text-muted-stronger"}`}>
                           {rec.selisihPajakFmt}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                        {rec.pphRekapFmt}
-                      </td>
-                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
-                        {rec.pphTerlaporFmt}
-                      </td>
+                      <td className="p-3 text-right font-mono text-muted-stronger">{rec.pphRekapFmt}</td>
+                      <td className="p-3 text-right font-mono text-navy-text">{rec.pphTerlaporFmt}</td>
                       <td className="p-3 text-right font-mono">
-                        <span
-                          className={`font-semibold ${
-                            Math.abs(rec.selisihPph) > 0.01
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}
-                        >
+                        <span className={`font-semibold ${Math.abs(rec.selisihPph) > 0.01 ? "text-status-red" : "text-muted-stronger"}`}>
                           {rec.selisihPphFmt}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono font-medium">
-                        {rec.totalPajakRekapFmt}
-                      </td>
-                      <td className="p-3 text-right font-mono font-semibold bg-blue-50/30 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
-                        {rec.totalPajakTerlaporFmt}
-                      </td>
+                      <td className="p-3 text-right font-mono text-muted-stronger">{rec.totalPajakRekapFmt}</td>
+                      <td className="p-3 text-right font-mono text-navy-text">{rec.totalPajakTerlaporFmt}</td>
                       <td className="p-3 text-right font-mono">
                         <span
                           className={`font-semibold ${
@@ -1427,71 +1311,31 @@ export function LaporanPendapatanClient({
                   <td colSpan={2} className="p-3 text-center uppercase tracking-wider">
                     Total Setahun
                   </td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.dppRekap)}</td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.dppTerlapor)}</td>
                   <td className="p-3 text-right font-mono">
-                    {formatRupiah(rekonTotals.dppRekap)}
-                  </td>
-                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
-                    {formatRupiah(rekonTotals.dppTerlapor)}
-                  </td>
-                  <td className="p-3 text-right font-mono">
-                    <span
-                      className={
-                        Math.abs(rekonTotals.selisihDpp) > 0.01
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }
-                    >
+                    <span className={Math.abs(rekonTotals.selisihDpp) > 0.01 ? "text-status-red" : ""}>
                       {formatRupiah(rekonTotals.selisihDpp)}
                     </span>
                   </td>
-                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                    {formatRupiah(rekonTotals.ppnRekap)}
-                  </td>
-                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
-                    {formatRupiah(rekonTotals.pajakTerlapor)}
-                  </td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.ppnRekap)}</td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.pajakTerlapor)}</td>
                   <td className="p-3 text-right font-mono">
-                    <span
-                      className={
-                        Math.abs(rekonTotals.selisihPajak) > 0.01
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }
-                    >
+                    <span className={Math.abs(rekonTotals.selisihPajak) > 0.01 ? "text-status-red" : ""}>
                       {formatRupiah(rekonTotals.selisihPajak)}
                     </span>
                   </td>
-                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                    {formatRupiah(rekonTotals.pphRekap)}
-                  </td>
-                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
-                    {formatRupiah(rekonTotals.pphTerlapor)}
-                  </td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.pphRekap)}</td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.pphTerlapor)}</td>
                   <td className="p-3 text-right font-mono">
-                    <span
-                      className={
-                        Math.abs(rekonTotals.selisihPph) > 0.01
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }
-                    >
+                    <span className={Math.abs(rekonTotals.selisihPph) > 0.01 ? "text-status-red" : ""}>
                       {formatRupiah(rekonTotals.selisihPph)}
                     </span>
                   </td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.totalPajakRekap)}</td>
+                  <td className="p-3 text-right font-mono">{formatRupiah(rekonTotals.totalPajakTerlapor)}</td>
                   <td className="p-3 text-right font-mono">
-                    {formatRupiah(rekonTotals.totalPajakRekap)}
-                  </td>
-                  <td className="p-3 text-right font-mono bg-blue-100/50 dark:bg-blue-500/15 text-blue-900 dark:text-blue-200">
-                    {formatRupiah(rekonTotals.totalPajakTerlapor)}
-                  </td>
-                  <td className="p-3 text-right font-mono">
-                    <span
-                      className={
-                        Math.abs(rekonTotals.selisihTotalPajak) > 0.01
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }
-                    >
+                    <span className={Math.abs(rekonTotals.selisihTotalPajak) > 0.01 ? "text-status-red" : ""}>
                       {formatRupiah(rekonTotals.selisihTotalPajak)}
                     </span>
                   </td>
@@ -1532,7 +1376,7 @@ export function LaporanPendapatanClient({
                     {editingFaktur ? "Edit E-Faktur Pendapatan" : "Input E-Faktur Baru"}
                   </h3>
                   <p className="text-xs text-navy-soft">
-                    {data.entity.legalName} • Tahun {formFaktur.tahunPajak}
+                    {data.entity.name} • Tahun {formFaktur.tahunPajak}
                   </p>
                 </div>
               </div>
@@ -1556,10 +1400,10 @@ export function LaporanPendapatanClient({
               )}
 
               {/* Form Section 1: Kode Proyek dari Sidamon */}
-              <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 space-y-2">
+              <div className="p-4 rounded-xl bg-surface-subtle border border-border-soft space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-navy-text flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-blue-600" />
+                    <Building2 className="w-4 h-4 text-muted-faint" />
                     Pilih Kode Proyek (Master Proyek Sidamon)
                   </label>
                   {formFaktur.projectId && (
@@ -1598,7 +1442,7 @@ export function LaporanPendapatanClient({
                   }}
                   className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                 >
-                  <option value="">-- Pilih Kode Proyek yang Sesuai --</option>
+                  <option value="">Pilih Kode Proyek</option>
                   {data.projectOptions.map((p) => (
                     <option key={p.id} value={p.id}>
                       [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
@@ -1610,7 +1454,7 @@ export function LaporanPendapatanClient({
                     const sel = data.projectOptions.find((x) => x.id === formFaktur.projectId);
                     return sel ? (
                       <div className="space-y-2.5 pt-1">
-                        <div className="text-[11px] text-blue-800 dark:text-blue-300 bg-surface-input p-2.5 rounded-lg border border-blue-100 dark:border-blue-500/20 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                        <div className="text-[11px] text-muted-stronger bg-surface-input p-2.5 rounded-lg border border-border-soft flex flex-wrap items-center justify-between gap-2">
                           <span>
                             Kode Proyek: <strong className="font-mono">{sel.code}</strong> • {sel.name}
                           </span>
@@ -1621,22 +1465,22 @@ export function LaporanPendapatanClient({
 
                         {/* Dropdown Termin untuk Sinkronisasi DPP */}
                         {sel.termins && sel.termins.length > 0 ? (
-                          <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-500/10 border border-emerald-200/90 dark:border-emerald-500/20 space-y-2">
+                          <div className="p-3 rounded-xl bg-surface-subtle border border-border-soft space-y-2">
                             <div className="flex items-center justify-between">
-                              <label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Pilih Termin Proyek (Sumber Otomatis Nilai DPP)</span>
+                              <label className="text-xs font-bold text-navy-text flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-muted-faint" />
+                                <span>Pilih Termin Proyek (Sumber Otomatis DPP)</span>
                               </label>
-                              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 px-2 py-0.5 rounded-full font-semibold">
-                                {sel.termins.length} Termin Terdaftar
+                              <span className="text-[10px] bg-surface-card text-muted-stronger px-2 py-0.5 rounded-full font-semibold border border-border-soft">
+                                {sel.termins.length} Termin
                               </span>
                             </div>
                             <select
                               value={selectedTerminId}
                               onChange={(e) => handleSelectTermin(e.target.value)}
-                              className="w-full px-3 py-2 text-xs border border-emerald-300 dark:border-emerald-500/40 rounded-lg bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold cursor-pointer"
+                              className="w-full px-3 py-2 text-xs border border-border-soft rounded-lg bg-surface-input text-navy-text focus:outline-none focus:border-brand font-semibold cursor-pointer"
                             >
-                              <option value="">-- Pilih Termin yang Ditagihkan --</option>
+                              <option value="">Pilih Termin</option>
                               {sel.termins.map((t) => (
                                 <option key={t.id} value={t.id}>
                                   {t.name} ({t.percentage}% Kontrak) — {t.nominalFmt}
@@ -1645,20 +1489,13 @@ export function LaporanPendapatanClient({
                               <option value="manual">Input Nilai DPP Manual (Tanpa Termin)</option>
                             </select>
                             {selectedTermin ? (
-                              <div className="text-[11px] text-emerald-900 dark:text-emerald-300 bg-surface-input p-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                  <span>
-                                    Nilai Termin: <strong className="font-mono">{selectedTermin.nominalFmt}</strong> ({selectedTermin.percentage}% dari nilai kontrak)
-                                  </span>
-                                </span>
-                                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-1.5 py-0.5 rounded">
-                                  DPP otomatis tersinkron
-                                </span>
+                              <div className="text-[11px] text-muted-stronger bg-surface-input p-2 rounded-lg border border-border-soft flex flex-wrap items-center justify-between gap-2">
+                                <span>Nilai Termin: <strong className="font-mono text-navy-text">{selectedTermin.nominalFmt}</strong> ({selectedTermin.percentage}% kontrak)</span>
+                                <span className="text-[10px] font-semibold text-status-green">DPP tersinkron</span>
                               </div>
                             ) : (
-                              <p className="text-[11px] text-emerald-800 dark:text-emerald-300">
-                                Pilih termin yang sedang ditagihkan agar nilai DPP & DPP Nilai Lain langsung terisi otomatis sesuai termin di Finance.
+                              <p className="text-[11px] text-muted-faint">
+                                Pilih termin agar DPP & DPP Nilai Lain terisi otomatis.
                               </p>
                             )}
                           </div>
@@ -1800,7 +1637,7 @@ export function LaporanPendapatanClient({
                       }}
                       className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                     >
-                      <option value="">-- Pilih dari Master Rekanan --</option>
+                      <option value="">Pilih Rekanan</option>
                       {data.rekananOptions && data.rekananOptions.length > 0 && (
                         <optgroup label="Master Rekanan">
                           {data.rekananOptions.map((r) => (
@@ -1856,9 +1693,7 @@ export function LaporanPendapatanClient({
                     <label className="text-xs font-semibold text-navy-text">
                       Nama Rekanan / Klien <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-[10px] text-navy-soft">
-                      Auto-Fill Rekanan
-                    </span>
+                    <span className="text-[10px] text-navy-soft">Auto-Fill</span>
                   </div>
                   <input
                     type="text"
@@ -1925,112 +1760,55 @@ export function LaporanPendapatanClient({
               </div>
 
               {/* Form Section 3: Tax Rates & DPP Inputs */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-surface-subtle/50 border border-border-soft space-y-4">
-                {/* Header Section with Title & Explanation */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-border-soft">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                      <Calculator className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-navy-text uppercase tracking-wider">
-                        Parameter Nilai & Perhitungan Pajak Otomatis
-                      </h4>
-                      <p className="text-[11px] text-navy-soft">
-                        Masukkan nilai termin dan tentukan tarif. Pajak dan laba bersih dihitung otomatis secara real-time.
-                      </p>
-                    </div>
+              <div className="p-4 rounded-[14px] bg-surface-subtle border border-border-soft space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-border-soft">
+                  <Calculator size={14} className="text-muted-faint flex-none" />
+                  <div>
+                    <h4 className="text-[12px] font-bold text-navy-text">Parameter Nilai & Perhitungan Pajak</h4>
+                    <p className="text-[11px] text-muted-faint">Tarif & DPP — pajak dihitung otomatis real-time</p>
                   </div>
                 </div>
 
-                {/* 1. KASUS TERSEDIA TERMIN: Tampilan Nilai DPP Otomatis (Tanpa Input Box) */}
+                {/* 1. KASUS TERSEDIA TERMIN */}
                 {selectedTermin && (
-                  <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/90 dark:border-emerald-800/60 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-2 text-emerald-950 dark:text-emerald-200 font-bold">
-                        <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Nilai DPP Otomatis Tersinkron dari {selectedTermin.name}</span>
-                      </div>
-                      <span className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold self-start sm:self-auto">
-                        Otomatis Tanpa Input Manual
-                      </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-[10px] bg-surface-card border border-border-soft space-y-1">
+                      <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider">DPP Dasar (Nilai Termin)</p>
+                      <p className="text-[17px] font-extrabold font-mono text-navy-text">{selectedTermin.nominalFmt}</p>
+                      <p className="text-[10.5px] text-muted-faint">Basis PPh Final {formFaktur.tarifPphPersen}% · {selectedTermin.percentage}% kontrak</p>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Card DPP Dasar */}
-                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-navy-text">DPP Dasar (Nilai Termin)</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded">
-                            Basis PPh Final ({formFaktur.tarifPphPersen}%)
-                          </span>
-                        </div>
-                        <div className="text-xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                          {selectedTermin.nominalFmt}
-                        </div>
-                        <span className="text-[11px] text-navy-soft block">
-                          Sesuai termin keluar ({selectedTermin.percentage}% dari nilai kontrak)
-                        </span>
-                      </div>
-
-                      {/* Card DPP Nilai Lain */}
-                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-navy-text">DPP Nilai Lain</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded">
-                            Basis PPN ({formFaktur.tarifPpnPersen}%)
-                          </span>
-                        </div>
-                        <div className="text-xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                          {selectedTermin.nominalFmt}
-                        </div>
-                        <span className="text-[11px] text-navy-soft block">
-                          Otomatis disamakan dengan DPP Dasar termin
-                        </span>
-                      </div>
+                    <div className="p-3.5 rounded-[10px] bg-surface-card border border-border-soft space-y-1">
+                      <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider">DPP Nilai Lain</p>
+                      <p className="text-[17px] font-extrabold font-mono text-navy-text">{selectedTermin.nominalFmt}</p>
+                      <p className="text-[10.5px] text-muted-faint">Basis PPN {formFaktur.tarifPpnPersen}% · otomatis dari termin</p>
                     </div>
                   </div>
                 )}
 
-                {/* 2. KASUS BELUM PILIH TERMIN: Informasi untuk memilih termin */}
+                {/* 2. KASUS BELUM PILIH TERMIN */}
                 {!selectedTermin && !showManualDppFallback && (
-                  <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold">Nilai DPP Tidak Perlu Diinput di Sini</span>
-                        <p className="text-blue-800 dark:text-blue-300 text-[11.5px] mt-0.5 leading-relaxed">
-                          Sistem akan mengambil nilai DPP secara otomatis dari termin proyek. Silakan pilih <strong>Kode Proyek</strong> dan <strong>Termin</strong> pada bagian atas formulir. Nilai DPP, PPh, PPN, dan laba setelah pajak akan langsung terisi otomatis.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-blue-700 dark:text-blue-400">Tidak ada data termin atau bukan faktur berbasis proyek?</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualDppFallback(true)}
-                        className="font-semibold text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-200 underline cursor-pointer"
-                      >
-                        Buka Opsi Input Manual
+                  <div className="p-3.5 rounded-[10px] bg-surface-card border border-border-soft text-[12px] text-muted-stronger flex items-start gap-2.5">
+                    <Info size={14} className="text-muted-faint flex-none mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-navy-text">DPP diambil otomatis dari Termin</p>
+                      <p className="text-muted-faint text-[11px] mt-0.5">Pilih Kode Proyek dan Termin di atas agar DPP, PPh, PPN terisi otomatis.</p>
+                      <button type="button" onClick={() => setShowManualDppFallback(true)} className="text-[11px] font-semibold text-muted-stronger underline mt-1.5 cursor-pointer hover:text-navy-text">
+                        Input DPP manual
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* 3. KASUS FALLBACK INPUT MANUAL (Hanya jika belum pilih termin & klik opsi manual) */}
+                {/* 3. FALLBACK INPUT MANUAL */}
                 {!selectedTermin && showManualDppFallback && (
-                  <div className="p-3.5 rounded-xl bg-surface-card border border-amber-200 dark:border-amber-800/60 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        Mode Input DPP Manual (Khusus Non-Termin)
+                  <div className="p-3.5 rounded-[10px] bg-surface-card border border-border-soft space-y-3">
+                    <div className="flex items-center justify-between text-[12px]">
+                      <span className="font-semibold text-navy-text flex items-center gap-1.5">
+                        <Info size={13} className="text-muted-faint" />
+                        Input DPP Manual
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualDppFallback(false)}
-                        className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline cursor-pointer"
-                      >
-                        Tutup Input Manual
+                      <button type="button" onClick={() => setShowManualDppFallback(false)} className="text-[11px] text-muted-faint hover:text-navy-text underline cursor-pointer">
+                        Tutup
                       </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2202,85 +1980,27 @@ export function LaporanPendapatanClient({
                   </div>
                 </div>
 
-                {/* Sub-grid 3: Live Automatic Calculation Summary Cards */}
-                <div className="pt-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
-                    <span className="text-[11px] font-bold text-navy-soft uppercase tracking-wider">
-                      Estimasi Tagihan & Potensi Pajak:
-                    </span>
-                    <div className="inline-flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 font-medium">
-                      <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>Di laporan, kolom PPN & PPh otomatis kosong (-) sampai uang cair di Jurnal Umum</span>
-                    </div>
+                {/* Sub-grid 3: Live Calculation Summary */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                  <div className="p-3 rounded-[10px] bg-surface-card border border-border-soft min-w-0">
+                    <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">PPN Dipungut</p>
+                    <p className="text-[15px] font-extrabold font-mono text-navy-text truncate mt-0.5" title={formatRupiah(liveCalc.ppn)}>{formatRupiah(liveCalc.ppn)}</p>
+                    <p className="text-[10px] text-muted-faint mt-0.5 truncate">{formFaktur.tarifPpnPersen}% × DPP Nilai Lain</p>
                   </div>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* Card 1: PPN */}
-                    <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-purple-700 dark:text-purple-300 mb-1">
-                        <span className="text-[11px] font-semibold truncate">PPN Dipungut</span>
-                        <Receipt className="w-3.5 h-3.5 shrink-0 ml-1" />
-                      </div>
-                      <div
-                        className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-purple-800 dark:text-purple-200 truncate block"
-                        title={formatRupiah(liveCalc.ppn)}
-                      >
-                        {formatRupiah(liveCalc.ppn)}
-                      </div>
-                      <span className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 block truncate">
-                        {formFaktur.tarifPpnPersen}% × DPP Nilai Lain
-                      </span>
-                    </div>
-
-                    {/* Card 2: PPh */}
-                    <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-amber-700 dark:text-amber-300 mb-1">
-                        <span className="text-[11px] font-semibold truncate">PPh Dipotong</span>
-                        <FileText className="w-3.5 h-3.5 shrink-0 ml-1" />
-                      </div>
-                      <div
-                        className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-amber-800 dark:text-amber-200 truncate block"
-                        title={formatRupiah(liveCalc.pph)}
-                      >
-                        {formatRupiah(liveCalc.pph)}
-                      </div>
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 block truncate">
-                        {formFaktur.tarifPphPersen}% × DPP Dasar
-                      </span>
-                    </div>
-
-                    {/* Card 3: Nilai Proyek */}
-                    <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 mb-1">
-                        <span className="text-[11px] font-semibold truncate">Nilai Proyek (111%)</span>
-                        <TrendingUp className="w-3.5 h-3.5 shrink-0 ml-1" />
-                      </div>
-                      <div
-                        className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-blue-800 dark:text-blue-200 truncate block"
-                        title={formatRupiah(liveCalc.nilaiProyek)}
-                      >
-                        {formatRupiah(liveCalc.nilaiProyek)}
-                      </div>
-                      <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 block truncate">
-                        Diakui Pendapatan Laba Rugi
-                      </span>
-                    </div>
-
-                    {/* Card 4: Laba Bersih Setelah Pajak */}
-                    <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/60 shadow-xs min-w-0 overflow-hidden flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-300 mb-1">
-                        <span className="text-[11px] font-bold truncate">Laba Stlh Pajak</span>
-                        <Wallet className="w-3.5 h-3.5 shrink-0 ml-1" />
-                      </div>
-                      <div
-                        className="text-xs sm:text-[13px] md:text-sm font-extrabold font-mono tracking-tight text-emerald-800 dark:text-emerald-200 truncate block"
-                        title={formatRupiah(liveCalc.labaSetelahPajak)}
-                      >
-                        {formatRupiah(liveCalc.labaSetelahPajak)}
-                      </div>
-                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 block font-medium truncate">
-                        DPP Dasar − PPh Final
-                      </span>
-                    </div>
+                  <div className="p-3 rounded-[10px] bg-surface-card border border-border-soft min-w-0">
+                    <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">PPh Dipotong</p>
+                    <p className="text-[15px] font-extrabold font-mono text-navy-text truncate mt-0.5" title={formatRupiah(liveCalc.pph)}>{formatRupiah(liveCalc.pph)}</p>
+                    <p className="text-[10px] text-muted-faint mt-0.5 truncate">{formFaktur.tarifPphPersen}% × DPP Dasar</p>
+                  </div>
+                  <div className="p-3 rounded-[10px] bg-surface-card border border-border-soft min-w-0">
+                    <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Nilai Proyek (111%)</p>
+                    <p className="text-[15px] font-extrabold font-mono text-navy-text truncate mt-0.5" title={formatRupiah(liveCalc.nilaiProyek)}>{formatRupiah(liveCalc.nilaiProyek)}</p>
+                    <p className="text-[10px] text-muted-faint mt-0.5 truncate">Pendapatan Laba Rugi</p>
+                  </div>
+                  <div className="p-3 rounded-[10px] bg-surface-card border border-border-soft min-w-0">
+                    <p className="text-[10.5px] font-bold text-muted-faint uppercase tracking-wider truncate">Laba Stlh Pajak</p>
+                    <p className="text-[15px] font-extrabold font-mono text-status-green truncate mt-0.5" title={formatRupiah(liveCalc.labaSetelahPajak)}>{formatRupiah(liveCalc.labaSetelahPajak)}</p>
+                    <p className="text-[10px] text-muted-faint mt-0.5 truncate">DPP Dasar − PPh Final</p>
                   </div>
                 </div>
               </div>
@@ -2349,18 +2069,12 @@ export function LaporanPendapatanClient({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Tanggal Terima Dana di Bank <span className="text-[10px] text-navy-soft font-normal">(Opsional jika belum cair)</span>
+                    Tanggal Terima Dana di Bank <span className="text-[10px] text-navy-soft font-normal">(Opsional)</span>
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={formFaktur.tanggalTerima}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        tanggalTerima: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(v) => setFormFaktur({ ...formFaktur, tanggalTerima: v })}
+                    placeholder="Pilih tanggal terima"
                   />
                 </div>
 
@@ -2375,7 +2089,7 @@ export function LaporanPendapatanClient({
                     }
                     className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                   >
-                    <option value="" className="bg-surface-card text-navy-text">-- Belum Cair / Kosong --</option>
+                    <option value="" className="bg-surface-card text-navy-text">Belum Cair</option>
                     {data.bankOptions.map((b) => (
                       <option key={b.id} value={b.nama} className="bg-surface-card text-navy-text">
                         {b.nama}
@@ -2389,7 +2103,7 @@ export function LaporanPendapatanClient({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-navy-text">
-                      Nominal Benar-Benar Cair <span className="text-[10px] text-navy-soft font-normal">(Rp 0 jika belum)</span>
+                      Nominal Benar-Benar Cair <span className="text-[10px] text-navy-soft font-normal">(Opsional)</span>
                     </label>
                     {liveCalc.labaSetelahPajak > 0 && (
                       <button

@@ -23,15 +23,38 @@ export type PegawaiItem = {
   ptkpFmt: string;
   gajiPokok: number;
   gajiPokokFmt: string;
+  tunjanganJabatan: number;
+  tunjanganJabatanFmt: string;
+  tanggalMasuk?: string | null;
+  tanggalMasukFmt?: string | null;
+  masaKerja?: string | null;
   isActive: boolean;
   currentGaji?: GajiBulananItem | null;
   akumulasiTahun?: {
     totalGajiKotor: number;
+    totalGajiTerlaporPajak: number;
     totalGajiBersih: number;
     totalPph21: number;
     bulanTerbayar: number;
   };
 };
+
+export function hitungMasaKerja(tanggalMasuk: Date, refDate: Date = new Date()): string {
+  let thn = refDate.getFullYear() - tanggalMasuk.getFullYear();
+  let bln = refDate.getMonth() - tanggalMasuk.getMonth();
+  if (refDate.getDate() < tanggalMasuk.getDate()) {
+    bln--;
+  }
+  if (bln < 0) {
+    thn--;
+    bln += 12;
+  }
+  if (thn < 0) return "0 bulan";
+  if (thn === 0 && bln === 0) return "< 1 bulan";
+  if (thn === 0) return `${bln} bulan`;
+  if (bln === 0) return `${thn} tahun`;
+  return `${thn} tahun ${bln} bulan`;
+}
 
 export type GajiBulananItem = {
   id: string;
@@ -39,26 +62,47 @@ export type GajiBulananItem = {
   pegawaiNama: string;
   pegawaiNik: string;
   pegawaiJabatan: string;
+  pegawaiTanggalMasuk?: string | null;
+  pegawaiMasaKerja?: string | null;
   bulan: number;
   tahun: number;
   gajiPokok: number;
   gajiPokokFmt: string;
   tunjanganJabatan: number;
   tunjanganJabatanFmt: string;
+  hariKerja: number;
+  tarifTransportHarian: number;
+  tarifTransportHarianFmt: string;
   tunjanganTransport: number;
   tunjanganTransportFmt: string;
   insentif: number;
   insentifFmt: string;
+  tunjanganLainnya: number;
+  tunjanganLainnyaFmt: string;
+  tunjanganBpjs: number;
+  tunjanganBpjsFmt: string;
+  tunjanganBpjsKes: number;
+  tunjanganBpjsKesFmt: string;
+  tunjanganBpjsTk: number;
+  tunjanganBpjsTkFmt: string;
+  tunjanganPph: number;
+  tunjanganPphFmt: string;
+  thr: number;
+  thrFmt: string;
   bpjsKesehatan: number;
   bpjsKesehatanFmt: string;
   bpjsKetenagakerjaan: number;
   bpjsKetenagakerjaanFmt: string;
+  potonganBpjs: number;
+  potonganBpjsFmt: string;
   potonganLain: number;
   potonganLainFmt: string;
   pph21: number;
   pph21Fmt: string;
   totalGajiKotor: number;
   totalGajiKotorFmt: string;
+  totalGajiTerlaporPajak: number;
+  totalGajiTerlaporPajakFmt: string;
   totalGajiBersih: number;
   totalGajiBersihFmt: string;
   catatan?: string | null;
@@ -117,8 +161,16 @@ export type RekapBulanPegawaiItem = {
   totalTunjanganFmt: string;
   totalInsentif: number;
   totalInsentifFmt: string;
+  totalThr: number;
+  totalThrFmt: string;
+  totalTunjanganBpjs: number;
+  totalTunjanganBpjsFmt: string;
+  totalTunjanganPph: number;
+  totalTunjanganPphFmt: string;
   totalGajiKotor: number;
   totalGajiKotorFmt: string;
+  totalGajiTerlaporPajak: number;
+  totalGajiTerlaporPajakFmt: string;
   totalBpjs: number;
   totalBpjsFmt: string;
   totalPph21: number;
@@ -340,17 +392,34 @@ export async function getPayrollData(
     const ptkpNum = Number(p.ptkp);
     const gajiPokokNum = Number(p.gajiPokok);
 
+    const tglMasuk = p.tanggalMasuk ? new Date(p.tanggalMasuk) : null;
+    const tanggalMasukStr = tglMasuk ? tglMasuk.toISOString() : null;
+    const tanggalMasukFmt = tglMasuk
+      ? tglMasuk.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : null;
+    const masaKerjaStr = tglMasuk ? hitungMasaKerja(tglMasuk, new Date(year, month - 1, 1)) : null;
+
     let currentGaji: GajiBulananItem | null = null;
     if (currentGajiRaw) {
       const gp = Number(currentGajiRaw.gajiPokok);
       const tj = Number(currentGajiRaw.tunjanganJabatan);
+      const hk = Number(currentGajiRaw.hariKerja ?? 0);
+      const tarif = Number(currentGajiRaw.tarifTransportHarian ?? 15000);
       const tt = Number(currentGajiRaw.tunjanganTransport);
       const ins = Number(currentGajiRaw.insentif);
+      const tLainnya = Number((currentGajiRaw as any).tunjanganLainnya ?? ins);
+      const tBpjsKes = Number((currentGajiRaw as any).tunjanganBpjsKes ?? 0);
+      const tBpjsTk = Number((currentGajiRaw as any).tunjanganBpjsTk ?? 0);
+      const tBpjs = Number(currentGajiRaw.tunjanganBpjs ?? (tBpjsKes + tBpjsTk));
+      const tPph = Number(currentGajiRaw.tunjanganPph ?? 0);
+      const thr = Number(currentGajiRaw.thr ?? 0);
       const bpjsKes = Number(currentGajiRaw.bpjsKesehatan);
       const bpjsTk = Number(currentGajiRaw.bpjsKetenagakerjaan);
+      const potBpjs = Number(currentGajiRaw.potonganBpjs ?? (bpjsKes + bpjsTk));
       const pot = Number(currentGajiRaw.potonganLain);
       const pph = Number(currentGajiRaw.pph21);
       const kotor = Number(currentGajiRaw.totalGajiKotor);
+      const terlapor = Number(currentGajiRaw.totalGajiTerlaporPajak ?? (gp + tj + tt + tLainnya + tBpjs + tPph + thr));
       const bersih = Number(currentGajiRaw.totalGajiBersih);
 
       currentGaji = {
@@ -359,26 +428,47 @@ export async function getPayrollData(
         pegawaiNama: p.nama,
         pegawaiNik: p.nik,
         pegawaiJabatan: p.jabatan,
+        pegawaiTanggalMasuk: tanggalMasukFmt,
+        pegawaiMasaKerja: masaKerjaStr,
         bulan: currentGajiRaw.bulan,
         tahun: currentGajiRaw.tahun,
         gajiPokok: gp,
         gajiPokokFmt: formatRupiah(gp),
         tunjanganJabatan: tj,
         tunjanganJabatanFmt: formatRupiah(tj),
+        hariKerja: hk,
+        tarifTransportHarian: tarif,
+        tarifTransportHarianFmt: formatRupiah(tarif),
         tunjanganTransport: tt,
         tunjanganTransportFmt: formatRupiah(tt),
         insentif: ins,
         insentifFmt: formatRupiah(ins),
+        tunjanganLainnya: tLainnya,
+        tunjanganLainnyaFmt: formatRupiah(tLainnya),
+        tunjanganBpjs: tBpjs,
+        tunjanganBpjsFmt: formatRupiah(tBpjs),
+        tunjanganBpjsKes: tBpjsKes,
+        tunjanganBpjsKesFmt: formatRupiah(tBpjsKes),
+        tunjanganBpjsTk: tBpjsTk,
+        tunjanganBpjsTkFmt: formatRupiah(tBpjsTk),
+        tunjanganPph: tPph,
+        tunjanganPphFmt: formatRupiah(tPph),
+        thr: thr,
+        thrFmt: formatRupiah(thr),
         bpjsKesehatan: bpjsKes,
         bpjsKesehatanFmt: formatRupiah(bpjsKes),
         bpjsKetenagakerjaan: bpjsTk,
         bpjsKetenagakerjaanFmt: formatRupiah(bpjsTk),
+        potonganBpjs: potBpjs,
+        potonganBpjsFmt: formatRupiah(potBpjs),
         potonganLain: pot,
         potonganLainFmt: formatRupiah(pot),
         pph21: pph,
         pph21Fmt: formatRupiah(pph),
         totalGajiKotor: kotor,
         totalGajiKotorFmt: formatRupiah(kotor),
+        totalGajiTerlaporPajak: terlapor,
+        totalGajiTerlaporPajakFmt: formatRupiah(terlapor),
         totalGajiBersih: bersih,
         totalGajiBersihFmt: formatRupiah(bersih),
         catatan: currentGajiRaw.catatan,
@@ -390,6 +480,10 @@ export async function getPayrollData(
       (sum, g) => sum + Number(g.totalGajiKotor),
       0
     );
+    const totalGajiTerlaporThn = p.gajiBulanan.reduce(
+      (sum, g) => sum + Number(g.totalGajiTerlaporPajak ?? g.totalGajiKotor),
+      0
+    );
     const totalGajiBersihThn = p.gajiBulanan.reduce(
       (sum, g) => sum + Number(g.totalGajiBersih),
       0
@@ -398,6 +492,8 @@ export async function getPayrollData(
       (sum, g) => sum + Number(g.pph21),
       0
     );
+
+    const tjMaster = Number(p.tunjanganJabatan ?? 0);
 
     return {
       id: p.id,
@@ -410,10 +506,16 @@ export async function getPayrollData(
       ptkpFmt: formatRupiah(ptkpNum),
       gajiPokok: gajiPokokNum,
       gajiPokokFmt: formatRupiah(gajiPokokNum),
+      tunjanganJabatan: tjMaster,
+      tunjanganJabatanFmt: formatRupiah(tjMaster),
+      tanggalMasuk: tanggalMasukStr,
+      tanggalMasukFmt,
+      masaKerja: masaKerjaStr,
       isActive: p.isActive,
       currentGaji,
       akumulasiTahun: {
         totalGajiKotor: totalGajiKotorThn,
+        totalGajiTerlaporPajak: totalGajiTerlaporThn,
         totalGajiBersih: totalGajiBersihThn,
         totalPph21: totalPph21Thn,
         bulanTerbayar: p.gajiBulanan.length,
@@ -433,11 +535,19 @@ export async function getPayrollData(
     totalTunjanganJabatan: gajiBulanIni.reduce((s, g) => s + g.tunjanganJabatan, 0),
     totalTunjanganTransport: gajiBulanIni.reduce((s, g) => s + g.tunjanganTransport, 0),
     totalInsentif: gajiBulanIni.reduce((s, g) => s + g.insentif, 0),
+    totalTunjanganLainnya: gajiBulanIni.reduce((s, g) => s + (g.tunjanganLainnya || g.insentif), 0),
+    totalTunjanganBpjs: gajiBulanIni.reduce((s, g) => s + g.tunjanganBpjs, 0),
+    totalTunjanganBpjsKes: gajiBulanIni.reduce((s, g) => s + g.tunjanganBpjsKes, 0),
+    totalTunjanganBpjsTk: gajiBulanIni.reduce((s, g) => s + g.tunjanganBpjsTk, 0),
+    totalTunjanganPph: gajiBulanIni.reduce((s, g) => s + g.tunjanganPph, 0),
+    totalThr: gajiBulanIni.reduce((s, g) => s + g.thr, 0),
     totalBpjsKesehatan: gajiBulanIni.reduce((s, g) => s + g.bpjsKesehatan, 0),
     totalBpjsKetenagakerjaan: gajiBulanIni.reduce((s, g) => s + g.bpjsKetenagakerjaan, 0),
+    totalPotonganBpjs: gajiBulanIni.reduce((s, g) => s + g.potonganBpjs, 0),
     totalPotonganLain: gajiBulanIni.reduce((s, g) => s + g.potonganLain, 0),
     totalPph21: gajiBulanIni.reduce((s, g) => s + g.pph21, 0),
     totalGajiKotor: gajiBulanIni.reduce((s, g) => s + g.totalGajiKotor, 0),
+    totalGajiTerlaporPajak: gajiBulanIni.reduce((s, g) => s + g.totalGajiTerlaporPajak, 0),
     totalGajiBersih: gajiBulanIni.reduce((s, g) => s + g.totalGajiBersih, 0),
   };
 
@@ -512,9 +622,16 @@ export async function getPayrollData(
       0
     );
     const totInsentif = gListM.reduce((s, g) => s + Number(g.insentif), 0);
+    const totThr = gListM.reduce((s, g) => s + Number(g.thr ?? 0), 0);
+    const totTunjanganBpjs = gListM.reduce((s, g) => s + Number(g.tunjanganBpjs ?? 0), 0);
+    const totTunjanganPph = gListM.reduce((s, g) => s + Number(g.tunjanganPph ?? 0), 0);
     const totGajiKotor = gListM.reduce((s, g) => s + Number(g.totalGajiKotor), 0);
+    const totGajiTerlapor = gListM.reduce(
+      (s, g) => s + Number(g.totalGajiTerlaporPajak ?? g.totalGajiKotor),
+      0
+    );
     const totBpjs = gListM.reduce(
-      (s, g) => s + Number(g.bpjsKesehatan) + Number(g.bpjsKetenagakerjaan),
+      (s, g) => s + Number(g.potonganBpjs || (Number(g.bpjsKesehatan) + Number(g.bpjsKetenagakerjaan))),
       0
     );
     const totPph21 = gListM.reduce((s, g) => s + Number(g.pph21), 0);
@@ -531,8 +648,16 @@ export async function getPayrollData(
       totalTunjanganFmt: formatRupiah(totTunjangan),
       totalInsentif: totInsentif,
       totalInsentifFmt: formatRupiah(totInsentif),
+      totalThr: totThr,
+      totalThrFmt: formatRupiah(totThr),
+      totalTunjanganBpjs: totTunjanganBpjs,
+      totalTunjanganBpjsFmt: formatRupiah(totTunjanganBpjs),
+      totalTunjanganPph: totTunjanganPph,
+      totalTunjanganPphFmt: formatRupiah(totTunjanganPph),
       totalGajiKotor: totGajiKotor,
       totalGajiKotorFmt: formatRupiah(totGajiKotor),
+      totalGajiTerlaporPajak: totGajiTerlapor,
+      totalGajiTerlaporPajakFmt: formatRupiah(totGajiTerlapor),
       totalBpjs: totBpjs,
       totalBpjsFmt: formatRupiah(totBpjs),
       totalPph21: totPph21,
@@ -775,8 +900,8 @@ export async function getPayrollData(
 
   const totalJurnalPegawaiBulan = txPegawaiBulan.reduce((s, t) => s + t.debit, 0);
   const totalJurnalPegawaiTahun = txPegawaiTahun.reduce((s, t) => s + t.debit, 0);
-  const totalPayrollPegawaiBulan = summaryBulanIni.totalGajiKotor;
-  const totalPayrollPegawaiTahun = rekapBulananPegawai.reduce((s, r) => s + r.totalGajiKotor, 0);
+  const totalPayrollPegawaiBulan = summaryBulanIni.totalGajiBersih;
+  const totalPayrollPegawaiTahun = rekapBulananPegawai.reduce((s, r) => s + r.totalGajiBersih, 0);
   const selisihPegawaiBulan = Math.abs(totalPayrollPegawaiBulan - totalJurnalPegawaiBulan);
   const selisihPegawaiTahun = Math.abs(totalPayrollPegawaiTahun - totalJurnalPegawaiTahun);
 
@@ -888,11 +1013,16 @@ export async function getPayrollData(
       totalTunjanganJabatanFmt: formatRupiah(summaryBulanIni.totalTunjanganJabatan),
       totalTunjanganTransportFmt: formatRupiah(summaryBulanIni.totalTunjanganTransport),
       totalInsentifFmt: formatRupiah(summaryBulanIni.totalInsentif),
+      totalTunjanganBpjsFmt: formatRupiah(summaryBulanIni.totalTunjanganBpjs),
+      totalTunjanganPphFmt: formatRupiah(summaryBulanIni.totalTunjanganPph),
+      totalThrFmt: formatRupiah(summaryBulanIni.totalThr),
       totalBpjsKesehatanFmt: formatRupiah(summaryBulanIni.totalBpjsKesehatan),
       totalBpjsKetenagakerjaanFmt: formatRupiah(summaryBulanIni.totalBpjsKetenagakerjaan),
+      totalPotonganBpjsFmt: formatRupiah(summaryBulanIni.totalPotonganBpjs),
       totalPotonganLainFmt: formatRupiah(summaryBulanIni.totalPotonganLain),
       totalPph21Fmt: formatRupiah(summaryBulanIni.totalPph21),
       totalGajiKotorFmt: formatRupiah(summaryBulanIni.totalGajiKotor),
+      totalGajiTerlaporPajakFmt: formatRupiah(summaryBulanIni.totalGajiTerlaporPajak),
       totalGajiBersihFmt: formatRupiah(summaryBulanIni.totalGajiBersih),
     },
     honorList,
@@ -984,7 +1114,7 @@ export async function getPayrollSyncData(
         end: new Date(`${year}-12-31T23:59:59`),
       };
 
-  // A. Total Gaji Kotor dari Modul Payroll Pegawai Tetap
+  // A. Total Gaji Bersih dari Modul Payroll Pegawai Tetap
   const gajiPegawaiAgg = await prisma.gajiPegawaiBulanan.aggregate({
     where: {
       entityId,
@@ -992,10 +1122,12 @@ export async function getPayrollSyncData(
       ...(month ? { bulan: month } : {}),
     },
     _sum: {
+      totalGajiBersih: true,
       totalGajiKotor: true,
+      totalGajiTerlaporPajak: true,
     },
   });
-  const payrollGajiPegawai = Number(gajiPegawaiAgg._sum.totalGajiKotor ?? 0);
+  const payrollGajiPegawai = Number(gajiPegawaiAgg._sum.totalGajiBersih ?? 0);
 
   // B. Total Honor Bruto dari Modul Payroll Tenaga Ahli
   const honorTenagaAhliAgg = await prisma.honorTenagaAhli.aggregate({

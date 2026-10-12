@@ -2151,20 +2151,6 @@ export function PayrollClient({
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      if (data.rekananTenagaAhli.length === 0) {
-                        setErrorMsg("Belum ada tenaga ahli terdaftar di entitas ini. Silakan tambahkan tenaga ahli terlebih dahulu.");
-                        return;
-                      }
-                      openHonorModal();
-                    }}
-                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs self-start sm:self-auto"
-                  >
-                    <Plus size={14} />
-                    <span>Input Gaji Tenaga Ahli</span>
-                  </button>
                 </div>
 
                 {/* 4 Stat Cards Rekap Proyek */}

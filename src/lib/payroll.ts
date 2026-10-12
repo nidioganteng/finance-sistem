@@ -117,6 +117,7 @@ export type HonorTenagaAhliItem = {
   nik: string;
   nama: string;
   npwp?: string | null;
+  ptkp?: string | null;
   uraian: string;
   tanggal: string;
   tanggalFmt: string;
@@ -124,6 +125,7 @@ export type HonorTenagaAhliItem = {
   tahun: number;
   nominalHonor: number;
   nominalHonorFmt: string;
+  jenisPph?: string | null;
   tarifPph21Persen: number;
   pph21: number;
   pph21Fmt: string;
@@ -248,6 +250,21 @@ export type KonsolidasiTenagaAhliItem = {
     pph21Fmt: string;
     transaksiCount: number;
   }[];
+};
+
+export type RekapTenagaAhliPerProyekItem = {
+  projectId?: string | null;
+  projectCode?: string | null;
+  projectName: string;
+  entityName: string;
+  totalTransaksi: number;
+  totalHonorBruto: number;
+  totalHonorBrutoFmt: string;
+  totalPph: number;
+  totalPphFmt: string;
+  totalHonorBersih: number;
+  totalHonorBersihFmt: string;
+  tenagaAhliList: string[];
 };
 
 export type JurnalTransaksiGajiItem = {
@@ -580,6 +597,7 @@ export async function getPayrollData(
       nik: h.nik,
       nama: h.nama,
       npwp: h.npwp,
+      ptkp: h.ptkp || "TK/0",
       uraian: h.uraian,
       tanggal: h.tanggal.toISOString(),
       tanggalFmt: h.tanggal.toLocaleDateString("id-ID"),
@@ -587,6 +605,7 @@ export async function getPayrollData(
       tahun: h.tahun,
       nominalHonor: bruto,
       nominalHonorFmt: formatRupiah(bruto),
+      jenisPph: h.jenisPph || "PPh 21",
       tarifPph21Persen: Number(h.tarifPph21Persen),
       pph21: pph,
       pph21Fmt: formatRupiah(pph),
@@ -847,6 +866,91 @@ export async function getPayrollData(
     })),
   }));
 
+  // Rekapitulasi Tenaga Ahli Per Proyek (Alokasi Beban Honorarium Per Proyek - Issue 98)
+  const perProyekMap = new Map<string, RekapTenagaAhliPerProyekItem>();
+  for (const h of allHonorEntitasTahun) {
+    const projKey = h.projectId || h.namaProyek || "non-proyek";
+    const projName = h.namaProyek || (h.project ? `${h.project.code} - ${h.project.name}` : "Umum / Non-Proyek");
+    const bruto = Number(h.nominalHonor);
+    const pph = Number(h.pph21);
+    const bersih = Number(h.nominalBersih);
+
+    if (!perProyekMap.has(projKey)) {
+      perProyekMap.set(projKey, {
+        projectId: h.projectId,
+        projectCode: h.project?.code ?? null,
+        projectName: projName,
+        entityName: entity?.name ?? "",
+        totalTransaksi: 0,
+        totalHonorBruto: 0,
+        totalHonorBrutoFmt: "Rp 0",
+        totalPph: 0,
+        totalPphFmt: "Rp 0",
+        totalHonorBersih: 0,
+        totalHonorBersihFmt: "Rp 0",
+        tenagaAhliList: [],
+      });
+    }
+
+    const rec = perProyekMap.get(projKey)!;
+    rec.totalTransaksi += 1;
+    rec.totalHonorBruto += bruto;
+    rec.totalPph += pph;
+    rec.totalHonorBersih += bersih;
+    if (h.nama && !rec.tenagaAhliList.includes(h.nama)) {
+      rec.tenagaAhliList.push(h.nama);
+    }
+  }
+
+  const rekapTenagaAhliPerProyek: RekapTenagaAhliPerProyekItem[] = Array.from(perProyekMap.values())
+    .map((r) => ({
+      ...r,
+      totalHonorBrutoFmt: formatRupiah(r.totalHonorBruto),
+      totalPphFmt: formatRupiah(r.totalPph),
+      totalHonorBersihFmt: formatRupiah(r.totalHonorBersih),
+    }))
+    .sort((a, b) => b.totalHonorBruto - a.totalHonorBruto);
+
+  // Daftar Seluruh Transaksi Tenaga Ahli Lintas Entitas (Bulan Ini - Issue 98)
+  const allHonorBulanIni: HonorTenagaAhliItem[] = allHonorTahunRaw
+    .filter((h) => h.bulan === month)
+    .map((h) => {
+      const bruto = Number(h.nominalHonor);
+      const pph = Number(h.pph21);
+      const bersih = Number(h.nominalBersih);
+      const resolvedProjName =
+        h.namaProyek || (h.project ? `${h.project.code} - ${h.project.name}` : null);
+      return {
+        id: h.id,
+        entityId: h.entityId,
+        entityName: h.entity.name,
+        entityKey: h.entity.key,
+        rekananId: h.rekananId,
+        nik: h.nik,
+        nama: h.nama,
+        npwp: h.npwp,
+        ptkp: h.ptkp || "TK/0",
+        uraian: h.uraian,
+        tanggal: h.tanggal.toISOString(),
+        tanggalFmt: h.tanggal.toLocaleDateString("id-ID"),
+        bulan: h.bulan,
+        tahun: h.tahun,
+        nominalHonor: bruto,
+        nominalHonorFmt: formatRupiah(bruto),
+        jenisPph: h.jenisPph || "PPh 21",
+        tarifPph21Persen: Number(h.tarifPph21Persen),
+        pph21: pph,
+        pph21Fmt: formatRupiah(pph),
+        nominalBersih: bersih,
+        nominalBersihFmt: formatRupiah(bersih),
+        projectId: h.projectId,
+        projectCode: h.project?.code ?? null,
+        projectName: h.project?.name ?? null,
+        namaProyek: resolvedProjName,
+        noBukti: h.noBukti,
+      };
+    });
+
   // 9. Penarikan Transaksi Jurnal Umum Riil untuk Kode Akun Gaji Pegawai (511) & Tenaga Ahli (612)
   const startYear = new Date(year, 0, 1, 0, 0, 0, 0);
   const endYear = new Date(year, 11, 31, 23, 59, 59, 999);
@@ -1026,8 +1130,10 @@ export async function getPayrollData(
       totalGajiBersihFmt: formatRupiah(summaryBulanIni.totalGajiBersih),
     },
     honorList,
+    allHonorBulanIni,
     rekapBulananTenagaAhli,
     rekapTenagaAhliPerNama,
+    rekapTenagaAhliPerProyek,
     summaryHonorBulanIni: {
       ...summaryHonorBulanIni,
       totalHonorBrutoFmt: formatRupiah(summaryHonorBulanIni.totalHonorBruto),

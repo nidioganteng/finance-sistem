@@ -55,6 +55,7 @@ import {
   deleteTenagaAhliMasterAction,
 } from "@/lib/actions/payroll";
 import { formatRupiah } from "@/lib/dashboard-data";
+import { DatePicker } from "@/components/shared/DatePicker";
 
 type PayrollData = {
   entity: { id: string; key: string; name: string; legalName: string } | null;
@@ -173,6 +174,7 @@ export function PayrollClient({
 
   const [isHonorModalOpen, setIsHonorModalOpen] = useState(false);
   const [editingHonor, setEditingHonor] = useState<HonorTenagaAhliItem | null>(null);
+  const [honorTanggal, setHonorTanggal] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Master Tenaga Ahli Modal
   const [isMasterAhliModalOpen, setIsMasterAhliModalOpen] = useState(false);
@@ -1658,6 +1660,7 @@ export function PayrollClient({
                                 <button
                                   onClick={() => {
                                     setEditingHonor(h);
+                                    setHonorTanggal(new Date(h.tanggal).toISOString().slice(0, 10));
                                     setIsHonorModalOpen(true);
                                   }}
                                   className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
@@ -3369,17 +3372,8 @@ export function PayrollClient({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">Tanggal Pembayaran *</label>
-                  <input
-                    type="date"
-                    name="tanggal"
-                    required
-                    defaultValue={
-                      editingHonor
-                        ? new Date(editingHonor.tanggal).toISOString().split("T")[0]
-                        : new Date().toISOString().split("T")[0]
-                    }
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
-                  />
+                  <DatePicker value={honorTanggal} onChange={setHonorTanggal} required />
+                  <input type="hidden" name="tanggal" value={honorTanggal} />
                 </div>
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">No. Bukti / Voucher (Opsional)</label>

@@ -3100,7 +3100,8 @@ export function PayrollClient({
                   type="number"
                   name="gajiPokok"
                   required
-                  defaultValue={editingPegawai?.gajiPokok ?? 0}
+                  defaultValue={editingPegawai?.gajiPokok ? editingPegawai.gajiPokok : ""}
+                  placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
               </div>
@@ -3110,7 +3111,7 @@ export function PayrollClient({
                 <input
                   type="number"
                   name="tunjanganJabatan"
-                  defaultValue={editingPegawai?.tunjanganJabatan ?? 0}
+                  defaultValue={editingPegawai?.tunjanganJabatan ? editingPegawai.tunjanganJabatan : ""}
                   placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
@@ -3349,8 +3350,9 @@ export function PayrollClient({
                         type="number"
                         name="gajiPokok"
                         required
-                        value={modalGajiPokok}
+                        value={modalGajiPokok || ""}
                         onChange={(e) => setModalGajiPokok(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                     </div>
@@ -3361,8 +3363,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="tunjanganJabatan"
-                        value={modalTunjanganJabatan}
+                        value={modalTunjanganJabatan || ""}
                         onChange={(e) => setModalTunjanganJabatan(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
@@ -3389,12 +3392,13 @@ export function PayrollClient({
                           name="hariKerja"
                           min={0}
                           max={31}
-                          value={modalHariKerja}
+                          value={modalHariKerja || ""}
                           onChange={(e) => {
                             const val = Number(e.target.value) || 0;
                             setModalHariKerja(val);
                             setModalTunjanganTransport(val * modalTarifTransport);
                           }}
+                          placeholder="0"
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
                         />
                       </div>
@@ -3404,12 +3408,13 @@ export function PayrollClient({
                           type="number"
                           name="tarifTransportHarian"
                           min={0}
-                          value={modalTarifTransport}
+                          value={modalTarifTransport || ""}
                           onChange={(e) => {
                             const val = Number(e.target.value) || 0;
                             setModalTarifTransport(val);
                             setModalTunjanganTransport(modalHariKerja * val);
                           }}
+                          placeholder="0"
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
                         />
                       </div>
@@ -3420,8 +3425,9 @@ export function PayrollClient({
                         <input
                           type="number"
                           name="tunjanganTransport"
-                          value={modalTunjanganTransport}
+                          value={modalTunjanganTransport || ""}
                           onChange={(e) => setModalTunjanganTransport(Number(e.target.value) || 0)}
+                          placeholder="0"
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-navy-text font-bold font-mono text-xs"
                         />
                       </div>
@@ -3438,8 +3444,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="insentif"
-                        value={modalInsentif}
+                        value={modalInsentif || ""}
                         onChange={(e) => setModalInsentif(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                     </div>
@@ -3448,8 +3455,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="thr"
-                        value={modalThr}
+                        value={modalThr || ""}
                         onChange={(e) => setModalThr(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                     </div>
@@ -3462,8 +3470,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="tunjanganBpjs"
-                        value={modalTunjanganBpjs}
+                        value={modalTunjanganBpjs || ""}
                         onChange={(e) => setModalTunjanganBpjs(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
@@ -3475,8 +3484,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="tunjanganPph"
-                        value={modalTunjanganPph}
+                        value={modalTunjanganPph || ""}
                         onChange={(e) => setModalTunjanganPph(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
@@ -3498,8 +3508,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="potonganBpjs"
-                        value={modalPotonganBpjs}
+                        value={modalPotonganBpjs || ""}
                         onChange={(e) => setModalPotonganBpjs(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
@@ -3511,8 +3522,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="pph21"
-                        value={modalPph21}
+                        value={modalPph21 || ""}
                         onChange={(e) => setModalPph21(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
@@ -3524,8 +3536,9 @@ export function PayrollClient({
                       <input
                         type="number"
                         name="potonganLain"
-                        value={modalPotonganLain}
+                        value={modalPotonganLain || ""}
                         onChange={(e) => setModalPotonganLain(Number(e.target.value) || 0)}
+                        placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
@@ -3888,7 +3901,7 @@ export function PayrollClient({
                   type="number"
                   name="nominalHonor"
                   required
-                  defaultValue={editingHonor?.nominalHonor ?? 0}
+                  defaultValue={editingHonor?.nominalHonor ? editingHonor.nominalHonor : ""}
                   placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold"
                 />

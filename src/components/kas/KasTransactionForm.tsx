@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { createKasTransaction, replaceKasTransaction, generateNoBukti } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
 import { CoaCombobox } from "./CoaCombobox";
-import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, Zap, Briefcase, TrendingUp, ArrowRightLeft, Sparkles } from "lucide-react";
+import { DatePicker } from "@/components/shared/DatePicker";
+import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, TrendingUp, ArrowRightLeft, Sparkles } from "lucide-react";
 
 type CoaOption = { id: string; code: string; name: string };
 type ProjectOption = {
@@ -314,12 +315,7 @@ export function KasTransactionForm({
         <div className="grid grid-cols-2 gap-3.5">
           <div>
             <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">Tanggal</label>
-            <input
-              type="date"
-              value={tanggal}
-              onChange={(e) => setTanggal(e.target.value)}
-              className={inputClass}
-            />
+            <DatePicker value={tanggal} onChange={setTanggal} required />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -349,21 +345,7 @@ export function KasTransactionForm({
                 placeholder="mis. UK09281 atau KC/0002"
                 className={`${inputClass} font-mono pr-24`}
               />
-              {!isNoBuktiManual && noBukti ? (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-md">
-                  auto umum
-                </span>
-              ) : isNoBuktiManual && (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted bg-surface-subtle px-1.5 py-0.5 rounded-md border border-border-subtle">
-                  mandiri
-                </span>
-              )}
             </div>
-            <p className="text-[10px] text-muted-faint mt-1">
-              {isNoBuktiManual
-                ? "No. bukti mandiri/proyek aktif (mis. KC/0002). Klik 'Reset ke Format Umum' untuk auto-generate."
-                : "Format pengeluaran umum otomatis. Dapat diketik manual untuk pengeluaran proyek (mis. KC/0002)."}
-            </p>
           </div>
         </div>
 
@@ -400,10 +382,7 @@ export function KasTransactionForm({
                 onChange={(e) => setSyncBukuBank(e.target.checked)}
                 className="accent-navy w-4 h-4 rounded"
               />
-              <div className="flex items-center gap-1.5">
-                <Zap size={12} className="text-brand" />
-                <span className="text-[13px] font-semibold text-navy-text">Catat juga keluar di Buku Bank</span>
-              </div>
+              <span className="text-[13px] font-semibold text-navy-text">Catat juga keluar di Buku Bank</span>
             </label>
             {syncBukuBank && (
               <select
@@ -449,7 +428,6 @@ export function KasTransactionForm({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
-                  <Briefcase size={12} className="text-muted-faint" />
                   Proyek Terkait (Sidamon)
                   {isOtherEntity && (
                     <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
@@ -479,7 +457,7 @@ export function KasTransactionForm({
                 onChange={(e) => handleProjectChange(e.target.value)}
                 className={inputClass}
               >
-                <option value="">— Bukan transaksi proyek —</option>
+                <option value="">Bukan transaksi proyek (opsional)</option>
                 {currentEntityProjects.length > 0 && (
                   <optgroup label="Proyek Entitas Ini">
                     {currentEntityProjects.map((p) => (
@@ -500,11 +478,7 @@ export function KasTransactionForm({
                 )}
               </select>
 
-              {!selectedProject ? (
-                <p className="text-[10.5px] text-muted-faint mt-1">
-                  Opsional. Hubungkan transaksi ke proyek Sidamon untuk sinkronisasi termin atau talangan lintas entitas.
-                </p>
-              ) : (
+              {!selectedProject ? null : (
                 <div className={`mt-2.5 rounded-[12px] border p-3.5 flex flex-col gap-3 ${
                   arah === "masuk"
                     ? "border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-950/10"
@@ -723,34 +697,38 @@ export function KasTransactionForm({
             </button>
           </div>
 
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-2">
             {rows.map((r, idx) => (
-              <div key={r.id} className="bg-surface-subtle/60 border border-border-soft rounded-[12px] p-3 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-muted-faint w-4 flex-none">{idx + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <CoaCombobox
-                      value={r.coaAccountId}
-                      onChange={(id) => updateRow(r.id, { coaAccountId: id })}
-                      options={coaOptions}
-                    />
-                  </div>
-                  <input
-                    value={r.nominal ? formatRupiahInput(r.nominal) : ""}
-                    onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
-                    placeholder="0"
-                    className="w-[150px] flex-none px-3 py-2 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-right font-mono text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand/60"
-                  />
+              <div key={r.id} className="bg-surface-subtle/60 border border-border-soft rounded-[12px] p-3 flex gap-2.5">
+                {/* Kolom kiri: nomor + trash */}
+                <div className="flex flex-col items-center justify-between flex-none w-6 pt-1.5 pb-0.5">
+                  <span className="text-[11px] font-bold text-muted-faint">{idx + 1}</span>
                   <button
                     type="button"
                     onClick={() => removeRow(r.id)}
                     disabled={rows.length === 1}
-                    className="p-1 rounded text-muted-faint hover:text-status-red hover:bg-surface-hover transition-colors disabled:opacity-20 flex-none"
+                    className="p-1 rounded text-muted-faint hover:text-status-red hover:bg-surface-hover transition-colors disabled:opacity-20"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
-                <div className="pl-6">
+                {/* Kolom kanan: akun + nominal + keterangan */}
+                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                  <div className="flex gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CoaCombobox
+                        value={r.coaAccountId}
+                        onChange={(id) => updateRow(r.id, { coaAccountId: id })}
+                        options={coaOptions}
+                      />
+                    </div>
+                    <input
+                      value={r.nominal ? formatRupiahInput(r.nominal) : ""}
+                      onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
+                      placeholder="0"
+                      className="w-[120px] flex-none px-3 py-2 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-right font-mono text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand/60"
+                    />
+                  </div>
                   <input
                     value={r.keterangan ?? ""}
                     onChange={(e) => updateRow(r.id, { keterangan: e.target.value })}
@@ -768,9 +746,7 @@ export function KasTransactionForm({
       <div className="px-6 py-4 border-t border-border-soft bg-surface-subtle/40">
         {/* Total */}
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[11.5px] text-muted-faint">
-            Jurnal otomatis: {arah === "keluar" ? `Dr. Akun / Cr. ${kasLabel()}` : `Dr. ${kasLabel()} / Cr. Akun`}
-          </div>
+          <div />
           <div className="text-right">
             <div className="text-[10.5px] font-semibold text-muted-faint mb-0.5">TOTAL</div>
             <div className={`text-[18px] font-extrabold tabular-nums ${arah === "keluar" ? "text-red-500" : "text-emerald-500"}`}>

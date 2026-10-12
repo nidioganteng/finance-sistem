@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useTransition, useRef, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, CalendarDays, X, Plus } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
+import { DatePicker } from "@/components/shared/DatePicker";
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string };
@@ -99,6 +100,106 @@ export function KasScreenClient({
   const [sortAsc, setSortAsc] = useState(false);
   const [filterDari, setFilterDari] = useState(dari);
   const [filterSampai, setFilterSampai] = useState(sampai);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activePreset, setActivePreset] = useState<string>(() => {
+    if (!dari && !sampai) return "bulan-ini";
+    const t = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const presetRanges: Record<string, [string, string]> = {
+      "bulan-ini":  [fmt(new Date(t.getFullYear(), t.getMonth(), 1)),     fmt(new Date(t.getFullYear(), t.getMonth() + 1, 0))],
+      "bulan-lalu": [fmt(new Date(t.getFullYear(), t.getMonth() - 1, 1)), fmt(new Date(t.getFullYear(), t.getMonth(), 0))],
+      "3-bulan":    [fmt(new Date(t.getFullYear(), t.getMonth() - 3, t.getDate())), fmt(t)],
+      "6-bulan":    [fmt(new Date(t.getFullYear(), t.getMonth() - 6, t.getDate())), fmt(t)],
+    };
+    const matched = Object.entries(presetRanges).find(([, [d, s]]) => d === dari && s === sampai);
+    return matched ? matched[0] : "custom";
+  });
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  function toDateStr(d: Date) {
+    return d.toISOString().slice(0, 10);
+  }
+  function fmtDateShort(s: string) {
+    if (!s) return "—";
+    const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+    return isNaN(d.getTime()) ? s.slice(0, 10) : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  }
+  function fmtDateFull(s: string) {
+    if (!s) return "";
+    const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+    return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) +
+      (d.getHours() || d.getMinutes() ? ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
+  }
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Auto-apply bulan ini kalau halaman dibuka tanpa filter
+  useEffect(() => {
+    if (!dari && !sampai) {
+      const t = new Date();
+      const d = toDateStr(new Date(t.getFullYear(), t.getMonth(), 1));
+      const s = toDateStr(new Date(t.getFullYear(), t.getMonth() + 1, 0));
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("dari", d);
+      params.set("sampai", s);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const today = new Date();
+  const PRESET_OPTIONS = [
+    { key: "bulan-ini", label: "Bulan Ini" },
+    { key: "bulan-lalu", label: "1 Bulan Lalu" },
+    { key: "3-bulan", label: "3 Bulan Lalu" },
+    { key: "6-bulan", label: "6 Bulan Lalu" },
+    { key: "custom", label: "Custom..." },
+  ];
+
+  function applyPreset(preset: string) {
+    let d = "";
+    let s = "";
+
+    if (preset === "bulan-ini") {
+      d = toDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+      s = toDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+    } else if (preset === "bulan-lalu") {
+      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+      s = toDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+    } else if (preset === "2-bulan") {
+      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 2, 1));
+      s = toDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 0));
+    } else if (preset === "3-bulan") {
+      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 3, today.getDate()));
+      s = toDateStr(today);
+    } else if (preset === "6-bulan") {
+      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 6, today.getDate()));
+      s = toDateStr(today);
+    } else if (preset === "tahun-ini") {
+      d = toDateStr(new Date(today.getFullYear(), 0, 1));
+      s = toDateStr(new Date(today.getFullYear(), 11, 31));
+    }
+
+    setActivePreset(preset);
+    setDropdownOpen(false);
+
+    if (preset === "custom") return;
+
+    setFilterDari(d);
+    setFilterSampai(s);
+    const params = new URLSearchParams(searchParams.toString());
+    if (d) params.set("dari", d); else params.delete("dari");
+    if (s) params.set("sampai", s); else params.delete("sampai");
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
   function applyDateFilter() {
     const params = new URLSearchParams(searchParams.toString());
@@ -107,16 +208,12 @@ export function KasScreenClient({
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  function resetDateFilter() {
-    setFilterDari("");
-    setFilterSampai("");
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("dari");
-    params.delete("sampai");
-    router.push(`${pathname}?${params.toString()}`);
+  function resetToDefault() {
+    applyPreset("bulan-ini");
   }
 
-  const isFiltered = !!dari || !!sampai;
+  const isNonDefault = activePreset !== "bulan-ini";
+  const activeLabel = PRESET_OPTIONS.find((o) => o.key === activePreset)?.label ?? "Bulan Ini";
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -151,14 +248,24 @@ export function KasScreenClient({
 
   return (
     <>
-      {/* Edit modal */}
+      {/* Edit drawer */}
       {editingRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex justify-end">
           <div
-            className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/10"
             onClick={() => setEditingRow(null)}
           />
-          <div className="relative w-full max-w-3xl my-auto">
+          <div className="relative w-full max-w-xl h-full bg-surface-card shadow-2xl flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
+              <h2 className="text-[15px] font-bold text-navy-text">Edit Transaksi</h2>
+              <button
+                onClick={() => setEditingRow(null)}
+                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
             <KasTransactionForm
               entityKey={entityKey}
               jenisInputKey={jenisInputKey}
@@ -186,6 +293,7 @@ export function KasScreenClient({
               }}
               onClose={() => setEditingRow(null)}
             />
+            </div>
           </div>
         </div>
       )}
@@ -227,40 +335,59 @@ export function KasScreenClient({
         ))}
       </div>
 
-      {/* Filter tanggal */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <CalendarDays size={14} className="text-muted-faint flex-none" />
-        <input
-          type="date"
-          value={filterDari}
-          onChange={(e) => setFilterDari(e.target.value)}
-          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
-        />
-        <span className="text-[12px] text-muted-faint">—</span>
-        <input
-          type="date"
-          value={filterSampai}
-          onChange={(e) => setFilterSampai(e.target.value)}
-          className="text-[12.5px] font-semibold text-muted-stronger border border-border-soft rounded-[9px] px-2.5 py-2 bg-surface-input focus:outline-none"
-        />
-        <button
-          onClick={applyDateFilter}
-          className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold"
-        >
-          Terapkan
-        </button>
-        {isFiltered && (
-          <button
-            onClick={resetDateFilter}
-            className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
-          >
-            <X size={11} /> Reset
-          </button>
-        )}
-      </div>
-
       <div className="flex items-center justify-between flex-wrap gap-3.5">
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Dropdown filter periode */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] border border-border-soft bg-surface-input text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors min-w-[140px] justify-between"
+            >
+              <span>{activeLabel}</span>
+              <ChevronDown size={13} className={`text-muted-faint transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute top-[calc(100%+6px)] left-0 z-30 bg-surface-card border border-border-soft rounded-[12px] shadow-lg py-1.5 min-w-[160px]">
+                {PRESET_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => applyPreset(opt.key)}
+                    className={`w-full text-left px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
+                      activePreset === opt.key
+                        ? "text-brand bg-blue-50 dark:bg-blue-500/10"
+                        : "text-muted-stronger hover:bg-surface-hover"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {activePreset === "custom" && (
+            <>
+              <DatePicker value={filterDari} onChange={setFilterDari} placeholder="Dari" className="w-[140px]" />
+              <DatePicker value={filterSampai} onChange={setFilterSampai} placeholder="Sampai" className="w-[140px]" />
+              <button
+                onClick={applyDateFilter}
+                className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold"
+              >
+                Terapkan
+              </button>
+            </>
+          )}
+
+          {isNonDefault && activePreset !== "custom" && (
+            <button
+              onClick={resetToDefault}
+              className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
+            >
+              <X size={11} /> Reset
+            </button>
+          )}
+
           <div className="px-3.5 py-2.5 rounded-[11px] border border-border-soft text-[12.5px] font-semibold text-muted-stronger bg-surface-card">
             {saldoLabel}: <span className="font-extrabold text-navy-text">{saldoFmt}</span>
           </div>
@@ -286,37 +413,50 @@ export function KasScreenClient({
         </div>
 
         <button
-          onClick={() => setPanelOpen((v) => !v)}
+          onClick={() => setPanelOpen(true)}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
         >
-          {panelOpen ? (
-            <>
-              <X className="w-4 h-4 flex-none" />
-              <span>Tutup Form</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-4 h-4 flex-none" />
-              <span>Transaksi Baru</span>
-            </>
-          )}
+          <Plus className="w-4 h-4 flex-none" />
+          <span>Transaksi Baru</span>
         </button>
       </div>
 
+      {/* Drawer kanan */}
       {panelOpen && (
-        <KasTransactionForm
-          entityKey={entityKey}
-          jenisInputKey={jenisInputKey}
-          pagePath={pagePath}
-          coaOptions={coaOptions}
-          rekeningOptions={rekeningOptions}
-          defaultRekeningId={selectedRekeningId}
-          allEntities={allEntities}
-          projectOptions={projectOptions}
-          defaultArahLaporan={defaultArahLaporan}
-          bukuBankRekeningOptions={bukuBankRekeningOptions}
-          onClose={() => setPanelOpen(false)}
-        />
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/10"
+            onClick={() => setPanelOpen(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-xl h-full bg-surface-card shadow-2xl flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
+              <h2 className="text-[15px] font-bold text-navy-text">Transaksi Baru</h2>
+              <button
+                onClick={() => setPanelOpen(false)}
+                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <KasTransactionForm
+                entityKey={entityKey}
+                jenisInputKey={jenisInputKey}
+                pagePath={pagePath}
+                coaOptions={coaOptions}
+                rekeningOptions={rekeningOptions}
+                defaultRekeningId={selectedRekeningId}
+                allEntities={allEntities}
+                projectOptions={projectOptions}
+                defaultArahLaporan={defaultArahLaporan}
+                bukuBankRekeningOptions={bukuBankRekeningOptions}
+                onClose={() => setPanelOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {actionError && (
@@ -410,7 +550,14 @@ export function KasScreenClient({
 
                   return (
                     <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
-                      <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{r.tanggal}</td>
+                      <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">
+                        <div className="relative group/dt inline-block">
+                          <span>{fmtDateShort(r.tanggalRaw || r.tanggal)}</span>
+                          <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                            {fmtDateFull(r.tanggalRaw || r.tanggal)}
+                          </div>
+                        </div>
+                      </td>
                       <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                       <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                         {r.keterangan}

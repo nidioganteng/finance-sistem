@@ -9,7 +9,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function PenggunaPage() {
   const session = await getServerSession(authOptions);
   const { role } = session!.user;
-  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
+  if (role !== "MANAJER_KEUANGAN" && role !== "SUPER_ADMIN") redirect("/dashboard");
 
   const [users, allEntities] = await Promise.all([getUserList(), getAllEntities()]);
 

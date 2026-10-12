@@ -62,7 +62,7 @@ type PayrollData = {
   entity: { id: string; key: string; name: string; legalName: string } | null;
   allEntities: { id: string; key: string; name: string; legalName: string }[];
   projects: { id: string; code: string; name: string }[];
-  rekananTenagaAhli: { id: string; nama: string; nik: string | null; npwp: string | null; kategori: string | null }[];
+  rekananTenagaAhli: { id: string; nama: string; nik: string | null; npwp: string | null; kategori: string | null; ptkp?: string | null }[];
   year: number;
   month: number;
   pegawaiList: PegawaiItem[];
@@ -330,7 +330,10 @@ export function PayrollClient({
         ? today.toISOString().split("T")[0]
         : `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
       setModalHonorTanggal(defaultDate);
-      setModalHonorPtkp("TK/0");
+      const targetRekananId = rekananId || (data.rekananTenagaAhli.length > 0 ? data.rekananTenagaAhli[0].id : "");
+      setSelectedRekananIdForHonor(targetRekananId);
+      const matchedRekanan = data.rekananTenagaAhli.find((r) => r.id === targetRekananId);
+      setModalHonorPtkp(matchedRekanan?.ptkp || "TK/0");
       setModalHonorJenisPph("PPh 21");
       setModalHonorNominal(0);
       setModalHonorTarifPph(0);
@@ -339,13 +342,6 @@ export function PayrollClient({
       setModalHonorNamaProyek("");
       setModalHonorUraian("");
       setModalHonorNoBukti("");
-      if (rekananId) {
-        setSelectedRekananIdForHonor(rekananId);
-      } else if (data.rekananTenagaAhli.length > 0) {
-        setSelectedRekananIdForHonor(data.rekananTenagaAhli[0].id);
-      } else {
-        setSelectedRekananIdForHonor("");
-      }
     }
     setIsHonorModalOpen(true);
   }
@@ -358,6 +354,7 @@ export function PayrollClient({
     nik: string | null;
     npwp: string | null;
     kategori: string | null;
+    ptkp?: string | null;
   } | null>(null);
 
   // State selection di modal honor
@@ -2717,13 +2714,14 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5">Nama & Spesialisasi</th>
                       <th className="py-2.5 px-3.5">NIK (16 Digit Terdaftar)</th>
                       <th className="py-2.5 px-3.5">NPWP</th>
+                      <th className="py-2.5 px-3.5">Status PTKP</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredRekananList.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-8 text-center text-muted-faint">
+                        <td colSpan={5} className="py-8 text-center text-muted-faint">
                           {searchQuery
                             ? "Tidak ada tenaga ahli yang cocok dengan pencarian."
                             : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli Baru' untuk mendaftarkan profil tenaga ahli."}
@@ -2758,6 +2756,11 @@ export function PayrollClient({
                             </td>
                             <td className="py-3 px-3.5 font-mono text-muted-stronger">
                               {hasNpwp ? r.npwp : <span className="text-muted-faint">-</span>}
+                            </td>
+                            <td className="py-3 px-3.5 font-mono font-bold text-navy-text">
+                              <span className="px-2 py-0.5 rounded-md bg-surface-subtle border border-border text-[11px]">
+                                {r.ptkp || "TK/0"}
+                              </span>
                             </td>
                             <td className="py-3 px-3.5 text-right whitespace-nowrap">
                               <div className="inline-flex items-center justify-end gap-1.5">
@@ -4283,6 +4286,7 @@ export function PayrollClient({
                       nik: editingHonor.nik,
                       npwp: editingHonor.npwp,
                       kategori: null as string | null,
+                      ptkp: editingHonor.ptkp || "TK/0",
                     }
                   : data.rekananTenagaAhli.find((r) => r.id === selectedRekananIdForHonor) ||
                     data.rekananTenagaAhli[0] ||
@@ -4294,6 +4298,7 @@ export function PayrollClient({
                     <input type="hidden" name="nama" value={currentExpert?.nama ?? ""} />
                     <input type="hidden" name="nik" value={currentExpert?.nik ?? ""} />
                     <input type="hidden" name="npwp" value={currentExpert?.npwp ?? ""} />
+                    <input type="hidden" name="ptkp" value={currentExpert?.ptkp || modalHonorPtkp || "TK/0"} />
 
                     {!editingHonor && (
                       <div className="space-y-1.5">
@@ -4340,7 +4345,12 @@ export function PayrollClient({
                             <select
                               value={currentExpert?.id || ""}
                               onChange={(e) => {
-                                setSelectedRekananIdForHonor(e.target.value);
+                                const val = e.target.value;
+                                setSelectedRekananIdForHonor(val);
+                                const matched = data.rekananTenagaAhli.find((r) => r.id === val);
+                                if (matched) {
+                                  setModalHonorPtkp(matched.ptkp || "TK/0");
+                                }
                               }}
                               className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
                             >
@@ -4366,17 +4376,23 @@ export function PayrollClient({
                             <CheckCircle size={10} /> Terverifikasi di Database
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-border/60">
+                        <div className="grid grid-cols-3 gap-2 text-[11px] pt-1.5 border-t border-border/60">
                           <div>
-                            <span className="text-muted-faint block">NIK (16 Digit Terkunci):</span>
+                            <span className="text-muted-faint block">NIK (16 Digit):</span>
                             <span className="font-mono font-bold text-navy-text">
                               {currentExpert.nik || "-"}
                             </span>
                           </div>
                           <div>
-                            <span className="text-muted-faint block">NPWP (Terkunci):</span>
+                            <span className="text-muted-faint block">NPWP:</span>
                             <span className="font-mono text-muted-stronger">
                               {currentExpert.npwp || "Tanpa NPWP"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-faint block">Status PTKP:</span>
+                            <span className="font-mono font-bold text-navy-text">
+                              {currentExpert.ptkp || "TK/0"}
                             </span>
                           </div>
                         </div>
@@ -4500,28 +4516,28 @@ export function PayrollClient({
                 )}
               </div>
 
-              {/* PTKP & Jenis Pajak */}
+              {/* Nominal Honor Bruto */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Nominal Gaji Bruto (Rp) *
+                </label>
+                <input
+                  type="number"
+                  name="nominalHonor"
+                  required
+                  min="0"
+                  value={modalHonorNominal || ""}
+                  onChange={(e) => {
+                    const val = Number(e.target.value) || 0;
+                    setModalHonorNominal(val);
+                  }}
+                  placeholder="0"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold"
+                />
+              </div>
+
+              {/* Jenis Pajak & Potongan Pajak */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">
-                    Status PTKP
-                  </label>
-                  <select
-                    name="ptkp"
-                    value={modalHonorPtkp}
-                    onChange={(e) => setModalHonorPtkp(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
-                  >
-                    <option value="TK/0">TK/0</option>
-                    <option value="TK/1">TK/1</option>
-                    <option value="TK/2">TK/2</option>
-                    <option value="TK/3">TK/3</option>
-                    <option value="K/0">K/0</option>
-                    <option value="K/1">K/1</option>
-                    <option value="K/2">K/2</option>
-                    <option value="K/3">K/3</option>
-                  </select>
-                </div>
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">
                     Jenis Pajak
@@ -4535,28 +4551,6 @@ export function PayrollClient({
                     <option value="PPh 21">PPh 21</option>
                     <option value="PPh 23">PPh 23</option>
                   </select>
-                </div>
-              </div>
-
-              {/* Nominal Honor & Potongan Pajak */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">
-                    Nominal Gaji Bruto (Rp) *
-                  </label>
-                  <input
-                    type="number"
-                    name="nominalHonor"
-                    required
-                    min="0"
-                    value={modalHonorNominal || ""}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 0;
-                      setModalHonorNominal(val);
-                    }}
-                    placeholder="0"
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold"
-                  />
                 </div>
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">
@@ -4932,17 +4926,38 @@ export function PayrollClient({
                 </span>
               </div>
 
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Bidang Keahlian / Spesialisasi (Opsional)
-                </label>
-                <input
-                  type="text"
-                  name="kategori"
-                  defaultValue={editingMasterAhli?.kategori ?? ""}
-                  placeholder="Contoh: Tenaga Ahli Struktur / Arsitektur / Geoteknik"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-navy-text block mb-1">
+                    Status PTKP *
+                  </label>
+                  <select
+                    name="ptkp"
+                    defaultValue={editingMasterAhli?.ptkp ?? "TK/0"}
+                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                  >
+                    <option value="TK/0">TK/0</option>
+                    <option value="TK/1">TK/1</option>
+                    <option value="TK/2">TK/2</option>
+                    <option value="TK/3">TK/3</option>
+                    <option value="K/0">K/0</option>
+                    <option value="K/1">K/1</option>
+                    <option value="K/2">K/2</option>
+                    <option value="K/3">K/3</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-navy-text block mb-1">
+                    Bidang Keahlian / Spesialisasi
+                  </label>
+                  <input
+                    type="text"
+                    name="kategori"
+                    defaultValue={editingMasterAhli?.kategori ?? ""}
+                    placeholder="Contoh: Ahli Struktur / Arsitektur"
+                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">

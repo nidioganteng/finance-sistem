@@ -7,6 +7,7 @@ export async function getProfitabilitasData(entityId: string) {
     include: {
       termin: { orderBy: { createdAt: "desc" }, take: 1 },
       jurnal: { include: { coaAccount: true } },
+      honorTenagaAhli: true,
     },
     orderBy: { code: "asc" },
   });
@@ -50,6 +51,16 @@ export async function getProfitabilitasData(entityId: string) {
         }
       }
     }
+
+    // Tambahkan honor tenaga ahli proyek yang belum tercatat di transaksi jurnal
+    const honorList = p.honorTenagaAhli || [];
+    for (const h of honorList) {
+      if (h.noBukti && projectJurnal.some((j) => j.noBukti === h.noBukti)) {
+        continue;
+      }
+      spendFromJurnal += Number(h.nominalHonor);
+    }
+
     const terpakai = spendFromJurnal > 0 ? spendFromJurnal : Number(p.spend);
     return { p, terpakai };
   });

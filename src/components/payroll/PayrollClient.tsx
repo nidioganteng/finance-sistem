@@ -4159,7 +4159,7 @@ export function PayrollClient({
       {/* ========================================================= */}
       {mounted && isHonorModalOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <CreditCard size={16} />
@@ -4510,16 +4510,16 @@ export function PayrollClient({
                     name="ptkp"
                     value={modalHonorPtkp}
                     onChange={(e) => setModalHonorPtkp(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
                   >
-                    <option value="TK/0">TK/0 (Tidak Kawin, 0 Tanggungan)</option>
-                    <option value="TK/1">TK/1 (Tidak Kawin, 1 Tanggungan)</option>
-                    <option value="TK/2">TK/2 (Tidak Kawin, 2 Tanggungan)</option>
-                    <option value="TK/3">TK/3 (Tidak Kawin, 3 Tanggungan)</option>
-                    <option value="K/0">K/0 (Kawin, 0 Tanggungan)</option>
-                    <option value="K/1">K/1 (Kawin, 1 Tanggungan)</option>
-                    <option value="K/2">K/2 (Kawin, 2 Tanggungan)</option>
-                    <option value="K/3">K/3 (Kawin, 3 Tanggungan)</option>
+                    <option value="TK/0">TK/0 - Tidak Kawin (0 Tanggungan)</option>
+                    <option value="TK/1">TK/1 - Tidak Kawin (1 Tanggungan)</option>
+                    <option value="TK/2">TK/2 - Tidak Kawin (2 Tanggungan)</option>
+                    <option value="TK/3">TK/3 - Tidak Kawin (3 Tanggungan)</option>
+                    <option value="K/0">K/0 - Kawin (0 Tanggungan)</option>
+                    <option value="K/1">K/1 - Kawin (1 Tanggungan)</option>
+                    <option value="K/2">K/2 - Kawin (2 Tanggungan)</option>
+                    <option value="K/3">K/3 - Kawin (3 Tanggungan)</option>
                   </select>
                 </div>
                 <div>
@@ -4530,18 +4530,18 @@ export function PayrollClient({
                     name="jenisPph"
                     value={modalHonorJenisPph}
                     onChange={(e) => setModalHonorJenisPph(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
                   >
-                    <option value="PPh 21">PPh 21 (Bukan Pegawai / Ahli Perorangan)</option>
-                    <option value="PPh 23">PPh 23 (Jasa Konsultasi / Badan / Ahli)</option>
+                    <option value="PPh 21">PPh 21 - Tenaga Ahli Perorangan</option>
+                    <option value="PPh 23">PPh 23 - Badan / Jasa Konsultasi</option>
                   </select>
                 </div>
               </div>
 
               {/* Nominal Honor Bruto, Tarif PPh, Potongan PPh Manual & Live Preview */}
-              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border space-y-3">
+              <div className="p-4 rounded-xl bg-surface-subtle border border-border space-y-3.5">
                 <div>
-                  <label className="font-semibold text-navy-text block mb-1">
+                  <label className="font-semibold text-navy-text block mb-1 text-xs">
                     Nominal Gaji Bruto (Rp) *
                   </label>
                   <input
@@ -4558,49 +4558,70 @@ export function PayrollClient({
                       }
                     }}
                     placeholder="0"
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold text-sm"
+                    className="w-full h-9 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold text-sm"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Preset Tarif Pajak Baris Tersendiri */}
+                <div className="space-y-1.5 pt-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-navy-text">
+                      Pilihan Tarif Cepat:
+                    </span>
+                    <span className="text-[10px] text-muted-faint font-mono">
+                      Klik preset untuk hitung otomatis
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { rate: 0, label: "0% Bebas" },
+                      { rate: 2.5, label: "2.5% NPWP" },
+                      { rate: 3, label: "3% Non-NPWP" },
+                      { rate: 5, label: "5% Umum" },
+                    ].map((item) => (
+                      <button
+                        key={item.rate}
+                        type="button"
+                        onClick={() => {
+                          setModalHonorTarifPph(item.rate);
+                          setModalHonorNominalPph(Math.round((modalHonorNominal * item.rate) / 100));
+                        }}
+                        className={`py-1 px-1 rounded-lg text-[11px] font-semibold border text-center transition-all cursor-pointer ${
+                          modalHonorTarifPph === item.rate
+                            ? "bg-navy text-white border-navy shadow-2xs font-bold"
+                            : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Input Tarif % dan Nominal Potongan berdampingan */}
+                <div className="grid grid-cols-2 gap-3 pt-0.5">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="font-semibold text-navy-text text-xs">
-                        Tarif Pajak (%)
-                      </label>
-                      <div className="flex gap-1">
-                        {[0, 2.5, 3, 5].map((rate) => (
-                          <button
-                            key={rate}
-                            type="button"
-                            onClick={() => {
-                              setModalHonorTarifPph(rate);
-                              setModalHonorNominalPph(Math.round((modalHonorNominal * rate) / 100));
-                            }}
-                            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border transition-colors cursor-pointer ${
-                              modalHonorTarifPph === rate
-                                ? "bg-navy text-white border-navy"
-                                : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
-                            }`}
-                          >
-                            {rate}%
-                          </button>
-                        ))}
-                      </div>
+                    <label className="font-semibold text-navy-text block mb-1 text-xs">
+                      Tarif Pajak (%)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        name="tarifPph21Persen"
+                        value={modalHonorTarifPph || ""}
+                        onChange={(e) => {
+                          const rate = Number(e.target.value) || 0;
+                          setModalHonorTarifPph(rate);
+                          setModalHonorNominalPph(Math.round((modalHonorNominal * rate) / 100));
+                        }}
+                        placeholder="0"
+                        className="w-full h-8 px-3 pr-7 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-faint text-xs font-mono">
+                        %
+                      </span>
                     </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="tarifPph21Persen"
-                      value={modalHonorTarifPph || ""}
-                      onChange={(e) => {
-                        const rate = Number(e.target.value) || 0;
-                        setModalHonorTarifPph(rate);
-                        setModalHonorNominalPph(Math.round((modalHonorNominal * rate) / 100));
-                      }}
-                      placeholder="0"
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                    />
                   </div>
 
                   <div>
@@ -4626,7 +4647,7 @@ export function PayrollClient({
                 </div>
 
                 {/* Live Summary Preview: Bruto - Pajak = Net */}
-                <div className="pt-2 border-t border-border/80 flex items-center justify-between text-xs">
+                <div className="p-3 rounded-xl bg-surface-card border border-border flex items-center justify-between text-xs shadow-2xs">
                   <div>
                     <span className="text-muted-faint text-[10px] block font-medium">Gaji Bersih (Net Diterima):</span>
                     <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
@@ -4635,7 +4656,7 @@ export function PayrollClient({
                   </div>
                   <div className="text-right text-[11px] text-muted-faint font-mono">
                     <span>Bruto: {formatRupiah(modalHonorNominal)}</span>
-                    <span className="text-rose-500 block">- Pajak: {formatRupiah(modalHonorNominalPph)}</span>
+                    <span className="text-rose-500 block font-semibold">- Pajak: {formatRupiah(modalHonorNominalPph)}</span>
                   </div>
                 </div>
               </div>

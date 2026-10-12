@@ -747,6 +747,17 @@ export function PayrollClient({
                                 <span className="px-1.5 py-0.2 rounded bg-surface-subtle font-mono text-[10px]">
                                   {p.statusKeluarga}
                                 </span>
+                                {p.masaKerja && (
+                                  <>
+                                    <span>·</span>
+                                    <span
+                                      className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-mono text-[10px] font-medium border border-amber-200 dark:border-amber-800/60"
+                                      title={`Mulai Bekerja: ${p.tanggalMasukFmt ?? "-"}`}
+                                    >
+                                      Masa Kerja: {p.masaKerja}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
 
@@ -1343,7 +1354,7 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-left text-xs">
+                <table className="w-full min-w-[960px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">NIK / Kode</th>
@@ -1353,6 +1364,7 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">PTKP Tahunan</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Gaji Pokok Standar</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Tunj. Jabatan Master</th>
+                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Mulai Bekerja / Masa Kerja</th>
                       <th className="py-2.5 px-3.5 text-center">Status</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
                     </tr>
@@ -1360,7 +1372,7 @@ export function PayrollClient({
                   <tbody className="divide-y divide-border">
                     {filteredPegawaiList.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-8 text-center text-muted-faint">
+                        <td colSpan={10} className="py-8 text-center text-muted-faint">
                           Tidak ada data karyawan ditemukan.
                         </td>
                       </tr>
@@ -1389,6 +1401,18 @@ export function PayrollClient({
                           </td>
                           <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
                             {p.tunjanganJabatanFmt || formatRupiah(p.tunjanganJabatan)}
+                          </td>
+                          <td className="py-3 px-3.5 whitespace-nowrap">
+                            {p.tanggalMasukFmt ? (
+                              <div>
+                                <div className="font-semibold text-navy-text text-xs">{p.tanggalMasukFmt}</div>
+                                <div className="text-[10px] font-mono text-muted-stronger">
+                                  Masa Kerja: <span className="text-emerald-700 dark:text-emerald-400 font-bold">{p.masaKerja}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-faint text-[11px]">-</span>
+                            )}
                           </td>
                           <td className="py-3 px-3.5 text-center">
                             <span
@@ -3095,6 +3119,25 @@ export function PayrollClient({
                 </p>
               </div>
 
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Bulan & Tahun Mulai Bekerja (Tanggal Masuk)
+                </label>
+                <input
+                  type="date"
+                  name="tanggalMasuk"
+                  defaultValue={
+                    editingPegawai?.tanggalMasuk
+                      ? new Date(editingPegawai.tanggalMasuk).toISOString().split("T")[0]
+                      : ""
+                  }
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
+                <p className="text-[10px] text-muted-faint mt-0.5">
+                  Mencatat tanggal/bulan/tahun mulai bekerja (misalnya masuk tahun 2014) untuk histori dan otomatis menghitung masa kerja karyawan.
+                </p>
+              </div>
+
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
@@ -3271,6 +3314,16 @@ export function PayrollClient({
                     <div className="text-[10px] text-muted-faint">
                       {editingGaji.pegawai.statusKeluarga} (PTKP: {editingGaji.pegawai.ptkpFmt})
                     </div>
+                    {editingGaji.pegawai.masaKerja && (
+                      <div className="text-[10px] text-muted-stronger mt-1">
+                        Masa Kerja: <span className="font-semibold text-emerald-700 dark:text-emerald-400 font-mono">{editingGaji.pegawai.masaKerja}</span>
+                        {editingGaji.pegawai.tanggalMasukFmt && (
+                          <span className="text-muted-faint text-[9px] block">
+                            (Sejak {editingGaji.pegawai.tanggalMasukFmt})
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-muted-faint block">Gaji Pokok & Tunj. Jabatan Master</span>
@@ -3895,7 +3948,7 @@ export function PayrollClient({
             {/* Slip Content */}
             <div className="p-6 space-y-5 text-xs">
               {/* Employee info */}
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-surface-subtle border border-border">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3.5 rounded-xl bg-surface-subtle border border-border">
                 <div>
                   <span className="text-muted-faint block text-[11px]">Nama Pegawai</span>
                   <strong className="text-navy-text text-sm">{slipModalItem.pegawaiNama}</strong>
@@ -3907,6 +3960,12 @@ export function PayrollClient({
                 <div>
                   <span className="text-muted-faint block text-[11px]">Jabatan</span>
                   <span className="text-navy-text">{slipModalItem.pegawaiJabatan}</span>
+                </div>
+                <div>
+                  <span className="text-muted-faint block text-[11px]">Mulai / Masa Kerja</span>
+                  <span className="text-navy-text font-semibold">
+                    {slipModalItem.pegawaiMasaKerja || "-"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-faint block text-[11px]">Periode Penggajian</span>

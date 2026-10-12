@@ -389,6 +389,7 @@ export async function getPayrollData(
       nik: true,
       npwp: true,
       kategori: true,
+      ptkp: true,
     },
     orderBy: { nama: "asc" },
   });

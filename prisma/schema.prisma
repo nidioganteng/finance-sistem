@@ -470,14 +470,17 @@ model GajiPegawaiBulanan {
   tarifTransportHarian   Decimal  @default(15000.00) @db.Decimal(18, 2) // Tarif Harian Transport (default Rp 15.000)
   tunjanganTransport     Decimal  @default(0.00) @db.Decimal(18, 2) // Hasil Hari Kerja x Tarif
   insentif               Decimal  @default(0.00) @db.Decimal(18, 2)
-  tunjanganBpjs          Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan BPJS Kes/TK ditanggung kantor
+  tunjanganLainnya       Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan Lainnya / Insentif
+  tunjanganBpjs          Decimal  @default(0.00) @db.Decimal(18, 2) // Total Tunjangan BPJS
+  tunjanganBpjsKes       Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan BPJS Kesehatan
+  tunjanganBpjsTk        Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan BPJS Ketenagakerjaan
   tunjanganPph           Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan PPh 21
   thr                    Decimal  @default(0.00) @db.Decimal(18, 2) // Tunjangan Hari Raya
-  bpjsKesehatan          Decimal  @default(0.00) @db.Decimal(18, 2)
-  bpjsKetenagakerjaan    Decimal  @default(0.00) @db.Decimal(18, 2)
+  bpjsKesehatan          Decimal  @default(0.00) @db.Decimal(18, 2) // Potongan BPJS Kesehatan Karyawan
+  bpjsKetenagakerjaan    Decimal  @default(0.00) @db.Decimal(18, 2) // Potongan BPJS Ketenagakerjaan Karyawan
   potonganBpjs           Decimal  @default(0.00) @db.Decimal(18, 2) // Total Potongan BPJS Karyawan
-  potonganLain           Decimal  @default(0.00) @db.Decimal(18, 2)
-  pph21                  Decimal  @default(0.00) @db.Decimal(18, 2)
+  potonganLain           Decimal  @default(0.00) @db.Decimal(18, 2) // Potongan Lain / Kasbon
+  pph21                  Decimal  @default(0.00) @db.Decimal(18, 2) // PPh 21 (Ditanggung Perusahaan)
   totalGajiKotor         Decimal  @db.Decimal(18, 2) // Pokok + Tunjangan + Insentif + THR
   totalGajiTerlaporPajak Decimal  @default(0.00) @db.Decimal(18, 2) // Bruto Pajak SPT PPh 21
   totalGajiBersih        Decimal  @db.Decimal(18, 2) // Take Home Pay riil

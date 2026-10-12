@@ -25,6 +25,9 @@ export type PegawaiItem = {
   gajiPokokFmt: string;
   tunjanganJabatan: number;
   tunjanganJabatanFmt: string;
+  tanggalMasuk?: string | null;
+  tanggalMasukFmt?: string | null;
+  masaKerja?: string | null;
   isActive: boolean;
   currentGaji?: GajiBulananItem | null;
   akumulasiTahun?: {
@@ -36,12 +39,31 @@ export type PegawaiItem = {
   };
 };
 
+export function hitungMasaKerja(tanggalMasuk: Date, refDate: Date = new Date()): string {
+  let thn = refDate.getFullYear() - tanggalMasuk.getFullYear();
+  let bln = refDate.getMonth() - tanggalMasuk.getMonth();
+  if (refDate.getDate() < tanggalMasuk.getDate()) {
+    bln--;
+  }
+  if (bln < 0) {
+    thn--;
+    bln += 12;
+  }
+  if (thn < 0) return "0 bulan";
+  if (thn === 0 && bln === 0) return "< 1 bulan";
+  if (thn === 0) return `${bln} bulan`;
+  if (bln === 0) return `${thn} tahun`;
+  return `${thn} tahun ${bln} bulan`;
+}
+
 export type GajiBulananItem = {
   id: string;
   pegawaiId: string;
   pegawaiNama: string;
   pegawaiNik: string;
   pegawaiJabatan: string;
+  pegawaiTanggalMasuk?: string | null;
+  pegawaiMasaKerja?: string | null;
   bulan: number;
   tahun: number;
   gajiPokok: number;
@@ -364,6 +386,13 @@ export async function getPayrollData(
     const ptkpNum = Number(p.ptkp);
     const gajiPokokNum = Number(p.gajiPokok);
 
+    const tglMasuk = p.tanggalMasuk ? new Date(p.tanggalMasuk) : null;
+    const tanggalMasukStr = tglMasuk ? tglMasuk.toISOString() : null;
+    const tanggalMasukFmt = tglMasuk
+      ? tglMasuk.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : null;
+    const masaKerjaStr = tglMasuk ? hitungMasaKerja(tglMasuk, new Date(year, month - 1, 1)) : null;
+
     let currentGaji: GajiBulananItem | null = null;
     if (currentGajiRaw) {
       const gp = Number(currentGajiRaw.gajiPokok);
@@ -390,6 +419,8 @@ export async function getPayrollData(
         pegawaiNama: p.nama,
         pegawaiNik: p.nik,
         pegawaiJabatan: p.jabatan,
+        pegawaiTanggalMasuk: tanggalMasukFmt,
+        pegawaiMasaKerja: masaKerjaStr,
         bulan: currentGajiRaw.bulan,
         tahun: currentGajiRaw.tahun,
         gajiPokok: gp,
@@ -462,6 +493,9 @@ export async function getPayrollData(
       gajiPokokFmt: formatRupiah(gajiPokokNum),
       tunjanganJabatan: tjMaster,
       tunjanganJabatanFmt: formatRupiah(tjMaster),
+      tanggalMasuk: tanggalMasukStr,
+      tanggalMasukFmt,
+      masaKerja: masaKerjaStr,
       isActive: p.isActive,
       currentGaji,
       akumulasiTahun: {

@@ -11,6 +11,17 @@ import { PrintButton } from "@/components/shared/PrintButton";
 import { AlertTriangle, ChevronRight, ChevronLeft } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
+function fmtDateShort(s: string) {
+  if (!s) return "—";
+  const d = new Date(s + "T00:00:00");
+  return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+}
+function fmtDateFull(s: string) {
+  if (!s) return "";
+  const d = new Date(s + "T00:00:00");
+  return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
 const KATEGORI_BADGE: Record<string, string> = {
   PENDAPATAN: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
   BEBAN:      "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400",
@@ -259,7 +270,14 @@ async function DrilldownView({
             ) : (
               data.entries.map((e, i) => (
                 <tr key={i} className="border-b border-surface-subtle hover:bg-surface-hover/30">
-                  <td className="py-2.5 px-5 text-[12.5px] text-muted whitespace-nowrap">{e.tanggal}</td>
+                  <td className="py-2.5 px-5 text-[12.5px] text-muted whitespace-nowrap">
+                    <div className="relative group/dt inline-block">
+                      <span>{fmtDateShort(e.tanggal)}</span>
+                      <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                        {fmtDateFull(e.tanggal)}
+                      </div>
+                    </div>
+                  </td>
                   <td className="py-2.5 px-3 font-mono text-[12px] text-muted whitespace-nowrap">{e.noBukti}</td>
                   <td className="py-2.5 px-3 text-[13px] text-muted-stronger">{e.keterangan}</td>
                   <td className="py-2.5 px-3 text-right tabular-nums text-[13px] text-navy-text whitespace-nowrap">{e.debitFmt}</td>

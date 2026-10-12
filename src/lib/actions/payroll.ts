@@ -32,6 +32,8 @@ export async function createPegawaiAction(formData: FormData) {
   const ptkp = Number(formData.get("ptkp")) || 54000000;
   const gajiPokok = Number(formData.get("gajiPokok")) || 0;
   const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
+  const tanggalMasukRaw = (formData.get("tanggalMasuk") as string)?.trim();
+  const tanggalMasuk = tanggalMasukRaw ? new Date(tanggalMasukRaw) : null;
   const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
 
   if (!entityId || !nik || !nama) {
@@ -56,6 +58,7 @@ export async function createPegawaiAction(formData: FormData) {
       ptkp,
       gajiPokok,
       tunjanganJabatan,
+      tanggalMasuk,
       isActive,
     },
   });
@@ -82,6 +85,8 @@ export async function updatePegawaiAction(formData: FormData) {
   const ptkp = Number(formData.get("ptkp")) || 54000000;
   const gajiPokok = Number(formData.get("gajiPokok")) || 0;
   const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
+  const tanggalMasukRaw = (formData.get("tanggalMasuk") as string)?.trim();
+  const tanggalMasuk = tanggalMasukRaw ? new Date(tanggalMasukRaw) : null;
   const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
 
   if (!id || !nik || !nama) {
@@ -111,6 +116,7 @@ export async function updatePegawaiAction(formData: FormData) {
       ptkp,
       gajiPokok,
       tunjanganJabatan,
+      tanggalMasuk,
       isActive,
     },
   });

@@ -355,6 +355,13 @@ export async function getPiutangData(entityId: string | string[]) {
           },
           orderBy: { tanggal: "desc" },
         },
+        honorTenagaAhli: {
+          include: {
+            entity: { select: { id: true, key: true, name: true } },
+            rekanan: { select: { id: true, nama: true, nik: true } },
+          },
+          orderBy: { tanggal: "desc" },
+        },
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -706,6 +713,39 @@ export async function getPiutangData(entityId: string | string[]) {
         sumberKasBank,
       };
     });
+
+    // Prioritas 4: Realisasi honor tenaga ahli yang dialokasikan ke proyek ini (Issue 98)
+    const projectHonorList = p.honorTenagaAhli || [];
+    for (const h of projectHonorList) {
+      if (h.noBukti && (seenCrossKeys.has(h.noBukti) || projectJurnal.some((j) => j.noBukti === h.noBukti))) {
+        continue;
+      }
+      const nominal = Number(h.nominalHonor);
+      const isTalangan = h.entityId !== p.entityId;
+      const sumberKasBank = isTalangan
+        ? `Talangan ${h.entity?.name || "Holding"} (Payroll)`
+        : `Payroll (${h.entity?.name || "Kas/Bank"})`;
+
+      const uraianKet = h.uraian
+        ? `${h.nama} - ${h.uraian}`
+        : `Honor Tenaga Ahli: ${h.nama}`;
+
+      expenseItems.push({
+        id: h.id,
+        tanggal: h.tanggal.toISOString(),
+        tanggalFmt: h.tanggal.toLocaleDateString("id-ID"),
+        noBukti: h.noBukti || "PAYROLL",
+        keterangan: uraianKet,
+        coaCode: "511",
+        coaName: "Beban Honorarium Tenaga Ahli",
+        kategoriBeban: "Gaji & Upah",
+        nominal,
+        nominalFmt: formatRupiah(nominal),
+        sumberKasBank,
+      });
+    }
+
+    expenseItems.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
 
     let totalGaji = 0;
     let totalMaterial = 0;

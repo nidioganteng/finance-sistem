@@ -116,3 +116,7 @@ select.no-custom-chevron {
   padding-right: 1.5rem !important;
 }
 
+/* ── DatePicker (react-day-picker v10) – reset semua style bawaan ── */
+.dp-root { all: revert; }
+.rdp-root * { box-sizing: border-box; }
+

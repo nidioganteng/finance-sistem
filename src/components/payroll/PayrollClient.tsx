@@ -657,7 +657,7 @@ export function PayrollClient({
 
             <div className="p-4 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20">
               <div className="text-[11px] font-semibold text-blue-800 dark:text-blue-300 flex items-center justify-between">
-                <span>Bruto Terlapor Pajak</span>
+                <span>Total Terlapor Pajak</span>
                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-mono font-bold">
                   SPT PPh 21
                 </span>
@@ -672,7 +672,7 @@ export function PayrollClient({
 
             <div className="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20">
               <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                <span>Total Gaji Bersih (THP)</span>
+                <span>Gaji Bersih stlh BPJS</span>
                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 font-mono font-bold">
                   Kas / GL 511
                 </span>
@@ -681,23 +681,88 @@ export function PayrollClient({
                 {data.summaryBulanIni.totalGajiBersihFmt}
               </div>
               <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/70 mt-1">
-                Dana riil keluar dari rekening
+                Dana riil keluar dari kas/bank
               </div>
             </div>
           </div>
 
           {/* Sub-Tab Content 1: Gaji Bulanan */}
           {pegawaiSubTab === "gaji" && (
-            <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text">
-                    Daftar Gaji Pegawai Tetap – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
-                  </h3>
-                  <p className="text-xs text-muted-faint">
-                    Entitas: {data.entity?.name} · Masukkan atau sesuaikan komponen tunjangan, insentif, dan potongan
-                  </p>
+            <div className="space-y-4">
+              {/* DISPLAY DUAL TOTAL UTAMA (Requirement Issue & Integrasi Jurnal Umum) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Total Gaji Bersih setelah BPJS */}
+                <div className="p-4 sm:p-5 rounded-2xl border-2 border-emerald-400/80 dark:border-emerald-700 bg-gradient-to-br from-emerald-50/90 via-surface-card to-emerald-50/40 dark:from-emerald-950/50 dark:via-surface-card dark:to-emerald-950/20 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-200">
+                        1. Total Gaji Bersih setelah BPJS
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800">
+                      Take Home Pay · Kas GL 511
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-700 dark:text-emerald-300">
+                    {data.summaryBulanIni.totalGajiBersihFmt}
+                  </div>
+                  <div className="mt-2.5 pt-2.5 border-t border-emerald-200/80 dark:border-emerald-800/80 flex items-center justify-between flex-wrap gap-2 text-[11px]">
+                    <span className="text-emerald-800/90 dark:text-emerald-300/90">
+                      Total penerimaan riil karyawan setelah dipotong BPJS & kasbon
+                    </span>
+                    {data.penyesuaianJurnal.pegawai.isSinkronBulan ? (
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1 bg-emerald-100/90 dark:bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-300/60 dark:border-emerald-700">
+                        ✓ 100% Balance dengan Akun 511 di Jurnal Umum
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setPegawaiSubTab("penyesuaian")}
+                        className="text-[10px] font-bold text-amber-800 dark:text-amber-300 inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 hover:underline cursor-pointer"
+                      >
+                        ⚠️ Cek Selisih Jurnal: {data.penyesuaianJurnal.pegawai.selisihBulanFmt}
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* 2. Total Gaji Terlapor Pajak */}
+                <div className="p-4 sm:p-5 rounded-2xl border-2 border-blue-400/80 dark:border-blue-700 bg-gradient-to-br from-blue-50/90 via-surface-card to-blue-50/40 dark:from-blue-950/50 dark:via-surface-card dark:to-blue-950/20 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">
+                        2. Total Gaji Terlapor Pajak
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-800">
+                      Bruto Pajak · SPT PPh 21
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold font-mono text-blue-900 dark:text-blue-200">
+                    {data.summaryBulanIni.totalGajiTerlaporPajakFmt || formatRupiah(data.summaryBulanIni.totalGajiTerlaporPajak)}
+                  </div>
+                  <div className="mt-2.5 pt-2.5 border-t border-blue-200/80 dark:border-blue-800/80 flex items-center justify-between flex-wrap gap-2 text-[11px]">
+                    <span className="text-blue-800/90 dark:text-blue-300/90">
+                      Total seluruh penghasilan bruto yang dilaporkan pada SPT Masa PPh 21
+                    </span>
+                    <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-100/90 dark:bg-blue-900/60 px-2 py-0.5 rounded">
+                      PPh 21 Ditanggung Perusahaan
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-navy-text">
+                      Daftar Gaji Pegawai Tetap – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
+                    </h3>
+                    <p className="text-xs text-muted-faint">
+                      Entitas: {data.entity?.name} · Masukkan atau sesuaikan komponen tunjangan, insentif, dan potongan
+                    </p>
+                  </div>
 
                 {isManager && (
                   <button
@@ -915,6 +980,7 @@ export function PayrollClient({
                 </table>
               </div>
             </div>
+          </div>
           )}
 
           {/* Sub-Tab Content 2: Rekapitulasi Per Bulan Pegawai Tetap (Jan - Des) */}

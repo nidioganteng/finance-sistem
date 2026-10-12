@@ -191,8 +191,11 @@ export function PayrollClient({
   const [modalTarifTransport, setModalTarifTransport] = useState<number>(15000);
   const [modalTunjanganTransport, setModalTunjanganTransport] = useState<number>(300000);
   const [modalInsentif, setModalInsentif] = useState<number>(0);
+  const [modalTunjanganLainnya, setModalTunjanganLainnya] = useState<number>(0);
   const [modalThr, setModalThr] = useState<number>(0);
   const [modalTunjanganBpjs, setModalTunjanganBpjs] = useState<number>(0);
+  const [modalTunjanganBpjsKes, setModalTunjanganBpjsKes] = useState<number>(0);
+  const [modalTunjanganBpjsTk, setModalTunjanganBpjsTk] = useState<number>(0);
   const [modalTunjanganPph, setModalTunjanganPph] = useState<number>(0);
   const [modalPotonganBpjs, setModalPotonganBpjs] = useState<number>(0);
   const [modalBpjsKes, setModalBpjsKes] = useState<number>(0);
@@ -218,9 +221,15 @@ export function PayrollClient({
       setModalHariKerja(hk);
       setModalTarifTransport(tarif);
       setModalTunjanganTransport(g?.tunjanganTransport ?? (hk * tarif));
-      setModalInsentif(g?.insentif ?? 0);
+      const tLain = g ? (g.tunjanganLainnya || g.insentif) : 0;
+      setModalInsentif(tLain);
+      setModalTunjanganLainnya(tLain);
       setModalThr(g?.thr ?? 0);
-      setModalTunjanganBpjs(g?.tunjanganBpjs ?? 0);
+      setModalTunjanganBpjsKes(g?.tunjanganBpjsKes ?? 0);
+      setModalTunjanganBpjsTk(g?.tunjanganBpjsTk ?? 0);
+      setModalTunjanganBpjs(
+        g?.tunjanganBpjs ?? ((g?.tunjanganBpjsKes ?? 0) + (g?.tunjanganBpjsTk ?? 0))
+      );
       setModalTunjanganPph(g?.tunjanganPph ?? 0);
       setModalPotonganBpjs(
         g?.potonganBpjs ?? ((g?.bpjsKesehatan ?? 0) + (g?.bpjsKetenagakerjaan ?? 0))
@@ -246,9 +255,15 @@ export function PayrollClient({
     setModalHariKerja(hk);
     setModalTarifTransport(tarif);
     setModalTunjanganTransport(g?.tunjanganTransport ?? (hk * tarif));
-    setModalInsentif(g?.insentif ?? 0);
+    const tLain = g ? (g.tunjanganLainnya || g.insentif) : 0;
+    setModalInsentif(tLain);
+    setModalTunjanganLainnya(tLain);
     setModalThr(g?.thr ?? 0);
-    setModalTunjanganBpjs(g?.tunjanganBpjs ?? 0);
+    setModalTunjanganBpjsKes(g?.tunjanganBpjsKes ?? 0);
+    setModalTunjanganBpjsTk(g?.tunjanganBpjsTk ?? 0);
+    setModalTunjanganBpjs(
+      g?.tunjanganBpjs ?? ((g?.tunjanganBpjsKes ?? 0) + (g?.tunjanganBpjsTk ?? 0))
+    );
     setModalTunjanganPph(g?.tunjanganPph ?? 0);
     setModalPotonganBpjs(
       g?.potonganBpjs ?? ((g?.bpjsKesehatan ?? 0) + (g?.bpjsKetenagakerjaan ?? 0))
@@ -2989,6 +3004,9 @@ export function PayrollClient({
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <Users size={16} />
                 <span>{editingPegawai ? "Edit Data Pegawai Tetap" : "Tambah Pegawai Tetap Baru"}</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-navy/10 text-navy font-sans">
+                  {data.entity?.name}
+                </span>
               </h3>
               <button
                 onClick={() => setIsPegawaiModalOpen(false)}
@@ -3178,23 +3196,35 @@ export function PayrollClient({
       {/* MODAL 2: FORM INPUT / EDIT GAJI BULANAN */}
       {/* ========================================================= */}
       {mounted && isGajiModalOpen && editingGaji && typeof document !== "undefined" && (() => {
+        const liveTotalBpjs = Number(modalBpjsKes || 0) + Number(modalBpjsTk || 0);
+        const liveTotalTunjanganBpjs =
+          Number(modalTunjanganBpjsKes || 0) + Number(modalTunjanganBpjsTk || 0);
+
         const liveTotalGajiKotor =
           Number(modalGajiPokok || 0) +
           Number(modalTunjanganJabatan || 0) +
           Number(modalTunjanganTransport || 0) +
-          Number(modalInsentif || 0) +
+          Number(modalTunjanganLainnya || 0) +
           Number(modalThr || 0) +
-          Number(modalTunjanganBpjs || 0) +
+          liveTotalTunjanganBpjs +
           Number(modalTunjanganPph || 0);
 
         const liveTotalGajiTerlaporPajak = liveTotalGajiKotor;
 
-        const liveTotalPotongan =
-          Number(modalPotonganBpjs || (Number(modalBpjsKes || 0) + Number(modalBpjsTk || 0))) +
-          Number(modalPph21 || 0) +
-          Number(modalPotonganLain || 0);
+        // Potongan yang riil dipotong dari karyawan: BPJS (Kes + TK) dan Potongan Lain
+        // PPh 21 TIDAK dipotong dari karyawan karena 100% ditanggung perusahaan
+        const liveTotalPotonganKaryawan =
+          liveTotalBpjs + Number(modalPotonganLain || 0);
 
-        const liveTotalGajiBersih = Math.max(0, liveTotalGajiKotor - liveTotalPotongan);
+        const liveTotalGajiBersih = Math.max(
+          0,
+          Number(modalGajiPokok || 0) +
+            Number(modalTunjanganJabatan || 0) +
+            Number(modalTunjanganTransport || 0) +
+            Number(modalTunjanganLainnya || 0) +
+            Number(modalThr || 0) -
+            liveTotalPotonganKaryawan
+        );
 
         return createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -3204,6 +3234,9 @@ export function PayrollClient({
                   <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                     <CreditCard size={16} />
                     <span>Komponen Gaji: {editingGaji.pegawai.nama}</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-navy/10 text-navy font-sans">
+                      {data.entity?.name}
+                    </span>
                   </h3>
                   <p className="text-[11px] text-muted-faint mt-0.5">
                     Periode: {BULAN_NAMES[modalGajiBulan - 1]} {modalGajiTahun} · {editingGaji.pegawai.jabatan}
@@ -3243,8 +3276,9 @@ export function PayrollClient({
               >
                 <input type="hidden" name="pegawaiId" value={modalGajiPegawaiId} />
                 <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
-                <input type="hidden" name="bpjsKesehatan" value={modalBpjsKes} />
-                <input type="hidden" name="bpjsKetenagakerjaan" value={modalBpjsTk} />
+                <input type="hidden" name="tunjanganBpjs" value={modalTunjanganBpjsKes + modalTunjanganBpjsTk} />
+                <input type="hidden" name="potonganBpjs" value={modalBpjsKes + modalBpjsTk} />
+                <input type="hidden" name="insentif" value={modalTunjanganLainnya} />
 
                 {/* 1. Pemilihan Periode Bulan & Tahun Dinamis */}
                 <div className="p-3.5 rounded-xl bg-surface-subtle border border-border space-y-2">
@@ -3437,98 +3471,132 @@ export function PayrollClient({
                     </p>
                   </div>
 
-                  {/* Insentif & THR */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-semibold text-navy-text block mb-1">Insentif / Lembur / Bonus</label>
-                      <input
-                        type="number"
-                        name="insentif"
-                        value={modalInsentif || ""}
-                        onChange={(e) => setModalInsentif(Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-semibold text-navy-text block mb-1">THR / Bonus Keagamaan</label>
-                      <input
-                        type="number"
-                        name="thr"
-                        value={modalThr || ""}
-                        onChange={(e) => setModalThr(Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                      />
-                    </div>
-                  </div>
+                  {/* 3. Komponen Tunjangan Tambahan */}
+                  <div className="space-y-2.5 pt-2 border-t border-border/60">
+                    <h5 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-muted-stronger">
+                      Komponen Tunjangan Tambahan
+                    </h5>
 
-                  {/* 4. Kolom Tambahan: Tunjangan BPJS & Tunjangan PPh */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Kes/TK</label>
-                      <input
-                        type="number"
-                        name="tunjanganBpjs"
-                        value={modalTunjanganBpjs || ""}
-                        onChange={(e) => setModalTunjanganBpjs(Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                      />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Tunjangan BPJS ditanggung pemberi kerja
-                      </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Kesehatan</label>
+                        <input
+                          type="number"
+                          name="tunjanganBpjsKes"
+                          value={modalTunjanganBpjsKes || ""}
+                          onChange={(e) => setModalTunjanganBpjsKes(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Tunjangan BPJS Kesehatan ditanggung pemberi kerja
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Ketenagakerjaan</label>
+                        <input
+                          type="number"
+                          name="tunjanganBpjsTk"
+                          value={modalTunjanganBpjsTk || ""}
+                          onChange={(e) => setModalTunjanganBpjsTk(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Tunjangan BPJS TK ditanggung pemberi kerja
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="font-semibold text-navy-text block mb-1">Tunjangan PPh 21</label>
-                      <input
-                        type="number"
-                        name="tunjanganPph"
-                        value={modalTunjanganPph || ""}
-                        onChange={(e) => setModalTunjanganPph(Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                      />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Subsidi PPh ditanggung pemberi kerja
-                      </span>
+
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan THR</label>
+                        <input
+                          type="number"
+                          name="thr"
+                          value={modalThr || ""}
+                          onChange={(e) => setModalThr(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Tunjangan Hari Raya
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan PPh</label>
+                        <input
+                          type="number"
+                          name="tunjanganPph"
+                          value={modalTunjanganPph || ""}
+                          onChange={(e) => setModalTunjanganPph(Number(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Subsidi PPh 21 kantor
+                        </span>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Tunjangan Lainnya</label>
+                        <input
+                          type="number"
+                          name="tunjanganLainnya"
+                          value={modalTunjanganLainnya || ""}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            setModalTunjanganLainnya(val);
+                            setModalInsentif(val);
+                          }}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <span className="text-[10px] text-muted-faint block mt-0.5">
+                          Insentif / lembur / bonus
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Potongan */}
                 <div className="space-y-2.5 pt-2 border-t border-border">
-                  <h4 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-rose-700 dark:text-rose-400">
-                    B. Komponen Potongan (Deductions)
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-navy-text uppercase tracking-wider text-[10px] text-rose-700 dark:text-rose-400">
+                      B. Komponen Potongan (Deductions)
+                    </h4>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 font-semibold">
+                      ✓ PPh 21 Ditanggung Perusahaan (Rp 0 Dipotong dari Karyawan)
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-3 gap-2.5">
                     <div>
-                      <label className="font-semibold text-navy-text block mb-1">Potongan BPJS</label>
+                      <label className="font-semibold text-navy-text block mb-1">Potongan BPJS Kesehatan</label>
                       <input
                         type="number"
-                        name="potonganBpjs"
-                        value={modalPotonganBpjs || ""}
-                        onChange={(e) => setModalPotonganBpjs(Number(e.target.value) || 0)}
+                        name="bpjsKesehatan"
+                        value={modalBpjsKes || ""}
+                        onChange={(e) => setModalBpjsKes(Number(e.target.value) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
-                        BPJS Kes/TK pegawai
+                        BPJS Kesehatan pegawai
                       </span>
                     </div>
                     <div>
-                      <label className="font-semibold text-navy-text block mb-1">Potongan PPh 21</label>
+                      <label className="font-semibold text-navy-text block mb-1">Potongan BPJS TK</label>
                       <input
                         type="number"
-                        name="pph21"
-                        value={modalPph21 || ""}
-                        onChange={(e) => setModalPph21(Number(e.target.value) || 0)}
+                        name="bpjsKetenagakerjaan"
+                        value={modalBpjsTk || ""}
+                        onChange={(e) => setModalBpjsTk(Number(e.target.value) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Pajak penghasilan
+                        BPJS Ketenagakerjaan
                       </span>
                     </div>
                     <div>
@@ -3543,6 +3611,31 @@ export function PayrollClient({
                       />
                       <span className="text-[10px] text-muted-faint block mt-0.5">
                         Kasbon / pinjaman
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* PPh 21 Ditanggung Perusahaan Card */}
+                  <div className="p-2.5 rounded-xl bg-surface-subtle border border-border flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-navy-text text-xs">
+                        Pelaporan PPh 21 (SPT Pajak)
+                      </div>
+                      <div className="text-[10px] text-muted-faint">
+                        PPh 21 ditanggung perusahaan sehingga <strong className="text-emerald-700 dark:text-emerald-400">tidak memotong Take Home Pay</strong> karyawan.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        name="pph21"
+                        value={modalPph21 || ""}
+                        onChange={(e) => setModalPph21(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-32 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right"
+                      />
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded border border-amber-200 dark:border-amber-800 whitespace-nowrap">
+                        Beban Kantor
                       </span>
                     </div>
                   </div>
@@ -4014,24 +4107,38 @@ export function PayrollClient({
                       <span className="font-mono">{slipModalItem.tunjanganTransportFmt}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">Insentif / Lembur:</span>
-                      <span className="font-mono">{slipModalItem.insentifFmt}</span>
+                      <span className="text-muted-faint">Tunjangan Lainnya:</span>
+                      <span className="font-mono">{slipModalItem.tunjanganLainnyaFmt || slipModalItem.insentifFmt}</span>
                     </div>
                     {slipModalItem.thr > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-faint">THR / Bonus:</span>
+                        <span className="text-muted-faint">Tunjangan THR:</span>
                         <span className="font-mono">{slipModalItem.thrFmt}</span>
                       </div>
                     )}
-                    {slipModalItem.tunjanganBpjs > 0 && (
+                    {slipModalItem.tunjanganBpjsKes > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-faint">Tunjangan BPJS Kes/TK:</span>
-                        <span className="font-mono">{slipModalItem.tunjanganBpjsFmt}</span>
+                        <span className="text-muted-faint">Tunjangan BPJS Kesehatan:</span>
+                        <span className="font-mono">{slipModalItem.tunjanganBpjsKesFmt}</span>
                       </div>
                     )}
+                    {slipModalItem.tunjanganBpjsTk > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-faint">Tunjangan BPJS Ketenagakerjaan:</span>
+                        <span className="font-mono">{slipModalItem.tunjanganBpjsTkFmt}</span>
+                      </div>
+                    )}
+                    {slipModalItem.tunjanganBpjsKes === 0 &&
+                      slipModalItem.tunjanganBpjsTk === 0 &&
+                      slipModalItem.tunjanganBpjs > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-faint">Tunjangan BPJS Kes/TK:</span>
+                          <span className="font-mono">{slipModalItem.tunjanganBpjsFmt}</span>
+                        </div>
+                      )}
                     {slipModalItem.tunjanganPph > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-faint">Tunjangan PPh 21:</span>
+                        <span className="text-muted-faint">Tunjangan PPh:</span>
                         <span className="font-mono">{slipModalItem.tunjanganPphFmt}</span>
                       </div>
                     )}
@@ -4051,30 +4158,33 @@ export function PayrollClient({
                   </h4>
                   <div className="space-y-1.5 text-[11px]">
                     <div className="flex justify-between">
-                      <span className="text-muted-faint">Potongan BPJS:</span>
+                      <span className="text-muted-faint">Potongan BPJS Kesehatan:</span>
                       <span className="font-mono">
-                        {slipModalItem.potonganBpjsFmt ||
-                          formatRupiah(
-                            slipModalItem.potonganBpjs ||
-                              slipModalItem.bpjsKesehatan + slipModalItem.bpjsKetenagakerjaan
-                          )}
+                        {slipModalItem.bpjsKesehatanFmt || formatRupiah(slipModalItem.bpjsKesehatan)}
                       </span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-muted-faint">Potongan BPJS TK:</span>
+                      <span className="font-mono">
+                        {slipModalItem.bpjsKetenagakerjaanFmt || formatRupiah(slipModalItem.bpjsKetenagakerjaan)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
                       <span className="text-muted-faint">Potongan PPh 21:</span>
-                      <span className="font-mono">{slipModalItem.pph21Fmt}</span>
+                      <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold text-[10px]">
+                        Rp 0 (Ditanggung Kantor)
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-faint">Potongan Lainnya / Kasbon:</span>
                       <span className="font-mono">{slipModalItem.potonganLainFmt}</span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-border font-bold text-rose-700 dark:text-rose-400">
-                      <span>Total Potongan:</span>
+                      <span>Total Potongan Karyawan:</span>
                       <span className="font-mono">
                         {formatRupiah(
                           (slipModalItem.potonganBpjs ||
                             slipModalItem.bpjsKesehatan + slipModalItem.bpjsKetenagakerjaan) +
-                            slipModalItem.pph21 +
                             slipModalItem.potonganLain
                         )}
                       </span>

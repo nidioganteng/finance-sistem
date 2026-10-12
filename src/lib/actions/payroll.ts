@@ -180,8 +180,17 @@ export async function saveGajiBulananAction(formData: FormData) {
     }
   }
 
-  const insentif = Number(formData.get("insentif")) || 0;
-  const tunjanganBpjs = Number(formData.get("tunjanganBpjs")) || 0;
+  const tunjanganLainnya =
+    Number(formData.get("tunjanganLainnya")) || Number(formData.get("insentif")) || 0;
+  const insentif = tunjanganLainnya;
+
+  const tunjanganBpjsKes = Number(formData.get("tunjanganBpjsKes")) || 0;
+  const tunjanganBpjsTk = Number(formData.get("tunjanganBpjsTk")) || 0;
+  let tunjanganBpjs = Number(formData.get("tunjanganBpjs")) || 0;
+  if (tunjanganBpjs === 0 && (tunjanganBpjsKes > 0 || tunjanganBpjsTk > 0)) {
+    tunjanganBpjs = tunjanganBpjsKes + tunjanganBpjsTk;
+  }
+
   const tunjanganPph = Number(formData.get("tunjanganPph")) || 0;
   const thr = Number(formData.get("thr")) || 0;
 
@@ -212,14 +221,26 @@ export async function saveGajiBulananAction(formData: FormData) {
   // Dual Total:
   // 1. Total Gaji Kotor / Terlapor Pajak (Bruto SPT PPh 21)
   const totalGajiKotor =
-    gajiPokok + tunjanganJabatan + tunjanganTransport + insentif + tunjanganBpjs + tunjanganPph + thr;
-  const totalGajiTerlaporPajak =
-    gajiPokok + tunjanganJabatan + tunjanganTransport + insentif + tunjanganBpjs + tunjanganPph + thr;
+    gajiPokok +
+    tunjanganJabatan +
+    tunjanganTransport +
+    tunjanganLainnya +
+    tunjanganBpjs +
+    tunjanganPph +
+    thr;
+  const totalGajiTerlaporPajak = totalGajiKotor;
 
   // 2. Total Gaji Bersih (Take Home Pay yang ditransfer riil ke karyawan)
+  // CATATAN: Potongan PPh 21 tidak dipotong dari karyawan karena ditanggung sepenuhnya oleh perusahaan
   const totalGajiBersih = Math.max(
     0,
-    gajiPokok + tunjanganJabatan + tunjanganTransport + insentif + thr - potonganBpjs - potonganLain - pph21
+    gajiPokok +
+      tunjanganJabatan +
+      tunjanganTransport +
+      tunjanganLainnya +
+      thr -
+      potonganBpjs -
+      potonganLain
   );
 
   const gaji = await prisma.gajiPegawaiBulanan.upsert({
@@ -237,7 +258,10 @@ export async function saveGajiBulananAction(formData: FormData) {
       tarifTransportHarian,
       tunjanganTransport,
       insentif,
+      tunjanganLainnya,
       tunjanganBpjs,
+      tunjanganBpjsKes,
+      tunjanganBpjsTk,
       tunjanganPph,
       thr,
       bpjsKesehatan,
@@ -261,7 +285,10 @@ export async function saveGajiBulananAction(formData: FormData) {
       tarifTransportHarian,
       tunjanganTransport,
       insentif,
+      tunjanganLainnya,
       tunjanganBpjs,
+      tunjanganBpjsKes,
+      tunjanganBpjsTk,
       tunjanganPph,
       thr,
       bpjsKesehatan,
@@ -553,13 +580,23 @@ export async function copyGajiBulanSebelumnyaAction(
           tahun: targetYear,
           gajiPokok: prev.gajiPokok,
           tunjanganJabatan: prev.tunjanganJabatan,
+          hariKerja: prev.hariKerja,
+          tarifTransportHarian: prev.tarifTransportHarian,
           tunjanganTransport: prev.tunjanganTransport,
           insentif: prev.insentif,
+          tunjanganLainnya: (prev as any).tunjanganLainnya ?? prev.insentif,
+          tunjanganBpjs: prev.tunjanganBpjs,
+          tunjanganBpjsKes: (prev as any).tunjanganBpjsKes ?? 0,
+          tunjanganBpjsTk: (prev as any).tunjanganBpjsTk ?? 0,
+          tunjanganPph: prev.tunjanganPph,
+          thr: 0,
           bpjsKesehatan: prev.bpjsKesehatan,
           bpjsKetenagakerjaan: prev.bpjsKetenagakerjaan,
+          potonganBpjs: prev.potonganBpjs,
           potonganLain: prev.potonganLain,
           pph21: prev.pph21,
           totalGajiKotor: prev.totalGajiKotor,
+          totalGajiTerlaporPajak: prev.totalGajiTerlaporPajak,
           totalGajiBersih: prev.totalGajiBersih,
           catatan: `Disalin dari bulan ${sourceMonth}/${sourceYear}`,
         },

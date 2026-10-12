@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageTransaksi } from "@/lib/rbac";
 import { logActivity } from "@/lib/actions/log";
+import { syncProjectSpend } from "@/lib/piutang";
 
 // Helper check auth
 async function checkAuth() {
@@ -351,9 +352,11 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   let nik = (formData.get("nik") as string)?.trim();
   let nama = (formData.get("nama") as string)?.trim();
   let npwp = (formData.get("npwp") as string)?.trim() || null;
+  const ptkp = (formData.get("ptkp") as string)?.trim() || "TK/0";
   const uraian = (formData.get("uraian") as string)?.trim();
   const tanggalStr = formData.get("tanggal") as string;
   const nominalHonor = Number(formData.get("nominalHonor")) || 0;
+  const jenisPph = (formData.get("jenisPph") as string)?.trim() || "PPh 21";
   const tarifPph21Persen = Number(formData.get("tarifPph21Persen")) || 0;
   const pph21 = Number(formData.get("pph21")) || 0;
   const projectId = (formData.get("projectId") as string)?.trim() || null;
@@ -387,8 +390,10 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   }
 
   const tanggal = new Date(tanggalStr);
-  const bulan = tanggal.getMonth() + 1;
-  const tahun = tanggal.getFullYear();
+  const bulanForm = Number(formData.get("bulan"));
+  const tahunForm = Number(formData.get("tahun"));
+  const bulan = bulanForm && bulanForm >= 1 && bulanForm <= 12 ? bulanForm : tanggal.getMonth() + 1;
+  const tahun = tahunForm && tahunForm >= 2000 ? tahunForm : tanggal.getFullYear();
   const nominalBersih = Math.max(0, nominalHonor - pph21);
 
   // Jika rekananId belum ada, cek apakah ada master Rekanan dengan NIK/NPWP cocok
@@ -405,6 +410,16 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
     }
   }
 
+  // Cek projectId lama jika proses edit untuk update realisasi biaya proyek
+  let previousProjectId: string | null = null;
+  if (id) {
+    const prev = await prisma.honorTenagaAhli.findUnique({
+      where: { id },
+      select: { projectId: true },
+    });
+    previousProjectId = prev?.projectId ?? null;
+  }
+
   let honor;
   if (id) {
     honor = await prisma.honorTenagaAhli.update({
@@ -415,11 +430,13 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
         nik,
         nama,
         npwp,
+        ptkp,
         uraian,
         tanggal,
         bulan,
         tahun,
         nominalHonor,
+        jenisPph,
         tarifPph21Persen,
         pph21,
         nominalBersih,
@@ -442,11 +459,13 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
         nik,
         nama,
         npwp,
+        ptkp,
         uraian,
         tanggal,
         bulan,
         tahun,
         nominalHonor,
+        jenisPph,
         tarifPph21Persen,
         pph21,
         nominalBersih,
@@ -463,8 +482,18 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
     );
   }
 
+  // Hubungkan ke pengeluaran proyek (realisasi biaya proyek - Issue 98)
+  if (honor.projectId) {
+    await syncProjectSpend(honor.projectId);
+  }
+  if (previousProjectId && previousProjectId !== honor.projectId) {
+    await syncProjectSpend(previousProjectId);
+  }
+
   revalidatePath("/payroll");
   revalidatePath("/laporan");
+  revalidatePath("/piutang");
+  revalidatePath("/profitabilitas");
   return { success: true, data: honor };
 }
 
@@ -473,11 +502,15 @@ export async function deleteHonorTenagaAhliAction(id: string) {
 
   const existing = await prisma.honorTenagaAhli.findUnique({
     where: { id },
-    select: { id: true, nama: true, nominalHonor: true, entityId: true },
+    select: { id: true, nama: true, nominalHonor: true, entityId: true, projectId: true },
   });
   if (!existing) throw new Error("Data honorarium tidak ditemukan.");
 
   await prisma.honorTenagaAhli.delete({ where: { id } });
+
+  if (existing.projectId) {
+    await syncProjectSpend(existing.projectId);
+  }
 
   await logActivity(
     session.user.id,
@@ -488,6 +521,8 @@ export async function deleteHonorTenagaAhliAction(id: string) {
 
   revalidatePath("/payroll");
   revalidatePath("/laporan");
+  revalidatePath("/piutang");
+  revalidatePath("/profitabilitas");
   return { success: true };
 }
 

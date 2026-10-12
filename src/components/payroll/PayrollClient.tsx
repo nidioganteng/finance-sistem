@@ -1450,29 +1450,14 @@ export function PayrollClient({
           {/* Sub-Tab Content 2: Master Database Karyawan */}
           {pegawaiSubTab === "master" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                    <Users size={16} className="text-navy" />
-                    <span>Database Pegawai Tetap (Master Karyawan)</span>
-                  </h3>
-                  <p className="text-xs text-muted-faint mt-0.5">
-                    Daftar profil seluruh pegawai tetap. NIK dan gaji pokok didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar.
-                  </p>
-                </div>
-
-                {isManager && (
-                  <button
-                    onClick={() => {
-                      setEditingPegawai(null);
-                      setIsPegawaiModalOpen(true);
-                    }}
-                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                  >
-                    <Plus size={14} />
-                    <span>Tambah Pegawai Baru</span>
-                  </button>
-                )}
+              <div className="p-4 border-b border-border">
+                <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                  <Users size={16} className="text-navy" />
+                  <span>Database Pegawai Tetap (Master Karyawan)</span>
+                </h3>
+                <p className="text-xs text-muted-faint mt-0.5">
+                  Daftar profil seluruh pegawai tetap. NIK dan gaji pokok didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar.
+                </p>
               </div>
 
               <div className="overflow-x-auto">
@@ -2682,29 +2667,14 @@ export function PayrollClient({
           {/* Sub-Tab Content: Database Tenaga Ahli */}
           {tenagaAhliSubTab === "database-ahli" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-surface-subtle/30">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                    <Users size={16} className="text-navy" />
-                    <span>Database Pegawai Tenaga Ahli (Master Rekanan)</span>
-                  </h3>
-                  <p className="text-xs text-muted-faint mt-0.5">
-                    Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
-                  </p>
-                </div>
-
-                {isManager && (
-                  <button
-                    onClick={() => {
-                      setEditingMasterAhli(null);
-                      setIsMasterAhliModalOpen(true);
-                    }}
-                    className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
-                  >
-                    <Plus size={14} />
-                    <span>Tambah Tenaga Ahli Baru</span>
-                  </button>
-                )}
+              <div className="p-4 border-b border-border bg-surface-subtle/30">
+                <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                  <Users size={16} className="text-navy" />
+                  <span>Database Pegawai Tenaga Ahli (Master Rekanan)</span>
+                </h3>
+                <p className="text-xs text-muted-faint mt-0.5">
+                  Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
+                </p>
               </div>
 
               <div className="overflow-x-auto">

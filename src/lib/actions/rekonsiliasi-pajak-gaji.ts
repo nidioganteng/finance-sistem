@@ -86,11 +86,12 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
     },
   });
 
-  logActivity(
+  await logActivity(
     session.user.id,
     `Update Rekonsiliasi Pajak Gaji & PPh 21 Bulan ${input.month}/${input.year} (${entity.name})`,
     "FINANCIAL_CHANGE",
     {
+      rekonsiliasiId: saved.id,
       entityId: input.entityId,
       year: input.year,
       month: input.month,
@@ -103,5 +104,5 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
 
   revalidatePath("/pajak");
   revalidatePath("/payroll");
-  return { success: true, data: saved };
+  return { success: true, id: saved.id };
 }

@@ -5,6 +5,7 @@ import { TerminStatus } from "@prisma/client";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";
 import {
   AlertTriangle,
+  Archive,
   CheckCircle,
   ChevronDown,
   ChevronRight,
@@ -71,6 +72,7 @@ export function PiutangClient({
   isUmumEntity = false,
   showTabs = true,
   isGrup = false,
+  initialTab = "berjalan",
 }: {
   projectList: ProjectItem[];
   summary: Summary;
@@ -79,8 +81,9 @@ export function PiutangClient({
   isUmumEntity?: boolean;
   showTabs?: boolean;
   isGrup?: boolean;
+  initialTab?: "berjalan" | "selesai" | "dock";
 }) {
-  const [tab, setTab] = useState<"berjalan" | "selesai" | "dock">("berjalan");
+  const [tab, setTab] = useState<"berjalan" | "selesai" | "dock">(initialTab);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -130,7 +133,7 @@ export function PiutangClient({
   }
 
   function handleCompleteProject(id: string, code: string) {
-    if (!confirm(`Tandai proyek ${code} sebagai selesai? Proyek akan dipindahkan ke tab Proyek Selesai, namun transaksi di jurnal tetap tercatat.`)) return;
+    if (!confirm(`Selesaikan dan arsipkan proyek ${code}? Proyek akan dipindahkan ke Arsip Proyek, namun transaksi di jurnal tetap tercatat.`)) return;
     startTransition(async () => {
       try {
         await completeProject(id);
@@ -141,7 +144,7 @@ export function PiutangClient({
   }
 
   function handleCancelProject(id: string, code: string) {
-    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dipindahkan ke tab Proyek Selesai.`)) return;
+    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dipindahkan ke Arsip Proyek.`)) return;
     startTransition(async () => {
       try {
         await cancelProject(id);
@@ -152,7 +155,7 @@ export function PiutangClient({
   }
 
   function handleReopenProject(id: string, code: string) {
-    if (!confirm(`Kembalikan proyek ${code} ke daftar Proyek Berjalan?`)) return;
+    if (!confirm(`Pulihkan proyek ${code} dari Arsip ke daftar Proyek Berjalan?`)) return;
     startTransition(async () => {
       try {
         await reopenProject(id);
@@ -196,8 +199,8 @@ export function PiutangClient({
                 : "text-muted-stronger hover:bg-surface-hover hover:text-navy-text"
             }`}
           >
-            <CheckCircle size={15} />
-            <span>Proyek Selesai</span>
+            <Archive size={15} />
+            <span>Arsip Proyek</span>
             <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
               tab === "selesai" ? "bg-white/20 text-white" : "bg-surface-hover text-muted-stronger"
             }`}>
@@ -285,7 +288,7 @@ export function PiutangClient({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
                 <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                  Total Proyek Selesai
+                  Total Arsip Proyek
                 </div>
                 <div className="text-[19px] sm:text-[21px] font-extrabold text-navy-text truncate">
                   {completedProjects.length} Proyek
@@ -296,16 +299,16 @@ export function PiutangClient({
               </div>
               <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
                 <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                  Total Nilai Kontrak Selesai
+                  Total Nilai Kontrak Arsip
                 </div>
                 <div className={`${getMetricValueFontSize(totalCompletedKontrakFmt)} text-navy-text truncate`} title={totalCompletedKontrakFmt}>
                   {totalCompletedKontrakFmt}
                 </div>
-                <div className="text-[12px] text-muted mt-0.5 truncate">Akumulasi kontrak rampung</div>
+                <div className="text-[12px] text-muted mt-0.5 truncate">Akumulasi kontrak rampung & arsip</div>
               </div>
               <div className="bg-surface-card rounded-[16px] border border-border-soft p-4 sm:p-5 min-w-0 overflow-hidden shadow-xs">
                 <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
-                  Total Realisasi Termin Selesai
+                  Total Realisasi Termin Arsip
                 </div>
                 <div className={`${getMetricValueFontSize(totalCompletedTerminFmt)} text-status-green truncate`} title={totalCompletedTerminFmt}>
                   {totalCompletedTerminFmt}
@@ -320,7 +323,7 @@ export function PiutangClient({
             <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center text-sm text-muted">
               {tab === "berjalan"
                 ? "Belum ada proyek yang sedang berjalan untuk entitas ini."
-                : "Belum ada proyek yang berstatus selesai untuk entitas ini."}
+                : "Belum ada proyek yang diarsipkan untuk entitas ini."}
             </div>
           ) : (
             <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
@@ -464,8 +467,9 @@ export function PiutangClient({
                                   }}
                                   disabled={isPending}
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-green-300 dark:border-green-600 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer"
+                                  title="Tandai selesai dan pindahkan ke Arsip Proyek"
                                 >
-                                  <CheckSquare size={11} /> Tandai Selesai
+                                  <Archive size={11} /> Selesai & Arsipkan
                                 </button>
                                 <button
                                   onClick={(e) => {
@@ -474,6 +478,7 @@ export function PiutangClient({
                                   }}
                                   disabled={isPending}
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover cursor-pointer"
+                                  title="Batalkan proyek dan pindahkan ke Arsip Proyek"
                                 >
                                   <Ban size={11} /> Batalkan Proyek
                                 </button>
@@ -488,9 +493,9 @@ export function PiutangClient({
                                   }}
                                   disabled={isPending}
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-blue-300 dark:border-blue-600 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 cursor-pointer"
-                                  title="Kembalikan proyek ini ke daftar Proyek Berjalan"
+                                  title="Pulihkan proyek ini dari Arsip ke daftar Proyek Berjalan"
                                 >
-                                  <RotateCcw size={11} /> Buka Kembali
+                                  <RotateCcw size={11} /> Pulihkan Proyek
                                 </button>
                               </div>
                             )}
@@ -525,7 +530,7 @@ export function PiutangClient({
                                             ? "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                                             : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                                         }`}>
-                                          {p.status === "COMPLETED" ? "Proyek Selesai" : p.status === "CANCELLED" ? "Dibatalkan" : "Proyek Aktif"}
+                                          {p.status === "COMPLETED" ? "Selesai (Diarsipkan)" : p.status === "CANCELLED" ? "Dibatalkan (Arsip)" : "Proyek Aktif"}
                                         </span>
                                       </div>
                                       <p className="text-xs text-muted-faint mt-1 flex items-center gap-1.5 flex-wrap">

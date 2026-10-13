@@ -88,7 +88,9 @@ if ($method === 'GET' && $sub_action === 'projects') {
     $pdo = get_pdo();
 
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.code, p.name, p.contractValue
+        'SELECT p.id, p.code, p.name, p.contractValue,
+                p.sidamon_client_name, p.sidamon_job_name,
+                p.sidamon_start_date, p.sidamon_end_date, p.deadline
            FROM Project p
           WHERE p.entityId = ?
           ORDER BY p.createdAt DESC'
@@ -124,11 +126,15 @@ if ($method === 'GET' && $sub_action === 'projects') {
         $result = [];
         foreach ($projects as $p) {
             $result[] = [
-                'id'            => $p['id'],
-                'code'          => $p['code'],
-                'name'          => $p['name'],
-                'contractValue' => (float)$p['contractValue'],
-                'termins'       => $termins_by_project[$p['id']] ?? [],
+                'id'              => $p['id'],
+                'code'            => $p['code'],
+                'name'            => $p['name'],
+                'contractValue'   => (float)$p['contractValue'],
+                'clientName'      => $p['sidamon_client_name'] ?? null,
+                'jobName'         => $p['sidamon_job_name']    ?? null,
+                'startDate'       => $p['sidamon_start_date']  ?? null,
+                'endDate'         => $p['sidamon_end_date'] ?? $p['deadline'] ?? null,
+                'termins'         => $termins_by_project[$p['id']] ?? [],
             ];
         }
     } else {

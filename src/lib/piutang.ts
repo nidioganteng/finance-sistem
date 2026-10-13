@@ -317,6 +317,7 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
       netBankFmt: fmt(nom),
       jurnalRows: [],
     };
+
     return {
       id: t.id,
       name: t.name,

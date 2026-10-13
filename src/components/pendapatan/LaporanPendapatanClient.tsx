@@ -316,6 +316,12 @@ export function LaporanPendapatanClient({
   }
 
   function handleSelectRekanan(r: RekananItem) {
+    setSelectedRekananNpwpId(r.id);
+    if (!r.npwp) {
+      setIsManualNpwp(true);
+    } else {
+      setIsManualNpwp(false);
+    }
     setFormFaktur((prev) => ({
       ...prev,
       namaRekanan: r.nama,
@@ -334,6 +340,8 @@ export function LaporanPendapatanClient({
   function openCreateFakturModal() {
     setEditingFaktur(null);
     setSelectedTerminId("");
+    setSelectedRekananNpwpId("");
+    setIsManualNpwp(false);
     setShowManualDppFallback(false);
     setMatchedRekananMaster(null);
     setRekananSuggestions([]);
@@ -1637,7 +1645,7 @@ export function LaporanPendapatanClient({
                       }}
                       className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                     >
-                      <option value="">Pilih Rekanan</option>
+                      <option value="">-- Pilih dari Master Rekanan --</option>
                       {data.rekananOptions && data.rekananOptions.length > 0 && (
                         <optgroup label="Master Rekanan">
                           {data.rekananOptions.map((r) => (

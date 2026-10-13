@@ -102,5 +102,6 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
   );
 
   revalidatePath("/pajak");
+  revalidatePath("/payroll");
   return { success: true, data: saved };
 }

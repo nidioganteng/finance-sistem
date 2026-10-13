@@ -103,6 +103,7 @@ export function LaporanPendapatanClient({
     tahunPajak: data.year,
     namaRekanan: "",
     namaJkp: "",
+    nilaiKuitansi: 0, // Input Utama
     dpp: 0,
     dppNilaiLain: 0,
     tarifPpnPersen: 12,
@@ -123,7 +124,10 @@ export function LaporanPendapatanClient({
   const [selectedTerminId, setSelectedTerminId] = useState<string>("");
   const [showManualDppFallback, setShowManualDppFallback] = useState(false);
 
-  // Auto-Fill Master Rekanan state (Issue 84)
+  // Amrahan / Multi-Termin detection state (Issue 101)
+  const [amrahanDetected, setAmrahanDetected] = useState<FakturPendapatanItem | null>(null);
+
+  // Auto-Fill Master Rekanan state (Issue 84 & 102)
   const [rekananSuggestions, setRekananSuggestions] = useState<RekananItem[]>([]);
   const [showRekananDropdown, setShowRekananDropdown] = useState(false);
   const [matchedRekananMaster, setMatchedRekananMaster] = useState<RekananItem | null>(null);
@@ -203,7 +207,8 @@ export function LaporanPendapatanClient({
     formFaktur.dpp,
     formFaktur.dppNilaiLain,
     formFaktur.tarifPpnPersen,
-    formFaktur.tarifPphPersen
+    formFaktur.tarifPphPersen,
+    formFaktur.nilaiKuitansi > 0 ? formFaktur.nilaiKuitansi : undefined
   );
 
   // Selected project & termin helpers for auto-syncing DPP
@@ -222,11 +227,12 @@ export function LaporanPendapatanClient({
     if (term) {
       const nominal = term.nominal;
       const dpp = hitungDppDariKwitansi(nominal);
-      const dppNilaiLain = hitungDppNilaiLain(dpp);
+      const dppNilaiLain = dpp;
       const pphNominal = Math.round((dpp * formFaktur.tarifPphPersen) / 100);
       const netReceived = dpp - pphNominal;
       setFormFaktur((prev) => ({
         ...prev,
+        nilaiKuitansi: nominal,
         dpp,
         dppNilaiLain,
         pekerjaanPerusahaan: dpp,
@@ -365,6 +371,7 @@ export function LaporanPendapatanClient({
     setMatchedRekananMaster(null);
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
+    setAmrahanDetected(null);
     setFormFaktur({
       npwp: "",
       noFaktur: "",
@@ -372,6 +379,7 @@ export function LaporanPendapatanClient({
       tahunPajak: data.year,
       namaRekanan: "",
       namaJkp: "",
+      nilaiKuitansi: 0,
       dpp: 0,
       dppNilaiLain: 0,
       tarifPpnPersen: 12,
@@ -393,6 +401,7 @@ export function LaporanPendapatanClient({
 
   function openEditFakturModal(f: FakturPendapatanItem) {
     setEditingFaktur(f);
+    setAmrahanDetected(null);
     const proj = data.projectOptions.find((p) => p.id === f.projectId);
     const matchedTermin = proj?.termins.find((t) => t.nominal === f.dpp);
     if (matchedTermin) {
@@ -412,6 +421,7 @@ export function LaporanPendapatanClient({
     setMatchedRekananMaster((matchedRek as any) ?? null);
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
+    const initialKuitansi = f.nilaiProyek || (f.dpp > 0 ? Math.round((f.dpp * 111) / 100) : 0);
     setFormFaktur({
       npwp: f.npwp,
       noFaktur: f.noFaktur,
@@ -419,6 +429,7 @@ export function LaporanPendapatanClient({
       tahunPajak: f.tahunPajak,
       namaRekanan: f.namaRekanan,
       namaJkp: f.namaJkp,
+      nilaiKuitansi: initialKuitansi,
       dpp: f.dpp,
       dppNilaiLain: f.dppNilaiLain,
       tarifPpnPersen: f.tarifPpnPersen,
@@ -436,6 +447,51 @@ export function LaporanPendapatanClient({
     });
     setErrorMessage(null);
     setIsFakturModalOpen(true);
+  }
+
+  function handleNoFakturChange(val: string) {
+    setFormFaktur((prev) => ({ ...prev, noFaktur: val }));
+    if (editingFaktur) return;
+
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed.length >= 3) {
+      const match = data.fakturList.find(
+        (f) => f.noFaktur.trim().toLowerCase() === trimmed
+      );
+      if (match) {
+        setAmrahanDetected(match);
+        const prevKuitansi = match.nilaiProyek || (match.dpp > 0 ? Math.round((match.dpp * 111) / 100) : 0);
+        setFormFaktur((prev) => ({
+          ...prev,
+          noFaktur: val,
+          namaRekanan: match.namaRekanan,
+          npwp: match.npwp,
+          projectId: match.projectId || prev.projectId,
+          namaJkp: match.namaJkp,
+          nilaiKuitansi: prevKuitansi,
+          dpp: match.dpp,
+          dppNilaiLain: match.dppNilaiLain,
+          tarifPpnPersen: match.tarifPpnPersen,
+          tarifPphPersen: match.tarifPphPersen,
+          kodeJenisProyek: match.kodeJenisProyek,
+          bank: match.bank || prev.bank,
+        }));
+        const cleanNpwp = (match.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
+        const matchedRek = (data.rekananOptions || []).find(
+          (r) =>
+            (r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanNpwp) ||
+            r.nama.toLowerCase() === (match.namaRekanan || "").toLowerCase()
+        );
+        if (matchedRek) {
+          setSelectedRekananId(matchedRek.id);
+          setMatchedRekananMaster(matchedRek as any);
+        }
+      } else {
+        setAmrahanDetected(null);
+      }
+    } else {
+      setAmrahanDetected(null);
+    }
   }
 
   function handleToggleCeklis(fakturId: string, field: "ppn" | "pph" | "buktiPotong", currentValue: boolean) {
@@ -469,6 +525,8 @@ export function LaporanPendapatanClient({
     setErrorMessage(null);
 
     try {
+      const kuitansiVal = Number(formFaktur.nilaiKuitansi) || (formFaktur.dpp > 0 ? Math.round((formFaktur.dpp * 111) / 100) : 0);
+      const dppVal = formFaktur.dpp > 0 ? Number(formFaktur.dpp) : (kuitansiVal > 0 ? Math.round((kuitansiVal * 100) / 111) : 0);
       const payload: FakturPendapatanInput = {
         entityId: data.entity.id,
         npwp: formFaktur.npwp,
@@ -477,13 +535,14 @@ export function LaporanPendapatanClient({
         tahunPajak: Number(formFaktur.tahunPajak),
         namaRekanan: formFaktur.namaRekanan,
         namaJkp: formFaktur.namaJkp,
-        dpp: Number(formFaktur.dpp),
-        dppNilaiLain: Number(formFaktur.dppNilaiLain),
+        nilaiKuitansi: kuitansiVal,
+        dpp: dppVal,
+        dppNilaiLain: Number(formFaktur.dppNilaiLain) || dppVal,
         tarifPpnPersen: Number(formFaktur.tarifPpnPersen),
         tarifPphPersen: Number(formFaktur.tarifPphPersen),
         kodeJenisProyek: Number(formFaktur.kodeJenisProyek),
-        pekerjaanPerusahaan: Number(formFaktur.pekerjaanPerusahaan),
-        pekerjaanYangDipinjam: Number(formFaktur.pekerjaanYangDipinjam),
+        pekerjaanPerusahaan: dppVal,
+        pekerjaanYangDipinjam: 0,
         tanggalTerima: formFaktur.tanggalTerima.trim() ? formFaktur.tanggalTerima.trim() : null,
         bank: formFaktur.bank.trim() ? formFaktur.bank.trim() : null,
         nominalDiterima: Number(formFaktur.nominalDiterima) || 0,
@@ -878,7 +937,7 @@ export function LaporanPendapatanClient({
                   <th className="p-3 text-right">PPN Realisasi</th>
                   <th className="p-3 text-right">PPh Realisasi</th>
                   <th className="p-3 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">
-                    Nilai Proyek (111%)
+                    Nilai Kuitansi Bruto (111%)
                   </th>
                   <th className="p-3 text-right text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10">
                     Netto Tagihan
@@ -1720,9 +1779,7 @@ export function LaporanPendapatanClient({
                     required
                     placeholder="010.000-24.00000001"
                     value={formFaktur.noFaktur}
-                    onChange={(e) =>
-                      setFormFaktur({ ...formFaktur, noFaktur: e.target.value })
-                    }
+                    onChange={(e) => handleNoFakturChange(e.target.value)}
                     className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1765,6 +1822,28 @@ export function LaporanPendapatanClient({
                   />
                 </div>
               </div>
+
+              {/* Notifikasi Amrahan / Multi-Termin Berulang */}
+              {amrahanDetected && !editingFaktur && (
+                <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-amber-200/80 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-amber-900 dark:text-amber-200">
+                        Multi-Termin / Amrahan Terdeteksi ({amrahanDetected.noFaktur})
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                        Nomor Faktur Sama Diizinkan
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                      Sistem otomatis memanggil rincian proyek, rekanan, dan nominal lama. Seluruh uraian dan nominal tetap dapat diedit bebas (misal merubah kata &quot;Uang Muka&quot; menjadi &quot;Tagihan Amrahan Ke-2&quot;).
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Form Section: Data Rekanan & NPWP */}
               <div className="p-4 rounded-2xl bg-surface-subtle/70 border border-border-soft space-y-3">
@@ -1914,9 +1993,9 @@ export function LaporanPendapatanClient({
                 )}
               </div>
 
-              {/* Form Section 3: Tax Rates & DPP Inputs */}
+              {/* Form Section 3: Input Nilai Kuitansi Bruto & Kalkulasi Pajak Otomatis */}
               <div className="p-4 sm:p-5 rounded-2xl bg-surface-subtle/50 border border-border-soft space-y-4">
-                {/* Header Section with Title & Explanation */}
+                {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-border-soft">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
@@ -1924,222 +2003,101 @@ export function LaporanPendapatanClient({
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-navy-text uppercase tracking-wider">
-                        Parameter Nilai & Perhitungan Pajak Otomatis
+                        Form E-Faktur Berbasis Nilai Kuitansi Bruto
                       </h4>
                       <p className="text-[11px] text-navy-soft">
-                        Masukkan nilai termin dan tentukan tarif. Pajak dan laba bersih dihitung otomatis secara real-time.
+                        Input utama adalah Nilai Kuitansi Bruto. Nilai DPP (100/111) dan PPN (11/111) dikalkulasi secara otomatis.
                       </p>
                     </div>
                   </div>
+                  {selectedTermin && (
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 self-start sm:self-auto flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Tersinkron dari Termin: {selectedTermin.name} ({selectedTermin.percentage}%)
+                    </span>
+                  )}
                 </div>
 
-                {/* 1. KASUS TERSEDIA TERMIN: Tampilan Nilai DPP Otomatis (Tanpa Input Box) */}
-                {selectedTermin && (
-                  <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/90 dark:border-emerald-800/60 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-2 text-emerald-950 dark:text-emerald-200 font-bold">
-                        <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Nilai DPP Otomatis Tersinkron dari {selectedTermin.name}</span>
-                      </div>
-                      <span className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold self-start sm:self-auto">
-                        Otomatis Tanpa Input Manual
+                {/* INPUT UTAMA: Nilai Kuitansi Bruto */}
+                <div className="p-4 rounded-xl bg-surface-card border-2 border-blue-500/40 dark:border-blue-500/50 shadow-xs space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5 uppercase tracking-wide">
+                      <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Nilai Kuitansi Bruto (Input Utama) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-navy-soft font-mono">
+                      Rumus otomatis: DPP = 100/111 × Kuitansi • PPN = 11/111 × Kuitansi
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-sm font-black text-blue-700 dark:text-blue-400">
+                      Rp
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      required
+                      placeholder="0"
+                      value={formatRupiahInput(
+                        formFaktur.nilaiKuitansi || (formFaktur.dpp > 0 ? Math.round((formFaktur.dpp * 111) / 100) : 0)
+                      )}
+                      onChange={(e) => {
+                        const kuitansi = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                        const dpp = hitungDppDariKwitansi(kuitansi);
+                        setFormFaktur((prev) => ({
+                          ...prev,
+                          nilaiKuitansi: kuitansi,
+                          dpp,
+                          dppNilaiLain: dpp,
+                          pekerjaanPerusahaan: dpp,
+                          pekerjaanYangDipinjam: 0,
+                        }));
+                      }}
+                      className="w-full pl-11 pr-4 py-2.5 text-base sm:text-lg font-mono font-black border border-blue-300 dark:border-blue-700 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                {/* Hasil Kalkulasi Otomatis: DPP & PPN */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Card DPP Dasar */}
+                  <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-navy-text uppercase tracking-wider">
+                        DPP Dasar (100/111 × Kuitansi)
+                      </span>
+                      <span className="text-[9.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-1.5 py-0.5 rounded">
+                        Otomatis
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Card DPP Dasar */}
-                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-navy-text">DPP Dasar (Nilai Termin)</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded">
-                            Basis PPh Final ({formFaktur.tarifPphPersen}%)
-                          </span>
-                        </div>
-                        <div className="text-xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                          {selectedTermin.nominalFmt}
-                        </div>
-                        <span className="text-[11px] text-navy-soft block">
-                          Sesuai termin keluar ({selectedTermin.percentage}% dari nilai kontrak)
-                        </span>
-                      </div>
-
-                      {/* Card DPP Nilai Lain */}
-                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-navy-text">DPP Nilai Lain</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded">
-                            Basis PPN ({formFaktur.tarifPpnPersen}%)
-                          </span>
-                        </div>
-                        <div className="text-xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                          {selectedTermin.nominalFmt}
-                        </div>
-                        <span className="text-[11px] text-navy-soft block">
-                          Otomatis disamakan dengan DPP Dasar termin
-                        </span>
-                      </div>
+                    <div className="text-lg font-bold font-mono text-navy-text">
+                      {formatRupiah(formFaktur.dpp)}
                     </div>
+                    <span className="text-[10px] text-navy-soft block">
+                      Dasar pengenaan PPh Final ({formFaktur.tarifPphPersen}%)
+                    </span>
                   </div>
-                )}
 
-                {/* 2. KASUS BELUM PILIH TERMIN: Informasi untuk memilih termin */}
-                {!selectedTermin && !showManualDppFallback && (
-                  <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold">Nilai DPP Tidak Perlu Diinput di Sini</span>
-                        <p className="text-blue-800 dark:text-blue-300 text-[11.5px] mt-0.5 leading-relaxed">
-                          Sistem akan mengambil nilai DPP secara otomatis dari termin proyek. Silakan pilih <strong>Kode Proyek</strong> dan <strong>Termin</strong> pada bagian atas formulir. Nilai DPP, PPh, PPN, dan laba setelah pajak akan langsung terisi otomatis.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-blue-700 dark:text-blue-400">Tidak ada data termin atau bukan faktur berbasis proyek?</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualDppFallback(true)}
-                        className="font-semibold text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-200 underline cursor-pointer"
-                      >
-                        Buka Opsi Input Manual
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. KASUS FALLBACK INPUT MANUAL (Hanya jika belum pilih termin & klik opsi manual) */}
-                {!selectedTermin && showManualDppFallback && (
-                  <div className="p-3.5 rounded-xl bg-surface-card border border-amber-200 dark:border-amber-800/60 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        Mode Input DPP Manual (Khusus Non-Termin)
+                  {/* Card PPN */}
+                  <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-navy-text uppercase tracking-wider">
+                        PPN (11/111 × Kuitansi)
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualDppFallback(false)}
-                        className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline cursor-pointer"
-                      >
-                        Tutup Input Manual
-                      </button>
+                      <span className="text-[9.5px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15 px-1.5 py-0.5 rounded">
+                        Otomatis
+                      </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* DPP Dasar Input */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-navy-text">
-                            DPP Dasar (Manual) <span className="text-rose-500">*</span>
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const raw = window.prompt("Masukkan Nilai Kwitansi (Bruto / Akun Pendapatan):");
-                              if (raw) {
-                                const parsed = Number(raw.replace(/[^\d.-]/g, ""));
-                                if (!isNaN(parsed) && parsed > 0) {
-                                  const dppVal = hitungDppDariKwitansi(parsed);
-                                  const dppNilaiLainVal = hitungDppNilaiLain(dppVal);
-                                  setFormFaktur((prev) => ({
-                                    ...prev,
-                                    dpp: dppVal,
-                                    dppNilaiLain: dppNilaiLainVal,
-                                    pekerjaanPerusahaan: dppVal,
-                                    pekerjaanYangDipinjam: 0,
-                                  }));
-                                }
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 cursor-pointer"
-                            title="Hitung DPP = 100/111 x Nilai Kwitansi"
-                          >
-                            <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            <span>100/111 Kwitansi</span>
-                          </button>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={formatRupiahInput(formFaktur.dpp)}
-                            onChange={(e) => {
-                              const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                              setFormFaktur((prev) => ({
-                                ...prev,
-                                dpp: val,
-                                dppNilaiLain: hitungDppNilaiLain(val),
-                                pekerjaanPerusahaan: val,
-                              }));
-                            }}
-                            className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* DPP Nilai Lain Input */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-navy-text">
-                            DPP Nilai Lain (Manual) <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFormFaktur((prev) => ({
-                                  ...prev,
-                                  dppNilaiLain: hitungDppNilaiLain(prev.dpp),
-                                }))
-                              }
-                              title="Hitung 11/12 x DPP Dasar"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-200 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span>11/12 × DPP</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFormFaktur((prev) => ({
-                                  ...prev,
-                                  dppNilaiLain: prev.dpp,
-                                }))
-                              }
-                              title="Samakan dengan DPP Dasar"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/60 cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
-                              <span>Samakan</span>
-                            </button>
-                          </div>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={formatRupiahInput(formFaktur.dppNilaiLain)}
-                            onChange={(e) =>
-                              setFormFaktur({
-                                ...formFaktur,
-                                dppNilaiLain: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                              })
-                            }
-                            className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
+                    <div className="text-lg font-bold font-mono text-purple-700 dark:text-purple-300">
+                      {formatRupiah(liveCalc.ppn)}
                     </div>
+                    <span className="text-[10px] text-navy-soft block">
+                      PPN terutang / dipungut rekanan ({formFaktur.tarifPpnPersen}%)
+                    </span>
                   </div>
-                )}
+                </div>
 
-                {/* Sub-grid 2: Tarif Pajak (2 Columns - No truncation!) */}
+                {/* Sub-grid 2: Tarif Pajak */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Tarif PPN */}
                   <div>
@@ -2156,12 +2114,12 @@ export function LaporanPendapatanClient({
                       }
                       className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text bg-surface-input focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                     >
-                      <option value={12}>PPN 12% (DPP Nilai Lain 11/12)</option>
-                      <option value={11}>PPN 11% (Tarif Standar Lama)</option>
+                      <option value={11}>PPN 11% (Standar Tarif Kuitansi 100/111)</option>
+                      <option value={12}>PPN 12%</option>
                       <option value={0}>Bebas PPN (0%)</option>
                     </select>
                     <span className="text-[10px] text-navy-soft mt-1 block">
-                      Dikalikan terhadap DPP Nilai Lain
+                      Kalkulasi standar: 11/111 × Kuitansi Bruto
                     </span>
                   </div>
 
@@ -2185,7 +2143,7 @@ export function LaporanPendapatanClient({
                       <option value={0}>Tanpa Pemotongan PPh (0%)</option>
                     </select>
                     <span className="text-[10px] text-navy-soft mt-1 block">
-                      Dipotong rekanan dari DPP Dasar termin keluar
+                      Dipotong rekanan dari DPP ({formFaktur.tarifPphPersen}% × DPP)
                     </span>
                   </div>
                 </div>
@@ -2198,7 +2156,7 @@ export function LaporanPendapatanClient({
                     </span>
                     <div className="inline-flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 font-medium">
                       <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>Di laporan, kolom PPN & PPh otomatis kosong (-) sampai uang cair di Jurnal Umum</span>
+                      <span>Di laporan, kolom PPN & PPh otomatis terisi saat transaksi tersimpan di Jurnal Umum</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -2215,7 +2173,7 @@ export function LaporanPendapatanClient({
                         {formatRupiah(liveCalc.ppn)}
                       </div>
                       <span className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 block truncate">
-                        {formFaktur.tarifPpnPersen}% × DPP Nilai Lain
+                        11/111 × Kuitansi
                       </span>
                     </div>
 
@@ -2232,24 +2190,24 @@ export function LaporanPendapatanClient({
                         {formatRupiah(liveCalc.pph)}
                       </div>
                       <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 block truncate">
-                        {formFaktur.tarifPphPersen}% × DPP Dasar
+                        {formFaktur.tarifPphPersen}% × DPP
                       </span>
                     </div>
 
-                    {/* Card 3: Nilai Proyek */}
+                    {/* Card 3: Nilai Kuitansi Bruto */}
                     <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
                       <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 mb-1">
-                        <span className="text-[11px] font-semibold truncate">Nilai Proyek (111%)</span>
+                        <span className="text-[11px] font-semibold truncate">Kuitansi Bruto (111%)</span>
                         <TrendingUp className="w-3.5 h-3.5 shrink-0 ml-1" />
                       </div>
                       <div
                         className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-blue-800 dark:text-blue-200 truncate block"
-                        title={formatRupiah(liveCalc.nilaiProyek)}
+                        title={formatRupiah(formFaktur.nilaiKuitansi || liveCalc.nilaiProyek)}
                       >
-                        {formatRupiah(liveCalc.nilaiProyek)}
+                        {formatRupiah(formFaktur.nilaiKuitansi || liveCalc.nilaiProyek)}
                       </div>
                       <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 block truncate">
-                        Diakui Pendapatan Laba Rugi
+                        DPP + PPN 11%
                       </span>
                     </div>
 
@@ -2273,64 +2231,24 @@ export function LaporanPendapatanClient({
                 </div>
               </div>
 
-              {/* Form Grid 4: Jenis Proyek & Porsi Pekerjaan */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Jenis Proyek <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formFaktur.kodeJenisProyek}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        kodeJenisProyek: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
-                  >
-                    <option value={1} className="bg-surface-card text-navy-text">1 - Perencanaan</option>
-                    <option value={2} className="bg-surface-card text-navy-text">2 - Pengawasan</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Pekerjaan Perusahaan (Sendiri)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={formatRupiahInput(formFaktur.pekerjaanPerusahaan)}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        pekerjaanPerusahaan: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Pekerjaan yang Dipinjam
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={formatRupiahInput(formFaktur.pekerjaanYangDipinjam)}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        pekerjaanYangDipinjam: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              {/* Form Grid 4: Jenis Proyek */}
+              <div>
+                <label className="block text-xs font-semibold text-navy-text mb-1">
+                  Jenis Proyek <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formFaktur.kodeJenisProyek}
+                  onChange={(e) =>
+                    setFormFaktur({
+                      ...formFaktur,
+                      kodeJenisProyek: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                >
+                  <option value={1} className="bg-surface-card text-navy-text">1 - Perencanaan</option>
+                  <option value={2} className="bg-surface-card text-navy-text">2 - Pengawasan</option>
+                </select>
               </div>
 
               {/* Form Grid 5: Realisasi Pencairan Kas Bank */}

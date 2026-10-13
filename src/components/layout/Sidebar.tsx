@@ -33,6 +33,7 @@ import {
   Settings2,
   ClipboardList,
   ChevronDown,
+  ChevronLeft,
   PenLine,
 } from "lucide-react";
 import { getNavForRole, type NavItem } from "@/lib/rbac";
@@ -68,10 +69,14 @@ export function Sidebar({
   role,
   customInputs = [],
   onClose,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   role: Role;
   customInputs?: { key: string; nama: string }[];
   onClose?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -143,29 +148,36 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-[280px] flex-none bg-surface-card border-r border-border-soft flex flex-col p-4 pt-5 sticky top-0 h-screen">
+    <aside className={`flex-none bg-[#0f1729] dark:bg-[#0c0c14] flex flex-col p-4 pt-5 sticky top-0 h-screen transition-all duration-300 relative ${collapsed ? "w-[68px]" : "w-[280px]"}`}>
+      {/* Toggle collapse button */}
+      {onToggleCollapse && (
+        <button
+          onClick={onToggleCollapse}
+          className="absolute -right-3 top-7 z-10 w-6 h-6 rounded-full bg-[#0f1729] dark:bg-[#0c0c14] border border-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors shadow-md"
+        >
+          <ChevronLeft size={13} className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
+        </button>
+      )}
+
       {/* Brand row */}
-      <div className="flex items-center gap-3 px-2 pb-6">
-        <div className="w-11 h-11 flex-none flex items-center justify-center">
-          <img
-            src="/logo-entitas/logo-simatra-light.png"
-            alt="SIMATRA"
-            className="w-11 h-11 object-contain block dark:hidden"
-          />
+      <div className={`flex items-center pb-6 ${collapsed ? "justify-center px-0" : "gap-3 px-2"}`}>
+        <div className="w-9 h-9 flex-none flex items-center justify-center">
           <img
             src="/logo-entitas/logo-simatra-dark.png"
             alt="SIMATRA"
-            className="w-11 h-11 object-contain hidden dark:block"
+            className="w-9 h-9 object-contain"
           />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-black text-[17px] tracking-tight text-navy-text leading-tight">SIMATRA</div>
-          <div className="text-[11px] text-muted-faint font-semibold">Gaharu Sempana Group</div>
-        </div>
-        {onClose && (
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <div className="font-black text-[17px] tracking-tight text-white leading-tight">SIMATRA</div>
+            <div className="text-[11px] text-white/50 font-semibold">Gaharu Sempana Group</div>
+          </div>
+        )}
+        {onClose && !collapsed && (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-faint transition-colors flex-none"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 transition-colors flex-none"
           >
             <X size={16} />
           </button>
@@ -180,20 +192,20 @@ export function Sidebar({
             : true;
           return (
           <div key={section.title} className="mb-2">
-            {section.collapsible ? (
+            {!collapsed && (section.collapsible ? (
               <button
                 type="button"
                 onClick={() => toggleDropdown(sectionKey, true)}
-                className="w-full flex items-center justify-between px-2.5 pt-1 pb-1 text-[10.5px] font-bold text-muted-faintest tracking-wider uppercase hover:text-muted-stronger transition-colors"
+                className="w-full flex items-center justify-between px-2.5 pt-1 pb-1 text-[10.5px] font-bold text-white/40 tracking-wider uppercase hover:text-white/60 transition-colors"
               >
                 {section.title}
                 <ChevronDown size={12} className={`transition-transform duration-200 ${isSectionOpen ? "rotate-180" : ""}`} />
               </button>
             ) : (
-              <div className="text-[10.5px] font-bold text-muted-faintest tracking-wider uppercase px-2.5 pt-1 pb-1">
+              <div className="text-[10.5px] font-bold text-white/40 tracking-wider uppercase px-2.5 pt-1 pb-1">
                 {section.title}
               </div>
-            )}
+            ))}
             {isSectionOpen && <div className="flex flex-col gap-0">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon];
@@ -209,25 +221,26 @@ export function Sidebar({
                     <div key={item.href} className="flex flex-col" ref={(el) => { dropdownRefs.current[item.href] = el; }}>
                       <button
                         type="button"
-                        onClick={() => toggleDropdown(item.href, isDefaultOpen)}
-                        className={`w-full flex items-center justify-between px-3.5 py-3 rounded-pill text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                        onClick={() => collapsed ? undefined : toggleDropdown(item.href, isDefaultOpen)}
+                        title={collapsed ? item.label : undefined}
+                        className={`w-full flex items-center transition-all duration-150 cursor-pointer rounded-pill text-sm font-semibold ${collapsed ? "justify-center px-0 py-3" : "justify-between px-3.5 py-3"} ${
                           isParentActive
-                            ? "bg-surface-hover/80 text-navy-text font-bold"
-                            : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                            ? "bg-white/15 text-white font-bold"
+                            : "text-white/70 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`flex items-center min-w-0 ${collapsed ? "" : "gap-2.5"}`}>
                           <Icon size={17} strokeWidth={1.8} className="flex-none" />
-                          <span className="truncate">{item.label}</span>
+                          {!collapsed && <span className="truncate">{item.label}</span>}
                         </div>
-                        <ChevronDown
+                        {!collapsed && <ChevronDown
                           size={15}
-                          className={`text-muted-faint transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                        />
+                          className={`text-white/40 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                        />}
                       </button>
 
-                      {isOpen && (
-                        <div className="ml-4 pl-3.5 border-l-2 border-border-soft flex flex-col gap-0.5 mt-1 mb-1.5">
+                      {isOpen && !collapsed && (
+                        <div className="ml-4 pl-3.5 border-l-2 border-white/15 flex flex-col gap-0.5 mt-1 mb-1.5">
                           {item.subItems.map((sub) => {
                             const subBasePath = sub.href.split("?")[0];
                             const isSubGroupActive = pathname === subBasePath ||
@@ -245,17 +258,17 @@ export function Sidebar({
                                     onClick={() => toggleDropdown(subKey, isSubGroupActive)}
                                     className={`w-full flex items-center justify-between px-3 py-3 rounded-xl text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
                                       isSubGroupActive
-                                        ? "text-navy-text font-bold"
-                                        : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                                        ? "text-white font-bold"
+                                        : "text-white/70 hover:bg-white/10 hover:text-white"
                                     }`}
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                       <span className="truncate">{sub.label}</span>
                                     </div>
-                                    <ChevronDown size={13} className={`text-muted-faint transition-transform duration-200 ${isSubOpen ? "rotate-180" : ""}`} />
+                                    <ChevronDown size={13} className={`text-white/40 transition-transform duration-200 ${isSubOpen ? "rotate-180" : ""}`} />
                                   </button>
                                   {isSubOpen && (
-                                    <div className="ml-3 pl-3 border-l-2 border-border-soft flex flex-col gap-0.5 mt-0.5 mb-1">
+                                    <div className="ml-3 pl-3 border-l-2 border-white/15 flex flex-col gap-0.5 mt-0.5 mb-1">
                                       {sub.children.map((child) => {
                                         const isChildActive = child.version
                                           ? isSubGroupActive &&
@@ -270,8 +283,8 @@ export function Sidebar({
                                             onClick={onClose}
                                             className={`flex items-center gap-2 px-3 py-3 rounded-xl text-[12px] font-semibold transition-all duration-150 ${
                                               isChildActive
-                                                ? "bg-navy text-white shadow-sm"
-                                                : "text-muted hover:bg-surface-hover hover:text-navy-text"
+                                                ? "bg-white/20 text-white shadow-sm"
+                                                : "text-white/60 hover:bg-white/10 hover:text-white"
                                             }`}
                                           >
                                             <span className="truncate">{child.label}</span>
@@ -297,8 +310,8 @@ export function Sidebar({
                                 onClick={onClose}
                                 className={`flex items-center gap-2.5 px-3 py-3 rounded-xl text-[13px] font-semibold transition-all duration-150 ${
                                   isSubActive
-                                    ? "bg-navy text-white shadow-sm"
-                                    : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                                    ? "bg-white/20 text-white shadow-sm"
+                                    : "text-white/70 hover:bg-white/10 hover:text-white"
                                 }`}
                               >
                                 <span className="truncate">{sub.label}</span>
@@ -316,14 +329,15 @@ export function Sidebar({
                     key={item.href}
                     href={getItemHref(item.href)}
                     onClick={onClose}
-                    className={`flex items-center gap-2.5 px-3.5 py-3 rounded-pill text-sm font-semibold transition-all duration-150 ${
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center rounded-pill text-sm font-semibold transition-all duration-150 ${collapsed ? "justify-center px-0 py-3" : "gap-2.5 px-3.5 py-3"} ${
                       isParentActive
-                        ? "bg-navy text-white shadow-sm"
-                        : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                        ? "bg-white/20 text-white shadow-sm"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <Icon size={17} strokeWidth={1.8} className="flex-none" />
-                    <span className="truncate">{item.label}</span>
+                    {!collapsed && <span className="truncate">{item.label}</span>}
                   </Link>
                 );
               })}
@@ -334,9 +348,11 @@ export function Sidebar({
 
         {customInputs.length > 0 && (
           <div className="mb-3.5">
-            <div className="text-[10.5px] font-bold text-muted-faintest tracking-wider uppercase px-2.5 pt-1.5 pb-2">
-              Input Lainnya
-            </div>
+            {!collapsed && (
+              <div className="text-[10.5px] font-bold text-white/40 tracking-wider uppercase px-2.5 pt-1.5 pb-2">
+                Input Lainnya
+              </div>
+            )}
             <div className="flex flex-col gap-0.5">
               {customInputs.map((item) => {
                 const href = `/input/${item.key}`;
@@ -346,14 +362,15 @@ export function Sidebar({
                     key={item.key}
                     href={getItemHref(href)}
                     onClick={onClose}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-pill text-sm font-semibold transition-all duration-150 ${
+                    title={collapsed ? item.nama : undefined}
+                    className={`flex items-center rounded-pill text-sm font-semibold transition-all duration-150 ${collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-3.5 py-2.5"} ${
                       active
-                        ? "bg-navy text-white shadow-sm"
-                        : "text-muted-strong hover:bg-surface-hover hover:text-navy-text"
+                        ? "bg-white/20 text-white shadow-sm"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <Layers size={17} strokeWidth={1.8} className="flex-none" />
-                    <span className="truncate">{item.nama}</span>
+                    {!collapsed && <span className="truncate">{item.nama}</span>}
                   </Link>
                 );
               })}
@@ -364,10 +381,11 @@ export function Sidebar({
 
       <button
         onClick={() => signOut({ callbackUrl: "/login" })}
-        className="mt-2 px-3.5 py-2.5 border border-border-soft rounded-pill flex items-center gap-2 text-[13.5px] font-semibold text-muted-strong hover:bg-surface-hover hover:text-status-red hover:border-red-200 dark:hover:border-red-500/30 transition-all duration-150"
+        title={collapsed ? "Keluar Sistem" : undefined}
+        className={`mt-2 border border-white/20 rounded-pill flex items-center text-[13.5px] font-semibold text-white/60 hover:bg-white/10 hover:text-red-400 hover:border-red-400/40 transition-all duration-150 ${collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3.5 py-2.5"}`}
       >
-        <LogOut size={16} strokeWidth={1.8} />
-        Keluar Sistem
+        <LogOut size={16} strokeWidth={1.8} className="flex-none" />
+        {!collapsed && "Keluar Sistem"}
       </button>
     </aside>
   );

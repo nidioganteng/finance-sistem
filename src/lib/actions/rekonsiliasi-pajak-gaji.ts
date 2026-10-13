@@ -74,7 +74,7 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
   logActivity(
     session.user.id,
     `Update Rekonsiliasi Pajak Gaji & PPh 21 Bulan ${input.month}/${input.year} (${entity.name})`,
-    "TRANSAKSI",
+    "FINANCIAL_CHANGE",
     {
       entityId: input.entityId,
       year: input.year,

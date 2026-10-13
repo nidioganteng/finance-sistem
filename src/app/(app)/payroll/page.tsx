@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getPayrollData } from "@/lib/payroll";
+import { getRekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
@@ -35,13 +36,16 @@ export default async function PayrollPage({
     );
   }
 
-  const payrollData = await getPayrollData(selectedEntity.id, year, month);
+  const [payrollData, rekonsiliasiData] = await Promise.all([
+    getPayrollData(selectedEntity.id, year, month),
+    getRekonsiliasiPajakGajiData(selectedEntity.id, year),
+  ]);
 
   return (
     <PageTransition>
       <PageHeader
         title={`Laporan Gaji – ${selectedEntity.name}`}
-        subtitle={`Laporan Penggajian Karyawan Tetap, Honorarium Tenaga Ahli Lintas Entitas, dan Rekonsiliasi Laba Rugi (Tahun ${year})`}
+        subtitle={`Laporan Penggajian Karyawan Tetap, Honorarium Tenaga Ahli, Rekonsiliasi Laba Rugi, dan Audit PPh 21 (Tahun ${year})`}
         rightSlot={
           <>
             <YearSelect currentYear={year} />
@@ -56,6 +60,7 @@ export default async function PayrollPage({
 
       <PayrollClient
         data={payrollData}
+        rekonsiliasiData={rekonsiliasiData}
         userRole={role}
         initialTab={initialTab}
         selectedYear={year}

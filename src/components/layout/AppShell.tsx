@@ -30,7 +30,7 @@ export function AppShell({
     }
     const fetchCount = async () => {
       try {
-        const res = await fetch("/api/notifikasi/count");
+        const res = await fetch("/api/notif-count");
         if (res.ok) {
           const data = await res.json();
           setUnreadCount(data.count ?? 0);

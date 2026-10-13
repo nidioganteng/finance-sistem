@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       logActivity(
         session.user.id,
         `Ekspor Excel Rekonsiliasi Pajak Gaji & PPh 21 (${displayName} ${year})`,
-        "EXPORT",
+        "USER_ACTIVITY",
         { year, entityCount: targetIds.length }
       );
     } catch {

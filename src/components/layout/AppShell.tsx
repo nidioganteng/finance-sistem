@@ -17,6 +17,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
   // Tutup sidebar saat resize ke desktop
@@ -36,7 +37,7 @@ export function AppShell({
     <div className="flex min-h-screen bg-surface-page">
       {/* ── Desktop sidebar ─────────────────────────────────────── */}
       <div className="hidden lg:block print:hidden flex-none">
-        <Sidebar role={role} customInputs={customInputs} />
+        <Sidebar role={role} customInputs={customInputs} collapsed={collapsed} onToggleCollapse={() => setCollapsed((v) => !v)} />
       </div>
 
       {/* ── Mobile sidebar backdrop ──────────────────────────────── */}

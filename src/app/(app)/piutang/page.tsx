@@ -12,7 +12,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 export default async function PiutangPage({
   searchParams,
 }: {
-  searchParams: { entity?: string };
+  searchParams: { entity?: string; tab?: string };
 }) {
   const session = await getServerSession(authOptions);
   const { role, entityKeys } = session!.user;
@@ -29,6 +29,7 @@ export default async function PiutangPage({
   }
 
   const data = await getPiutangData(selectedEntity.id);
+  const initialTab = searchParams.tab === "arsip" || searchParams.tab === "selesai" ? "selesai" : "berjalan";
 
   return (
     <PageTransition>
@@ -49,6 +50,7 @@ export default async function PiutangPage({
         loadingDockList={data.loadingDockList}
         userRole={role}
         isUmumEntity={selectedEntity.isUmum}
+        initialTab={initialTab}
       />
     </PageTransition>
   );

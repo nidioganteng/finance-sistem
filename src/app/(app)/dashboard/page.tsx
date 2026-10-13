@@ -24,9 +24,11 @@ import {
   BarChart3,
   AlertTriangle,
   CalendarClock,
+  Archive,
+  Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { Sparkles } from "lucide-react";
 
 export default async function DashboardPage({
   searchParams,
@@ -335,7 +337,16 @@ export default async function DashboardPage({
           />
 
           <div className="bg-surface-card rounded-2xl border border-border p-5">
-            <div className="text-sm font-bold text-navy-text mb-4">Proyek Berjalan</div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-bold text-navy-text">Proyek Berjalan</div>
+              <Link
+                href={`/piutang?tab=arsip&entity=${selectedEntity.key}`}
+                className="text-xs font-semibold text-brand hover:underline inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Archive size={13} />
+                <span>Lihat Arsip Proyek</span>
+              </Link>
+            </div>
             <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[560px]">
               <thead>

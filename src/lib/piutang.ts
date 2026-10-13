@@ -379,6 +379,7 @@ export async function getPiutangData(entityId: string | string[]) {
   const now = new Date();
   let totalKontrak = 0;
   let totalTerminTagih = 0;
+  const autoCompletedProjectIds: string[] = [];
 
   const projectList = projects.map((p) => {
     const contractValue = Number(p.contractValue);
@@ -783,14 +784,21 @@ export async function getPiutangData(entityId: string | string[]) {
       items: expenseItems,
     };
 
-    const maxPct = isCompleted
-      ? 100
-      : (contractValue > 0 ? Math.min(100, Math.round((totalGross / contractValue) * 100)) : 0);
-    const terminTagih = isCompleted ? contractValue : totalGross;
-    const sisaTagih = sisaKontrak;
+    const calculatedPct = contractValue > 0 ? Math.min(100, Math.round((totalGross / contractValue) * 100)) : 0;
+    const isAutoCompleted = p.status === "ACTIVE" && contractValue > 0 && (calculatedPct >= 100 || totalGross >= contractValue);
+    const finalStatus: "ACTIVE" | "CANCELLED" | "COMPLETED" = isCompleted || isAutoCompleted ? "COMPLETED" : (p.status as "ACTIVE" | "CANCELLED");
+    const finalIsCompleted = finalStatus === "COMPLETED";
+
+    if (isAutoCompleted) {
+      autoCompletedProjectIds.push(p.id);
+    }
+
+    const maxPct = finalIsCompleted ? 100 : calculatedPct;
+    const terminTagih = finalIsCompleted ? contractValue : totalGross;
+    const sisaTagih = finalIsCompleted ? 0 : sisaKontrak;
 
     // "Total Nilai Kontrak Aktif" cuma menjumlah proyek yang masih aktif
-    if (!isCancelled && !isCompleted) {
+    if (!isCancelled && !finalIsCompleted) {
       totalKontrak += contractValue;
       totalTerminTagih += terminTagih;
     }
@@ -804,8 +812,8 @@ export async function getPiutangData(entityId: string | string[]) {
       contractValue,
       contractValueFmt: formatRupiah(contractValue),
       deadlineFmt: p.deadline.toLocaleDateString("id-ID"),
-      isOverdue: !isCancelled && !isCompleted && maxPct < 80 && p.deadline < now,
-      status: p.status,
+      isOverdue: !isCancelled && !finalIsCompleted && maxPct < 80 && p.deadline < now,
+      status: finalStatus,
       maxPercentage: maxPct,
       terminTagih,
       terminTagihFmt: formatRupiah(terminTagih),
@@ -816,6 +824,13 @@ export async function getPiutangData(entityId: string | string[]) {
       expensesSummary,
     };
   });
+
+  if (autoCompletedProjectIds.length > 0) {
+    await prisma.project.updateMany({
+      where: { id: { in: autoCompletedProjectIds } },
+      data: { status: "COMPLETED" },
+    });
+  }
 
   const sisaPiutang = totalKontrak - totalTerminTagih;
 

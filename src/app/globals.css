@@ -17,13 +17,13 @@
   --color-brand: 59 111 237;
   --color-brand-hover: 41 82 196;
   --color-brand-soft: 109 94 245;
-  --color-surface-page: 245 246 248;
+  --color-surface-page: 235 241 253;
   --color-surface-card: 255 255 255;
-  --color-surface-subtle: 247 248 250;
-  --color-surface-input: 249 250 251;
-  --color-surface-hover: 241 242 245;
-  --color-border: 226 230 235;
-  --color-border-soft: 229 232 236;
+  --color-surface-subtle: 246 248 255;
+  --color-surface-input: 250 251 255;
+  --color-surface-hover: 238 243 255;
+  --color-border: 218 225 240;
+  --color-border-soft: 224 230 245;
   --color-muted: 100 116 139;
   --color-muted-strong: 71 85 105;
   --color-muted-stronger: 51 65 85;
@@ -38,21 +38,21 @@
 }
 
 :root.dark {
-  --color-navy: 65 96 158;
+  --color-navy: 99 102 241;
   --color-navy-text: 241 245 249;
   --color-navy-soft: 148 163 184;
-  --color-surface-page: 10 14 24;
-  --color-surface-card: 17 24 39;
-  --color-surface-subtle: 23 31 46;
-  --color-surface-input: 27 36 53;
-  --color-surface-hover: 31 41 58;
-  --color-border: 39 49 68;
-  --color-border-soft: 34 43 61;
+  --color-surface-page: 8 8 14;
+  --color-surface-card: 14 14 24;
+  --color-surface-subtle: 18 18 30;
+  --color-surface-input: 20 20 34;
+  --color-surface-hover: 26 26 44;
+  --color-border: 32 32 56;
+  --color-border-soft: 26 26 46;
   --color-muted: 148 163 184;
   --color-muted-strong: 203 213 225;
   --color-muted-stronger: 226 232 240;
   --color-muted-faint: 100 116 139;
-  --color-muted-faintest: 86 96 122;
+  --color-muted-faintest: 80 90 115;
   --color-status-amber: 251 191 36;
   --color-status-amberDark: 253 230 138;
   --color-status-green: 52 211 153;
@@ -62,8 +62,20 @@
 }
 
 body {
-  background: rgb(var(--color-surface-page));
+  background-color: rgb(var(--color-surface-page));
+  background-image:
+    radial-gradient(ellipse 70% 50% at 15% 0%, rgb(99 130 246 / 0.12) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 85% 100%, rgb(59 111 237 / 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 35% at 70% 10%, rgb(139 92 246 / 0.06) 0%, transparent 55%);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+}
+
+:root.dark body {
+  background-image:
+    radial-gradient(ellipse 70% 50% at 15% 0%, rgb(37 99 235 / 0.20) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 85% 100%, rgb(99 102 241 / 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 35% at 70% 10%, rgb(109 40 217 / 0.10) 0%, transparent 55%);
 }
 
 ::-webkit-scrollbar {

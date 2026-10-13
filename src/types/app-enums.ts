@@ -61,7 +61,8 @@ export type NotifikasiType =
   | "PROGRES_80"
   | "PERUBAHAN_CLOSED"
   | "BACKDATE"
-  | "JENIS_INPUT_BARU";
+  | "JENIS_INPUT_BARU"
+  | "PENUGASAN_BARU";
 
 export const NotifikasiType = {
   PENDAFTARAN: "PENDAFTARAN",
@@ -72,6 +73,7 @@ export const NotifikasiType = {
   PERUBAHAN_CLOSED: "PERUBAHAN_CLOSED",
   BACKDATE: "BACKDATE",
   JENIS_INPUT_BARU: "JENIS_INPUT_BARU",
+  PENUGASAN_BARU: "PENUGASAN_BARU",
 } as const;
 
 export type RekananTipe = "VENDOR" | "KLIEN" | "TENAGA_AHLI" | "SUBKONTRAKTOR" | "LAINNYA";

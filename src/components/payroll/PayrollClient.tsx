@@ -712,104 +712,69 @@ export function PayrollClient({
           </div>
 
           {/* Stat Cards Pegawai */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-medium text-muted-faint truncate">
-                  Pegawai Terdaftar ({BULAN_NAMES[selectedMonth - 1]})
-                </div>
-                <div className="text-xl font-bold font-mono text-navy-text mt-1">
-                  {data.summaryBulanIni.totalPegawaiInput} / {data.summaryBulanIni.totalPegawaiAktif}
-                </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col gap-1">
+              <div className="text-[11px] font-medium text-muted-faint">Pegawai Aktif</div>
+              <div className="text-xl font-bold font-mono text-navy-text">
+                {data.summaryBulanIni.totalPegawaiInput}
+                <span className="text-sm font-normal text-muted-faint"> / {data.summaryBulanIni.totalPegawaiAktif}</span>
               </div>
-              <div className="text-[10px] text-muted-faint mt-1 truncate">
-                Sudah diinput dari total aktif
-              </div>
+              <div className="text-[10px] text-muted-faint">Input / Terdaftar</div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-medium text-muted-faint truncate">
-                  Gaji Pokok Total
-                </div>
-                <div className="text-xl font-bold font-mono text-navy-text mt-1">
-                  {data.summaryBulanIni.totalGajiPokokFmt}
-                </div>
+            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col gap-1">
+              <div className="text-[11px] font-medium text-muted-faint">Gaji Pokok</div>
+              <div className="text-xl font-bold font-mono text-navy-text">
+                {data.summaryBulanIni.totalGajiPokokFmt}
               </div>
-              <div className="text-[10px] text-muted-faint mt-1 truncate">
-                Gaji pokok bulan {BULAN_NAMES[selectedMonth - 1]}
-              </div>
+              <div className="text-[10px] text-muted-faint">{BULAN_NAMES[selectedMonth - 1]} {selectedYear}</div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-medium text-muted-faint truncate">
-                  Tunjangan, THR & Insentif
-                </div>
-                <div className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300 mt-1">
-                  {formatRupiah(
-                    data.summaryBulanIni.totalTunjanganJabatan +
-                      data.summaryBulanIni.totalTunjanganTransport +
-                      data.summaryBulanIni.totalInsentif +
-                      (data.summaryBulanIni.totalThr ?? 0) +
-                      (data.summaryBulanIni.totalTunjanganBpjs ?? 0) +
-                      (data.summaryBulanIni.totalTunjanganPph ?? 0)
-                  )}
-                </div>
+            <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-col gap-1">
+              <div className="text-[11px] font-medium text-muted-faint">Tunjangan & Insentif</div>
+              <div className="text-xl font-bold font-mono text-amber-700 dark:text-amber-300">
+                {formatRupiah(
+                  (data.summaryBulanIni.totalTunjanganJabatan ?? 0) +
+                  (data.summaryBulanIni.totalTunjanganTransport ?? 0) +
+                  (data.summaryBulanIni.totalInsentif ?? 0) +
+                  (data.summaryBulanIni.totalThr ?? 0) +
+                  (data.summaryBulanIni.totalTunjanganBpjs ?? 0) +
+                  (data.summaryBulanIni.totalTunjanganPph ?? 0)
+                )}
               </div>
-              <div className="text-[10px] text-muted-faint mt-1 truncate">
-                Jabatan, transport, THR & tunjangan
-              </div>
+              <div className="text-[10px] text-muted-faint">Jabatan, transport, THR</div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-semibold text-blue-800 dark:text-blue-300 flex items-center justify-between gap-1.5">
-                  <span className="truncate">Total Terlapor Pajak</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-mono font-bold whitespace-nowrap shrink-0">
-                    SPT PPh 21
-                  </span>
-                </div>
-                <div className="text-xl font-bold font-mono text-blue-900 dark:text-blue-200 mt-1">
-                  {data.summaryBulanIni.totalGajiTerlaporPajakFmt || formatRupiah(data.summaryBulanIni.totalGajiTerlaporPajak)}
-                </div>
+            <div className="p-4 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">Terlapor Pajak</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono font-bold">SPT</span>
               </div>
-              <div className="text-[10px] text-blue-700/80 dark:text-blue-300/70 mt-1 flex items-center justify-between gap-1">
-                <span className="truncate">Total bruto pelaporan SPT Masa</span>
-                <span className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap shrink-0">
-                  Ditanggung
-                </span>
+              <div className="text-xl font-bold font-mono text-blue-900 dark:text-blue-200">
+                {data.summaryBulanIni.totalGajiTerlaporPajakFmt ?? formatRupiah(data.summaryBulanIni.totalGajiTerlaporPajak ?? 0)}
               </div>
+              <div className="text-[10px] text-blue-600/70 dark:text-blue-400/70">Bruto SPT Masa PPh 21</div>
             </div>
 
-            <div className="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between gap-1.5">
-                  <span className="truncate">Total Gaji Bersih</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 font-mono font-bold whitespace-nowrap shrink-0">
-                    Kas / GL 511
-                  </span>
-                </div>
-                <div className="text-xl font-bold font-mono text-emerald-800 dark:text-emerald-200 mt-1">
-                  {data.summaryBulanIni.totalGajiBersihFmt}
-                </div>
-              </div>
-              <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/70 mt-1 flex items-center justify-between gap-1">
-                <span className="truncate">Setelah BPJS & kasbon</span>
+            <div className="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Gaji Bersih</span>
                 {data.penyesuaianJurnal.pegawai.isSinkronBulan ? (
-                  <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 font-mono whitespace-nowrap shrink-0">
-                    ✓ Balance
-                  </span>
+                  <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400">✓ Balance</span>
                 ) : (
                   <button
                     onClick={() => setPegawaiSubTab("penyesuaian")}
-                    className="text-[9px] font-bold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer whitespace-nowrap shrink-0"
-                    title={`Selisih Akun 511: ${data.penyesuaianJurnal.pegawai.selisihBulanFmt}`}
+                    className="text-[9px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                    title={`Selisih: ${data.penyesuaianJurnal.pegawai.selisihBulanFmt}`}
                   >
-                    ⚠️ Cek Jurnal
+                    ⚠ Cek
                   </button>
                 )}
               </div>
+              <div className="text-xl font-bold font-mono text-emerald-800 dark:text-emerald-200">
+                {data.summaryBulanIni.totalGajiBersihFmt}
+              </div>
+              <div className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">Setelah BPJS & potongan</div>
             </div>
           </div>
 

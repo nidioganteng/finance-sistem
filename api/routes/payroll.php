@@ -97,11 +97,16 @@ if ($method === 'GET' && $sub === '') {
         'totalTunjanganJabatan'     => 0.0,
         'totalTunjanganTransport'   => 0.0,
         'totalInsentif'             => 0.0,
+        'totalThr'                  => 0.0,
+        'totalTunjanganBpjs'        => 0.0,
+        'totalTunjanganPph'         => 0.0,
         'totalBpjsKesehatan'        => 0.0,
         'totalBpjsKetenagakerjaan'  => 0.0,
+        'totalPotonganBpjs'         => 0.0,
         'totalPotonganLain'         => 0.0,
         'totalPph21'                => 0.0,
         'totalGajiKotor'            => 0.0,
+        'totalGajiTerlaporPajak'    => 0.0,
         'totalGajiBersih'           => 0.0,
     ];
 
@@ -165,9 +170,11 @@ if ($method === 'GET' && $sub === '') {
             $summary_bulan_ini['totalInsentif']            += $ins;
             $summary_bulan_ini['totalBpjsKesehatan']       += $bkes;
             $summary_bulan_ini['totalBpjsKetenagakerjaan'] += $btk;
+            $summary_bulan_ini['totalPotonganBpjs']        += ($bkes + $btk);
             $summary_bulan_ini['totalPotonganLain']        += $pot;
             $summary_bulan_ini['totalPph21']               += $pph;
             $summary_bulan_ini['totalGajiKotor']           += $kotor;
+            $summary_bulan_ini['totalGajiTerlaporPajak']   += $kotor;
             $summary_bulan_ini['totalGajiBersih']          += $brsih;
             $summary_bulan_ini['totalPegawaiInput']++;
         }
@@ -765,11 +772,16 @@ if ($method === 'GET' && $sub === '') {
             'totalTunjanganJabatanFmt'      => fmt_rp_payroll($summary_bulan_ini['totalTunjanganJabatan']),
             'totalTunjanganTransportFmt'    => fmt_rp_payroll($summary_bulan_ini['totalTunjanganTransport']),
             'totalInsentifFmt'              => fmt_rp_payroll($summary_bulan_ini['totalInsentif']),
+            'totalThrFmt'                   => fmt_rp_payroll($summary_bulan_ini['totalThr']),
+            'totalTunjanganBpjsFmt'         => fmt_rp_payroll($summary_bulan_ini['totalTunjanganBpjs']),
+            'totalTunjanganPphFmt'          => fmt_rp_payroll($summary_bulan_ini['totalTunjanganPph']),
             'totalBpjsKesehatanFmt'         => fmt_rp_payroll($summary_bulan_ini['totalBpjsKesehatan']),
             'totalBpjsKetenagakerjaanFmt'   => fmt_rp_payroll($summary_bulan_ini['totalBpjsKetenagakerjaan']),
+            'totalPotonganBpjsFmt'          => fmt_rp_payroll($summary_bulan_ini['totalPotonganBpjs']),
             'totalPotonganLainFmt'          => fmt_rp_payroll($summary_bulan_ini['totalPotonganLain']),
             'totalPph21Fmt'                 => fmt_rp_payroll($summary_bulan_ini['totalPph21']),
             'totalGajiKotorFmt'             => fmt_rp_payroll($summary_bulan_ini['totalGajiKotor']),
+            'totalGajiTerlaporPajakFmt'     => fmt_rp_payroll($summary_bulan_ini['totalGajiTerlaporPajak']),
             'totalGajiBersihFmt'            => fmt_rp_payroll($summary_bulan_ini['totalGajiBersih']),
         ]),
         'honorList'             => $honor_list,

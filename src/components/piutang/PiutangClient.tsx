@@ -26,6 +26,7 @@ import {
   Calendar,
   PlayCircle,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
 import { formatRupiah, getMetricValueFontSize } from "@/lib/dashboard-data";
 import type {
@@ -132,33 +133,26 @@ export function PiutangClient({
     });
   }
 
-  function handleCompleteProject(id: string, code: string) {
-    if (!confirm(`Selesaikan dan arsipkan proyek ${code}? Proyek akan dipindahkan ke Arsip Proyek, namun transaksi di jurnal tetap tercatat.`)) return;
-    startTransition(async () => {
-      try {
-        await completeProject(id);
-      } catch (e: unknown) {
-        setError((e as Error).message);
-      }
-    });
-  }
+  const [confirmModal, setConfirmModal] = useState<{
+    type: "complete" | "cancel" | "reopen";
+    projectId: string;
+    projectCode: string;
+    projectName: string;
+  } | null>(null);
 
-  function handleCancelProject(id: string, code: string) {
-    if (!confirm(`Batalkan proyek ${code}? Termin yang belum terbayar akan dihapus dan proyek dipindahkan ke Arsip Proyek.`)) return;
+  function handleConfirmAction() {
+    if (!confirmModal) return;
+    const { type, projectId } = confirmModal;
     startTransition(async () => {
       try {
-        await cancelProject(id);
-      } catch (e: unknown) {
-        setError((e as Error).message);
-      }
-    });
-  }
-
-  function handleReopenProject(id: string, code: string) {
-    if (!confirm(`Pulihkan proyek ${code} dari Arsip ke daftar Proyek Berjalan?`)) return;
-    startTransition(async () => {
-      try {
-        await reopenProject(id);
+        if (type === "complete") {
+          await completeProject(projectId);
+        } else if (type === "cancel") {
+          await cancelProject(projectId);
+        } else if (type === "reopen") {
+          await reopenProject(projectId);
+        }
+        setConfirmModal(null);
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -463,10 +457,15 @@ export function PiutangClient({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleCompleteProject(p.id, p.code);
+                                    setConfirmModal({
+                                      type: "complete",
+                                      projectId: p.id,
+                                      projectCode: p.code,
+                                      projectName: p.name,
+                                    });
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-green-300 dark:border-green-600 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
                                   title="Tandai selesai dan pindahkan ke Arsip Proyek"
                                 >
                                   <Archive size={11} /> Selesai & Arsipkan
@@ -474,10 +473,15 @@ export function PiutangClient({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleCancelProject(p.id, p.code);
+                                    setConfirmModal({
+                                      type: "cancel",
+                                      projectId: p.id,
+                                      projectCode: p.code,
+                                      projectName: p.name,
+                                    });
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover cursor-pointer"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border text-[11px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
                                   title="Batalkan proyek dan pindahkan ke Arsip Proyek"
                                 >
                                   <Ban size={11} /> Batalkan Proyek
@@ -489,10 +493,15 @@ export function PiutangClient({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleReopenProject(p.id, p.code);
+                                    setConfirmModal({
+                                      type: "reopen",
+                                      projectId: p.id,
+                                      projectCode: p.code,
+                                      projectName: p.name,
+                                    });
                                   }}
                                   disabled={isPending}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-blue-300 dark:border-blue-600 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 cursor-pointer"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-blue-300 dark:border-blue-700 text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
                                   title="Pulihkan proyek ini dari Arsip ke daftar Proyek Berjalan"
                                 >
                                   <RotateCcw size={11} /> Pulihkan Proyek
@@ -551,13 +560,18 @@ export function PiutangClient({
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleReopenProject(p.id, p.code);
+                                          setConfirmModal({
+                                            type: "reopen",
+                                            projectId: p.id,
+                                            projectCode: p.code,
+                                            projectName: p.name,
+                                          });
                                         }}
                                         disabled={isPending}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
                                         title="Kembalikan proyek ini ke daftar Proyek Berjalan"
                                       >
-                                        <RotateCcw size={13} /> Buka Kembali Proyek
+                                        <RotateCcw size={13} /> Pulihkan Proyek
                                       </button>
                                     )}
                                     <button
@@ -1313,6 +1327,147 @@ export function PiutangClient({
                 className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors"
               >
                 Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Tindakan Proyek (Arsipkan / Batalkan / Pulihkan) */}
+      {confirmModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            if (!isPending) setConfirmModal(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-surface-card rounded-[22px] border border-border-soft shadow-2xl p-6 relative flex flex-col gap-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                if (!isPending) setConfirmModal(null);
+              }}
+              disabled={isPending}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-faint hover:bg-surface-hover hover:text-navy-text transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <X size={17} />
+            </button>
+
+            {/* Header / Icon & Titles */}
+            <div className="flex items-start gap-3.5 pr-6">
+              {confirmModal.type === "complete" && (
+                <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 shadow-xs border border-emerald-200/60 dark:border-emerald-800/50">
+                  <Archive size={20} />
+                </div>
+              )}
+              {confirmModal.type === "cancel" && (
+                <div className="w-11 h-11 rounded-2xl bg-rose-100 dark:bg-rose-950/50 text-status-red flex items-center justify-center shrink-0 shadow-xs border border-rose-200/60 dark:border-rose-800/50">
+                  <Ban size={20} />
+                </div>
+              )}
+              {confirmModal.type === "reopen" && (
+                <div className="w-11 h-11 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0 shadow-xs border border-blue-200/60 dark:border-blue-800/50">
+                  <RotateCcw size={20} />
+                </div>
+              )}
+              <div>
+                <h3 className="text-[15px] font-bold text-navy-text leading-snug">
+                  {confirmModal.type === "complete"
+                    ? "Selesaikan & Arsipkan Proyek?"
+                    : confirmModal.type === "cancel"
+                    ? "Batalkan Proyek Ini?"
+                    : "Pulihkan Proyek ke Aktif?"}
+                </h3>
+                <p className="text-[12.5px] text-muted-stronger mt-0.5 leading-normal">
+                  {confirmModal.type === "complete"
+                    ? "Proyek akan dipindahkan ke Arsip Proyek."
+                    : confirmModal.type === "cancel"
+                    ? "Proyek akan dibatalkan dan dipindahkan ke arsip."
+                    : "Proyek akan dikembalikan ke daftar Proyek Berjalan."}
+                </p>
+              </div>
+            </div>
+
+            {/* Detail Box */}
+            <div className="bg-surface-subtle border border-border-soft rounded-2xl p-4 space-y-2.5">
+              <div>
+                <span className="text-[10.5px] font-bold uppercase tracking-wider text-muted-faint block">
+                  Informasi Proyek
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-surface-card border border-border-soft text-navy-text">
+                    {confirmModal.projectCode}
+                  </span>
+                  <span className="text-xs font-semibold text-navy-text truncate">
+                    {confirmModal.projectName}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2.5 border-t border-border-soft/80 text-[12px] leading-relaxed text-muted-stronger">
+                {confirmModal.type === "complete" && (
+                  <span>
+                    Semua pencatatan termin dan transaksi jurnal tetap tersimpan utuh. Proyek tidak akan lagi memenuhi daftar proyek aktif di dashboard.
+                  </span>
+                )}
+                {confirmModal.type === "cancel" && (
+                  <span className="text-rose-700 dark:text-rose-400 font-medium">
+                    Termin yang belum terbayar akan dibatalkan. Transaksi jurnal yang telah dibukukan sebelumnya tetap tersimpan di pembukuan.
+                  </span>
+                )}
+                {confirmModal.type === "reopen" && (
+                  <span>
+                    Status proyek akan kembali menjadi Aktif dan dapat ditambahkan termin baru serta tampil di widget Proyek Berjalan dashboard.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                disabled={isPending}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border-soft text-[13px] font-semibold text-muted-stronger hover:bg-surface-hover hover:text-navy-text transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAction}
+                disabled={isPending}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-white text-[13px] font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
+                  confirmModal.type === "complete"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : confirmModal.type === "cancel"
+                    ? "bg-status-red hover:opacity-90"
+                    : "bg-navy hover:bg-navy/90"
+                }`}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : confirmModal.type === "complete" ? (
+                  <>
+                    <Archive size={15} />
+                    <span>Selesai & Arsipkan</span>
+                  </>
+                ) : confirmModal.type === "cancel" ? (
+                  <>
+                    <Ban size={15} />
+                    <span>Batalkan Proyek</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw size={15} />
+                    <span>Pulihkan Proyek</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

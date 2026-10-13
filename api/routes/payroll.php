@@ -499,6 +499,90 @@ if ($method === 'GET' && $sub === '') {
         $konsolidasi_ta[] = $k;
     }
 
+    // Build allHonorBulanIni — semua honor bulan ini, lintas entitas
+    $all_honor_bulan_ini = [];
+    foreach ($all_honor_tahun as $h) {
+        if ((int)$h['bulan'] !== $month) continue;
+        $bruto  = (float)$h['nominalHonor'];
+        $pph    = (float)$h['pph21'];
+        $bersih = (float)$h['nominalBersih'];
+        $resolved_proj = $h['namaProyek']
+            ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
+        $tgl_str = substr($h['tanggal'], 0, 10);
+        $all_honor_bulan_ini[] = [
+            'id'               => $h['id'],
+            'entityId'         => $h['entityId'],
+            'entityName'       => $h['ename'],
+            'entityKey'        => $h['ekey'],
+            'rekananId'        => $h['rekananId'] ?? null,
+            'nik'              => $h['nik'],
+            'nama'             => $h['nama'],
+            'npwp'             => $h['npwp'] ?? null,
+            'uraian'           => $h['uraian'],
+            'tanggal'          => $tgl_str,
+            'tanggalFmt'       => fmt_tanggal_id($tgl_str),
+            'bulan'            => (int)$h['bulan'],
+            'tahun'            => (int)$h['tahun'],
+            'nominalHonor'     => $bruto,
+            'nominalHonorFmt'  => fmt_rp_payroll($bruto),
+            'tarifPph21Persen' => (float)($h['tarifPph21Persen'] ?? 0),
+            'pph21'            => $pph,
+            'pph21Fmt'         => fmt_rp_payroll($pph),
+            'nominalBersih'    => $bersih,
+            'nominalBersihFmt' => fmt_rp_payroll($bersih),
+            'projectId'        => $h['projectId'] ?? null,
+            'projectCode'      => $h['projCode'] ?? null,
+            'namaProyek'       => $resolved_proj,
+            'ptkp'             => $h['ptkp'] ?? null,
+            'jenisPph'         => $h['jenisPph'] ?? null,
+            'noBukti'          => $h['noBukti'] ?? null,
+        ];
+    }
+
+    // Build rekapTenagaAhliPerProyek — honor per proyek, seluruh tahun
+    $per_proyek_map = [];
+    foreach ($all_honor_tahun as $h) {
+        $proj_key = $h['projectId'] ?: '__none__';
+        $bruto  = (float)$h['nominalHonor'];
+        $pph    = (float)$h['pph21'];
+        $bersih = (float)$h['nominalBersih'];
+        $proj_name = $h['namaProyek']
+            ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
+
+        if (!isset($per_proyek_map[$proj_key])) {
+            $per_proyek_map[$proj_key] = [
+                'projectId'         => $h['projectId'] ?: null,
+                'projectCode'       => $h['projCode'] ?? null,
+                'projectName'       => $proj_name,
+                'entityName'        => $h['ename'],
+                'totalTransaksi'    => 0,
+                'totalHonorBruto'   => 0.0,
+                'totalPph'          => 0.0,
+                'totalHonorBersih'  => 0.0,
+                'tenagaAhliList'    => [],
+            ];
+        }
+        $rec = &$per_proyek_map[$proj_key];
+        $rec['totalTransaksi']++;
+        $rec['totalHonorBruto']  += $bruto;
+        $rec['totalPph']          += $pph;
+        $rec['totalHonorBersih']  += $bersih;
+        $nama = trim($h['nama']);
+        if ($nama && !in_array($nama, $rec['tenagaAhliList'])) {
+            $rec['tenagaAhliList'][] = $nama;
+        }
+        unset($rec);
+    }
+
+    $rekap_ta_per_proyek = [];
+    foreach ($per_proyek_map as $item) {
+        $item['totalHonorBrutoFmt']  = fmt_rp_payroll($item['totalHonorBruto']);
+        $item['totalPphFmt']         = fmt_rp_payroll($item['totalPph']);
+        $item['totalHonorBersihFmt'] = fmt_rp_payroll($item['totalHonorBersih']);
+        $rekap_ta_per_proyek[] = $item;
+    }
+    usort($rekap_ta_per_proyek, fn($a, $b) => $b['totalHonorBruto'] <=> $a['totalHonorBruto']);
+
     // 10. Transactions for COA gaji/honor/tenaga ahli for year (for sync laba rugi)
     $year_start = "$year-01-01 00:00:00";
     $year_end   = "$year-12-31 23:59:59";
@@ -689,8 +773,10 @@ if ($method === 'GET' && $sub === '') {
             'totalGajiBersihFmt'            => fmt_rp_payroll($summary_bulan_ini['totalGajiBersih']),
         ]),
         'honorList'             => $honor_list,
+        'allHonorBulanIni'      => $all_honor_bulan_ini,
         'rekapBulananTenagaAhli'=> $rekap_bulanan_ta,
         'rekapTenagaAhliPerNama'=> $rekap_ta_per_nama,
+        'rekapTenagaAhliPerProyek' => $rekap_ta_per_proyek,
         'summaryHonorBulanIni'  => array_merge($summary_honor_bulan_ini, [
             'totalHonorBrutoFmt'  => fmt_rp_payroll($summary_honor_bulan_ini['totalHonorBruto']),
             'totalPph21Fmt'       => fmt_rp_payroll($summary_honor_bulan_ini['totalPph21']),

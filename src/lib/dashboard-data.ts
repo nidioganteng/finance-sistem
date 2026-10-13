@@ -53,6 +53,25 @@ export async function getAccessibleEntities(
     orderBy: { createdAt: "asc" },
   });
 
+  // Auto-archive: Periksa proyek aktif yang sudah lunas 100% dan update status ke COMPLETED
+  const completedProjectIdsToArchive: string[] = [];
+  for (const e of entities) {
+    for (const p of e.projects) {
+      const cv = Number(p.contractValue);
+      const maxPct = p.termin.reduce((max, t) => Math.max(max, t.percentage), 0);
+      const sumNom = p.termin.reduce((sum, t) => sum + (t.nominal ? Number(t.nominal) : 0), 0);
+      if ((cv > 0 && maxPct >= 100) || (cv > 0 && sumNom >= cv)) {
+        completedProjectIdsToArchive.push(p.id);
+      }
+    }
+  }
+  if (completedProjectIdsToArchive.length > 0) {
+    await prisma.project.updateMany({
+      where: { id: { in: completedProjectIdsToArchive } },
+      data: { status: "COMPLETED" },
+    });
+  }
+
   const entityIds = entities.map((e) => e.id);
   const excludedNoBukti = await getExcludedNoBuktiForVersion(entityIds, targetYear, "INTERNAL");
 
@@ -185,14 +204,16 @@ export async function getAccessibleEntities(
       profit,
       talanganKeluar,
       talanganMasuk,
-      projects: e.projects.map((p) => ({
-        code: p.code,
-        name: p.name,
-        contractValue: Number(p.contractValue),
-        spend: Number(p.spend),
-        profit: Number(p.contractValue) - Number(p.spend),
-        termin: p.termin.map((t) => ({ name: t.name, percentage: t.percentage, status: t.status })),
-      })),
+      projects: e.projects
+        .filter((p) => !completedProjectIdsToArchive.includes(p.id))
+        .map((p) => ({
+          code: p.code,
+          name: p.name,
+          contractValue: Number(p.contractValue),
+          spend: Number(p.spend),
+          profit: Number(p.contractValue) - Number(p.spend),
+          termin: p.termin.map((t) => ({ name: t.name, percentage: t.percentage, status: t.status })),
+        })),
     };
   });
 }

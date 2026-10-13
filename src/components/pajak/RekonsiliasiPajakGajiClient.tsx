@@ -15,6 +15,7 @@ import {
   Calculator,
   X,
   ExternalLink,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -99,6 +100,35 @@ export function RekonsiliasiPajakGajiClient({
     const peg = Number(pph21PegawaiTerlapor) || 0;
     const ta = Number(val) || 0;
     setPph21Terlapor(String(peg + ta));
+  }
+
+  function handleAutoFillAll() {
+    if (!editingItem) return;
+    const gPeg = String(editingItem.gajiPegawaiJurnal || 0);
+    const pPeg = String(editingItem.pph21PegawaiBasis || 0);
+    const gTa = String(editingItem.gajiTaJurnal || 0);
+    const pTa = String(editingItem.pph21TaBasis || 0);
+    const gTot = String(editingItem.gajiTotalJurnal || 0);
+    const pTot = String(editingItem.pph21Basis || 0);
+
+    setGajiPegawaiTerlapor(gPeg);
+    setPph21PegawaiTerlapor(pPeg);
+    setGajiTaTerlapor(gTa);
+    setPph21TaTerlapor(pTa);
+    setGajiTerlapor(gTot);
+    setPph21Terlapor(pTot);
+  }
+
+  function handleAutoFillPegawai() {
+    if (!editingItem) return;
+    handleGajiPegawaiChange(String(editingItem.gajiPegawaiJurnal || 0));
+    handlePphPegawaiChange(String(editingItem.pph21PegawaiBasis || 0));
+  }
+
+  function handleAutoFillTa() {
+    if (!editingItem) return;
+    handleGajiTaChange(String(editingItem.gajiTaJurnal || 0));
+    handlePphTaChange(String(editingItem.pph21TaBasis || 0));
   }
 
   async function handleSave() {
@@ -758,16 +788,32 @@ export function RekonsiliasiPajakGajiClient({
                   </p>
                 </div>
               </div>
-              <button
-                onClick={closeEditModal}
-                className="p-1 rounded-lg hover:bg-surface-hover text-navy-soft hover:text-navy-text transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoFillAll}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-all cursor-pointer shadow-2xs"
+                  title="Salin seluruh nilai dari Jurnal Pembukuan internal agar status langsung Balance"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>Salin dari Jurnal</span>
+                </button>
+                <button
+                  onClick={closeEditModal}
+                  className="p-1 rounded-lg hover:bg-surface-hover text-navy-soft hover:text-navy-text transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
             <div className="p-6 space-y-4 text-xs overflow-y-auto">
+              {/* Petunjuk Singkat Pengisian */}
+              <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-soft text-navy-soft text-[11px] flex items-center justify-between">
+                <span>💡 Masukkan nilai dari <strong>SPT Masa 1721 resmi DJP</strong>. Jika pelaporan identik dengan pembukuan internal, gunakan tombol <strong>Salin dari Jurnal</strong> di atas.</span>
+              </div>
+
               {errorMsg && (
                 <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -789,9 +835,19 @@ export function RekonsiliasiPajakGajiClient({
                     <Users className="w-4 h-4 text-blue-600" />
                     Kategori 1: Pegawai Tetap (Akun 511)
                   </span>
-                  <span className="text-[11px] text-navy-soft font-mono">
-                    Jurnal: {editingItem.gajiPegawaiJurnalFmt} | PPh: {editingItem.pph21PegawaiBasisFmt}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-navy-soft font-mono">
+                      Jurnal: {editingItem.gajiPegawaiJurnalFmt} | PPh: {editingItem.pph21PegawaiBasisFmt}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAutoFillPegawai}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 transition-colors cursor-pointer"
+                      title="Salin nilai pembukuan pegawai tetap ke form SPT"
+                    >
+                      Salin Jurnal
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -841,9 +897,19 @@ export function RekonsiliasiPajakGajiClient({
                     <Award className="w-4 h-4 text-amber-600" />
                     Kategori 2: Tenaga Ahli (Akun 612)
                   </span>
-                  <span className="text-[11px] text-navy-soft font-mono">
-                    Jurnal: {editingItem.gajiTaJurnalFmt} | PPh: {editingItem.pph21TaBasisFmt}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-navy-soft font-mono">
+                      Jurnal: {editingItem.gajiTaJurnalFmt} | PPh: {editingItem.pph21TaBasisFmt}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAutoFillTa}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 transition-colors cursor-pointer"
+                      title="Salin nilai pembukuan tenaga ahli ke form SPT"
+                    >
+                      Salin Jurnal
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

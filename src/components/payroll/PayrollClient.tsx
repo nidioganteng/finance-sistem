@@ -542,7 +542,7 @@ export function PayrollClient({
           </button>
 
           <Link
-            href={`/pajak?entity=${data.entityKey}&year=${data.year}`}
+            href={`/pajak?entity=${data.entity?.key ?? ""}&year=${data.year}`}
             className="px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-800/60"
             title="Buka Halaman Rekonsiliasi Pajak Gaji & PPh 21 (SPT Masa)"
           >

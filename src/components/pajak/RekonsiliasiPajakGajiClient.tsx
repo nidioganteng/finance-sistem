@@ -27,6 +27,13 @@ import { formatRupiah } from "@/lib/dashboard-data";
 
 type ViewMode = "total" | "pegawai" | "tenaga-ahli" | "paralel";
 
+function formatRupiahInput(val: string | number | undefined | null) {
+  if (val === undefined || val === null || val === "") return "";
+  const num = String(val).replace(/[^0-9]/g, "");
+  if (!num) return "";
+  return Number(num).toLocaleString("id-ID");
+}
+
 export function RekonsiliasiPajakGajiClient({
   data,
   entityKey,
@@ -935,10 +942,11 @@ export function RekonsiliasiPajakGajiClient({
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="0"
-                            value={gajiPegawaiTerlapor}
-                            onChange={(e) => handleGajiPegawaiChange(e.target.value)}
+                            value={formatRupiahInput(gajiPegawaiTerlapor)}
+                            onChange={(e) => handleGajiPegawaiChange(e.target.value.replace(/[^0-9]/g, ""))}
                             className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
                           />
                         </div>
@@ -951,10 +959,11 @@ export function RekonsiliasiPajakGajiClient({
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="0"
-                            value={pph21PegawaiTerlapor}
-                            onChange={(e) => handlePphPegawaiChange(e.target.value)}
+                            value={formatRupiahInput(pph21PegawaiTerlapor)}
+                            onChange={(e) => handlePphPegawaiChange(e.target.value.replace(/[^0-9]/g, ""))}
                             className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
                           />
                         </div>
@@ -999,10 +1008,11 @@ export function RekonsiliasiPajakGajiClient({
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="0"
-                            value={gajiTaTerlapor}
-                            onChange={(e) => handleGajiTaChange(e.target.value)}
+                            value={formatRupiahInput(gajiTaTerlapor)}
+                            onChange={(e) => handleGajiTaChange(e.target.value.replace(/[^0-9]/g, ""))}
                             className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
                           />
                         </div>
@@ -1015,10 +1025,11 @@ export function RekonsiliasiPajakGajiClient({
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="0"
-                            value={pph21TaTerlapor}
-                            onChange={(e) => handlePphTaChange(e.target.value)}
+                            value={formatRupiahInput(pph21TaTerlapor)}
+                            onChange={(e) => handlePphTaChange(e.target.value.replace(/[^0-9]/g, ""))}
                             className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
                           />
                         </div>

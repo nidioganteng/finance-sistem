@@ -71,12 +71,14 @@ export function Sidebar({
   onClose,
   collapsed = false,
   onToggleCollapse,
+  unreadCount = 0,
 }: {
   role: Role;
   customInputs?: { key: string; nama: string }[];
   onClose?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  unreadCount?: number;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -324,20 +326,34 @@ export function Sidebar({
                   );
                 }
 
+                const isNotifItem = item.href === "/notifikasi";
+                const showBadge = isNotifItem && unreadCount > 0;
                 return (
                   <Link
                     key={item.href}
                     href={getItemHref(item.href)}
                     onClick={onClose}
                     title={collapsed ? item.label : undefined}
-                    className={`flex items-center rounded-pill text-sm font-semibold transition-all duration-150 ${collapsed ? "justify-center px-0 py-3" : "gap-2.5 px-3.5 py-3"} ${
+                    className={`relative flex items-center rounded-pill text-sm font-semibold transition-all duration-150 ${collapsed ? "justify-center px-0 py-3" : "gap-2.5 px-3.5 py-3"} ${
                       isParentActive
                         ? "bg-white/20 text-white shadow-sm"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <Icon size={17} strokeWidth={1.8} className="flex-none" />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    <span className="relative flex-none">
+                      <Icon size={17} strokeWidth={1.8} />
+                      {showBadge && collapsed && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </span>
+                    {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+                    {showBadge && !collapsed && (
+                      <span className="ml-auto min-w-[20px] h-5 px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center leading-none flex-none">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

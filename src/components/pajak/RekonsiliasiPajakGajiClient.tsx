@@ -48,7 +48,6 @@ export function RekonsiliasiPajakGajiClient({
   const [pph21Terlapor, setPph21Terlapor] = useState<string>("0");
   const [ntpn, setNtpn] = useState<string>("");
   const [keterangan, setKeterangan] = useState<string>("");
-  const [modalCategoryTab, setModalCategoryTab] = useState<"all" | "pegawai" | "tenaga-ahli">("all");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -57,13 +56,6 @@ export function RekonsiliasiPajakGajiClient({
 
   function openEditModal(item: RekonsiliasiGajiPph21Item) {
     setEditingItem(item);
-    if (viewMode === "pegawai") {
-      setModalCategoryTab("pegawai");
-    } else if (viewMode === "tenaga-ahli") {
-      setModalCategoryTab("tenaga-ahli");
-    } else {
-      setModalCategoryTab("all");
-    }
     setGajiPegawaiTerlapor(String(item.gajiPegawaiTerlapor || 0));
     setPph21PegawaiTerlapor(String(item.pph21PegawaiTerlapor || 0));
     setGajiTaTerlapor(String(item.gajiTaTerlapor || 0));
@@ -528,22 +520,46 @@ export function RekonsiliasiPajakGajiClient({
                       : "Total Beban Gaji Jurnal"}
                   </th>
                   <th className="p-2.5 text-right bg-blue-50/50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-300">
-                    Gaji Terlapor (SPT 1721)
+                    {viewMode === "pegawai"
+                      ? "Gaji Pegawai Terlapor (SPT)"
+                      : viewMode === "tenaga-ahli"
+                      ? "Honor TA Terlapor (SPT)"
+                      : "Total Gaji Terlapor (SPT 1721)"}
                   </th>
-                  <th className="p-2.5 text-right">Selisih Gaji</th>
+                  <th className="p-2.5 text-right">
+                    {viewMode === "pegawai"
+                      ? "Selisih Gaji Pegawai"
+                      : viewMode === "tenaga-ahli"
+                      ? "Selisih Honor TA"
+                      : "Total Selisih Gaji"}
+                  </th>
 
                   <th className="p-2.5 text-right text-purple-700 dark:text-purple-400">
-                    PPh 21 Jurnal/Payroll
+                    {viewMode === "pegawai"
+                      ? "PPh 21 Pegawai Jurnal"
+                      : viewMode === "tenaga-ahli"
+                      ? "PPh 21 TA Jurnal"
+                      : "Total PPh 21 Jurnal/Payroll"}
                   </th>
                   <th className="p-2.5 text-right bg-blue-50/50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-300">
-                    PPh 21 Terlapor (SPT)
+                    {viewMode === "pegawai"
+                      ? "PPh 21 Pegawai Terlapor (SPT)"
+                      : viewMode === "tenaga-ahli"
+                      ? "PPh 21 TA Terlapor (SPT)"
+                      : "Total PPh 21 Terlapor (SPT)"}
                   </th>
-                  <th className="p-2.5 text-right">Selisih PPh 21</th>
+                  <th className="p-2.5 text-right">
+                    {viewMode === "pegawai"
+                      ? "Selisih PPh Pegawai"
+                      : viewMode === "tenaga-ahli"
+                      ? "Selisih PPh TA"
+                      : "Total Selisih PPh 21"}
+                  </th>
 
                   <th className="p-2.5 text-center">Status Audit</th>
                   <th className="p-2.5">NTPN / Bukti</th>
                   <th className="p-2.5">Catatan</th>
-                  {canEdit && <th className="p-2.5 text-center w-12">Aksi</th>}
+                  {canEdit && <th className="p-2.5 text-center w-24">Aksi</th>}
                 </tr>
               )}
             </thead>
@@ -699,10 +715,17 @@ export function RekonsiliasiPajakGajiClient({
                       <td className="p-2.5 text-center">
                         <button
                           onClick={() => openEditModal(row)}
-                          className="p-1 rounded-lg hover:bg-surface-hover text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
-                          title="Input / Edit Data SPT Masa"
+                          className="px-2 py-1 rounded-lg bg-surface-subtle hover:bg-surface-hover text-blue-600 hover:text-blue-700 font-semibold text-[11px] inline-flex items-center gap-1 transition-all border border-border-soft cursor-pointer shadow-2xs whitespace-nowrap"
+                          title={
+                            isPeg
+                              ? "Input / Koreksi SPT Pegawai Tetap"
+                              : isTa
+                              ? "Input / Koreksi SPT Tenaga Ahli"
+                              : "Input / Koreksi SPT Masa 1721"
+                          }
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
+                          <Edit3 className="w-3 h-3" />
+                          <span>{isPeg ? "Input Pegawai" : isTa ? "Input TA" : "Input SPT"}</span>
                         </button>
                       </td>
                     )}
@@ -776,331 +799,317 @@ export function RekonsiliasiPajakGajiClient({
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* 4. MODAL INPUT / EDIT SPT MASA PPH 21 (2 KATEGORI TERPISAH) */}
+      {/* 4. MODAL INPUT / EDIT SPT MASA PPH 21 (TERISOLASI KHUSUS PER KATEGORI) */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-text/60 backdrop-blur-xs">
-          <div className="bg-surface-card rounded-2xl border border-border-soft w-full max-w-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 flex items-center justify-center border border-blue-200 dark:border-blue-500/20">
-                  <Edit3 className="w-4 h-4" />
+      {editingItem && (() => {
+        const isModalPegawai = viewMode === "pegawai";
+        const isModalTa = viewMode === "tenaga-ahli";
+        const isModalTotal = viewMode === "total" || viewMode === "paralel";
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-text/60 backdrop-blur-xs">
+            <div className="bg-surface-card rounded-2xl border border-border-soft w-full max-w-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+                    isModalPegawai
+                      ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-500/20"
+                      : isModalTa
+                      ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/20"
+                      : "bg-purple-50 dark:bg-purple-500/10 text-purple-600 border-purple-200 dark:border-purple-500/20"
+                  }`}>
+                    {isModalPegawai ? (
+                      <Users className="w-4 h-4" />
+                    ) : isModalTa ? (
+                      <Award className="w-4 h-4" />
+                    ) : (
+                      <Edit3 className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-navy-text">
+                      {isModalPegawai
+                        ? "Input SPT Masa PPh 21 — Pegawai Tetap (Akun 511)"
+                        : isModalTa
+                        ? "Input SPT Masa PPh 21 — Tenaga Ahli (Akun 612)"
+                        : "Input SPT Masa 1721 — Konsolidasi Induk"}
+                    </h3>
+                    <p className="text-xs text-navy-soft">
+                      Masa {editingItem.namaBulan} {data.year} — {data.entityName}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text">
-                    {modalCategoryTab === "pegawai"
-                      ? "Input SPT Masa PPh 21 — Pegawai Tetap (Akun 511)"
-                      : modalCategoryTab === "tenaga-ahli"
-                      ? "Input SPT Masa PPh 21 — Tenaga Ahli (Akun 612)"
-                      : "Input SPT Masa PPh 21 (Form 1721 Konsolidasi)"}
-                  </h3>
-                  <p className="text-xs text-navy-soft">
-                    Masa {editingItem.namaBulan} {data.year} — {data.entityName}
-                  </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={
+                      isModalPegawai
+                        ? handleAutoFillPegawai
+                        : isModalTa
+                        ? handleAutoFillTa
+                        : handleAutoFillAll
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-all cursor-pointer shadow-2xs"
+                    title="Salin nilai dari Jurnal Pembukuan internal agar status langsung Balance"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span>
+                      {isModalPegawai
+                        ? "Salin Jurnal Pegawai"
+                        : isModalTa
+                        ? "Salin Jurnal Tenaga Ahli"
+                        : "Salin dari Jurnal"}
+                    </span>
+                  </button>
+                  <button
+                    onClick={closeEditModal}
+                    className="p-1 rounded-lg hover:bg-surface-hover text-navy-soft hover:text-navy-text transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4 text-xs overflow-y-auto">
+                {/* Petunjuk Singkat Pengisian */}
+                <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-soft text-navy-soft text-[11px]">
+                  <span>
+                    {isModalPegawai
+                      ? "💡 Masukkan nilai Bruto & PPh 21 Pegawai Tetap yang dilaporkan pada formulir SPT 1721-I (Bagian A). Gunakan tombol Salin Jurnal Pegawai jika pelaporan sesuai pembukuan internal."
+                      : isModalTa
+                      ? "💡 Masukkan nilai Honorarium & PPh 21 Tenaga Ahli yang dilaporkan pada Bukti Potong 1721-VI. Gunakan tombol Salin Jurnal Tenaga Ahli jika pelaporan sesuai pembukuan internal."
+                      : "💡 Masukkan nilai SPT Masa 1721 resmi DJP Online untuk masa pajak ini."}
+                  </span>
+                </div>
+
+                {errorMsg && (
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {successMsg && (
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{successMsg}</span>
+                  </div>
+                )}
+
+                {/* Kategori 1: Pegawai Tetap */}
+                {(isModalPegawai || isModalTotal) && (
+                  <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/20 dark:bg-blue-950/10 space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-800/40 pb-2">
+                      <span className="font-bold text-blue-900 dark:text-blue-300 text-xs flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-blue-600" />
+                        Pegawai Tetap (Akun 511)
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-navy-soft font-mono">
+                          Jurnal: {editingItem.gajiPegawaiJurnalFmt} | PPh: {editingItem.pph21PegawaiBasisFmt}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAutoFillPegawai}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 transition-colors cursor-pointer"
+                          title="Salin nilai pembukuan pegawai tetap ke form SPT"
+                        >
+                          Salin Jurnal
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-navy-text mb-1">
+                          Bruto Pegawai di SPT (Rp)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={gajiPegawaiTerlapor}
+                            onChange={(e) => handleGajiPegawaiChange(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-navy-text mb-1">
+                          PPh 21 Pegawai di SPT (Rp)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={pph21PegawaiTerlapor}
+                            onChange={(e) => handlePphPegawaiChange(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 text-navy-soft border-t border-blue-100 dark:border-blue-900/40">
+                      <span>Selisih Gaji Pegawai: <strong className={Math.abs(simSelisihGajiPeg) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihGajiPeg)}</strong></span>
+                      <span>Selisih PPh Pegawai: <strong className={Math.abs(simSelisihPphPeg) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihPphPeg)}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Kategori 2: Tenaga Ahli */}
+                {(isModalTa || isModalTotal) && (
+                  <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/20 dark:bg-amber-950/10 space-y-3">
+                    <div className="flex items-center justify-between border-b border-amber-200/60 dark:border-amber-800/40 pb-2">
+                      <span className="font-bold text-amber-900 dark:text-amber-300 text-xs flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-amber-600" />
+                        Tenaga Ahli (Akun 612)
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-navy-soft font-mono">
+                          Jurnal: {editingItem.gajiTaJurnalFmt} | PPh: {editingItem.pph21TaBasisFmt}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAutoFillTa}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 transition-colors cursor-pointer"
+                          title="Salin nilai pembukuan tenaga ahli ke form SPT"
+                        >
+                          Salin Jurnal
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-navy-text mb-1">
+                          Honorarium TA di SPT (Rp)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={gajiTaTerlapor}
+                            onChange={(e) => handleGajiTaChange(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-navy-text mb-1">
+                          PPh 21 TA di SPT (Rp)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={pph21TaTerlapor}
+                            onChange={(e) => handlePphTaChange(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 text-navy-soft border-t border-amber-100 dark:border-amber-900/40">
+                      <span>Selisih Honor TA: <strong className={Math.abs(simSelisihGajiTa) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihGajiTa)}</strong></span>
+                      <span>Selisih PPh TA: <strong className={Math.abs(simSelisihPphTa) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihPphTa)}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Total SPT Otomatis (Hanya di mode Total Gabungan) */}
+                {isModalTotal && (
+                  <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/20 dark:bg-purple-950/10 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-purple-900 dark:text-purple-300">
+                        Total SPT Masa 1721 (Formulir Induk)
+                      </span>
+                      <span className="text-[11px] text-navy-soft">
+                        Otomatis dijumlahkan dari Pegawai + Tenaga Ahli
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-navy-soft block">Total Bruto Dilaporkan:</span>
+                        <strong className="text-navy-text font-mono text-sm">{formatRupiah(simGajiTot)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-navy-soft block">Total PPh 21 Dilaporkan:</span>
+                        <strong className="text-purple-700 dark:text-purple-400 font-mono text-sm">{formatRupiah(simPphTot)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bukti & Catatan */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-semibold text-navy-text mb-1">
+                      No. Bukti Lapor (BPS) / NTPN (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: S-12345/WPJ.01/KP.0203/2026 atau NTPN"
+                      value={ntpn}
+                      onChange={(e) => setNtpn(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-navy-text mb-1">
+                      Catatan / Penjelasan Selisih Audit (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Contoh: Ada selisih pembetulan masa sebelumnya dilaporkan di masa ini..."
+                      value={keterangan}
+                      onChange={(e) => setKeterangan(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2.5 px-6 py-3.5 border-t border-border-soft bg-surface-subtle shrink-0">
                 <button
                   type="button"
-                  onClick={
-                    modalCategoryTab === "pegawai"
-                      ? handleAutoFillPegawai
-                      : modalCategoryTab === "tenaga-ahli"
-                      ? handleAutoFillTa
-                      : handleAutoFillAll
-                  }
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-all cursor-pointer shadow-2xs"
-                  title="Salin nilai dari Jurnal Pembukuan internal agar status langsung Balance"
+                  onClick={closeEditModal}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-navy-soft hover:bg-surface-hover transition-colors cursor-pointer"
                 >
-                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  <span>
-                    {modalCategoryTab === "pegawai"
-                      ? "Salin Jurnal Pegawai"
-                      : modalCategoryTab === "tenaga-ahli"
-                      ? "Salin Jurnal Tenaga Ahli"
-                      : "Salin dari Jurnal"}
-                  </span>
+                  Batal
                 </button>
                 <button
-                  onClick={closeEditModal}
-                  className="p-1 rounded-lg hover:bg-surface-hover text-navy-soft hover:text-navy-text transition-colors"
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSubmitting}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  <X className="w-4 h-4" />
+                  {isSubmitting
+                    ? "Menyimpan..."
+                    : isModalPegawai
+                    ? "Simpan SPT Pegawai Tetap"
+                    : isModalTa
+                    ? "Simpan SPT Tenaga Ahli"
+                    : "Simpan Data SPT"}
                 </button>
               </div>
             </div>
-
-            {/* Modal Category Switcher */}
-            <div className="flex items-center gap-1.5 px-6 py-2 bg-surface-subtle/80 border-b border-border-soft overflow-x-auto shrink-0">
-              <span className="text-[11px] font-semibold text-navy-soft mr-1">Kategori:</span>
-              <button
-                type="button"
-                onClick={() => setModalCategoryTab("pegawai")}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                  modalCategoryTab === "pegawai"
-                    ? "bg-navy text-white shadow-2xs font-bold"
-                    : "text-navy-soft hover:text-navy-text hover:bg-surface-card"
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Pegawai Tetap (511)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalCategoryTab("tenaga-ahli")}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                  modalCategoryTab === "tenaga-ahli"
-                    ? "bg-navy text-white shadow-2xs font-bold"
-                    : "text-navy-soft hover:text-navy-text hover:bg-surface-card"
-                }`}
-              >
-                <Award className="w-3.5 h-3.5" />
-                <span>Tenaga Ahli (612)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalCategoryTab("all")}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                  modalCategoryTab === "all"
-                    ? "bg-navy text-white shadow-2xs font-bold"
-                    : "text-navy-soft hover:text-navy-text hover:bg-surface-card"
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Kedua Kategori (Form Induk)</span>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-4 text-xs overflow-y-auto">
-              {/* Petunjuk Singkat Pengisian */}
-              <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-soft text-navy-soft text-[11px] flex items-center justify-between">
-                <span>
-                  💡 Masukkan nilai dari <strong>SPT Masa 1721 resmi DJP</strong>. Gunakan tombol <strong>Salin Jurnal</strong> jika pelaporan sesuai dengan pembukuan internal.
-                </span>
-              </div>
-
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              {successMsg && (
-                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{successMsg}</span>
-                </div>
-              )}
-
-              {/* Kategori 1: Pegawai Tetap */}
-              {(modalCategoryTab === "pegawai" || modalCategoryTab === "all") && (
-                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/20 dark:bg-blue-950/10 space-y-3">
-                <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-800/40 pb-2">
-                  <span className="font-bold text-blue-900 dark:text-blue-300 text-xs flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-blue-600" />
-                    Kategori 1: Pegawai Tetap (Akun 511)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-navy-soft font-mono">
-                      Jurnal: {editingItem.gajiPegawaiJurnalFmt} | PPh: {editingItem.pph21PegawaiBasisFmt}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAutoFillPegawai}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 transition-colors cursor-pointer"
-                      title="Salin nilai pembukuan pegawai tetap ke form SPT"
-                    >
-                      Salin Jurnal
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-navy-text mb-1">
-                      Bruto Pegawai di SPT (Rp)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={gajiPegawaiTerlapor}
-                        onChange={(e) => handleGajiPegawaiChange(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-navy-text mb-1">
-                      PPh 21 Pegawai di SPT (Rp)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={pph21PegawaiTerlapor}
-                        onChange={(e) => handlePphPegawaiChange(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] pt-1 text-navy-soft border-t border-blue-100 dark:border-blue-900/40">
-                  <span>Selisih Gaji: <strong className={Math.abs(simSelisihGajiPeg) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihGajiPeg)}</strong></span>
-                  <span>Selisih PPh: <strong className={Math.abs(simSelisihPphPeg) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihPphPeg)}</strong></span>
-                </div>
-              </div>
-              )}
-
-              {/* Kategori 2: Tenaga Ahli */}
-              {(modalCategoryTab === "tenaga-ahli" || modalCategoryTab === "all") && (
-              <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/20 dark:bg-amber-950/10 space-y-3">
-                <div className="flex items-center justify-between border-b border-amber-200/60 dark:border-amber-800/40 pb-2">
-                  <span className="font-bold text-amber-900 dark:text-amber-300 text-xs flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-amber-600" />
-                    Kategori 2: Tenaga Ahli (Akun 612)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-navy-soft font-mono">
-                      Jurnal: {editingItem.gajiTaJurnalFmt} | PPh: {editingItem.pph21TaBasisFmt}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAutoFillTa}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 transition-colors cursor-pointer"
-                      title="Salin nilai pembukuan tenaga ahli ke form SPT"
-                    >
-                      Salin Jurnal
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-navy-text mb-1">
-                      Honorarium TA di SPT (Rp)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={gajiTaTerlapor}
-                        onChange={(e) => handleGajiTaChange(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-navy-text mb-1">
-                      PPh 21 TA di SPT (Rp)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-navy-soft font-mono">Rp</span>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={pph21TaTerlapor}
-                        onChange={(e) => handlePphTaChange(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] pt-1 text-navy-soft border-t border-amber-100 dark:border-amber-900/40">
-                  <span>Selisih Honor: <strong className={Math.abs(simSelisihGajiTa) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihGajiTa)}</strong></span>
-                  <span>Selisih PPh: <strong className={Math.abs(simSelisihPphTa) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihPphTa)}</strong></span>
-                </div>
-              </div>
-              )}
-
-              {/* Total SPT Otomatis */}
-              {modalCategoryTab === "all" && (
-              <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/20 dark:bg-purple-950/10 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-purple-900 dark:text-purple-300">
-                    Total SPT Masa 1721 (Formulir Induk)
-                  </span>
-                  <span className="text-[11px] text-navy-soft">
-                    Otomatis dijumlahkan dari Pegawai + Tenaga Ahli
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-navy-soft block">Total Bruto Dilaporkan:</span>
-                    <strong className="text-navy-text font-mono text-sm">{formatRupiah(simGajiTot)}</strong>
-                  </div>
-                  <div>
-                    <span className="text-navy-soft block">Total PPh 21 Dilaporkan:</span>
-                    <strong className="text-purple-700 dark:text-purple-400 font-mono text-sm">{formatRupiah(simPphTot)}</strong>
-                  </div>
-                </div>
-              </div>
-              )}
-
-              {/* Bukti & Catatan */}
-              <div className="space-y-3">
-                <div>
-                  <label className="block font-semibold text-navy-text mb-1">
-                    No. Bukti Lapor (BPS) / NTPN (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: S-12345/WPJ.01/KP.0203/2026 atau NTPN"
-                    value={ntpn}
-                    onChange={(e) => setNtpn(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-navy-text mb-1">
-                    Catatan / Penjelasan Selisih Audit (Opsional)
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Contoh: Ada selisih pembetulan gaji masa sebelumnya dilaporkan di masa ini..."
-                    value={keterangan}
-                    onChange={(e) => setKeterangan(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-surface-card border border-border-soft rounded-lg text-navy-text"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2.5 px-6 py-3.5 border-t border-border-soft bg-surface-subtle shrink-0">
-              <button
-                type="button"
-                onClick={closeEditModal}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-navy-soft hover:bg-surface-hover transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSubmitting}
-                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? "Menyimpan..." : "Simpan Data SPT"}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

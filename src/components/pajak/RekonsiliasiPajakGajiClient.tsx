@@ -136,30 +136,35 @@ export function RekonsiliasiPajakGajiClient({
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    const res = await saveRekonsiliasiGajiPph21Action({
-      entityId: data.entityId,
-      year: data.year,
-      month: editingItem.month,
-      gajiTerlapor: Number(gajiTerlapor) || 0,
-      pph21Terlapor: Number(pph21Terlapor) || 0,
-      gajiPegawaiTerlapor: Number(gajiPegawaiTerlapor) || 0,
-      gajiTaTerlapor: Number(gajiTaTerlapor) || 0,
-      pph21PegawaiTerlapor: Number(pph21PegawaiTerlapor) || 0,
-      pph21TaTerlapor: Number(pph21TaTerlapor) || 0,
-      ntpn: ntpn.trim() || undefined,
-      keterangan: keterangan.trim() || undefined,
-    });
+    try {
+      const res = await saveRekonsiliasiGajiPph21Action({
+        entityId: data.entityId,
+        year: data.year,
+        month: editingItem.month,
+        gajiTerlapor: Number(gajiTerlapor) || 0,
+        pph21Terlapor: Number(pph21Terlapor) || 0,
+        gajiPegawaiTerlapor: Number(gajiPegawaiTerlapor) || 0,
+        gajiTaTerlapor: Number(gajiTaTerlapor) || 0,
+        pph21PegawaiTerlapor: Number(pph21PegawaiTerlapor) || 0,
+        pph21TaTerlapor: Number(pph21TaTerlapor) || 0,
+        ntpn: ntpn.trim() || undefined,
+        keterangan: keterangan.trim() || undefined,
+      });
 
-    setIsSubmitting(false);
-
-    if (res?.error) {
-      setErrorMsg(res.error);
-    } else {
-      setSuccessMsg("Data SPT Masa berhasil disimpan!");
-      setTimeout(() => {
-        closeEditModal();
-        window.location.reload();
-      }, 600);
+      if (res?.error) {
+        setErrorMsg(res.error);
+        setIsSubmitting(false);
+      } else {
+        setSuccessMsg("Data SPT Masa berhasil disimpan!");
+        setTimeout(() => {
+          closeEditModal();
+          window.location.reload();
+        }, 500);
+      }
+    } catch (err) {
+      console.error("Gagal menyimpan SPT:", err);
+      setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan data.");
+      setIsSubmitting(false);
     }
   }
 

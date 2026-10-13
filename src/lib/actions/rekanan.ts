@@ -305,14 +305,17 @@ export async function autoRegisterRekananIfNew(
   nama: string,
   tipe: RekananTipe = RekananTipe.KLIEN
 ) {
-  const cleanNpwp = npwp.trim();
-  const cleanNama = nama.trim();
-  if (!cleanNama) return;
+  const cleanNpwp = npwp ? npwp.trim() : "";
+  const cleanNama = nama ? nama.trim() : "";
+  if (!cleanNama) return null;
+
+  const cleanedDigits = cleanIdentityNumber(cleanNpwp);
 
   const existing = await prisma.rekanan.findFirst({
     where: {
       OR: [
         ...(cleanNpwp ? [{ npwp: cleanNpwp }] : []),
+        ...(cleanedDigits && cleanedDigits !== cleanNpwp ? [{ npwp: cleanedDigits }] : []),
         { nama: cleanNama },
       ],
     },
@@ -320,27 +323,34 @@ export async function autoRegisterRekananIfNew(
 
   if (!existing) {
     try {
-      await prisma.rekanan.create({
+      const created = await prisma.rekanan.create({
         data: {
           nama: cleanNama,
           npwp: cleanNpwp || null,
           tipe,
+          kategori: "Klien E-Faktur",
         },
       });
       revalidatePath("/rekanan");
+      revalidatePath("/pendapatan");
+      return created;
     } catch {
       // Abaikan jika ada concurrency race condition
+      return null;
     }
   } else if (!existing.npwp && cleanNpwp) {
     // Perbarui jika sebelumnya NPWP-nya kosong
     try {
-      await prisma.rekanan.update({
+      const updated = await prisma.rekanan.update({
         where: { id: existing.id },
         data: { npwp: cleanNpwp },
       });
       revalidatePath("/rekanan");
+      revalidatePath("/pendapatan");
+      return updated;
     } catch {
-      // Abaikan
+      return existing;
     }
   }
+  return existing;
 }

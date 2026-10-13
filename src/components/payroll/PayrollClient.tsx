@@ -46,6 +46,8 @@ import {
   BULAN_NAMES,
   PTKP_RATES,
 } from "@/lib/payroll";
+import { RekonsiliasiPajakGajiClient } from "@/components/pajak/RekonsiliasiPajakGajiClient";
+import { type RekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
 import {
   createPegawaiAction,
   updatePegawaiAction,
@@ -124,12 +126,14 @@ type PayrollData = {
 
 export function PayrollClient({
   data,
+  rekonsiliasiData,
   userRole,
   initialTab,
   selectedYear,
   selectedMonth,
 }: {
   data: PayrollData;
+  rekonsiliasiData: RekonsiliasiPajakGajiData;
   userRole: Role;
   initialTab: string;
   selectedYear: number;
@@ -145,9 +149,9 @@ export function PayrollClient({
     userRole === "STAF_KEUANGAN" ||
     userRole === "SUPER_ADMIN";
 
-  // Tab utama: "pegawai" | "tenaga-ahli" | "sync"
-  const [mainTab, setMainTab] = useState<"pegawai" | "tenaga-ahli" | "sync">(
-    (initialTab as "pegawai" | "tenaga-ahli" | "sync") || "pegawai"
+  // Tab utama: "pegawai" | "tenaga-ahli" | "sync" | "rekonsiliasi"
+  const [mainTab, setMainTab] = useState<"pegawai" | "tenaga-ahli" | "sync" | "rekonsiliasi">(
+    (initialTab as "pegawai" | "tenaga-ahli" | "sync" | "rekonsiliasi") || "pegawai"
   );
 
   // Sub-tab pegawai: "gaji" (Gaji Per Bulan) | "rekap-bulan" (Rekap Gaji Setahun) | "penyesuaian" | "master" | "tahunan"
@@ -384,7 +388,7 @@ export function PayrollClient({
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  function handleTabChange(tab: "pegawai" | "tenaga-ahli" | "sync") {
+  function handleTabChange(tab: "pegawai" | "tenaga-ahli" | "sync" | "rekonsiliasi") {
     setErrorMsg(null);
     setSuccessMsg(null);
     setMainTab(tab);
@@ -541,34 +545,45 @@ export function PayrollClient({
             )}
           </button>
 
-          <Link
-            href={`/pajak?entity=${data.entity?.key ?? ""}&year=${data.year}`}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-800/60"
-            title="Buka Halaman Rekonsiliasi Pajak Gaji & PPh 21 (SPT Masa)"
+          <button
+            onClick={() => handleTabChange("rekonsiliasi")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap cursor-pointer ${
+              mainTab === "rekonsiliasi"
+                ? "bg-navy text-white shadow-sm"
+                : "bg-surface-subtle text-muted-stronger hover:bg-surface-hover"
+            }`}
           >
-            <ShieldCheck size={14} />
-            <span>Rekonsiliasi PPh 21</span>
-            <ExternalLink size={12} className="opacity-70" />
-          </Link>
+            <ShieldCheck size={15} />
+            <span>Rekonsiliasi PPh 21 (SPT)</span>
+            {rekonsiliasiData?.summary.overallStatus === "ALL_BALANCED" ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-400" title="Semua 12 Bulan Balance" />
+            ) : rekonsiliasiData?.summary.overallStatus === "HAS_DIFF" ? (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="Terdapat Selisih Jurnal vs SPT" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-amber-400" title="Sebagian Belum Dilaporkan" />
+            )}
+          </button>
         </div>
 
-        {/* Month Selector Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto self-start sm:self-auto">
-          <span className="text-[11px] text-muted-faint mr-1 flex items-center gap-1">
-            <Calendar size={12} /> Bulan:
-          </span>
-          <select
-            value={selectedMonth}
-            onChange={(e) => handleMonthChange(Number(e.target.value))}
-            className="h-8 text-xs font-semibold px-2.5 rounded-lg border border-border bg-surface-card text-navy-text cursor-pointer"
-          >
-            {BULAN_NAMES.map((name, idx) => (
-              <option key={idx + 1} value={idx + 1}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Month Selector Pills (Hanya saat di Tab Bulanan) */}
+        {mainTab !== "rekonsiliasi" && (
+          <div className="flex items-center gap-1.5 overflow-x-auto self-start sm:self-auto">
+            <span className="text-[11px] text-muted-faint mr-1 flex items-center gap-1">
+              <Calendar size={12} /> Bulan:
+            </span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => handleMonthChange(Number(e.target.value))}
+              className="h-8 text-xs font-semibold px-2.5 rounded-lg border border-border bg-surface-card text-navy-text cursor-pointer"
+            >
+              {BULAN_NAMES.map((name, idx) => (
+                <option key={idx + 1} value={idx + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* ========================================================= */}
@@ -3388,6 +3403,17 @@ export function PayrollClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 4: REKONSILIASI PAJAK GAJI & PPH 21 (SPT MASA 1721) */}
+      {/* ========================================================= */}
+      {mainTab === "rekonsiliasi" && (
+        <RekonsiliasiPajakGajiClient
+          data={rekonsiliasiData}
+          canEdit={isManager}
+          entityKey={data.entity?.key ?? ""}
+        />
       )}
 
       {/* ========================================================= */}

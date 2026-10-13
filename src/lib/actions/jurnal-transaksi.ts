@@ -43,14 +43,20 @@ export async function saveJurnalTransaksi(formData: FormData) {
 
   const tanggal = (formData.get("tanggal") as string | null)?.trim() ?? "";
   const entityKey = (formData.get("entityKey") as string | null)?.trim() ?? "";
-  const noBukti = (formData.get("noBukti") as string | null)?.trim() ?? "";
+  let noBukti = (formData.get("noBukti") as string | null)?.trim() ?? "";
   const editNoBukti = (formData.get("editNoBukti") as string | null)?.trim() ?? "";
   const projectId = (formData.get("projectId") as string | null)?.trim() || null;
   const fakturId = (formData.get("fakturId") as string | null)?.trim() || null;
 
   if (!tanggal) return { error: "Tanggal wajib diisi." };
-  if (!noBukti) return { error: "No. Bukti wajib diisi." };
   if (!entityKey) return { error: "Entity tidak ditemukan." };
+
+  // Nomor Bukti opsional: jika dikosongkan, buat otomatis
+  if (!noBukti) {
+    const dateStr = tanggal.replace(/-/g, "");
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    noBukti = `JU-${dateStr}-${rand}`;
+  }
 
   if (!session.user.entityKeys.includes(entityKey)) {
     return { error: "Kamu tidak punya akses ke entity ini." };
@@ -111,18 +117,33 @@ export async function saveJurnalTransaksi(formData: FormData) {
         extraFieldsJson: { path: "$.autoPostedFromJurnal", equals: true },
       },
     });
-    await prisma.fakturPendapatan.deleteMany({
-      where: { noFaktur: editNoBukti },
-    });
+    if (fakturId) {
+      await prisma.fakturPendapatan.deleteMany({
+        where: { id: fakturId },
+      });
+    } else {
+      await prisma.fakturPendapatan.deleteMany({
+        where: { noFaktur: editNoBukti },
+      });
+    }
     await prisma.termin.deleteMany({
       where: { name: { contains: `[${editNoBukti}]` } },
     });
   } else {
+    // Bypass duplikasi: jika nomor bukti / faktur yang sama diinput ulang (amrahan multi-termin),
+    // berikan suffix unik otomatis agar pemisahan voucher jurnal tetap terjaga
+    let finalNoBukti = noBukti;
     const dup = await prisma.transaction.findFirst({
-      where: { entityId: entity.id, noBukti },
+      where: { entityId: entity.id, noBukti: finalNoBukti },
       select: { id: true },
     });
-    if (dup) return { error: `No. Bukti "${noBukti}" sudah dipakai di entitas ini.` };
+    if (dup) {
+      const countSimilar = await prisma.transaction.count({
+        where: { entityId: entity.id, noBukti: { startsWith: finalNoBukti } },
+      });
+      finalNoBukti = `${noBukti}-A${countSimilar + 1}`;
+    }
+    noBukti = finalNoBukti;
   }
 
   try {

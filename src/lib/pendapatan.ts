@@ -232,6 +232,9 @@ export interface LaporanPendapatanData {
     name: string;
     contractValue: number;
     contractValueFmt: string;
+    clientName: string | null;
+    startDate: string | null;
+    endDate: string | null;
     termins: Array<{
       id: string;
       name: string;
@@ -615,6 +618,9 @@ export async function getLaporanPendapatanData(
       name: p.name,
       contractValue: p.contractValue,
       contractValueFmt: formatRupiah(p.contractValue),
+      clientName: (p as any).clientName ?? null,
+      startDate: (p as any).startDate ?? null,
+      endDate: (p as any).endDate ?? null,
       termins: (p.termins ?? []).map((t) => ({
         id: t.id,
         name: t.name,

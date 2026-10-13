@@ -48,7 +48,7 @@ if ($method === 'GET' && $sub_action === null) {
          FROM Project p
          JOIN Entity e ON p.entityId = e.id
          WHERE p.entityId = ? AND p.status = \'ACTIVE\'
-         ORDER BY p.deadline ASC'
+         ORDER BY p.createdAt DESC'
     );
     $stmt->execute([$entity_id]);
     $projects = $stmt->fetchAll();
@@ -399,6 +399,12 @@ if ($method === 'POST' && $sub_action === 'termin' && $sub_sub === 'audit') {
         'UPDATE Termin SET status = \'ON_TRACK\', auditedAt = NOW(), auditedById = ? WHERE id = ?'
     )->execute([$user['id'], $termin_id]);
 
+    // Sync progress ke Sidamon
+    $stmt = $pdo->prepare('SELECT projectId FROM Termin WHERE id = ? LIMIT 1');
+    $stmt->execute([$termin_id]);
+    $t = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($t) sync_termin_to_sidamon($t['projectId']);
+
     log_activity($user['id'], 'termin.audit', 'FINANCIAL_CHANGE', ['terminId' => $termin_id]);
 
     json_response(['message' => 'Termin berhasil diaudit.']);
@@ -420,6 +426,12 @@ if ($method === 'PATCH' && $sub_action === 'termin' && $sub_sub === 'status') {
     if (!$stmt->fetch()) error_response('Termin tidak ditemukan.', 404);
 
     $pdo->prepare('UPDATE Termin SET status = ? WHERE id = ?')->execute([$status, $termin_id]);
+
+    // Sync progress ke Sidamon
+    $stmt = $pdo->prepare('SELECT projectId FROM Termin WHERE id = ? LIMIT 1');
+    $stmt->execute([$termin_id]);
+    $t = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($t) sync_termin_to_sidamon($t['projectId']);
 
     log_activity($user['id'], 'termin.update_status', 'FINANCIAL_CHANGE', [
         'terminId' => $termin_id,

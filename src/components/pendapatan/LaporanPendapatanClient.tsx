@@ -128,8 +128,7 @@ export function LaporanPendapatanClient({
   const [showRekananDropdown, setShowRekananDropdown] = useState(false);
   const [matchedRekananMaster, setMatchedRekananMaster] = useState<RekananItem | null>(null);
   const [isSearchingRekanan, setIsSearchingRekanan] = useState(false);
-  const [selectedRekananNpwpId, setSelectedRekananNpwpId] = useState<string>("");
-  const [isManualNpwp, setIsManualNpwp] = useState(false);
+  const [selectedRekananId, setSelectedRekananId] = useState<string>("");
 
   // Form state for Rekonsiliasi
   const [formRecon, setFormRecon] = useState({
@@ -262,6 +261,29 @@ export function LaporanPendapatanClient({
     });
   }
 
+  function handleSelectRekananFromDropdown(id: string) {
+    if (id === "__MANUAL__") {
+      setSelectedRekananId("__MANUAL__");
+      setMatchedRekananMaster(null);
+      return;
+    }
+    setSelectedRekananId(id);
+    if (!id) {
+      setMatchedRekananMaster(null);
+      return;
+    }
+    const sel = data.rekananOptions?.find((r) => r.id === id);
+    if (sel) {
+      setFormFaktur((prev) => ({
+        ...prev,
+        namaRekanan: sel.nama,
+        npwp: sel.npwp || prev.npwp,
+      }));
+      setMatchedRekananMaster(sel as any);
+      setShowRekananDropdown(false);
+    }
+  }
+
   async function handleNpwpChange(val: string) {
     setFormFaktur((prev) => ({ ...prev, npwp: val }));
     const trimmed = val.trim();
@@ -279,15 +301,18 @@ export function LaporanPendapatanClient({
 
           if (match) {
             setMatchedRekananMaster(match);
+            setSelectedRekananId(match.id);
             setFormFaktur((prev) => ({
               ...prev,
               namaRekanan: match.nama,
             }));
           } else {
             setMatchedRekananMaster(null);
+            setSelectedRekananId("__MANUAL__");
           }
         } else {
           setMatchedRekananMaster(null);
+          setSelectedRekananId("__MANUAL__");
         }
       } catch {
         // ignore
@@ -322,12 +347,7 @@ export function LaporanPendapatanClient({
   }
 
   function handleSelectRekanan(r: RekananItem) {
-    setSelectedRekananNpwpId(r.id);
-    if (!r.npwp) {
-      setIsManualNpwp(true);
-    } else {
-      setIsManualNpwp(false);
-    }
+    setSelectedRekananId(r.id);
     setFormFaktur((prev) => ({
       ...prev,
       namaRekanan: r.nama,
@@ -340,8 +360,7 @@ export function LaporanPendapatanClient({
   function openCreateFakturModal() {
     setEditingFaktur(null);
     setSelectedTerminId("");
-    setSelectedRekananNpwpId("");
-    setIsManualNpwp(false);
+    setSelectedRekananId("");
     setShowManualDppFallback(false);
     setMatchedRekananMaster(null);
     setRekananSuggestions([]);
@@ -385,11 +404,12 @@ export function LaporanPendapatanClient({
     }
     const cleanFakturNpwp = (f.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
     const matchedRek = (data.rekananOptions || []).find(
-      (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanFakturNpwp
+      (r) =>
+        (r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanFakturNpwp) ||
+        r.nama.toLowerCase() === (f.namaRekanan || "").toLowerCase()
     );
-    setSelectedRekananNpwpId(matchedRek?.id || "");
+    setSelectedRekananId(matchedRek?.id || "__MANUAL__");
     setMatchedRekananMaster((matchedRek as any) ?? null);
-    setIsManualNpwp(!matchedRek);
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
     setFormFaktur({
@@ -1703,131 +1723,8 @@ export function LaporanPendapatanClient({
                     onChange={(e) =>
                       setFormFaktur({ ...formFaktur, noFaktur: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-navy-text">
-                      NPWP Rekanan <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {isSearchingRekanan && (
-                        <span className="text-[10px] text-blue-600 animate-pulse font-medium">
-                          Mencari...
-                        </span>
-                      )}
-                      {isManualNpwp ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsManualNpwp(false);
-                            const cleanVal = formFaktur.npwp.replace(/[\s.\-_/]/g, "").toLowerCase();
-                            const matchInOptions = (data.rekananOptions || []).find(
-                              (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanVal
-                            );
-                            setSelectedRekananNpwpId(matchInOptions ? matchInOptions.id : "");
-                          }}
-                          className="text-[11px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 cursor-pointer"
-                        >
-                          Pilih dari Master
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsManualNpwp(true);
-                            setSelectedRekananNpwpId("__MANUAL__");
-                          }}
-                          className="text-[11px] font-medium text-navy-soft hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
-                        >
-                          Ketik Manual
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {isManualNpwp ? (
-                    <input
-                      type="text"
-                      required
-                      placeholder="00.000.000.0-000.000"
-                      value={formFaktur.npwp}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const cleanVal = val.replace(/[\s.\-_/]/g, "").toLowerCase();
-                        const matchInOptions = (data.rekananOptions || []).find(
-                          (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanVal
-                        );
-                        setSelectedRekananNpwpId(matchInOptions ? matchInOptions.id : "__MANUAL__");
-                        handleNpwpChange(val);
-                      }}
-                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      autoFocus
-                    />
-                  ) : (
-                    <select
-                      required
-                      value={selectedRekananNpwpId}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        if (id === "__MANUAL__") {
-                          setIsManualNpwp(true);
-                          setSelectedRekananNpwpId("__MANUAL__");
-                          return;
-                        }
-                        setSelectedRekananNpwpId(id);
-                        if (!id) {
-                          setFormFaktur((prev) => ({ ...prev, npwp: "" }));
-                          setMatchedRekananMaster(null);
-                          return;
-                        }
-                        const sel = data.rekananOptions?.find((r) => r.id === id);
-                        if (sel) {
-                          if (!sel.npwp) {
-                            setIsManualNpwp(true);
-                            setFormFaktur((prev) => ({
-                              ...prev,
-                              namaRekanan: sel.nama || prev.namaRekanan,
-                            }));
-                            setMatchedRekananMaster(sel as any);
-                          } else {
-                            setFormFaktur((prev) => ({
-                              ...prev,
-                              npwp: sel.npwp || "",
-                              namaRekanan: sel.nama || prev.namaRekanan,
-                            }));
-                            setMatchedRekananMaster(sel as any);
-                          }
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
-                    >
-                      <option value="">-- Pilih dari Master Rekanan --</option>
-                      {data.rekananOptions && data.rekananOptions.length > 0 && (
-                        <optgroup label="Master Rekanan">
-                          {data.rekananOptions.map((r) => (
-                            <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
-                              {r.npwp ? `${r.npwp} — ${r.nama}` : `[Tanpa NPWP] ${r.nama}`}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      <optgroup label="Opsi Lainnya">
-                        <option value="__MANUAL__" className="bg-surface-card font-semibold text-blue-600 dark:text-blue-400">
-                          ✏️ Input Manual (Ketik Sendiri)...
-                        </option>
-                      </optgroup>
-                    </select>
-                  )}
-
-                  {matchedRekananMaster && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Auto-Fill: {matchedRekananMaster.nama}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div>
@@ -1851,65 +1748,6 @@ export function LaporanPendapatanClient({
                     ))}
                   </select>
                 </div>
-              </div>
-
-              {/* Form Grid 2: Rekanan & JKP */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-navy-text">
-                      Nama Rekanan / Klien <span className="text-rose-500">*</span>
-                    </label>
-                    <span className="text-[10px] text-navy-soft">
-                      Auto-Fill Rekanan
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: RSUD dr. Doris Sylvanus"
-                    value={formFaktur.namaRekanan}
-                    onChange={(e) => handleNamaRekananChange(e.target.value)}
-                    onFocus={() => {
-                      if (rekananSuggestions.length > 0) setShowRekananDropdown(true);
-                    }}
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-
-                  {/* Floating Auto-complete dropdown */}
-                  {showRekananDropdown && rekananSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-surface-card border border-border-soft rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border-soft">
-                      <div className="p-2 text-[10px] font-bold text-navy-soft uppercase tracking-wider bg-surface-subtle/50 flex items-center justify-between">
-                        <span>Pilih Rekanan:</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowRekananDropdown(false)}
-                          className="text-navy-soft hover:text-navy-text"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      {rekananSuggestions.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSelectRekanan(item)}
-                          className="w-full p-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-start justify-between gap-2 cursor-pointer"
-                        >
-                          <div>
-                            <div className="text-xs font-bold text-navy-text">{item.nama}</div>
-                            {item.npwp && (
-                              <div className="text-[10px] font-mono text-navy-soft">NPWP: {item.npwp}</div>
-                            )}
-                          </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-surface-subtle text-navy-soft border border-border-soft uppercase shrink-0">
-                            {item.tipe}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
@@ -1926,6 +1764,154 @@ export function LaporanPendapatanClient({
                     className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+              </div>
+
+              {/* Form Section: Data Rekanan & NPWP */}
+              <div className="p-4 rounded-2xl bg-surface-subtle/70 border border-border-soft space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-brand" />
+                    <span className="text-xs font-bold text-navy-text uppercase tracking-wide">
+                      Identitas Rekanan / Klien
+                    </span>
+                  </div>
+                  {selectedRekananId && selectedRekananId !== "__MANUAL__" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRekananId("__MANUAL__");
+                        setMatchedRekananMaster(null);
+                      }}
+                      className="text-[11px] font-semibold text-brand hover:underline cursor-pointer"
+                    >
+                      + Input Rekanan Baru
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  {/* Dropdown Master Rekanan */}
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      Pilih Master Rekanan
+                    </label>
+                    <select
+                      value={selectedRekananId}
+                      onChange={(e) => handleSelectRekananFromDropdown(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                    >
+                      <option value="">-- Pilih dari Master Rekanan --</option>
+                      {data.rekananOptions && data.rekananOptions.length > 0 && (
+                        <optgroup label="Database Master Rekanan">
+                          {data.rekananOptions.map((r) => (
+                            <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
+                              {r.nama} {r.npwp ? `(${r.npwp})` : "(Tanpa NPWP)"}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Input Manual">
+                        <option value="__MANUAL__" className="bg-surface-card font-semibold text-blue-600 dark:text-blue-400">
+                          ✏️ Rekanan Baru / Input Manual...
+                        </option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  {/* Input Nama Rekanan */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-navy-text">
+                        Nama Rekanan / Klien <span className="text-rose-500">*</span>
+                      </label>
+                      {isSearchingRekanan && (
+                        <span className="text-[10px] text-blue-600 animate-pulse font-medium">
+                          Mencari...
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: RSUD dr. Doris Sylvanus"
+                      value={formFaktur.namaRekanan}
+                      onChange={(e) => handleNamaRekananChange(e.target.value)}
+                      onFocus={() => {
+                        if (rekananSuggestions.length > 0) setShowRekananDropdown(true);
+                      }}
+                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+
+                    {/* Floating Auto-complete dropdown */}
+                    {showRekananDropdown && rekananSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-surface-card border border-border-soft rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border-soft">
+                        <div className="p-2 text-[10px] font-bold text-navy-soft uppercase tracking-wider bg-surface-subtle/50 flex items-center justify-between">
+                          <span>Saran Rekanan Terdaftar:</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowRekananDropdown(false)}
+                            className="text-navy-soft hover:text-navy-text cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {rekananSuggestions.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectRekanan(item)}
+                            className="w-full p-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-start justify-between gap-2 cursor-pointer"
+                          >
+                            <div>
+                              <div className="text-xs font-bold text-navy-text">{item.nama}</div>
+                              {item.npwp && (
+                                <div className="text-[10px] font-mono text-navy-soft">NPWP: {item.npwp}</div>
+                              )}
+                            </div>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-surface-subtle text-navy-soft border border-border-soft uppercase shrink-0">
+                              {item.tipe}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input NPWP Rekanan */}
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      NPWP Rekanan <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="00.000.000.0-000.000"
+                      value={formFaktur.npwp}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleNpwpChange(val);
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Banner Status Auto-Fill / Auto-Save */}
+                {matchedRekananMaster ? (
+                  <div className="flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">
+                      Terhubung dengan Master Rekanan: <strong>{matchedRekananMaster.nama}</strong> {matchedRekananMaster.npwp ? `(${matchedRekananMaster.npwp})` : ""}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[11px] text-blue-700 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-xl border border-blue-200/60 dark:border-blue-800/40">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                    <span>
+                      Rekanan & NPWP baru ini akan <strong>otomatis disimpan</strong> ke Database Master Rekanan saat e-faktur disimpan.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Form Section 3: Tax Rates & DPP Inputs */}

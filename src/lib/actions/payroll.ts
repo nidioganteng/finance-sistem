@@ -18,6 +18,13 @@ async function checkAuth() {
   return session;
 }
 
+function parseMoney(val: FormDataEntryValue | null, fallback = 0): number {
+  if (val === null || val === undefined || val === "") return fallback;
+  if (typeof val === "number") return val;
+  const clean = String(val).replace(/[^0-9]/g, "");
+  return clean ? Number(clean) : fallback;
+}
+
 // ----------------------------------------------------
 // PEGAWAI TETAP (MASTER DATA)
 // ----------------------------------------------------
@@ -30,9 +37,9 @@ export async function createPegawaiAction(formData: FormData) {
   const nama = (formData.get("nama") as string)?.trim();
   const jabatan = (formData.get("jabatan") as string)?.trim() || "Karyawan";
   const statusKeluarga = (formData.get("statusKeluarga") as string)?.trim() || "TK/0";
-  const ptkp = Number(formData.get("ptkp")) || 54000000;
-  const gajiPokok = Number(formData.get("gajiPokok")) || 0;
-  const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
+  const ptkp = parseMoney(formData.get("ptkp"), 54000000);
+  const gajiPokok = parseMoney(formData.get("gajiPokok"), 0);
+  const tunjanganJabatan = parseMoney(formData.get("tunjanganJabatan"), 0);
   const tanggalMasukRaw = (formData.get("tanggalMasuk") as string)?.trim();
   const tanggalMasuk = tanggalMasukRaw ? new Date(tanggalMasukRaw) : null;
   const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
@@ -83,9 +90,9 @@ export async function updatePegawaiAction(formData: FormData) {
   const nama = (formData.get("nama") as string)?.trim();
   const jabatan = (formData.get("jabatan") as string)?.trim() || "Karyawan";
   const statusKeluarga = (formData.get("statusKeluarga") as string)?.trim() || "TK/0";
-  const ptkp = Number(formData.get("ptkp")) || 54000000;
-  const gajiPokok = Number(formData.get("gajiPokok")) || 0;
-  const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
+  const ptkp = parseMoney(formData.get("ptkp"), 54000000);
+  const gajiPokok = parseMoney(formData.get("gajiPokok"), 0);
+  const tunjanganJabatan = parseMoney(formData.get("tunjanganJabatan"), 0);
   const tanggalMasukRaw = (formData.get("tanggalMasuk") as string)?.trim();
   const tanggalMasuk = tanggalMasukRaw ? new Date(tanggalMasukRaw) : null;
   const isActive = formData.get("isActive") === "true" || formData.get("isActive") === "on";
@@ -166,14 +173,14 @@ export async function saveGajiBulananAction(formData: FormData) {
   const entityId = formData.get("entityId") as string;
   const bulan = Number(formData.get("bulan"));
   const tahun = Number(formData.get("tahun"));
-  const gajiPokok = Number(formData.get("gajiPokok")) || 0;
-  const tunjanganJabatan = Number(formData.get("tunjanganJabatan")) || 0;
+  const gajiPokok = parseMoney(formData.get("gajiPokok"), 0);
+  const tunjanganJabatan = parseMoney(formData.get("tunjanganJabatan"), 0);
   const hariKerja = Number(formData.get("hariKerja")) || 0;
-  const tarifTransportHarian = Number(formData.get("tarifTransportHarian")) || 15000;
+  const tarifTransportHarian = parseMoney(formData.get("tarifTransportHarian"), 15000);
   
   // Otomatisasi Tunjangan Transport: jika tunjanganTransport manual kosong/0 tapi hariKerja diisi
-  let tunjanganTransport = Number(formData.get("tunjanganTransport"));
-  if (isNaN(tunjanganTransport) || tunjanganTransport === 0) {
+  let tunjanganTransport = parseMoney(formData.get("tunjanganTransport"), 0);
+  if (tunjanganTransport === 0) {
     if (hariKerja > 0) {
       tunjanganTransport = hariKerja * tarifTransportHarian;
     } else {
@@ -182,28 +189,28 @@ export async function saveGajiBulananAction(formData: FormData) {
   }
 
   const tunjanganLainnya =
-    Number(formData.get("tunjanganLainnya")) || Number(formData.get("insentif")) || 0;
+    parseMoney(formData.get("tunjanganLainnya")) || parseMoney(formData.get("insentif")) || 0;
   const insentif = tunjanganLainnya;
 
-  const tunjanganBpjsKes = Number(formData.get("tunjanganBpjsKes")) || 0;
-  const tunjanganBpjsTk = Number(formData.get("tunjanganBpjsTk")) || 0;
-  let tunjanganBpjs = Number(formData.get("tunjanganBpjs")) || 0;
+  const tunjanganBpjsKes = parseMoney(formData.get("tunjanganBpjsKes"), 0);
+  const tunjanganBpjsTk = parseMoney(formData.get("tunjanganBpjsTk"), 0);
+  let tunjanganBpjs = parseMoney(formData.get("tunjanganBpjs"), 0);
   if (tunjanganBpjs === 0 && (tunjanganBpjsKes > 0 || tunjanganBpjsTk > 0)) {
     tunjanganBpjs = tunjanganBpjsKes + tunjanganBpjsTk;
   }
 
-  const tunjanganPph = Number(formData.get("tunjanganPph")) || 0;
-  const thr = Number(formData.get("thr")) || 0;
+  const tunjanganPph = parseMoney(formData.get("tunjanganPph"), 0);
+  const thr = parseMoney(formData.get("thr"), 0);
 
-  const bpjsKesehatan = Number(formData.get("bpjsKesehatan")) || 0;
-  const bpjsKetenagakerjaan = Number(formData.get("bpjsKetenagakerjaan")) || 0;
-  let potonganBpjs = Number(formData.get("potonganBpjs")) || 0;
+  const bpjsKesehatan = parseMoney(formData.get("bpjsKesehatan"), 0);
+  const bpjsKetenagakerjaan = parseMoney(formData.get("bpjsKetenagakerjaan"), 0);
+  let potonganBpjs = parseMoney(formData.get("potonganBpjs"), 0);
   if (potonganBpjs === 0 && (bpjsKesehatan > 0 || bpjsKetenagakerjaan > 0)) {
     potonganBpjs = bpjsKesehatan + bpjsKetenagakerjaan;
   }
 
-  const potonganLain = Number(formData.get("potonganLain")) || 0;
-  const pph21 = Number(formData.get("pph21")) || 0;
+  const potonganLain = parseMoney(formData.get("potonganLain"), 0);
+  const pph21 = parseMoney(formData.get("pph21"), 0);
   const catatan = (formData.get("catatan") as string)?.trim() || null;
 
   if (!pegawaiId || !entityId || !bulan || !tahun) {
@@ -355,10 +362,10 @@ export async function saveHonorTenagaAhliAction(formData: FormData) {
   let ptkp = (formData.get("ptkp") as string)?.trim() || "";
   const uraian = (formData.get("uraian") as string)?.trim();
   const tanggalStr = formData.get("tanggal") as string;
-  const nominalHonor = Number(formData.get("nominalHonor")) || 0;
+  const nominalHonor = parseMoney(formData.get("nominalHonor"), 0);
   const jenisPph = (formData.get("jenisPph") as string)?.trim() || "PPh 21";
   const tarifPph21Persen = Number(formData.get("tarifPph21Persen")) || 0;
-  const pph21 = Number(formData.get("pph21")) || 0;
+  const pph21 = parseMoney(formData.get("pph21"), 0);
   const projectId = (formData.get("projectId") as string)?.trim() || null;
   let namaProyek = (formData.get("namaProyek") as string)?.trim() || null;
   const noBukti = (formData.get("noBukti") as string)?.trim() || null;

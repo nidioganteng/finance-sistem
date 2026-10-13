@@ -60,6 +60,13 @@ interface Props {
 
 type TabType = "faktur" | "rekap-bulanan" | "rekonsiliasi";
 
+function formatRupiahInput(val: string | number | undefined | null) {
+  if (val === undefined || val === null || val === "" || val === 0 || val === "0") return "";
+  const num = String(val).replace(/[^0-9]/g, "");
+  if (!num) return "";
+  return Number(num).toLocaleString("id-ID");
+}
+
 export function LaporanPendapatanClient({
   data,
   canEdit,
@@ -2068,13 +2075,12 @@ export function LaporanPendapatanClient({
                             Rp
                           </span>
                           <input
-                            type="number"
-                            min={0}
-                            step="any"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="0"
-                            value={formFaktur.dpp || ""}
+                            value={formatRupiahInput(formFaktur.dpp)}
                             onChange={(e) => {
-                              const val = Number(e.target.value);
+                              const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                               setFormFaktur((prev) => ({
                                 ...prev,
                                 dpp: val,
@@ -2129,15 +2135,14 @@ export function LaporanPendapatanClient({
                             Rp
                           </span>
                           <input
-                            type="number"
-                            min={0}
-                            step="any"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="0"
-                            value={formFaktur.dppNilaiLain || ""}
+                            value={formatRupiahInput(formFaktur.dppNilaiLain)}
                             onChange={(e) =>
                               setFormFaktur({
                                 ...formFaktur,
-                                dppNilaiLain: Number(e.target.value),
+                                dppNilaiLain: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                               })
                             }
                             className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2308,14 +2313,14 @@ export function LaporanPendapatanClient({
                     Pekerjaan Perusahaan (Sendiri)
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={formFaktur.pekerjaanPerusahaan || ""}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatRupiahInput(formFaktur.pekerjaanPerusahaan)}
                     onChange={(e) =>
                       setFormFaktur({
                         ...formFaktur,
-                        pekerjaanPerusahaan: Number(e.target.value),
+                        pekerjaanPerusahaan: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                       })
                     }
                     className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2327,14 +2332,14 @@ export function LaporanPendapatanClient({
                     Pekerjaan yang Dipinjam
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={formFaktur.pekerjaanYangDipinjam || ""}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatRupiahInput(formFaktur.pekerjaanYangDipinjam)}
                     onChange={(e) =>
                       setFormFaktur({
                         ...formFaktur,
-                        pekerjaanYangDipinjam: Number(e.target.value),
+                        pekerjaanYangDipinjam: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                       })
                     }
                     className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2410,15 +2415,14 @@ export function LaporanPendapatanClient({
                       Rp
                     </span>
                     <input
-                      type="number"
-                      min={0}
-                      step="any"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="0"
-                      value={formFaktur.nominalDiterima || ""}
+                      value={formatRupiahInput(formFaktur.nominalDiterima)}
                       onChange={(e) =>
                         setFormFaktur({
                           ...formFaktur,
-                          nominalDiterima: Number(e.target.value),
+                          nominalDiterima: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                         })
                       }
                       className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2611,14 +2615,14 @@ export function LaporanPendapatanClient({
                     Rp
                   </span>
                   <input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={formRecon.dppTerlapor}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatRupiahInput(formRecon.dppTerlapor)}
                     onChange={(e) =>
                       setFormRecon({
                         ...formRecon,
-                        dppTerlapor: Number(e.target.value),
+                        dppTerlapor: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                       })
                     }
                     className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2636,14 +2640,14 @@ export function LaporanPendapatanClient({
                       Rp
                     </span>
                     <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={formRecon.pajakTerlapor}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formatRupiahInput(formRecon.pajakTerlapor)}
                       onChange={(e) =>
                         setFormRecon({
                           ...formRecon,
-                          pajakTerlapor: Number(e.target.value),
+                          pajakTerlapor: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                         })
                       }
                       className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2660,14 +2664,14 @@ export function LaporanPendapatanClient({
                       Rp
                     </span>
                     <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={formRecon.pphTerlapor}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formatRupiahInput(formRecon.pphTerlapor)}
                       onChange={(e) =>
                         setFormRecon({
                           ...formRecon,
-                          pphTerlapor: Number(e.target.value),
+                          pphTerlapor: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
                         })
                       }
                       className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"

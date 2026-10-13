@@ -1444,7 +1444,7 @@ export function LaporanPendapatanClient({
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
-                      namaRekanan: prev.namaRekanan,
+                      namaRekanan: p?.clientName || prev.namaRekanan,
                       namaJkp: p ? p.name : prev.namaJkp,
                     }));
                   }}
@@ -1462,13 +1462,25 @@ export function LaporanPendapatanClient({
                     const sel = data.projectOptions.find((x) => x.id === formFaktur.projectId);
                     return sel ? (
                       <div className="space-y-2.5 pt-1">
-                        <div className="text-[11px] text-muted-stronger bg-surface-input p-2.5 rounded-lg border border-border-soft flex flex-wrap items-center justify-between gap-2">
-                          <span>
-                            Kode Proyek: <strong className="font-mono">{sel.code}</strong> • {sel.name}
-                          </span>
-                          <span className="font-semibold text-navy-text">
-                            Nilai Kontrak: {sel.contractValueFmt}
-                          </span>
+                        <div className="text-[11px] text-muted-stronger bg-surface-input p-2.5 rounded-lg border border-border-soft space-y-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span>
+                              Kode Proyek: <strong className="font-mono">{sel.code}</strong> • {sel.name}
+                            </span>
+                            <span className="font-semibold text-navy-text">
+                              Nilai Kontrak: {sel.contractValueFmt}
+                            </span>
+                          </div>
+                          {(sel.clientName || sel.startDate) && (
+                            <div className="flex flex-wrap gap-3 pt-0.5 border-t border-border-soft mt-1">
+                              {sel.clientName && (
+                                <span>Klien: <strong className="text-navy-text">{sel.clientName}</strong></span>
+                              )}
+                              {sel.startDate && sel.endDate && (
+                                <span>Masa Kontrak: <strong className="text-navy-text">{sel.startDate} s/d {sel.endDate}</strong></span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Dropdown Termin untuk Sinkronisasi DPP */}

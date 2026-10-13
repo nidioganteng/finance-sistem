@@ -35,6 +35,13 @@ const KATEGORI_OPTIONS = STANDAR_KATEGORI_ASET.map((k) => ({
   label: k.label,
 }));
 
+function formatRupiahInput(val: string | number | undefined | null) {
+  if (val === undefined || val === null || val === "" || val === 0 || val === "0") return "";
+  const num = String(val).replace(/[^0-9]/g, "");
+  if (!num) return "";
+  return Number(num).toLocaleString("id-ID");
+}
+
 export function AktivaTetapManager({
   summary,
   entityId,
@@ -637,13 +644,12 @@ export function AktivaTetapManager({
                     Harga Perolehan (Rp) *
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    step="1000"
+                    type="text"
+                    inputMode="numeric"
                     required
-                    value={hargaPerolehan || ""}
-                    onChange={(e) => setHargaPerolehan(Number(e.target.value))}
-                    placeholder="Contoh: 150000000"
+                    value={formatRupiahInput(hargaPerolehan)}
+                    onChange={(e) => setHargaPerolehan(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                    placeholder="Contoh: 150.000.000"
                     className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums font-semibold"
                   />
                 </div>
@@ -655,12 +661,11 @@ export function AktivaTetapManager({
                     Nilai Residu (Sisa) Rp
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    step="1000"
+                    type="text"
+                    inputMode="numeric"
                     disabled={kategori === "TANAH"}
-                    value={kategori === "TANAH" ? hargaPerolehan : (nilaiResidu || "")}
-                    onChange={(e) => setNilaiResidu(Number(e.target.value))}
+                    value={kategori === "TANAH" ? formatRupiahInput(hargaPerolehan) : formatRupiahInput(nilaiResidu)}
+                    onChange={(e) => setNilaiResidu(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                     placeholder="0"
                     className="w-full px-3 py-2 bg-surface-base border border-border-soft rounded-xl text-[13px] text-navy-text focus:outline-none focus:border-brand tabular-nums disabled:opacity-60 disabled:cursor-not-allowed"
                   />

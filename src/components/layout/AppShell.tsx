@@ -18,7 +18,29 @@ export function AppShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
+
+  // Fetch unread notification count
+  useEffect(() => {
+    // Reset langsung saat user buka halaman notifikasi
+    if (pathname === "/notifikasi") {
+      setUnreadCount(0);
+      return;
+    }
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/notifikasi/count");
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadCount(data.count ?? 0);
+        }
+      } catch {}
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+    return () => clearInterval(interval);
+  }, [pathname]);
 
   // Tutup sidebar saat resize ke desktop
   useEffect(() => {
@@ -37,7 +59,7 @@ export function AppShell({
     <div className="flex min-h-screen bg-surface-page">
       {/* ── Desktop sidebar ─────────────────────────────────────── */}
       <div className="hidden lg:block print:hidden flex-none">
-        <Sidebar role={role} customInputs={customInputs} collapsed={collapsed} onToggleCollapse={() => setCollapsed((v) => !v)} />
+        <Sidebar role={role} customInputs={customInputs} collapsed={collapsed} onToggleCollapse={() => setCollapsed((v) => !v)} unreadCount={unreadCount} />
       </div>
 
       {/* ── Mobile sidebar backdrop ──────────────────────────────── */}
@@ -65,6 +87,7 @@ export function AppShell({
                 role={role}
                 customInputs={customInputs}
                 onClose={() => setSidebarOpen(false)}
+                unreadCount={unreadCount}
               />
             </motion.div>
           </>

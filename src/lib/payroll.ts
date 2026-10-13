@@ -22,15 +22,38 @@ export type PegawaiItem = {
   ptkpFmt: string;
   gajiPokok: number;
   gajiPokokFmt: string;
+  tunjanganJabatan: number;
+  tunjanganJabatanFmt: string;
+  tanggalMasuk?: string | null;
+  tanggalMasukFmt?: string | null;
+  masaKerja?: string | null;
   isActive: boolean;
   currentGaji?: GajiBulananItem | null;
   akumulasiTahun?: {
     totalGajiKotor: number;
+    totalGajiTerlaporPajak: number;
     totalGajiBersih: number;
     totalPph21: number;
     bulanTerbayar: number;
   };
 };
+
+export function hitungMasaKerja(tanggalMasuk: Date, refDate: Date = new Date()): string {
+  let thn = refDate.getFullYear() - tanggalMasuk.getFullYear();
+  let bln = refDate.getMonth() - tanggalMasuk.getMonth();
+  if (refDate.getDate() < tanggalMasuk.getDate()) {
+    bln--;
+  }
+  if (bln < 0) {
+    thn--;
+    bln += 12;
+  }
+  if (thn < 0) return "0 bulan";
+  if (thn === 0 && bln === 0) return "< 1 bulan";
+  if (thn === 0) return `${bln} bulan`;
+  if (bln === 0) return `${thn} tahun`;
+  return `${thn} tahun ${bln} bulan`;
+}
 
 export type GajiBulananItem = {
   id: string;
@@ -38,26 +61,47 @@ export type GajiBulananItem = {
   pegawaiNama: string;
   pegawaiNik: string;
   pegawaiJabatan: string;
+  pegawaiTanggalMasuk?: string | null;
+  pegawaiMasaKerja?: string | null;
   bulan: number;
   tahun: number;
   gajiPokok: number;
   gajiPokokFmt: string;
   tunjanganJabatan: number;
   tunjanganJabatanFmt: string;
+  hariKerja: number;
+  tarifTransportHarian: number;
+  tarifTransportHarianFmt: string;
   tunjanganTransport: number;
   tunjanganTransportFmt: string;
   insentif: number;
   insentifFmt: string;
+  tunjanganLainnya: number;
+  tunjanganLainnyaFmt: string;
+  tunjanganBpjs: number;
+  tunjanganBpjsFmt: string;
+  tunjanganBpjsKes: number;
+  tunjanganBpjsKesFmt: string;
+  tunjanganBpjsTk: number;
+  tunjanganBpjsTkFmt: string;
+  tunjanganPph: number;
+  tunjanganPphFmt: string;
+  thr: number;
+  thrFmt: string;
   bpjsKesehatan: number;
   bpjsKesehatanFmt: string;
   bpjsKetenagakerjaan: number;
   bpjsKetenagakerjaanFmt: string;
+  potonganBpjs: number;
+  potonganBpjsFmt: string;
   potonganLain: number;
   potonganLainFmt: string;
   pph21: number;
   pph21Fmt: string;
   totalGajiKotor: number;
   totalGajiKotorFmt: string;
+  totalGajiTerlaporPajak: number;
+  totalGajiTerlaporPajakFmt: string;
   totalGajiBersih: number;
   totalGajiBersihFmt: string;
   catatan?: string | null;
@@ -72,6 +116,7 @@ export type HonorTenagaAhliItem = {
   nik: string;
   nama: string;
   npwp?: string | null;
+  ptkp?: string | null;
   uraian: string;
   tanggal: string;
   tanggalFmt: string;
@@ -79,6 +124,7 @@ export type HonorTenagaAhliItem = {
   tahun: number;
   nominalHonor: number;
   nominalHonorFmt: string;
+  jenisPph?: string | null;
   tarifPph21Persen: number;
   pph21: number;
   pph21Fmt: string;
@@ -116,8 +162,16 @@ export type RekapBulanPegawaiItem = {
   totalTunjanganFmt: string;
   totalInsentif: number;
   totalInsentifFmt: string;
+  totalThr: number;
+  totalThrFmt: string;
+  totalTunjanganBpjs: number;
+  totalTunjanganBpjsFmt: string;
+  totalTunjanganPph: number;
+  totalTunjanganPphFmt: string;
   totalGajiKotor: number;
   totalGajiKotorFmt: string;
+  totalGajiTerlaporPajak: number;
+  totalGajiTerlaporPajakFmt: string;
   totalBpjs: number;
   totalBpjsFmt: string;
   totalPph21: number;
@@ -195,6 +249,21 @@ export type KonsolidasiTenagaAhliItem = {
     pph21Fmt: string;
     transaksiCount: number;
   }[];
+};
+
+export type RekapTenagaAhliPerProyekItem = {
+  projectId?: string | null;
+  projectCode?: string | null;
+  projectName: string;
+  entityName: string;
+  totalTransaksi: number;
+  totalHonorBruto: number;
+  totalHonorBrutoFmt: string;
+  totalPph: number;
+  totalPphFmt: string;
+  totalHonorBersih: number;
+  totalHonorBersihFmt: string;
+  tenagaAhliList: string[];
 };
 
 export type JurnalTransaksiGajiItem = {

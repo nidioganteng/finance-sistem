@@ -30,6 +30,7 @@ require_once __DIR__ . '/config/env.php';
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/jwt.php';
 require_once __DIR__ . '/helpers/response.php';
+require_once __DIR__ . '/helpers/sync-helpers.php';
 require_once __DIR__ . '/middleware/auth.php';
 
 $origin = defined('FRONTEND_URL') ? FRONTEND_URL : '*';
@@ -85,6 +86,7 @@ $routes = [
     'validasi-pajak-3arah'  => 'validasi-pajak-3arah',
     'rekanan'               => 'rekanan',
     'payroll'               => 'payroll',
+    'sync'                  => 'sync',
 ];
 
 // ── Dispatch ─────────────────────────────────────────────────────────────────

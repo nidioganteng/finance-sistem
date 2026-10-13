@@ -48,6 +48,7 @@ export function RekonsiliasiPajakGajiClient({
   const [pph21Terlapor, setPph21Terlapor] = useState<string>("0");
   const [ntpn, setNtpn] = useState<string>("");
   const [keterangan, setKeterangan] = useState<string>("");
+  const [modalCategoryTab, setModalCategoryTab] = useState<"all" | "pegawai" | "tenaga-ahli">("all");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -56,6 +57,13 @@ export function RekonsiliasiPajakGajiClient({
 
   function openEditModal(item: RekonsiliasiGajiPph21Item) {
     setEditingItem(item);
+    if (viewMode === "pegawai") {
+      setModalCategoryTab("pegawai");
+    } else if (viewMode === "tenaga-ahli") {
+      setModalCategoryTab("tenaga-ahli");
+    } else {
+      setModalCategoryTab("all");
+    }
     setGajiPegawaiTerlapor(String(item.gajiPegawaiTerlapor || 0));
     setPph21PegawaiTerlapor(String(item.pph21PegawaiTerlapor || 0));
     setGajiTaTerlapor(String(item.gajiTaTerlapor || 0));
@@ -781,7 +789,11 @@ export function RekonsiliasiPajakGajiClient({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-navy-text">
-                    Input SPT Masa PPh 21 (Form 1721)
+                    {modalCategoryTab === "pegawai"
+                      ? "Input SPT Masa PPh 21 — Pegawai Tetap (Akun 511)"
+                      : modalCategoryTab === "tenaga-ahli"
+                      ? "Input SPT Masa PPh 21 — Tenaga Ahli (Akun 612)"
+                      : "Input SPT Masa PPh 21 (Form 1721 Konsolidasi)"}
                   </h3>
                   <p className="text-xs text-navy-soft">
                     Masa {editingItem.namaBulan} {data.year} — {data.entityName}
@@ -791,12 +803,24 @@ export function RekonsiliasiPajakGajiClient({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleAutoFillAll}
+                  onClick={
+                    modalCategoryTab === "pegawai"
+                      ? handleAutoFillPegawai
+                      : modalCategoryTab === "tenaga-ahli"
+                      ? handleAutoFillTa
+                      : handleAutoFillAll
+                  }
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-all cursor-pointer shadow-2xs"
-                  title="Salin seluruh nilai dari Jurnal Pembukuan internal agar status langsung Balance"
+                  title="Salin nilai dari Jurnal Pembukuan internal agar status langsung Balance"
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  <span>Salin dari Jurnal</span>
+                  <span>
+                    {modalCategoryTab === "pegawai"
+                      ? "Salin Jurnal Pegawai"
+                      : modalCategoryTab === "tenaga-ahli"
+                      ? "Salin Jurnal Tenaga Ahli"
+                      : "Salin dari Jurnal"}
+                  </span>
                 </button>
                 <button
                   onClick={closeEditModal}
@@ -807,11 +831,56 @@ export function RekonsiliasiPajakGajiClient({
               </div>
             </div>
 
+            {/* Modal Category Switcher */}
+            <div className="flex items-center gap-1.5 px-6 py-2 bg-surface-subtle/80 border-b border-border-soft overflow-x-auto shrink-0">
+              <span className="text-[11px] font-semibold text-navy-soft mr-1">Kategori:</span>
+              <button
+                type="button"
+                onClick={() => setModalCategoryTab("pegawai")}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                  modalCategoryTab === "pegawai"
+                    ? "bg-navy text-white shadow-2xs font-bold"
+                    : "text-navy-soft hover:text-navy-text hover:bg-surface-card"
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Pegawai Tetap (511)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModalCategoryTab("tenaga-ahli")}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                  modalCategoryTab === "tenaga-ahli"
+                    ? "bg-navy text-white shadow-2xs font-bold"
+                    : "text-navy-soft hover:text-navy-text hover:bg-surface-card"
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>Tenaga Ahli (612)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModalCategoryTab("all")}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                  modalCategoryTab === "all"
+                    ? "bg-navy text-white shadow-2xs font-bold"
+                    : "text-navy-soft hover:text-navy-text hover:bg-surface-card"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Kedua Kategori (Form Induk)</span>
+              </button>
+            </div>
+
             {/* Modal Body */}
             <div className="p-6 space-y-4 text-xs overflow-y-auto">
               {/* Petunjuk Singkat Pengisian */}
               <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-soft text-navy-soft text-[11px] flex items-center justify-between">
-                <span>💡 Masukkan nilai dari <strong>SPT Masa 1721 resmi DJP</strong>. Jika pelaporan identik dengan pembukuan internal, gunakan tombol <strong>Salin dari Jurnal</strong> di atas.</span>
+                <span>
+                  💡 Masukkan nilai dari <strong>SPT Masa 1721 resmi DJP</strong>. Gunakan tombol <strong>Salin Jurnal</strong> jika pelaporan sesuai dengan pembukuan internal.
+                </span>
               </div>
 
               {errorMsg && (
@@ -829,7 +898,8 @@ export function RekonsiliasiPajakGajiClient({
               )}
 
               {/* Kategori 1: Pegawai Tetap */}
-              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/20 dark:bg-blue-950/10 space-y-3">
+              {(modalCategoryTab === "pegawai" || modalCategoryTab === "all") && (
+                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/20 dark:bg-blue-950/10 space-y-3">
                 <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-800/40 pb-2">
                   <span className="font-bold text-blue-900 dark:text-blue-300 text-xs flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-blue-600" />
@@ -889,8 +959,10 @@ export function RekonsiliasiPajakGajiClient({
                   <span>Selisih PPh: <strong className={Math.abs(simSelisihPphPeg) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihPphPeg)}</strong></span>
                 </div>
               </div>
+              )}
 
               {/* Kategori 2: Tenaga Ahli */}
+              {(modalCategoryTab === "tenaga-ahli" || modalCategoryTab === "all") && (
               <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/20 dark:bg-amber-950/10 space-y-3">
                 <div className="flex items-center justify-between border-b border-amber-200/60 dark:border-amber-800/40 pb-2">
                   <span className="font-bold text-amber-900 dark:text-amber-300 text-xs flex items-center gap-1.5">
@@ -951,8 +1023,10 @@ export function RekonsiliasiPajakGajiClient({
                   <span>Selisih PPh: <strong className={Math.abs(simSelisihPphTa) > 0.01 ? "text-rose-600" : "text-emerald-600"}>{formatRupiah(simSelisihPphTa)}</strong></span>
                 </div>
               </div>
+              )}
 
               {/* Total SPT Otomatis */}
+              {modalCategoryTab === "all" && (
               <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/20 dark:bg-purple-950/10 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-purple-900 dark:text-purple-300">
@@ -973,6 +1047,7 @@ export function RekonsiliasiPajakGajiClient({
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Bukti & Catatan */}
               <div className="space-y-3">

@@ -46,6 +46,7 @@ export type RekonsiliasiPajakInput = {
 
 function revalidatePendapatanPaths() {
   revalidatePath("/pendapatan");
+  revalidatePath("/rekanan");
   revalidatePath("/laporan");
   revalidatePath("/laporan-keuangan");
   revalidatePath("/dashboard");
@@ -111,8 +112,8 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
   });
 
   // Auto-register atau sync ke Master Data Rekanan Terpusat jika rekanan baru
-  if (data.npwp && data.namaRekanan) {
-    await autoRegisterRekananIfNew(data.npwp, data.namaRekanan);
+  if (data.namaRekanan?.trim()) {
+    await autoRegisterRekananIfNew(data.npwp || "", data.namaRekanan);
   }
 
   logActivity(
@@ -199,8 +200,10 @@ export async function updateFakturPendapatanAction(
     },
   });
 
-  if (data.npwp && data.namaRekanan) {
-    await autoRegisterRekananIfNew(data.npwp, data.namaRekanan);
+  const effectiveNpwp = data.npwp !== undefined ? data.npwp : existing.npwp;
+  const effectiveNama = data.namaRekanan !== undefined ? data.namaRekanan : existing.namaRekanan;
+  if (effectiveNama?.trim()) {
+    await autoRegisterRekananIfNew(effectiveNpwp || "", effectiveNama);
   }
 
   logActivity(

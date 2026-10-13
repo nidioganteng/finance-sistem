@@ -124,6 +124,13 @@ type PayrollData = {
   syncData: PayrollSyncLabaRugi;
 };
 
+function formatRupiahInput(val: string | number | undefined | null) {
+  if (val === undefined || val === null || val === "" || val === 0 || val === "0") return "";
+  const num = String(val).replace(/[^0-9]/g, "");
+  if (!num) return "";
+  return Number(num).toLocaleString("id-ID");
+}
+
 export function PayrollClient({
   data,
   rekonsiliasiData,
@@ -3510,7 +3517,7 @@ export function PayrollClient({
                       const form = e.target.form;
                       if (form && PTKP_RATES[e.target.value]) {
                         const ptkpInput = form.elements.namedItem("ptkp") as HTMLInputElement;
-                        if (ptkpInput) ptkpInput.value = PTKP_RATES[e.target.value].toString();
+                        if (ptkpInput) ptkpInput.value = formatRupiahInput(PTKP_RATES[e.target.value]);
                       }
                     }}
                     className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
@@ -3526,9 +3533,14 @@ export function PayrollClient({
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">Nominal PTKP (Thn)</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="ptkp"
-                    defaultValue={editingPegawai?.ptkp ?? 54000000}
+                    defaultValue={formatRupiahInput(editingPegawai?.ptkp ?? 54000000)}
+                    onChange={(e) => {
+                      const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                      e.target.value = formatRupiahInput(num);
+                    }}
                     className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                   />
                 </div>
@@ -3537,10 +3549,15 @@ export function PayrollClient({
               <div>
                 <label className="font-semibold text-navy-text block mb-1">Gaji Pokok Standar (Rp) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="gajiPokok"
                   required
-                  defaultValue={editingPegawai?.gajiPokok ? editingPegawai.gajiPokok : ""}
+                  defaultValue={formatRupiahInput(editingPegawai?.gajiPokok ? editingPegawai.gajiPokok : "")}
+                  onChange={(e) => {
+                    const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                    e.target.value = formatRupiahInput(num);
+                  }}
                   placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
@@ -3549,9 +3566,14 @@ export function PayrollClient({
               <div>
                 <label className="font-semibold text-navy-text block mb-1">Tunjangan Jabatan Rutin (Rp)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="tunjanganJabatan"
-                  defaultValue={editingPegawai?.tunjanganJabatan ? editingPegawai.tunjanganJabatan : ""}
+                  defaultValue={formatRupiahInput(editingPegawai?.tunjanganJabatan ? editingPegawai.tunjanganJabatan : "")}
+                  onChange={(e) => {
+                    const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                    e.target.value = formatRupiahInput(num);
+                  }}
                   placeholder="0"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
@@ -3803,11 +3825,12 @@ export function PayrollClient({
                     <div>
                       <label className="font-semibold text-navy-text block mb-1">Gaji Pokok (Bulan ini) *</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="gajiPokok"
                         required
-                        value={modalGajiPokok || ""}
-                        onChange={(e) => setModalGajiPokok(Number(e.target.value) || 0)}
+                        value={formatRupiahInput(modalGajiPokok)}
+                        onChange={(e) => setModalGajiPokok(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
@@ -3817,10 +3840,11 @@ export function PayrollClient({
                         Tunjangan Jabatan (Rutin)
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="tunjanganJabatan"
-                        value={modalTunjanganJabatan || ""}
-                        onChange={(e) => setModalTunjanganJabatan(Number(e.target.value) || 0)}
+                        value={formatRupiahInput(modalTunjanganJabatan)}
+                        onChange={(e) => setModalTunjanganJabatan(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
@@ -3861,12 +3885,12 @@ export function PayrollClient({
                       <div>
                         <label className="text-[10px] text-muted-stronger block mb-0.5">Tarif Harian (Rp)</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="tarifTransportHarian"
-                          min={0}
-                          value={modalTarifTransport || ""}
+                          value={formatRupiahInput(modalTarifTransport)}
                           onChange={(e) => {
-                            const val = Number(e.target.value) || 0;
+                            const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                             setModalTarifTransport(val);
                             setModalTunjanganTransport(modalHariKerja * val);
                           }}
@@ -3879,10 +3903,11 @@ export function PayrollClient({
                           Total Transport (Rp)
                         </label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="tunjanganTransport"
-                          value={modalTunjanganTransport || ""}
-                          onChange={(e) => setModalTunjanganTransport(Number(e.target.value) || 0)}
+                          value={formatRupiahInput(modalTunjanganTransport)}
+                          onChange={(e) => setModalTunjanganTransport(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                           placeholder="0"
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-navy-text font-bold font-mono text-xs"
                         />
@@ -3903,10 +3928,11 @@ export function PayrollClient({
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Kesehatan</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="tunjanganBpjsKes"
-                          value={modalTunjanganBpjsKes || ""}
-                          onChange={(e) => setModalTunjanganBpjsKes(Number(e.target.value) || 0)}
+                          value={formatRupiahInput(modalTunjanganBpjsKes)}
+                          onChange={(e) => setModalTunjanganBpjsKes(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                           placeholder="0"
                           className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                         />
@@ -3917,10 +3943,11 @@ export function PayrollClient({
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">Tunjangan BPJS Ketenagakerjaan</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="tunjanganBpjsTk"
-                          value={modalTunjanganBpjsTk || ""}
-                          onChange={(e) => setModalTunjanganBpjsTk(Number(e.target.value) || 0)}
+                          value={formatRupiahInput(modalTunjanganBpjsTk)}
+                          onChange={(e) => setModalTunjanganBpjsTk(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                           placeholder="0"
                           className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                         />
@@ -3934,10 +3961,11 @@ export function PayrollClient({
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">Tunjangan THR</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="thr"
-                          value={modalThr || ""}
-                          onChange={(e) => setModalThr(Number(e.target.value) || 0)}
+                          value={formatRupiahInput(modalThr)}
+                          onChange={(e) => setModalThr(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                           placeholder="0"
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                         />
@@ -3948,10 +3976,11 @@ export function PayrollClient({
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">Tunjangan PPh</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="tunjanganPph"
-                          value={modalTunjanganPph || ""}
-                          onChange={(e) => setModalTunjanganPph(Number(e.target.value) || 0)}
+                          value={formatRupiahInput(modalTunjanganPph)}
+                          onChange={(e) => setModalTunjanganPph(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                           placeholder="0"
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                         />
@@ -3962,11 +3991,12 @@ export function PayrollClient({
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">Tunjangan Lainnya</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           name="tunjanganLainnya"
-                          value={modalTunjanganLainnya || ""}
+                          value={formatRupiahInput(modalTunjanganLainnya)}
                           onChange={(e) => {
-                            const val = Number(e.target.value) || 0;
+                            const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                             setModalTunjanganLainnya(val);
                             setModalInsentif(val);
                           }}
@@ -3996,10 +4026,11 @@ export function PayrollClient({
                     <div>
                       <label className="font-semibold text-navy-text block mb-1">Potongan BPJS Kesehatan</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="bpjsKesehatan"
-                        value={modalBpjsKes || ""}
-                        onChange={(e) => setModalBpjsKes(Number(e.target.value) || 0)}
+                        value={formatRupiahInput(modalBpjsKes)}
+                        onChange={(e) => setModalBpjsKes(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
@@ -4010,10 +4041,11 @@ export function PayrollClient({
                     <div>
                       <label className="font-semibold text-navy-text block mb-1">Potongan BPJS TK</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="bpjsKetenagakerjaan"
-                        value={modalBpjsTk || ""}
-                        onChange={(e) => setModalBpjsTk(Number(e.target.value) || 0)}
+                        value={formatRupiahInput(modalBpjsTk)}
+                        onChange={(e) => setModalBpjsTk(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
@@ -4024,10 +4056,11 @@ export function PayrollClient({
                     <div>
                       <label className="font-semibold text-navy-text block mb-1">Potongan Lain</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="potonganLain"
-                        value={modalPotonganLain || ""}
-                        onChange={(e) => setModalPotonganLain(Number(e.target.value) || 0)}
+                        value={formatRupiahInput(modalPotonganLain)}
+                        onChange={(e) => setModalPotonganLain(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
@@ -4049,10 +4082,11 @@ export function PayrollClient({
                     </div>
                     <div className="flex items-center gap-2">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="pph21"
-                        value={modalPph21 || ""}
-                        onChange={(e) => setModalPph21(Number(e.target.value) || 0)}
+                        value={formatRupiahInput(modalPph21)}
+                        onChange={(e) => setModalPph21(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
                         className="w-32 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right"
                       />
@@ -4514,13 +4548,13 @@ export function PayrollClient({
                   Nominal Gaji Bruto (Rp) *
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="nominalHonor"
                   required
-                  min="0"
-                  value={modalHonorNominal || ""}
+                  value={formatRupiahInput(modalHonorNominal)}
                   onChange={(e) => {
-                    const val = Number(e.target.value) || 0;
+                    const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                     setModalHonorNominal(val);
                   }}
                   placeholder="0"
@@ -4549,12 +4583,12 @@ export function PayrollClient({
                     Potongan Pajak (Rp)
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="pph21"
-                    min="0"
-                    value={modalHonorNominalPph || ""}
+                    value={formatRupiahInput(modalHonorNominalPph)}
                     onChange={(e) => {
-                      const pphVal = Number(e.target.value) || 0;
+                      const pphVal = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                       setModalHonorNominalPph(pphVal);
                       if (modalHonorNominal > 0) {
                         setModalHonorTarifPph(Number(((pphVal / modalHonorNominal) * 100).toFixed(2)));

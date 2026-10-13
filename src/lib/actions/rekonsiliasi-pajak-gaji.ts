@@ -15,6 +15,8 @@ export interface SaveRekonsiliasiGajiPph21Input {
   pph21Terlapor: number;
   gajiPegawaiTerlapor?: number;
   gajiTaTerlapor?: number;
+  pph21PegawaiTerlapor?: number;
+  pph21TaTerlapor?: number;
   ntpn?: string;
   keterangan?: string;
 }
@@ -42,6 +44,15 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
     return { error: "Bulan harus antara 1 dan 12." };
   }
 
+  const gajiPeg = Math.max(0, Number(input.gajiPegawaiTerlapor) || 0);
+  const gajiTa = Math.max(0, Number(input.gajiTaTerlapor) || 0);
+  const pphPeg = Math.max(0, Number(input.pph21PegawaiTerlapor) || 0);
+  const pphTa = Math.max(0, Number(input.pph21TaTerlapor) || 0);
+
+  // Jika input total kosong tapi rincian diisi, auto-sum ke total
+  const gajiTot = Math.max(0, Number(input.gajiTerlapor) || (gajiPeg + gajiTa));
+  const pphTot = Math.max(0, Number(input.pph21Terlapor) || (pphPeg + pphTa));
+
   const saved = await prisma.rekonsiliasiGajiPph21.upsert({
     where: {
       entityId_year_month: {
@@ -51,10 +62,12 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
       },
     },
     update: {
-      gajiTerlapor: Math.max(0, Number(input.gajiTerlapor) || 0),
-      pph21Terlapor: Math.max(0, Number(input.pph21Terlapor) || 0),
-      gajiPegawaiTerlapor: Math.max(0, Number(input.gajiPegawaiTerlapor) || 0),
-      gajiTaTerlapor: Math.max(0, Number(input.gajiTaTerlapor) || 0),
+      gajiTerlapor: gajiTot,
+      pph21Terlapor: pphTot,
+      gajiPegawaiTerlapor: gajiPeg,
+      gajiTaTerlapor: gajiTa,
+      pph21PegawaiTerlapor: pphPeg,
+      pph21TaTerlapor: pphTa,
       ntpn: input.ntpn?.trim() || null,
       keterangan: input.keterangan?.trim() || null,
     },
@@ -62,10 +75,12 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
       entityId: input.entityId,
       year: input.year,
       month: input.month,
-      gajiTerlapor: Math.max(0, Number(input.gajiTerlapor) || 0),
-      pph21Terlapor: Math.max(0, Number(input.pph21Terlapor) || 0),
-      gajiPegawaiTerlapor: Math.max(0, Number(input.gajiPegawaiTerlapor) || 0),
-      gajiTaTerlapor: Math.max(0, Number(input.gajiTaTerlapor) || 0),
+      gajiTerlapor: gajiTot,
+      pph21Terlapor: pphTot,
+      gajiPegawaiTerlapor: gajiPeg,
+      gajiTaTerlapor: gajiTa,
+      pph21PegawaiTerlapor: pphPeg,
+      pph21TaTerlapor: pphTa,
       ntpn: input.ntpn?.trim() || null,
       keterangan: input.keterangan?.trim() || null,
     },
@@ -79,8 +94,10 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
       entityId: input.entityId,
       year: input.year,
       month: input.month,
-      gajiTerlapor: input.gajiTerlapor,
-      pph21Terlapor: input.pph21Terlapor,
+      gajiTerlapor: gajiTot,
+      pph21Terlapor: pphTot,
+      gajiPegawaiTerlapor: gajiPeg,
+      gajiTaTerlapor: gajiTa,
     }
   );
 

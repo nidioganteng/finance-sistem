@@ -191,18 +191,21 @@ if ($method === 'GET' && $sub === '') {
 
         if ($is_active) $summary_bulan_ini['totalPegawaiAktif']++;
 
+        $tj_master = (float)$p['tunjanganJabatan'];
         $pegawai_list[] = [
-            'id'             => $pid,
-            'entityId'       => $p['entityId'],
-            'nik'            => $p['nik'],
-            'nama'           => $p['nama'],
-            'jabatan'        => $p['jabatan'],
-            'statusKeluarga' => $p['statusKeluarga'],
-            'ptkp'           => $ptkp_num,
-            'ptkpFmt'        => fmt_rp_payroll($ptkp_num),
-            'gajiPokok'      => $gaji_pokok_num,
-            'gajiPokokFmt'   => fmt_rp_payroll($gaji_pokok_num),
-            'isActive'       => (bool)$p['isActive'],
+            'id'                    => $pid,
+            'entityId'              => $p['entityId'],
+            'nik'                   => $p['nik'],
+            'nama'                  => $p['nama'],
+            'jabatan'               => $p['jabatan'],
+            'statusKeluarga'        => $p['statusKeluarga'],
+            'ptkp'                  => $ptkp_num,
+            'ptkpFmt'               => fmt_rp_payroll($ptkp_num),
+            'gajiPokok'             => $gaji_pokok_num,
+            'gajiPokokFmt'          => fmt_rp_payroll($gaji_pokok_num),
+            'tunjanganJabatan'      => $tj_master,
+            'tunjanganJabatanFmt'   => fmt_rp_payroll($tj_master),
+            'isActive'              => (bool)$p['isActive'],
             'currentGaji'    => $current_gaji,
             'akumulasiTahun' => [
                 'totalGajiKotor'  => $total_gaji_kotor_thn,
@@ -829,10 +832,11 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
 
     $id  = uuid4();
     $now = date('Y-m-d H:i:s');
+    $tunjangan_jabatan = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : 0.0;
     $pdo->prepare(
-        "INSERT INTO Pegawai (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok, isActive, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    )->execute([$id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $is_active ? 1 : 0, $now, $now]);
+        "INSERT INTO Pegawai (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok, tunjanganJabatan, isActive, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )->execute([$id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $now, $now]);
 
     log_activity($user['id'], "Tambah Pegawai Tetap: $nama ($nik) - $jabatan", 'FINANCIAL_CHANGE', [
         'pegawaiId' => $id, 'entityId' => $entity_id,
@@ -856,13 +860,14 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$existing) return error_response('Data pegawai tidak ditemukan.', 404);
 
-    $nik        = trim($body['nik'] ?? $existing['nik']);
-    $nama       = trim($body['nama'] ?? $existing['nama']);
-    $jabatan    = trim($body['jabatan'] ?? $existing['jabatan']) ?: 'Karyawan';
-    $status_kel = trim($body['statusKeluarga'] ?? $existing['statusKeluarga']) ?: 'TK/0';
-    $ptkp       = isset($body['ptkp']) ? (float)$body['ptkp'] : (float)$existing['ptkp'];
-    $gaji_pokok = isset($body['gajiPokok']) ? (float)$body['gajiPokok'] : (float)$existing['gajiPokok'];
-    $is_active  = isset($body['isActive'])
+    $nik               = trim($body['nik'] ?? $existing['nik']);
+    $nama              = trim($body['nama'] ?? $existing['nama']);
+    $jabatan           = trim($body['jabatan'] ?? $existing['jabatan']) ?: 'Karyawan';
+    $status_kel        = trim($body['statusKeluarga'] ?? $existing['statusKeluarga']) ?: 'TK/0';
+    $ptkp              = isset($body['ptkp']) ? (float)$body['ptkp'] : (float)$existing['ptkp'];
+    $gaji_pokok        = isset($body['gajiPokok']) ? (float)$body['gajiPokok'] : (float)$existing['gajiPokok'];
+    $tunjangan_jabatan = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : (float)$existing['tunjanganJabatan'];
+    $is_active         = isset($body['isActive'])
         ? ($body['isActive'] === true || $body['isActive'] === 'true' || $body['isActive'] === 'on')
         : (bool)$existing['isActive'];
 
@@ -879,8 +884,8 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
 
     $now = date('Y-m-d H:i:s');
     $pdo->prepare(
-        "UPDATE Pegawai SET nik=?, nama=?, jabatan=?, statusKeluarga=?, ptkp=?, gajiPokok=?, isActive=?, updatedAt=? WHERE id=?"
-    )->execute([$nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $is_active ? 1 : 0, $now, $id]);
+        "UPDATE Pegawai SET nik=?, nama=?, jabatan=?, statusKeluarga=?, ptkp=?, gajiPokok=?, tunjanganJabatan=?, isActive=?, updatedAt=? WHERE id=?"
+    )->execute([$nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $now, $id]);
 
     log_activity($user['id'], "Update Pegawai Tetap: $nama ($nik)", 'FINANCIAL_CHANGE', ['pegawaiId' => $id]);
 

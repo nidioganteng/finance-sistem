@@ -781,42 +781,28 @@ export function PayrollClient({
           {/* Sub-Tab Content 1: Gaji Bulanan */}
           {pegawaiSubTab === "gaji" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-                <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-navy-text">
-                      Daftar Gaji Pegawai Tetap – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
-                    </h3>
-                    <p className="text-xs text-muted-faint">
-                      Entitas: {data.entity?.name} · Masukkan atau sesuaikan komponen tunjangan, insentif, dan potongan
-                    </p>
-                  </div>
-                </div>
+              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm font-bold text-navy-text">
+                  Gaji Bulanan — {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
+                </span>
+              </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-left text-xs">
-                  <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                <table className="w-full min-w-[780px] text-left text-xs">
+                  <thead className="bg-surface-subtle border-b border-border">
                     <tr>
-                      <th className="py-2.5 px-3.5">Pegawai</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[105px]">Gaji Pokok</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[95px]">Tunj. Jabatan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[115px]">Tunj. Transport</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[95px]">Insentif/Lain</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[85px]">THR</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200">
-                        Terlapor Pajak (Bruto)
-                      </th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[85px]">BPJS</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[80px]">PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200">
-                        Gaji Bersih (THP)
-                      </th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Aksi</th>
+                      <th className="py-2.5 px-3.5 text-[11px] font-bold text-muted-faint">PEGAWAI</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[110px]">GAJI POKOK</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[110px]">TUNJANGAN</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[130px]">POTONGAN</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[120px]">TAKE HOME</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[120px]">AKSI</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredPegawaiList.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-8 text-center text-muted-faint">
+                        <td colSpan={6} className="py-8 text-center text-muted-faint">
                           Belum ada pegawai terdaftar pada entitas ini. Silakan klik "Tambah Pegawai".
                         </td>
                       </tr>
@@ -824,10 +810,18 @@ export function PayrollClient({
                       filteredPegawaiList.map((p) => {
                         const gaji = p.currentGaji;
                         const isInputted = !!gaji;
+                        const totalTunjangan = gaji
+                          ? (gaji.tunjanganJabatan || 0) + (gaji.tunjanganTransport || 0) + (gaji.insentif || 0) + (gaji.thr || 0) + (gaji.tunjanganBpjs || 0) + (gaji.tunjanganPph || 0)
+                          : p.tunjanganJabatan || 0;
+                        const totalPotonganBpjs = gaji
+                          ? (gaji.potonganBpjs || (gaji.bpjsKesehatan + gaji.bpjsKetenagakerjaan))
+                          : 0;
+                        const totalPotonganPph = gaji ? (gaji.pph21 || 0) : 0;
+                        const totalPotongan = totalPotonganBpjs + totalPotonganPph;
                         return (
-                          <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
+                          <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors border-b border-surface-subtle">
                             <td className="py-3 px-3.5">
-                              <div className="font-bold text-navy-text text-sm">{p.nama}</div>
+                              <div className="font-bold text-[13px] text-navy-text">{p.nama}</div>
                               <div className="text-[11px] text-muted-faint mt-0.5 flex items-center gap-1.5 flex-wrap">
                                 <span className="font-mono">{p.nik}</span>
                                 <span>·</span>
@@ -836,75 +830,46 @@ export function PayrollClient({
                                 <span className="px-1.5 py-0.2 rounded bg-surface-subtle font-mono text-[10px]">
                                   {p.statusKeluarga}
                                 </span>
-                                {p.masaKerja && (
-                                  <>
-                                    <span>·</span>
-                                    <span
-                                      className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-mono text-[10px] font-medium border border-amber-200 dark:border-amber-800/60"
-                                      title={`Mulai Bekerja: ${p.tanggalMasukFmt ?? "-"}`}
-                                    >
-                                      Masa Kerja: {p.masaKerja}
-                                    </span>
-                                  </>
-                                )}
                               </div>
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
+                            <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-navy-text whitespace-nowrap">
                               {gaji ? gaji.gajiPokokFmt : p.gajiPokokFmt}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              {gaji
-                                ? gaji.tunjanganJabatanFmt
-                                : p.tunjanganJabatanFmt || formatRupiah(p.tunjanganJabatan)}
+                            <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                              {formatRupiah(totalTunjangan)}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              <div>{gaji ? gaji.tunjanganTransportFmt : "Rp 0"}</div>
-                              {gaji && gaji.hariKerja > 0 && (
-                                <div className="text-[10px] text-muted-faint font-sans">
-                                  {gaji.hariKerja} hr × {formatRupiah(gaji.tarifTransportHarian || 15000)}
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                              {gaji ? (
+                                <div className="space-y-0.5">
+                                  <div className="tabular-nums font-mono text-[11px] text-muted-stronger flex justify-between gap-3">
+                                    <span>BPJS</span>
+                                    <span>{gaji.potonganBpjsFmt || formatRupiah(totalPotonganBpjs)}</span>
+                                  </div>
+                                  <div className="tabular-nums font-mono text-[11px] text-muted-stronger flex justify-between gap-3">
+                                    <span>PPh21</span>
+                                    <span>{gaji.pph21Fmt}</span>
+                                  </div>
+                                  <div className="border-t border-border-soft pt-0.5 tabular-nums font-mono text-[12px] font-bold text-rose-700 dark:text-rose-300 flex justify-between gap-3">
+                                    <span>Total</span>
+                                    <span>{formatRupiah(totalPotongan)}</span>
+                                  </div>
                                 </div>
+                              ) : (
+                                <span className="tabular-nums font-mono text-[13px] text-muted-faint">—</span>
                               )}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              {gaji
-                                ? formatRupiah(
-                                    (gaji.insentif || 0) +
-                                      (gaji.tunjanganBpjs || 0) +
-                                      (gaji.tunjanganPph || 0)
-                                  )
-                                : "Rp 0"}
-                            </td>
-
-                            <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                              {gaji ? (gaji.thrFmt || formatRupiah(gaji.thr || 0)) : "Rp 0"}
-                            </td>
-
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/30 dark:bg-blue-950/15 whitespace-nowrap">
-                              {gaji
-                                ? (gaji.totalGajiTerlaporPajakFmt || gaji.totalGajiKotorFmt)
-                                : p.gajiPokokFmt}
-                            </td>
-
-                            <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
-                              {gaji
-                                ? (gaji.potonganBpjsFmt ||
-                                    formatRupiah(
-                                      gaji.potonganBpjs ||
-                                        (gaji.bpjsKesehatan + gaji.bpjsKetenagakerjaan)
-                                    ))
-                                : "Rp 0"}
-                            </td>
-
-                            <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                              {gaji ? gaji.pph21Fmt : "Rp 0"}
-                            </td>
-
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/15 whitespace-nowrap">
-                              {gaji ? gaji.totalGajiBersihFmt : p.gajiPokokFmt}
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                              {gaji ? (
+                                <span className="tabular-nums font-mono text-[13px] font-bold text-emerald-800 dark:text-emerald-200">
+                                  {gaji.totalGajiBersihFmt}
+                                </span>
+                              ) : (
+                                <span className="text-muted-faint italic text-xs">Belum diinput</span>
+                              )}
                             </td>
 
                             <td className="py-3 px-3.5 text-right whitespace-nowrap">
@@ -942,44 +907,39 @@ export function PayrollClient({
                   {data.pegawaiList.length > 0 && (
                     <tfoot className="bg-surface-subtle border-t border-border font-bold text-xs">
                       <tr>
-                        <td className="py-3 px-3.5 text-navy-text whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-[13px] text-navy-text whitespace-nowrap">
                           Total ({data.summaryBulanIni.totalPegawaiInput} Terinput):
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-navy-text whitespace-nowrap">
                           {data.summaryBulanIni.totalGajiPokokFmt}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap">
-                          {data.summaryBulanIni.totalTunjanganJabatanFmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap">
-                          {data.summaryBulanIni.totalTunjanganTransportFmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-amber-700 dark:text-amber-300 whitespace-nowrap">
                           {formatRupiah(
-                            data.summaryBulanIni.totalInsentif +
-                              (data.summaryBulanIni.totalTunjanganBpjs ?? 0) +
-                              (data.summaryBulanIni.totalTunjanganPph ?? 0)
+                            (data.summaryBulanIni.totalTunjanganJabatan || 0) +
+                            (data.summaryBulanIni.totalTunjanganTransport || 0) +
+                            (data.summaryBulanIni.totalInsentif || 0) +
+                            (data.summaryBulanIni.totalThr ?? 0) +
+                            (data.summaryBulanIni.totalTunjanganBpjs ?? 0) +
+                            (data.summaryBulanIni.totalTunjanganPph ?? 0)
                           )}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap">
-                          {data.summaryBulanIni.totalThrFmt || formatRupiah(data.summaryBulanIni.totalThr ?? 0)}
+                        <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                          <div className="space-y-0.5">
+                            <div className="tabular-nums font-mono text-[11px] text-muted-stronger flex justify-between gap-3">
+                              <span>BPJS</span>
+                              <span>{data.summaryBulanIni.totalPotonganBpjsFmt || formatRupiah(data.summaryBulanIni.totalPotonganBpjs || (data.summaryBulanIni.totalBpjsKesehatan + data.summaryBulanIni.totalBpjsKetenagakerjaan))}</span>
+                            </div>
+                            <div className="tabular-nums font-mono text-[11px] text-muted-stronger flex justify-between gap-3">
+                              <span>PPh21</span>
+                              <span>{data.summaryBulanIni.totalPph21Fmt}</span>
+                            </div>
+                            <div className="border-t border-border-soft pt-0.5 tabular-nums font-mono text-[12px] font-bold text-rose-700 dark:text-rose-300 flex justify-between gap-3">
+                              <span>Total</span>
+                              <span>{formatRupiah((data.summaryBulanIni.totalPotonganBpjs || (data.summaryBulanIni.totalBpjsKesehatan + data.summaryBulanIni.totalBpjsKetenagakerjaan)) + (data.summaryBulanIni.totalPph21 || 0))}</span>
+                            </div>
+                          </div>
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-blue-900 dark:text-blue-200 bg-blue-50/40 dark:bg-blue-950/20 whitespace-nowrap">
-                          {data.summaryBulanIni.totalGajiTerlaporPajakFmt ||
-                            formatRupiah(data.summaryBulanIni.totalGajiTerlaporPajak)}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
-                          {data.summaryBulanIni.totalPotonganBpjsFmt ||
-                            formatRupiah(
-                              data.summaryBulanIni.totalPotonganBpjs ||
-                                (data.summaryBulanIni.totalBpjsKesehatan +
-                                  data.summaryBulanIni.totalBpjsKetenagakerjaan)
-                            )}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                          {data.summaryBulanIni.totalPph21Fmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-emerald-800 dark:text-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
                           {data.summaryBulanIni.totalGajiBersihFmt}
                         </td>
                         <td className="py-3 px-3.5" />
@@ -995,147 +955,103 @@ export function PayrollClient({
           {pegawaiSubTab === "rekap-bulan" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text">
-                    Rekapitulasi Penggajian Pegawai Tetap Per Bulan – Tahun {selectedYear}
-                  </h3>
-                  <p className="text-xs text-muted-faint">
-                    Ringkasan total beban gaji kotor, potongan BPJS, PPh 21, dan total gaji bersih selama 12 bulan (Entitas: {data.entity?.name})
-                  </p>
-                </div>
+                <span className="text-sm font-bold text-navy-text">
+                  Rekap {selectedYear}
+                </span>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1020px] text-left text-xs">
-                  <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
+                <table className="w-full min-w-[780px] text-left text-xs">
+                  <thead className="bg-surface-subtle border-b border-border">
                     <tr>
-                      <th className="py-2.5 px-3.5">Bulan</th>
-                      <th className="py-2.5 px-3.5 text-center">Jml Pegawai</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">Gaji Pokok</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">Tunjangan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">Insentif/THR</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200">
-                        Terlapor Pajak (Bruto)
-                      </th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">BPJS</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px]">PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200">
-                        Gaji Bersih (THP)
-                      </th>
-                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Aksi</th>
+                      <th className="py-2.5 px-3.5 text-[11px] font-bold text-muted-faint">BULAN</th>
+                      <th className="py-2.5 px-3.5 text-center text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[80px]">PEGAWAI</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[110px]">GAJI POKOK</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[110px]">TUNJANGAN</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[110px]">POTONGAN</th>
+                      <th className="py-2.5 px-3.5 text-right text-[11px] font-bold text-muted-faint whitespace-nowrap min-w-[130px]">TAKE HOME</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {data.rekapBulananPegawai.map((r) => (
                       <tr
                         key={r.bulan}
-                        className={`hover:bg-surface-hover/30 transition-colors ${
+                        className={`hover:bg-surface-hover/30 transition-colors border-b border-surface-subtle ${
                           r.bulan === selectedMonth ? "bg-navy/5 font-medium" : ""
                         }`}
                       >
                         <td className="py-3 px-3.5">
-                          <div className="font-bold text-navy-text flex items-center gap-1.5">
-                            <span>{r.bulanName}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-[13px] text-navy-text">{r.bulanName}</span>
                             {r.bulan === selectedMonth && (
                               <span className="text-[10px] px-1.5 py-0.2 rounded bg-navy text-white font-semibold">
                                 Aktif
                               </span>
                             )}
+                            <button
+                              onClick={() => {
+                                handleMonthChange(r.bulan);
+                                setPegawaiSubTab("gaji");
+                              }}
+                              className="ml-1 text-[10px] text-muted-faint hover:text-navy-text font-semibold inline-flex items-center gap-0.5 cursor-pointer transition-colors"
+                            >
+                              <span>Lihat</span>
+                              <ChevronRight size={10} />
+                            </button>
                           </div>
                         </td>
-                        <td className="py-3 px-3.5 text-center font-mono">
-                          {r.totalPegawai > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-bold text-[11px]">
-                              {r.totalPegawai} orang
-                            </span>
-                          ) : (
+                        <td className="py-3 px-3.5 text-center tabular-nums font-mono text-[13px] text-navy-text">
+                          {r.totalPegawai > 0 ? r.totalPegawai : (
                             <span className="text-muted-faint text-[11px]">-</span>
                           )}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-navy-text whitespace-nowrap">
                           {r.totalGajiPokokFmt}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                          {r.totalTunjanganFmt}
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                          {formatRupiah((r.totalTunjangan || 0) + (r.totalInsentif || 0) + (r.totalThr || 0))}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                          {formatRupiah((r.totalInsentif || 0) + (r.totalThr || 0))}
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-rose-700 dark:text-rose-300 whitespace-nowrap">
+                          {formatRupiah((r.totalBpjs || 0) + (r.totalPph21 || 0))}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/30 dark:bg-blue-950/15 whitespace-nowrap">
-                          {r.totalGajiTerlaporPajakFmt || r.totalGajiKotorFmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
-                          {r.totalBpjsFmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                          {r.totalPph21Fmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/15 whitespace-nowrap">
+                        <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
                           {r.totalGajiBersihFmt}
-                        </td>
-                        <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              handleMonthChange(r.bulan);
-                              setPegawaiSubTab("gaji");
-                            }}
-                            className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                          >
-                            <span>Input / Lihat Bulan Ini</span>
-                            <ChevronRight size={12} />
-                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-surface-subtle border-t-2 border-border font-bold text-xs">
                     <tr>
-                      <td className="py-3 px-3.5 text-navy-text">Grand Total (12 Bulan):</td>
-                      <td className="py-3 px-3.5 text-center font-mono">
-                        {data.rekapBulananPegawai.reduce((s, r) => s + r.totalPegawai, 0)} total
+                      <td className="py-3 px-3.5 text-[13px] text-navy-text">Grand Total (12 Bulan):</td>
+                      <td className="py-3 px-3.5 text-center tabular-nums font-mono text-[13px] text-navy-text">
+                        {data.rekapBulananPegawai.reduce((s, r) => s + r.totalPegawai, 0)}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-navy-text whitespace-nowrap">
                         {formatRupiah(
                           data.rekapBulananPegawai.reduce((s, r) => s + r.totalGajiPokok, 0)
                         )}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
-                        {formatRupiah(
-                          data.rekapBulananPegawai.reduce((s, r) => s + r.totalTunjangan, 0)
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-amber-700 dark:text-amber-300 whitespace-nowrap">
                         {formatRupiah(
                           data.rekapBulananPegawai.reduce(
-                            (s, r) => s + (r.totalInsentif || 0) + (r.totalThr || 0),
+                            (s, r) => s + (r.totalTunjangan || 0) + (r.totalInsentif || 0) + (r.totalThr || 0),
                             0
                           )
                         )}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/40 dark:bg-blue-950/20 whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] text-rose-700 dark:text-rose-300 whitespace-nowrap">
                         {formatRupiah(
                           data.rekapBulananPegawai.reduce(
-                            (s, r) => s + (r.totalGajiTerlaporPajak || r.totalGajiKotor),
+                            (s, r) => s + (r.totalBpjs || 0) + (r.totalPph21 || 0),
                             0
                           )
                         )}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap">
-                        {formatRupiah(
-                          data.rekapBulananPegawai.reduce((s, r) => s + r.totalBpjs, 0)
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                        {formatRupiah(
-                          data.rekapBulananPegawai.reduce((s, r) => s + r.totalPph21, 0)
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
                         {formatRupiah(
                           data.rekapBulananPegawai.reduce((s, r) => s + r.totalGajiBersih, 0)
                         )}
                       </td>
-                      <td />
                     </tr>
                   </tfoot>
                 </table>

@@ -540,8 +540,10 @@ model RekonsiliasiGajiPph21 {
   month               Int      // 1 - 12
   gajiTerlapor        Decimal  @default(0.00) @db.Decimal(18, 2) // Total Bruto Gaji Dilaporkan ke SPT Masa PPh 21
   pph21Terlapor       Decimal  @default(0.00) @db.Decimal(18, 2) // Nilai PPh 21 Terutang/Dilaporkan ke SPT
-  gajiPegawaiTerlapor Decimal  @default(0.00) @db.Decimal(18, 2) // Rincian Bruto Pegawai Tetap (Opsional)
-  gajiTaTerlapor      Decimal  @default(0.00) @db.Decimal(18, 2) // Rincian Bruto Tenaga Ahli (Opsional)
+  gajiPegawaiTerlapor  Decimal  @default(0.00) @db.Decimal(18, 2) // Rincian Bruto Pegawai Tetap (Opsional)
+  gajiTaTerlapor       Decimal  @default(0.00) @db.Decimal(18, 2) // Rincian Bruto Tenaga Ahli (Opsional)
+  pph21PegawaiTerlapor Decimal  @default(0.00) @db.Decimal(18, 2) // PPh 21 Pegawai Tetap di SPT
+  pph21TaTerlapor      Decimal  @default(0.00) @db.Decimal(18, 2) // PPh 21 Tenaga Ahli di SPT
   ntpn                String?  // No. Tanda Penerimaan Negara / BPS Bukti Lapor
   keterangan          String?  @db.Text
   updatedAt           DateTime @updatedAt

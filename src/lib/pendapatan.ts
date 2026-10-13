@@ -42,6 +42,23 @@ export function hitungDppNilaiLain(dpp: number): number {
   return Math.round((dpp * 11) / 12);
 }
 
+/**
+ * Menghitung DPP & PPN Otomatis berbasis Nilai Kuitansi Bruto:
+ * DPP = (100 / 111) * Nilai Kuitansi Bruto
+ * PPN = (11 / 111) * Nilai Kuitansi Bruto
+ */
+export function hitungDppDanPpnDariKuitansi(nilaiKwitansi: number, tarifPphPersen = 3.5) {
+  if (!nilaiKwitansi || nilaiKwitansi <= 0) {
+    return { dpp: 0, ppn: 0, pph: 0, nilaiProyek: 0, labaSetelahPajak: 0 };
+  }
+  const dpp = Math.round((nilaiKwitansi * 100) / 111);
+  const ppn = Math.round((nilaiKwitansi * 11) / 111);
+  const pph = Math.round((dpp * tarifPphPersen) / 100);
+  const nilaiProyek = nilaiKwitansi;
+  const labaSetelahPajak = Math.round(dpp - pph);
+  return { dpp, ppn, pph, nilaiProyek, labaSetelahPajak };
+}
+
 export function hitungPajakFaktur(
   dpp: number,
   dppNilaiLain: number,
@@ -49,12 +66,19 @@ export function hitungPajakFaktur(
   tarifPphPersen = 3.5,
   nilaiKwitansiManual?: number
 ): HitungPajakResult {
-  const ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
+  let ppn: number;
+  let nilaiProyek: number;
+
+  if (nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0) {
+    nilaiProyek = nilaiKwitansiManual;
+    ppn = Math.round((nilaiKwitansiManual * 11) / 111);
+  } else {
+    ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
+    nilaiProyek =
+      tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100);
+  }
+
   const pph = Math.round((dpp * tarifPphPersen) / 100);
-  const nilaiProyek =
-    nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0
-      ? nilaiKwitansiManual
-      : (tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100));
   const labaSetelahPajak = Math.round(nilaiProyek - ppn - pph);
 
   return {

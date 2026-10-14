@@ -218,33 +218,39 @@ if ($method === 'POST' && $sub_action === 'pelunasan') {
         if (empty($body[$field])) error_response("Field '$field' diperlukan.", 400);
     }
 
+    $nominal = (float)$body['nominal'];
+    if ($nominal <= 0) error_response('Nominal harus lebih dari 0.', 400);
+
     $current_entity      = resolve_entity_by_key($body['currentEntityKey']);
     $counterparty_entity = resolve_entity_by_key($body['counterpartyEntityKey']);
     if (!$current_entity)      error_response('Entitas sumber tidak ditemukan.', 404);
     if (!$counterparty_entity) error_response('Entitas rekanan tidak ditemukan.', 404);
 
-    $pdo     = get_pdo();
-    $nominal = (float)$body['nominal'];
-    $tanggal = $body['tanggal'];
-    $no_bukti = $body['noBukti'];
-    $keterangan = $body['keterangan'];
+    $pdo          = get_pdo();
+    $tanggal      = $body['tanggal'];
+    $no_bukti     = $body['noBukti'];
+    $keterangan   = $body['keterangan'];
     $balance_type = $body['balanceType']; // 'piutang' | 'hutang'
 
-    // Cari jenisInputId untuk kas sumber
+    // Cek duplikat noBukti sebelum membuka transaksi DB
+    $dup = $pdo->prepare('SELECT 1 FROM `Transaction` WHERE entityId = ? AND noBukti = ? LIMIT 1');
+    $dup->execute([$current_entity['id'], $no_bukti]);
+    if ($dup->fetch()) error_response("No. bukti \"$no_bukti\" sudah dipakai di entitas ini.", 409);
+
     $stmt = $pdo->prepare('SELECT id FROM JenisInputTransaksi WHERE `key` = ? LIMIT 1');
     $stmt->execute([$body['jenisKasSumber']]);
     $jenis_sumber = $stmt->fetch();
     if (!$jenis_sumber) error_response('Jenis kas sumber tidak ditemukan.', 404);
 
-    // Jenis kas tujuan (opsional, fallback ke sumber)
     $jenis_tujuan_key = $body['jenisKasTujuan'] ?? $body['jenisKasSumber'];
     $stmt = $pdo->prepare('SELECT id FROM JenisInputTransaksi WHERE `key` = ? LIMIT 1');
     $stmt->execute([$jenis_tujuan_key]);
     $jenis_tujuan = $stmt->fetch();
     if (!$jenis_tujuan) error_response('Jenis kas tujuan tidak ditemukan.', 404);
 
-    // Tentukan kode akun berdasarkan pasangan entitas
-    // Mapping key -> kode akun piutang antar entitas
+    // Peta COA piutang/hutang antar entitas.
+    // Bug A (gaharu/kencana tertukar) dan Bug B (strtolower ciptaAsri) masih
+    // ada di sini — dikoreksi terpisah di commit berikutnya agar diff minimal.
     $entity_code_map = [
         'gaharu'   => ['piutang' => '111', 'hutang' => '311'],
         'kencana'  => ['piutang' => '112', 'hutang' => '312'],
@@ -252,18 +258,27 @@ if ($method === 'POST' && $sub_action === 'pelunasan') {
         'ciptaAsri'=> ['piutang' => '114', 'hutang' => '314'],
         'umum'     => ['piutang' => '115', 'hutang' => '315'],
     ];
+    $cok = strtolower($current_entity['key']);
+    $cpk = strtolower($counterparty_entity['key']);
 
-    $current_key      = strtolower($current_entity['key']);
-    $counterparty_key = strtolower($counterparty_entity['key']);
+    // Peta COA kas hardcoded (sesuai seed/database), menggantikan coa_by_jenis()
+    // yang bergantung riwayat transaksi dan bisa mengembalikan null diam-diam.
+    // Kunci pakai lowercase agar cocok dengan strtolower di atas.
+    $kas_kecil_map = [
+        'gaharu' => '1200', 'kencana' => '1100', 'tataring' => '1300',
+        'ciptaasri' => '1400', 'umum' => '1500',
+    ];
+    $kas_besar_map = [
+        'gaharu' => '120', 'kencana' => '110', 'tataring' => '130',
+        'ciptaasri' => '140', 'umum' => '150',
+    ];
 
-    // Cari CoaAccount untuk piutang/hutang di current entity (piutang dari sudut pandang counterparty)
     function cari_coa(string $code): ?array {
         $stmt = get_pdo()->prepare('SELECT id, code, name, kategori FROM CoaAccount WHERE code = ? LIMIT 1');
         $stmt->execute([$code]);
         return $stmt->fetch() ?: null;
     }
 
-    // Saldo dummy untuk saldoSetelah (kalkulasi sederhana)
     function last_saldo(string $entity_id, string $coa_id): float {
         $stmt = get_pdo()->prepare(
             'SELECT saldoSetelah FROM `Transaction`
@@ -275,43 +290,46 @@ if ($method === 'POST' && $sub_action === 'pelunasan') {
         return $row ? (float)$row['saldoSetelah'] : 0.0;
     }
 
-    // Kode kas/bank (akun kas: umumnya kode '1' atau sesuai jenis input)
-    // Ambil CoaAccount yang terhubung ke JenisInputTransaksi via transaksi terakhir
-    function coa_by_jenis(string $entity_id, string $jenis_id): ?array {
-        $stmt = get_pdo()->prepare(
-            'SELECT c.id, c.code, c.name, c.kategori
-             FROM `Transaction` t
-             JOIN CoaAccount c ON t.coaAccountId = c.id
-             WHERE t.entityId = ? AND t.jenisInputId = ?
-             ORDER BY t.createdAt DESC LIMIT 1'
-        );
-        $stmt->execute([$entity_id, $jenis_id]);
-        return $stmt->fetch() ?: null;
-    }
+    // Pre-resolve semua 6 COA sebelum beginTransaction.
+    // Kegagalan di sini mengembalikan 422 sebelum DB transaction dibuka —
+    // tidak ada data setengah jadi.
+    $kas_src_code = match($body['jenisKasSumber']) {
+        'kasKecil' => $kas_kecil_map[$cok] ?? null,
+        'kasBesar' => $kas_besar_map[$cok] ?? null,
+        default    => null,
+    };
+    $kas_dst_code = match($jenis_tujuan_key) {
+        'kasKecil' => $kas_kecil_map[$cpk] ?? null,
+        'kasBesar' => $kas_besar_map[$cpk] ?? null,
+        default    => null,
+    };
+    if (!$kas_src_code) error_response("COA kas sumber tidak ditemukan untuk entitas ini.", 422);
+    if (!$kas_dst_code) error_response("COA kas tujuan tidak ditemukan untuk entitas ini.", 422);
+
+    $cp_piutang_code = $entity_code_map[$cpk]['piutang'] ?? null;
+    $cp_hutang_code  = $entity_code_map[$cpk]['hutang']  ?? null;
+    $cu_piutang_code = $entity_code_map[$cok]['piutang'] ?? null;
+    $cu_hutang_code  = $entity_code_map[$cok]['hutang']  ?? null;
+    if (!$cp_piutang_code) error_response("COA piutang/hutang counterparty tidak ditemukan.", 422);
+    if (!$cu_piutang_code) error_response("COA piutang/hutang current tidak ditemukan.", 422);
+
+    $coa_kas_current      = cari_coa($kas_src_code);
+    $coa_kas_counterparty = cari_coa($kas_dst_code);
+    $coa_piutang_current  = cari_coa($cp_piutang_code);
+    $coa_hutang_current   = cari_coa($cp_hutang_code);
+    $coa_piutang_counter  = cari_coa($cu_piutang_code);
+    $coa_hutang_counter   = cari_coa($cu_hutang_code);
+
+    if (!$coa_kas_current)      error_response("COA kas sumber '$kas_src_code' tidak ada di database.", 422);
+    if (!$coa_kas_counterparty) error_response("COA kas tujuan '$kas_dst_code' tidak ada di database.", 422);
+    if (!$coa_piutang_current)  error_response("COA piutang '$cp_piutang_code' tidak ada di database.", 422);
+    if (!$coa_hutang_current)   error_response("COA hutang '$cp_hutang_code' tidak ada di database.", 422);
+    if (!$coa_piutang_counter)  error_response("COA piutang '$cu_piutang_code' tidak ada di database.", 422);
+    if (!$coa_hutang_counter)   error_response("COA hutang '$cu_hutang_code' tidak ada di database.", 422);
 
     $pdo->beginTransaction();
     try {
         $now = date('Y-m-d H:i:s');
-
-        // Kode akun piutang counterparty (dari sudut pandang current entity)
-        $counterparty_piutang_code = $entity_code_map[$counterparty_key]['piutang'] ?? null;
-        $counterparty_hutang_code  = $entity_code_map[$counterparty_key]['hutang']  ?? null;
-
-        $coa_piutang_current = $counterparty_piutang_code ? cari_coa($counterparty_piutang_code) : null;
-        $coa_hutang_current  = $counterparty_hutang_code  ? cari_coa($counterparty_hutang_code)  : null;
-
-        // Kode akun piutang current (dari sudut pandang counterparty entity)
-        $current_piutang_code = $entity_code_map[$current_key]['piutang'] ?? null;
-        $current_hutang_code  = $entity_code_map[$current_key]['hutang']  ?? null;
-
-        $coa_piutang_counter = $current_piutang_code ? cari_coa($current_piutang_code) : null;
-        $coa_hutang_counter  = $current_hutang_code  ? cari_coa($current_hutang_code)  : null;
-
-        // Kas akun untuk current dan counterparty entity
-        $coa_kas_current    = coa_by_jenis($current_entity['id'],      $jenis_sumber['id']);
-        $coa_kas_counterparty = coa_by_jenis($counterparty_entity['id'], $jenis_tujuan['id']);
-
-        // INSERT helper
         $ins = $pdo->prepare(
             'INSERT INTO `Transaction`
              (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId, debit, kredit, saldoSetelah, staffId, createdAt)
@@ -319,53 +337,41 @@ if ($method === 'POST' && $sub_action === 'pelunasan') {
         );
 
         if ($balance_type === 'piutang') {
-            // Melunasi piutang current kepada counterparty:
-            // 1. Current entity: Kas masuk (debit kas, kredit piutang counterparty)
-            if ($coa_piutang_current) {
-                $saldo1 = last_saldo($current_entity['id'], $coa_piutang_current['id']);
-                $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_piutang_current['id'], 0, $nominal, $saldo1 - $nominal, $user['id'], $now]);
-            }
-            if ($coa_kas_current) {
-                $saldo2 = last_saldo($current_entity['id'], $coa_kas_current['id']);
-                $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_kas_current['id'], $nominal, 0, $saldo2 + $nominal, $user['id'], $now]);
-            }
-            // 2. Counterparty entity: Lunaskan hutang ke current (debit hutang current, kredit kas)
-            if ($coa_hutang_counter) {
-                $saldo3 = last_saldo($counterparty_entity['id'], $coa_hutang_counter['id']);
-                $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_hutang_counter['id'], $nominal, 0, $saldo3 - $nominal, $user['id'], $now]);
-            }
-            if ($coa_kas_counterparty) {
-                $saldo4 = last_saldo($counterparty_entity['id'], $coa_kas_counterparty['id']);
-                $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_kas_counterparty['id'], 0, $nominal, $saldo4 - $nominal, $user['id'], $now]);
-            }
+            // Current entity: Cr. piutang (berkurang), Dr. kas (masuk)
+            $s1 = last_saldo($current_entity['id'], $coa_piutang_current['id']);
+            $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_piutang_current['id'], 0, $nominal, $s1 - $nominal, $user['id'], $now]);
+
+            $s2 = last_saldo($current_entity['id'], $coa_kas_current['id']);
+            $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_kas_current['id'], $nominal, 0, $s2 + $nominal, $user['id'], $now]);
+
+            // Counterparty: Dr. hutang (berkurang), Cr. kas (keluar)
+            $s3 = last_saldo($counterparty_entity['id'], $coa_hutang_counter['id']);
+            $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_hutang_counter['id'], $nominal, 0, $s3 - $nominal, $user['id'], $now]);
+
+            $s4 = last_saldo($counterparty_entity['id'], $coa_kas_counterparty['id']);
+            $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_kas_counterparty['id'], 0, $nominal, $s4 - $nominal, $user['id'], $now]);
         } else {
-            // Melunasi hutang current kepada counterparty:
-            // 1. Current entity: Kas keluar (debit hutang counterparty, kredit kas)
-            if ($coa_hutang_current) {
-                $saldo1 = last_saldo($current_entity['id'], $coa_hutang_current['id']);
-                $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_hutang_current['id'], $nominal, 0, $saldo1 - $nominal, $user['id'], $now]);
-            }
-            if ($coa_kas_current) {
-                $saldo2 = last_saldo($current_entity['id'], $coa_kas_current['id']);
-                $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_kas_current['id'], 0, $nominal, $saldo2 - $nominal, $user['id'], $now]);
-            }
-            // 2. Counterparty entity: Terima pelunasan (debit kas, kredit piutang current)
-            if ($coa_piutang_counter) {
-                $saldo3 = last_saldo($counterparty_entity['id'], $coa_piutang_counter['id']);
-                $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_piutang_counter['id'], 0, $nominal, $saldo3 - $nominal, $user['id'], $now]);
-            }
-            if ($coa_kas_counterparty) {
-                $saldo4 = last_saldo($counterparty_entity['id'], $coa_kas_counterparty['id']);
-                $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
-                    $keterangan, $coa_kas_counterparty['id'], $nominal, 0, $saldo4 + $nominal, $user['id'], $now]);
-            }
+            // Current entity: Dr. hutang (berkurang), Cr. kas (keluar)
+            $s1 = last_saldo($current_entity['id'], $coa_hutang_current['id']);
+            $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_hutang_current['id'], $nominal, 0, $s1 - $nominal, $user['id'], $now]);
+
+            $s2 = last_saldo($current_entity['id'], $coa_kas_current['id']);
+            $ins->execute([uuid4(), $current_entity['id'], $jenis_sumber['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_kas_current['id'], 0, $nominal, $s2 - $nominal, $user['id'], $now]);
+
+            // Counterparty: Cr. piutang (berkurang), Dr. kas (masuk)
+            $s3 = last_saldo($counterparty_entity['id'], $coa_piutang_counter['id']);
+            $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_piutang_counter['id'], 0, $nominal, $s3 - $nominal, $user['id'], $now]);
+
+            $s4 = last_saldo($counterparty_entity['id'], $coa_kas_counterparty['id']);
+            $ins->execute([uuid4(), $counterparty_entity['id'], $jenis_tujuan['id'], $tanggal, $no_bukti,
+                $keterangan, $coa_kas_counterparty['id'], $nominal, 0, $s4 + $nominal, $user['id'], $now]);
         }
 
         $pdo->commit();

@@ -207,39 +207,60 @@ ORDER BY e.name;
 
 ## A3 — Tarif PPN untuk faktur lama
 
-**Pertanyaan:** Untuk faktur-faktur lama dari tahun 2022–2024 yang dibuat saat tarif PPN masih 11%, apakah angka PPN-nya sudah benar dan perlu dijaga agar tidak berubah jika diedit?
+> ✅ **Sudah diperbaiki secara teknis** (commit `4045e38`). Tidak ada keputusan teknis lagi.
+> Tindakan yang masih diperlukan: periksa apakah ada faktur yang sudah terlanjur rusak
+> (diedit sebelum perbaikan), dan putuskan apakah perlu koreksi.
 
-**Konteks:** Sistem saat ini menyimpan tarif PPN per faktur (`tarifPpnPersen`) di database — jadi angka yang sudah tersimpan aman. Namun ada celah: jika faktur lama (tarifPpn=11%) diedit dan pengguna tidak secara eksplisit mengisi ulang tarif, sistem akan menghitung ulang PPN-nya menggunakan tarif terbaru (12%). Ini bisa mengubah angka PPN faktur lama secara diam-diam.
+**Konteks perbaikan:** Sebelum commit `4045e38`, jika faktur lama (tarifPpn=11%) diedit tanpa mengisi ulang tarif, sistem menghitung ulang PPN menggunakan tarif terbaru (12%) secara diam-diam. Ini sudah diperbaiki: sistem sekarang membaca `tarifPpnPersen` yang tersimpan di database sebagai fallback — sama dengan perilaku Node.js (`pendapatan.ts:169-174`).
 
-**Analisis teknis** (info untuk pengembang — tidak perlu dibaca akuntan):
-- `get_tarif_ppn_aktif()` dipanggil di `pendapatan.php:237` (POST baru) dan `pendapatan.php:295` (PUT edit)
-- Fungsi ini selalu mengambil tarif terbaru (`ORDER BY tanggalMulai DESC LIMIT 1`), tidak mempertimbangkan tanggal/masa pajak faktur
-- Untuk POST: `tarifPpnPersen` adalah field **wajib** — jadi tarif dari DB tidak pernah dipakai saat membuat faktur baru, user selalu memasukkan tarif
-- Untuk PUT: jika request edit tidak menyertakan `tarifPpnPersen`, kalkulasi ulang ppn/nilaiProyek/laba menggunakan tarif dari DB (12%) meski faktur aslinya 11%
+**Pertanyaan yang tersisa:** Apakah ada faktur lama yang PPN-nya sudah terlanjur dihitung ulang dengan tarif yang salah (12% padahal seharusnya 11%), dan apakah perlu dikoreksi?
 
-**Query untuk melihat faktur dengan tarifPpn < 12%:**
+**Query 1 — Faktur yang mungkin sudah rusak** (selisih antara ppn tersimpan vs ppn yang seharusnya):
 
 ```sql
+-- Faktur dengan tarifPpn < 12 tetapi ppn tersimpan tampaknya dihitung pakai 12%
+-- Indikator: ppn ≠ round(dppNilaiLain × tarifPpnPersen / 100)
 SELECT
   noFaktur,
   masaPajak,
   tahunPajak,
   namaRekanan,
   dpp,
-  tarifPpnPersen,
-  ppn,
-  ROUND(dpp * tarifPpnPersen / 100, 0) AS ppn_dihitung_ulang,
-  ppn - ROUND(dpp * tarifPpnPersen / 100, 0) AS selisih_ppn,
+  dppNilaiLain,
+  tarifPpnPersen                                        AS tarif_tersimpan,
+  ppn                                                   AS ppn_tersimpan,
+  ROUND(dppNilaiLain * tarifPpnPersen / 100, 0)         AS ppn_seharusnya,
+  ppn - ROUND(dppNilaiLain * tarifPpnPersen / 100, 0)   AS selisih,
+  createdAt,
+  updatedAt
+FROM FakturPendapatan
+WHERE tarifPpnPersen < 12
+  AND ABS(ppn - ROUND(dppNilaiLain * tarifPpnPersen / 100, 0)) > 1
+ORDER BY tahunPajak, masaPajak;
+```
+
+**Query 2 — Semua faktur bertarif 11% untuk review:**
+
+```sql
+SELECT
+  noFaktur, masaPajak, tahunPajak, namaRekanan,
+  tarifPpnPersen, ppn,
+  ROUND(dppNilaiLain * tarifPpnPersen / 100, 0) AS ppn_seharusnya,
   updatedAt
 FROM FakturPendapatan
 WHERE tarifPpnPersen < 12
 ORDER BY tahunPajak, masaPajak;
 ```
 
+**Tindakan jika ada selisih di Query 1:**
+
+- Faktur yang perlu dikoreksi bisa diedit langsung di sistem — sekarang sistem sudah aman, edit tidak akan mengubah tarif.
+- Atau akuntan buat catatan koreksi manual jika faktur sudah dilaporkan ke pajak.
+
 **Pilihan jawaban:**
 
-- **[ ] Lindungi faktur lama** — saat mengedit, sistem harus membaca `tarifPpnPersen` yang tersimpan di DB sebagai fallback (bukan tarif terbaru). Pengembang akan fix logika PUT.
-- **[ ] Biarkan** — pengguna harus selalu memilih tarif secara manual saat edit. Risiko: kalkulasi salah jika lupa mengisi tarif saat mengedit faktur lama.
+- **[x] Sudah diperbaiki** — jalankan Query 1 di produksi untuk melihat apakah ada faktur yang perlu dikoreksi manual.
+- **[ ] Ada faktur rusak, perlu koreksi** — edit satu per satu lewat form, atau minta pengembang buat script koreksi batch.
 
 ---
 

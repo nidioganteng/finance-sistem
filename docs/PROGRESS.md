@@ -75,7 +75,8 @@
 
 **Commit 1:** `5310d09` — fix rumus nilaiProyek dan tambah path kuitansi bruto  
 **Commit 2:** `b34090f` — DELETE faktur unlink Transaction.fakturId dulu  
-**Commit 3:** `71acd78` — fix nominalDiterima null → crash (NOT NULL column)
+**Commit 3:** `71acd78` — fix nominalDiterima null → crash (NOT NULL column)  
+**Commit 4:** `4045e38` — PUT faktur pakai tarifPpn tersimpan, bukan tarif terbaru (A3)
 
 ### Skenario uji (dijalankan otomatis via `tests/manual/pendapatan-faktur.sh`)
 
@@ -96,6 +97,19 @@
 | Tarif PPN hardcode 11.0 | Default tarif PPN ditulis langsung di kode, bukan dari tabel TarifPajak | Diperbaiki (Commit 1: `get_tarif_ppn_aktif()`) |
 | DELETE faktur tidak unlink Transaction | Baris Transaction dengan `fakturId` → UUID faktur yang dihapus menjadi orphaned reference | Diperbaiki (Commit 2) |
 | `nominalDiterima` null → crash | Kolom NOT NULL, tapi PHP kirim null saat field tidak ada di request | Diperbaiki (Commit 3) |
+| PUT faktur pakai tarif terbaru (A3) | `get_tarif_ppn_aktif()` selalu mengembalikan 12% — edit faktur lama (tarifPpn=11%) diam-diam mengubah ppn ke tarif salah | Diperbaiki (Commit 4) |
+
+### Skenario uji A3 (dijalankan otomatis via `tests/manual/pendapatan-a3-tarif.sh`)
+
+| # | Skenario | Hasil diharapkan | Hasil aktual | Status |
+|---|----------|-----------------|--------------|--------|
+| 1 | Faktur tarifPpn=11 → PUT namaRekanan saja (tanpa tarif) | ppn tetap 19820 (tarif 11%) | ppn=19820, tidak berubah | ✓ Lulus (6 assertion) |
+| 2 | POST faktur baru tarifPpn=12 | ppn dihitung pakai 12% | ppn=10714 | ✓ Lulus (2 assertion) |
+| 3 | PUT dengan tarifPpnPersen=11 eksplisit | ppn dihitung pakai 11% | ppn=9821, tarifPpnPersen=11 | ✓ Lulus (3 assertion) |
+
+**11 assertion lulus, 0 gagal.**
+
+**Perilaku Node.js:** sama — `pendapatan.ts:169-174` membaca `existing.tarifPpnPersen` sebagai fallback.
 
 ### Catatan terbuka (belum diubah)
 

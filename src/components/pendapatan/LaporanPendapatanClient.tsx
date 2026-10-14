@@ -126,6 +126,8 @@ export function LaporanPendapatanClient({
 
   // Amrahan / Multi-Termin detection state (Issue 101)
   const [amrahanDetected, setAmrahanDetected] = useState<FakturPendapatanItem | null>(null);
+  // Mode input nomor faktur: "existing" (pilih dari riwayat nomor faktur proyek) atau "new" (input nomor faktur baru manual)
+  const [noFakturMode, setNoFakturMode] = useState<"existing" | "new">("new");
 
   // Auto-Fill Master Rekanan state (Issue 84 & 102)
   const [rekananSuggestions, setRekananSuggestions] = useState<RekananItem[]>([]);
@@ -214,6 +216,81 @@ export function LaporanPendapatanClient({
   // Selected project & termin helpers for auto-syncing DPP
   const selectedProject = data.projectOptions.find((p) => p.id === formFaktur.projectId);
   const selectedTermin = selectedProject?.termins.find((t) => t.id === selectedTerminId);
+
+  // Riwayat nomor faktur unik pada proyek yang dipilih untuk dukungan Amrahan / Multi-Termin
+  const distinctProjectFakturs = useMemo(() => {
+    if (!selectedProject?.existingFakturs || selectedProject.existingFakturs.length === 0) {
+      return [];
+    }
+    const map = new Map<
+      string,
+      {
+        noFaktur: string;
+        count: number;
+        latest: (typeof selectedProject.existingFakturs)[0];
+      }
+    >();
+    for (const f of selectedProject.existingFakturs) {
+      const key = f.noFaktur.trim();
+      if (!key) continue;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, { noFaktur: key, count: 1, latest: f });
+      }
+    }
+    return Array.from(map.values());
+  }, [selectedProject]);
+
+  function handleSelectExistingProjectFaktur(chosenNoFaktur: string) {
+    if (!chosenNoFaktur || chosenNoFaktur === "__MANUAL_NEW__") {
+      setNoFakturMode("new");
+      setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+      setAmrahanDetected(null);
+      return;
+    }
+
+    const match =
+      selectedProject?.existingFakturs.find(
+        (f) => f.noFaktur.trim().toLowerCase() === chosenNoFaktur.trim().toLowerCase()
+      ) ||
+      data.fakturList.find(
+        (f) => f.noFaktur.trim().toLowerCase() === chosenNoFaktur.trim().toLowerCase()
+      );
+
+    if (match) {
+      setAmrahanDetected(match as any);
+      const prevKuitansi =
+        match.nilaiProyek || (match.dpp > 0 ? Math.round((match.dpp * 111) / 100) : 0);
+      setFormFaktur((prev) => ({
+        ...prev,
+        noFaktur: match.noFaktur,
+        namaRekanan: match.namaRekanan,
+        npwp: match.npwp,
+        namaJkp: match.namaJkp,
+        nilaiKuitansi: prevKuitansi,
+        dpp: match.dpp,
+        dppNilaiLain: match.dppNilaiLain,
+        tarifPpnPersen: match.tarifPpnPersen,
+        tarifPphPersen: match.tarifPphPersen,
+        bank: match.bank || prev.bank,
+      }));
+
+      const cleanNpwp = (match.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
+      const matchedRek = (data.rekananOptions || []).find(
+        (r) =>
+          (r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanNpwp) ||
+          r.nama.toLowerCase() === (match.namaRekanan || "").toLowerCase()
+      );
+      if (matchedRek) {
+        setSelectedRekananId(matchedRek.id);
+        setMatchedRekananMaster(matchedRek as any);
+      }
+    } else {
+      setFormFaktur((prev) => ({ ...prev, noFaktur: chosenNoFaktur }));
+    }
+  }
 
   function handleSelectTermin(terminId: string) {
     setSelectedTerminId(terminId);
@@ -372,6 +449,7 @@ export function LaporanPendapatanClient({
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
     setAmrahanDetected(null);
+    setNoFakturMode("new");
     setFormFaktur({
       npwp: "",
       noFaktur: "",
@@ -402,6 +480,7 @@ export function LaporanPendapatanClient({
   function openEditFakturModal(f: FakturPendapatanItem) {
     setEditingFaktur(f);
     setAmrahanDetected(null);
+    setNoFakturMode("new");
     const proj = data.projectOptions.find((p) => p.id === f.projectId);
     const matchedTermin = proj?.termins.find((t) => t.nominal === f.dpp);
     if (matchedTermin) {
@@ -455,9 +534,26 @@ export function LaporanPendapatanClient({
 
     const trimmed = val.trim().toLowerCase();
     if (trimmed.length >= 3) {
-      const match = data.fakturList.find(
+      let match = selectedProject?.existingFakturs.find(
         (f) => f.noFaktur.trim().toLowerCase() === trimmed
-      );
+      ) as any;
+      if (!match) {
+        match = data.fakturList.find(
+          (f) => f.noFaktur.trim().toLowerCase() === trimmed
+        ) as any;
+      }
+      if (!match) {
+        for (const pr of data.projectOptions) {
+          const m = pr.existingFakturs?.find(
+            (f) => f.noFaktur.trim().toLowerCase() === trimmed
+          );
+          if (m) {
+            match = { ...m, projectId: pr.id } as any;
+            break;
+          }
+        }
+      }
+
       if (match) {
         setAmrahanDetected(match);
         const prevKuitansi = match.nilaiProyek || (match.dpp > 0 ? Math.round((match.dpp * 111) / 100) : 0);
@@ -1653,6 +1749,7 @@ export function LaporanPendapatanClient({
                       onClick={() => {
                         setSelectedTerminId("");
                         setShowManualDppFallback(false);
+                        setNoFakturMode("new");
                         setFormFaktur((prev) => ({
                           ...prev,
                           projectId: "",
@@ -1674,6 +1771,11 @@ export function LaporanPendapatanClient({
                     const p = data.projectOptions.find((x) => x.id === selectedProjId);
                     setSelectedTerminId("");
                     setShowManualDppFallback(false);
+                    if (p?.existingFakturs && p.existingFakturs.length > 0) {
+                      setNoFakturMode("existing");
+                    } else {
+                      setNoFakturMode("new");
+                    }
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
@@ -1703,6 +1805,100 @@ export function LaporanPendapatanClient({
                             Nilai Kontrak: {sel.contractValueFmt}
                           </span>
                         </div>
+
+                        {/* Pilihan Nomor Faktur Proyek (Dukungan Multi-Termin / Amrahan) */}
+                        {distinctProjectFakturs.length > 0 ? (
+                          <div className="p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <label className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                                <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                <span>Nomor Faktur Proyek ({distinctProjectFakturs.length} Tersedia)</span>
+                              </label>
+                              <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
+                                Amrahan / Multi-Termin
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-blue-800 dark:text-blue-300/90 leading-relaxed">
+                              Proyek ini telah memiliki riwayat faktur. Anda dapat menggunakan nomor faktur yang sama untuk penagihan bertahap (Amrahan), atau membuat nomor faktur baru.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNoFakturMode("existing");
+                                  if (distinctProjectFakturs.length === 1) {
+                                    handleSelectExistingProjectFaktur(distinctProjectFakturs[0].noFaktur);
+                                  }
+                                }}
+                                className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all flex items-start gap-2 cursor-pointer border ${
+                                  noFakturMode === "existing"
+                                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                                    : "bg-surface-card text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800/60 hover:bg-blue-100/50"
+                                }`}
+                              >
+                                <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${noFakturMode === "existing" ? "text-white" : "text-blue-600"}`} />
+                                <div>
+                                  <div className="font-bold">Gunakan No. Faktur yang Ada</div>
+                                  <div className={`text-[10.5px] ${noFakturMode === "existing" ? "text-blue-100" : "text-blue-700/80 dark:text-blue-300/80"}`}>
+                                    Lanjutkan penagihan Amrahan ke-{distinctProjectFakturs[0]?.count ? distinctProjectFakturs[0].count + 1 : 2}
+                                  </div>
+                                </div>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNoFakturMode("new");
+                                  setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                                  setAmrahanDetected(null);
+                                }}
+                                className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all flex items-start gap-2 cursor-pointer border ${
+                                  noFakturMode === "new"
+                                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                                    : "bg-surface-card text-navy-text border-border-soft hover:bg-surface-subtle"
+                                }`}
+                              >
+                                <Plus className={`w-4 h-4 mt-0.5 shrink-0 ${noFakturMode === "new" ? "text-white" : "text-navy-muted"}`} />
+                                <div>
+                                  <div className="font-bold">Input No. Faktur Baru</div>
+                                  <div className={`text-[10.5px] ${noFakturMode === "new" ? "text-blue-100" : "text-navy-soft"}`}>
+                                    Ketik nomor faktur baru manual
+                                  </div>
+                                </div>
+                              </button>
+                            </div>
+
+                            {noFakturMode === "existing" && (
+                              <div className="pt-1">
+                                <label className="block text-[11px] font-bold text-blue-950 dark:text-blue-200 mb-1">
+                                  Pilih Nomor Faktur Lama:
+                                </label>
+                                <select
+                                  value={formFaktur.noFaktur}
+                                  onChange={(e) => handleSelectExistingProjectFaktur(e.target.value)}
+                                  className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-lg bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-semibold cursor-pointer"
+                                >
+                                  <option value="">-- Pilih Nomor Faktur dari Proyek Ini --</option>
+                                  {distinctProjectFakturs.map((df) => (
+                                    <option key={df.noFaktur} value={df.noFaktur}>
+                                      {df.noFaktur} — {df.latest.namaJkp} ({formatRupiah(df.latest.nilaiProyek)}) [Tagihan ke-{df.count + 1}]
+                                    </option>
+                                  ))}
+                                  <option value="__MANUAL_NEW__">+ Buat / Ketik Nomor Faktur Baru...</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-lg bg-surface-subtle/60 border border-border-soft text-[11px] text-navy-soft flex items-center gap-2">
+                            <Info className="w-3.5 h-3.5 text-navy-muted shrink-0" />
+                            <span>
+                              Belum ada nomor faktur sebelumnya di proyek ini. Nomor faktur baru yang Anda input akan otomatis terhubung ke proyek <strong>{sel.code}</strong>.
+                            </span>
+                          </div>
+                        )}
 
                         {/* Dropdown Termin untuk Sinkronisasi DPP */}
                         {sel.termins && sel.termins.length > 0 ? (
@@ -1771,17 +1967,66 @@ export function LaporanPendapatanClient({
               {/* Form Grid 1: Basic Faktur Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Nomor E-Faktur <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="010.000-24.00000001"
-                    value={formFaktur.noFaktur}
-                    onChange={(e) => handleNoFakturChange(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-navy-text">
+                      Nomor E-Faktur <span className="text-rose-500">*</span>
+                    </label>
+                    {distinctProjectFakturs.length > 0 && !editingFaktur && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMode = noFakturMode === "existing" ? "new" : "existing";
+                          setNoFakturMode(nextMode);
+                          if (nextMode === "new") {
+                            setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                            setAmrahanDetected(null);
+                          }
+                        }}
+                        className="text-[10.5px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                      >
+                        {noFakturMode === "existing" ? "✏️ Ketik Manual" : "📋 Pilih dari Proyek"}
+                      </button>
+                    )}
+                  </div>
+                  {distinctProjectFakturs.length > 0 && noFakturMode === "existing" && !editingFaktur ? (
+                    <select
+                      value={formFaktur.noFaktur}
+                      onChange={(e) => {
+                        if (e.target.value === "__MANUAL_NEW__") {
+                          setNoFakturMode("new");
+                          setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                          setAmrahanDetected(null);
+                        } else {
+                          handleSelectExistingProjectFaktur(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono font-semibold border border-blue-300 dark:border-blue-500/40 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="">-- Pilih No. Faktur Proyek ({distinctProjectFakturs.length}) --</option>
+                      {distinctProjectFakturs.map((df) => (
+                        <option key={df.noFaktur} value={df.noFaktur}>
+                          {df.noFaktur} — {df.latest.namaJkp} (Kuitansi: {formatRupiah(df.latest.nilaiProyek)}) [Tagihan ke-{df.count + 1}]
+                        </option>
+                      ))}
+                      <option value="__MANUAL_NEW__">+ Input Nomor Faktur Baru / Manual...</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      placeholder="010.000-24.00000001"
+                      value={formFaktur.noFaktur}
+                      onChange={(e) => handleNoFakturChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
+                  {selectedProject && (
+                    <span className="text-[10px] text-navy-soft mt-1 block">
+                      {distinctProjectFakturs.length > 0 && noFakturMode === "existing"
+                        ? "Memilih nomor di atas otomatis memanggil rincian rekanan & nominal proyek lama untuk amrahan."
+                        : `Nomor faktur akan otomatis tersimpan dan terhubung ke proyek ${selectedProject.code}.`}
+                    </span>
+                  )}
                 </div>
 
                 <div>

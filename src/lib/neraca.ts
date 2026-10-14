@@ -266,6 +266,7 @@ export async function getNeracaData(
     // Breakdown Aktiva
     aktivaLancar,
     aktivaTetap,
+    rekapPerKategoriAset: penyusutanSummary.rekapPerKategori,
     totalAktivaLancar,
     totalAktivaTetap,
     totalAktiva,

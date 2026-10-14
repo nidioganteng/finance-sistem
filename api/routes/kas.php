@@ -38,7 +38,7 @@ if ($method === 'GET' && $sub === 'ledger') {
         ? get_saldo_sebelum($pdo, $entity_id, $jenis_input_id, $dari, $rekening_nama, $current_year)
         : get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama, $current_year);
 
-    // Query transaksi — ambil semua (max 2000), order ASC untuk hitung saldo kumulatif
+    // Query transaksi — ambil semua di rentang tanggal, order ASC untuk hitung saldo kumulatif
     $sql = "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit,
                    t.saldoSetelah, t.extraFieldsJson, t.projectId,
                    c.id as coa_id, c.code as coa_code, c.name as coa_name,
@@ -58,7 +58,7 @@ if ($method === 'GET' && $sub === 'ledger') {
         $params[] = $sampai . ' 23:59:59';
     }
 
-    $sql .= " ORDER BY t.tanggal ASC, t.noBukti ASC, t.createdAt ASC LIMIT 2000";
+    $sql .= " ORDER BY t.tanggal ASC, t.noBukti ASC, t.createdAt ASC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

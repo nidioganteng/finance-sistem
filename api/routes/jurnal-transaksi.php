@@ -543,6 +543,10 @@ elseif ($method === 'POST' && $sub === '') {
             }
         }
 
+        if ($project_id) {
+            sync_project_spend($pdo, $project_id);
+        }
+
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         return error_response('Gagal menyimpan jurnal: ' . $e->getMessage(), 500);
@@ -566,13 +570,18 @@ elseif ($method === 'DELETE' && $sub === '') {
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi yang dihapus.', 400);
 
-    // Ambil noBukti dari transaksi pertama
+    // Ambil noBukti dan projectIds sebelum dihapus
+    $ph_pre = implode(',', array_fill(0, count($tx_ids), '?'));
     $stmt = $pdo->prepare("SELECT noBukti FROM `Transaction` WHERE id = ? LIMIT 1");
     $stmt->execute([$tx_ids[0]]);
     $first_no_bukti = $stmt->fetchColumn();
 
+    $stmt_pids = $pdo->prepare("SELECT DISTINCT projectId FROM `Transaction` WHERE id IN ($ph_pre) AND projectId IS NOT NULL");
+    $stmt_pids->execute(array_values($tx_ids));
+    $project_ids_to_sync = $stmt_pids->fetchAll(PDO::FETCH_COLUMN);
+
     // Hapus source rows
-    $ph = implode(',', array_fill(0, count($tx_ids), '?'));
+    $ph = $ph_pre;
     $pdo->prepare("DELETE FROM `Transaction` WHERE id IN ($ph)")->execute(array_values($tx_ids));
 
     if ($first_no_bukti) {
@@ -604,6 +613,10 @@ elseif ($method === 'DELETE' && $sub === '') {
                 }
             }
         }
+    }
+
+    foreach ($project_ids_to_sync as $pid) {
+        sync_project_spend($pdo, $pid);
     }
 
     log_activity($user['id'], 'Hapus Jurnal Transaksi (' . count($tx_ids) . ' baris)', 'FINANCIAL_CHANGE', ['txIds' => $tx_ids]);

@@ -19,7 +19,7 @@
 | **dokumen** | 3 | Rapi | `unlink` tanpa error handling saat DELETE | kecil |
 | **jurnal** *(jurnal umum)* | 3 | Rapi | Tidak ada default pagination limit (Node.js ada) | kecil |
 | **daftar-akun** | 1 | Rapi | — | kecil |
-| **jurnal-transaksi** | 4 | ✅ Selesai dan teruji (`a1f2f95`, `71957fd`) | ~~`syncProjectSpend` hilang, `fakturId` diabaikan, edit mode hapus faktur terlalu destruktif.~~ Semua diperbaiki. Catatan terbuka: duplikat noBukti auto-suffix (Node.js) vs 409 (PHP) — perbedaan desain yang disengaja. | sedang → selesai |
+| **jurnal-transaksi** | 4 | ✅ Selesai dan teruji (`a1f2f95`, `71957fd`, `c3fb1cd`) | ~~`syncProjectSpend` hilang, `fakturId` diabaikan, edit mode hapus faktur terlalu destruktif, `$now` null di edit path.~~ Semua diperbaiki. 13/13 assertion lulus. Catatan terbuka: duplikat noBukti auto-suffix (Node.js) vs 409 (PHP) — perbedaan desain yang disengaja. | sedang → selesai |
 | **kas** *(kecil+besar+bank)* | 6+ | Ada beda kecil | `LIMIT 2000` hardcoded di PHP; Node.js pakai pagination dinamis | kecil |
 | **profitabilitas** | 2 | Ada beda kecil | Node.js hitung margin per proyek dari saldo COA — PHP hitung dari transaksi langsung, bisa beda hasil kalau ada saldo awal | sedang |
 | **dashboard** | 3 | Ada beda kecil | Float casting pada agregat revenue; Node.js pakai Prisma `Decimal`, PHP pakai `(float)` biasa | kecil |

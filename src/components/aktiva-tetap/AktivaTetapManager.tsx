@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AsetTetapWithDepreciation,
@@ -28,6 +28,8 @@ import {
   X,
   Search,
   SlidersHorizontal,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 const KATEGORI_OPTIONS = STANDAR_KATEGORI_ASET.map((k) => ({
@@ -58,6 +60,7 @@ export function AktivaTetapManager({
 
   const [search, setSearch] = useState("");
   const [selectedKategori, setSelectedKategori] = useState<string>("ALL");
+  const [expandedKategori, setExpandedKategori] = useState<string[]>([]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -469,76 +472,127 @@ export function AktivaTetapManager({
                   </td>
                 </tr>
               ) : (
-                filteredAssets.map((asset) => {
-                  const katLabel =
-                    asset.kategoriLabel ||
-                    getKategoriLabel(asset.kategoriStandar || asset.kategori);
+                STANDAR_KATEGORI_ASET
+                  .filter((kat) => selectedKategori === "ALL" || selectedKategori === kat.key)
+                  .map((kat) => {
+                    const categoryAssets = filteredAssets.filter((asset) => asset.kategoriStandar === kat.key);
+                    const isExpanded = expandedKategori.includes(kat.key);
+                    const categoryTotals = categoryAssets.reduce(
+                      (total, asset) => ({
+                        perolehan: total.perolehan + asset.hargaPerolehanNum,
+                        beban: total.beban + asset.bebanPeriodeIni,
+                        akumulasi: total.akumulasi + asset.akumulasiPenyusutan,
+                        nilaiBuku: total.nilaiBuku + asset.nilaiBuku,
+                      }),
+                      { perolehan: 0, beban: 0, akumulasi: 0, nilaiBuku: 0 }
+                    );
+                    return (
+                      <Fragment key={kat.key}>
+                        <tr className="bg-surface-subtle/70">
+                          <td colSpan={11} className="px-5 py-3">
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              aria-controls={`rincian-${kat.key}`}
+                              onClick={() => setExpandedKategori((current) =>
+                                current.includes(kat.key)
+                                  ? current.filter((key) => key !== kat.key)
+                                  : [...current, kat.key]
+                              )}
+                              className="w-full text-left flex flex-wrap items-center gap-x-6 gap-y-2 text-navy-text rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                            >
+                              <span className="flex items-center gap-2 font-bold">
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                {kat.label} ({categoryAssets.length} unit)
+                              </span>
+                              <span className="text-[12px]">Perolehan: {formatRupiah(categoryTotals.perolehan)}</span>
+                              <span className="text-[12px]">Beban {year}: {formatRupiah(categoryTotals.beban)}</span>
+                              <span className="text-[12px]">Akumulasi: {formatRupiah(categoryTotals.akumulasi)}</span>
+                              <span className="text-[12px] font-bold">Nilai Buku Awal {year + 1}: {formatRupiah(categoryTotals.nilaiBuku)}</span>
+                              <span className="ml-auto text-[12px] font-semibold text-brand">
+                                {isExpanded ? "Tutup rincian" : "Lihat rincian"}
+                              </span>
+                            </button>
+                          </td>
+                        </tr>
+                        <tr id={`rincian-${kat.key}`} hidden={!isExpanded}>
+                          <td colSpan={11} className="px-5 py-2 text-[12px] text-muted-faint">
+                            {categoryAssets.length === 0 ? "Tidak ada aset pada kategori ini sesuai filter." : `Rincian unit ${kat.label}`}
+                          </td>
+                        </tr>
+                        {isExpanded && categoryAssets.map((asset) => {
+                          const katLabel =
+                            asset.kategoriLabel ||
+                            getKategoriLabel(asset.kategoriStandar || asset.kategori);
 
-                  return (
-                    <tr
-                      key={asset.id}
-                      className="hover:bg-surface-hover/40 transition-colors group"
-                    >
-                      <td className="py-3 px-5 font-mono text-[12px] font-semibold text-brand shrink-0">
-                        {asset.kode}
-                      </td>
-                      <td className="py-3 px-5">
-                        <div className="font-bold text-navy-text">{asset.nama}</div>
-                        <div className="text-[11px] text-muted-faint">{katLabel}</div>
-                      </td>
-                      <td className="py-3 px-5 text-[12.5px] text-muted-strong whitespace-nowrap">
-                        {asset.tanggalPerolehanFmt}
-                      </td>
-                      <td className="py-3 px-5 text-right font-semibold text-navy-text tabular-nums whitespace-nowrap">
-                        {asset.hargaPerolehanFmt}
-                      </td>
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {asset.kategoriStandar === "TANAH" ? (
-                          <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11px] font-semibold text-muted-faint">
-                            Tidak disusutkan
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11.5px] font-semibold text-muted-strong">
-                            {asset.umurBulan} bln ({asset.umurTahun} th)
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-5 text-right text-[12px] text-muted-strong tabular-nums whitespace-nowrap">
-                        {asset.penyusutanPerBulanFmt}
-                      </td>
-                      <td className="py-3 px-5 text-right font-semibold text-navy-text tabular-nums whitespace-nowrap" title={`Akumulasi s/d ${year - 1}: ${asset.akumulasiPenyusutanAwalTahunFmt}`}>
-                        {asset.nilaiBukuAwalTahunFmt}
-                      </td>
-                      <td className="py-3 px-5 text-right font-bold text-status-red tabular-nums whitespace-nowrap">
-                        {asset.bebanPeriodeIniFmt}
-                      </td>
-                      <td className="py-3 px-5 text-right font-bold text-status-amber tabular-nums whitespace-nowrap">
-                        ({asset.akumulasiPenyusutanFmt})
-                      </td>
-                      <td className="py-3 px-5 text-right font-extrabold text-status-green tabular-nums whitespace-nowrap">
-                        {asset.nilaiBukuFmt}
-                      </td>
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => openEditModal(asset)}
-                            title="Edit Aset"
-                            className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-strong hover:text-navy-text transition-colors"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(asset.id, asset.nama)}
-                            title="Hapus Aset"
-                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-muted-strong hover:text-status-red transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                          return (
+                            <tr
+                              key={asset.id}
+                              className="hover:bg-surface-hover/40 transition-colors group"
+                            >
+                              <td className="py-3 px-5 font-mono text-[12px] font-semibold text-brand shrink-0">
+                                {asset.kode}
+                              </td>
+                              <td className="py-3 px-5">
+                                <div className="font-bold text-navy-text">{asset.nama}</div>
+                                <div className="text-[11px] text-muted-faint">{katLabel}</div>
+                              </td>
+                              <td className="py-3 px-5 text-[12.5px] text-muted-strong whitespace-nowrap">
+                                {asset.tanggalPerolehanFmt}
+                              </td>
+                              <td className="py-3 px-5 text-right font-semibold text-navy-text tabular-nums whitespace-nowrap">
+                                {asset.hargaPerolehanFmt}
+                              </td>
+                              <td className="py-3 px-4 text-center whitespace-nowrap">
+                                {asset.kategoriStandar === "TANAH" ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11px] font-semibold text-muted-faint">
+                                    Tidak disusutkan
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11.5px] font-semibold text-muted-strong">
+                                    {asset.umurBulan} bln ({asset.umurTahun} th)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-5 text-right text-[12px] text-muted-strong tabular-nums whitespace-nowrap">
+                                {asset.penyusutanPerBulanFmt}
+                              </td>
+                              <td className="py-3 px-5 text-right font-semibold text-navy-text tabular-nums whitespace-nowrap" title={`Akumulasi s/d ${year - 1}: ${asset.akumulasiPenyusutanAwalTahunFmt}`}>
+                                {asset.nilaiBukuAwalTahunFmt}
+                              </td>
+                              <td className="py-3 px-5 text-right font-bold text-status-red tabular-nums whitespace-nowrap">
+                                {asset.bebanPeriodeIniFmt}
+                              </td>
+                              <td className="py-3 px-5 text-right font-bold text-status-amber tabular-nums whitespace-nowrap">
+                                ({asset.akumulasiPenyusutanFmt})
+                              </td>
+                              <td className="py-3 px-5 text-right font-extrabold text-status-green tabular-nums whitespace-nowrap">
+                                {asset.nilaiBukuFmt}
+                              </td>
+                              <td className="py-3 px-4 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => openEditModal(asset)}
+                                    title="Edit Aset"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-strong hover:text-navy-text transition-colors"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(asset.id, asset.nama)}
+                                    title="Hapus Aset"
+                                    className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-muted-strong hover:text-status-red transition-colors"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
+                    );
+                  })
               )}
             </tbody>
             {filteredAssets.length > 0 && (

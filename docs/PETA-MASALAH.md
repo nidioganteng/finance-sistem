@@ -30,10 +30,10 @@
 | **pajak / validasi-3arah** | 4 | Ada beda kecil | Tarif PPN di PHP belum tentu mengikuti update 12% yang ada di Node.js (`tarifpajak.php` sudah ada, tapi perlu dicek apakah endpoint pendapatan sudah pakai) | kecil |
 | **laporan-keuangan** | 2 | Ada beda kecil | Node.js mengonsolidasi 4 laporan dengan relasi yang konsisten; PHP masing-masing endpoint independen — potensi angka tidak sinkron antar laporan | sedang |
 | **payroll** | 8+ | Ada beda kecil | Node.js punya field `ptkp` di master Pegawai (untuk PPh21 otomatis di masa depan); PHP tidak punya — belum jadi masalah karena PPh21 masih diinput manual di kedua versi | kecil |
-| **pendapatan** | 8 | Ada beda kecil | Commit `24bcc05` di develop menambah field `kuitansiJenis`/`nilaiKuitansi` (e-faktur kuitansi bruto) + multi-termin — field-field ini kemungkinan belum ada di `pendapatan.php` | sedang |
+| **pendapatan** | 8 | Ada beda kecil | `nilaiKuitansi` bukan field DB baru — ia adalah parameter kalkulasi yang mengubah rumus `nilaiProyek` dan `ppn`. PHP `hitung_pajak_faktur()` belum menangani path ini (nilaiProyek = nilaiKuitansi, ppn = 11/111 × nilaiKuitansi). Selain itu, rumus nilaiProyek PHP (`dpp + ppn`) berbeda dari Node.js (`dpp × 111/100`). Multi-termin adalah logic UI saja (tidak perlu field baru di DB). DELETE faktur PHP tidak unlink `Transaction.fakturId` dulu. | sedang |
 | **sync** | 2 | Ada beda kecil | Entity mapping hardcoded di PHP (`Gaharu` → `GH`, dll) — tidak fleksibel jika struktur entitas berubah | kecil |
 | **neraca** | 1 | Ada beda kecil | Commit `feddf3e` di develop menambah rekap 4 kategori aktiva tetap ke neraca; `neraca.php` belum punya ini | sedang |
-| **aset-tetap** | 5+ | **Rusak parah** | PHP memakai 6 kategori custom; Node.js 4 kategori PSAK standar (Tanah, Bangunan, Kendaraan, Peralatan). Lebih kritis: PHP menyusutkan **Tanah** (salah — PSAK melarang); Node.js sudah fix ini di commit `887f4eb` + fix saldo tahunan + year-end rollover, **belum masuk ke PHP** | **besar** |
+| **aset-tetap** | 5+ | ⏸ Menunggu keputusan tim | PHP memakai 6 kategori custom; Node.js 4 kategori PSAK standar (Tanah, Bangunan, Kendaraan, Peralatan). Lebih kritis: PHP menyusutkan **Tanah** (salah — PSAK melarang); Node.js sudah fix ini di commit `887f4eb` + fix saldo tahunan + year-end rollover, **belum masuk ke PHP**. Tim perlu putuskan: (A) kategori PSAK, (B) migrasi data lama, (C) koreksi Tanah yang salah input, (D) dampak ke neraca. | **besar — ditunda** |
 
 ---
 
@@ -65,6 +65,6 @@ Ya, arsitektur PHP secara keseluruhan konsisten: semua route mengikuti pola yang
 Sebagian besar commit terbaru yang belum masuk PHP adalah **logic**, bukan hanya UI:
 - `887f4eb` — fix depresiasi aset tetap, year-end balance rollover (logic kalkulasi)
 - `feddf3e` — neraca sertakan 4 kategori aktiva tetap (logic agregasi)
-- `24bcc05` — e-faktur kuitansi bruto + multi-termin (logic field baru + perhitungan pajak)
+- `24bcc05` — e-faktur kuitansi bruto + multi-termin: `nilaiKuitansi` adalah parameter kalkulasi (bukan field DB baru); multi-termin adalah UI-only. Gap sebenarnya: rumus `nilaiProyek` berbeda dan PHP belum punya path kalkulasi kuitansi bruto.
 
 Ada juga beberapa commit style/UI (`ab405ca`, `0712293`), tapi itu bukan yang kritis.

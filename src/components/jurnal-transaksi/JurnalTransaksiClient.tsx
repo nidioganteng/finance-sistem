@@ -121,6 +121,7 @@ export function JurnalTransaksiClient({
   const [filterSampai, setFilterSampai] = useState(sampai);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const prevPanelOpen = useRef(false);
 
   const [activePreset, setActivePreset] = useState<PresetKey>(() => {
     if (!dari && !sampai) return "bulan-ini";
@@ -148,6 +149,13 @@ export function JurnalTransaksiClient({
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (!dari && !sampai) applyPreset("bulan-ini"); }, []);
+
+  // Refresh server data when modal closes (after save or manual close)
+  useEffect(() => {
+    if (prevPanelOpen.current && !panelOpen) router.refresh();
+    prevPanelOpen.current = panelOpen;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelOpen]);
 
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
@@ -472,10 +480,8 @@ export function JurnalTransaksiClient({
         if (result?.error) {
           setFeedback({ type: "error", msg: result.error });
         } else {
-          setFeedback({ type: "success", msg: editingGroup ? "Jurnal berhasil diperbarui." : "Jurnal berhasil disimpan." });
           resetForm();
           setPanelOpen(false);
-          router.refresh();
         }
       } catch (err) {
         setFeedback({ type: "error", msg: err instanceof Error ? err.message : "Terjadi kesalahan tak terduga." });

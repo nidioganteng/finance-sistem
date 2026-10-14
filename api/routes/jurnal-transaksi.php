@@ -464,9 +464,9 @@ elseif ($method === 'POST' && $sub === '') {
                      nilaiProyek=?, labaSetelahPajak=?, kodeJenisProyek=?,
                      pekerjaanPerusahaan=?, pekerjaanYangDipinjam=?,
                      tanggalTerima=?, bank=?, nominalDiterima=?, projectId=?,
-                     createdById=?
+                     createdById=?, updatedAt=?
                      WHERE id = ?"
-                )->execute(array_merge($faktur_data, [$existing_faktur_id]));
+                )->execute(array_merge($faktur_data, [$now, $existing_faktur_id]));
             } else {
                 $pdo->prepare(
                     "INSERT INTO FakturPendapatan
@@ -476,9 +476,9 @@ elseif ($method === 'POST' && $sub === '') {
                       nilaiProyek, labaSetelahPajak, kodeJenisProyek,
                       pekerjaanPerusahaan, pekerjaanYangDipinjam,
                       tanggalTerima, bank, nominalDiterima, projectId,
-                      createdById, createdAt)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                )->execute(array_merge([uuid4()], $faktur_data, [$now]));
+                      createdById, createdAt, updatedAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute(array_merge([uuid4()], $faktur_data, [$now, $now]));
             }
 
             // ── Update/Tambah Termin jika ada proyek

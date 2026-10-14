@@ -1771,7 +1771,11 @@ export function LaporanPendapatanClient({
                     const p = data.projectOptions.find((x) => x.id === selectedProjId);
                     setSelectedTerminId("");
                     setShowManualDppFallback(false);
-                    setNoFakturMode("new");
+                    if (p?.existingFakturs && p.existingFakturs.length > 0) {
+                      setNoFakturMode("existing");
+                    } else {
+                      setNoFakturMode("new");
+                    }
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
@@ -1801,60 +1805,6 @@ export function LaporanPendapatanClient({
                             Nilai Kontrak: {sel.contractValueFmt}
                           </span>
                         </div>
-
-                        {/* Dropdown Nomor Faktur Proyek (Amrahan / Multi-Termin) */}
-                        {distinctProjectFakturs.length > 0 && (
-                          <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200/90 dark:border-blue-500/20 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <label className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                <span>Nomor Faktur Proyek (Amrahan)</span>
-                              </label>
-                              <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400 px-2 py-0.5 rounded-full font-semibold">
-                                {distinctProjectFakturs.length} Nomor Terdaftar
-                              </span>
-                            </div>
-                            <select
-                              value={noFakturMode === "new" ? "__NEW__" : formFaktur.noFaktur}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (!val || val === "__NEW__") {
-                                  setNoFakturMode("new");
-                                  setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
-                                  setAmrahanDetected(null);
-                                } else {
-                                  setNoFakturMode("existing");
-                                  handleSelectExistingProjectFaktur(val);
-                                }
-                              }}
-                              className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-lg bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold cursor-pointer"
-                            >
-                              <option value="__NEW__">+ Input Nomor Faktur Baru (Ketik Manual)</option>
-                              {distinctProjectFakturs.map((df) => (
-                                <option key={df.noFaktur} value={df.noFaktur}>
-                                  Gunakan {df.noFaktur} — {df.latest.namaJkp} ({formatRupiah(df.latest.nilaiProyek)})
-                                </option>
-                              ))}
-                            </select>
-                            {noFakturMode === "existing" && formFaktur.noFaktur ? (
-                              <div className="text-[11px] text-blue-900 dark:text-blue-300 bg-surface-input p-2 rounded-lg border border-blue-100 dark:border-blue-500/20 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                                  <span>
-                                    Amrahan: <strong className="font-mono">{formFaktur.noFaktur}</strong>
-                                  </span>
-                                </span>
-                                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-1.5 py-0.5 rounded">
-                                  Rincian & nominal otomatis dipanggil
-                                </span>
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-blue-800 dark:text-blue-300">
-                                Pilih nomor faktur yang sudah ada untuk tagihan bertahap (Amrahan), atau pilih buat nomor baru.
-                              </p>
-                            )}
-                          </div>
-                        )}
 
                         {/* Dropdown Termin untuk Sinkronisasi DPP */}
                         {sel.termins && sel.termins.length > 0 ? (
@@ -1923,17 +1873,61 @@ export function LaporanPendapatanClient({
               {/* Form Grid 1: Basic Faktur Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Nomor E-Faktur <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="010.000-24.00000001"
-                    value={formFaktur.noFaktur}
-                    onChange={(e) => handleNoFakturChange(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-navy-text">
+                      Nomor E-Faktur <span className="text-rose-500">*</span>
+                    </label>
+                    {distinctProjectFakturs.length > 0 && !editingFaktur && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMode = noFakturMode === "existing" ? "new" : "existing";
+                          setNoFakturMode(nextMode);
+                          if (nextMode === "new") {
+                            setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                            setAmrahanDetected(null);
+                          }
+                        }}
+                        className="text-[10.5px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                      >
+                        {noFakturMode === "existing" ? "Ketik Baru" : "Pilih dari Proyek"}
+                      </button>
+                    )}
+                  </div>
+
+                  {distinctProjectFakturs.length > 0 && noFakturMode === "existing" && !editingFaktur ? (
+                    <select
+                      value={formFaktur.noFaktur}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val || val === "__NEW__") {
+                          setNoFakturMode("new");
+                          setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                          setAmrahanDetected(null);
+                        } else {
+                          handleSelectExistingProjectFaktur(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono font-medium border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="">-- Pilih Nomor Faktur --</option>
+                      {distinctProjectFakturs.map((df) => (
+                        <option key={df.noFaktur} value={df.noFaktur}>
+                          {df.noFaktur} — {df.latest.namaJkp} (Amrahan ke-{df.count + 1})
+                        </option>
+                      ))}
+                      <option value="__NEW__">+ Ketik Nomor Baru Manual...</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      placeholder="010.000-24.00000001"
+                      value={formFaktur.noFaktur}
+                      onChange={(e) => handleNoFakturChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
                   {selectedProject && (
                     <span className="text-[10px] text-navy-soft mt-1 block">
                       {amrahanDetected

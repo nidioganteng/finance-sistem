@@ -105,6 +105,102 @@
 
 ---
 
+## Tahap B — Perbaikan Teknis Sisa Modul
+
+### T8 sync — `api/routes/sync.php`
+
+**Commit:** `1ee355c` — cek errno dan HTTP status curl ke Sidamon, log gagal, syncBack di response
+
+| Temuan | Fix |
+|--------|-----|
+| `curl_exec()` ke Sidamon tidak dicek hasilnya — error diabaikan, response selalu sukses | Tangkap return value, cek `curl_errno()` dan HTTP status; jika gagal log ke `log_activity()` dan sertakan `syncBack.success/error` di response |
+
+**Test:** `tests/manual/sync-assignment.sh` — 7/7 assertion lulus (Sidamon sengaja offline saat uji).
+
+**Catatan:** `log_activity('system', ...)` silently gagal karena FK constraint `ActivityLog.actorId` references `User.id` — tidak ada baris User dengan id='system'. Ini isu pre-existing di `sync.php:120` juga. T8 tidak memperbaikinya karena di luar scope.
+
+---
+
+### T5 kas — `api/routes/kas.php`
+
+**Commit:** `0c329cf` — hapus LIMIT 2000 dari SQL ledger
+
+| Temuan | Fix |
+|--------|-----|
+| `LIMIT 2000` di level SQL (`kas.php:61`) memotong data diam-diam jika transaksi dalam periode > 2000 baris | Hapus `LIMIT 2000` dari SQL string; pagination tetap di level PHP (page_size=25 grup) |
+
+**Kenapa saldo berjalan tetap benar di semua halaman:** Running saldo dihitung di PHP (`kas.php:140–145`) atas **semua** grup dalam periode sebelum `array_slice()` memotong per halaman — sehingga grup di halaman 2/3/dst selalu mendapat nilai saldo yang akurat dari akumulasi seluruh periode.
+
+---
+
+### T4 jurnal — `api/routes/jurnal.php`
+
+**Commit:** `6bbc82d` — tambah parameter `?limit=` (default 25, max 100)
+
+| Temuan | Fix |
+|--------|-----|
+| `$page_size = 25` hardcode (`jurnal.php:83`) — client tidak bisa mengontrol jumlah baris per halaman | Ganti dengan `min(100, max(10, (int)($_GET['limit'] ?? 25)))` |
+
+---
+
+### T3 dokumen — `api/routes/dokumen.php`
+
+**Commit:** `cab54e8` — cek return value unlink, error 500 jika gagal
+
+| Temuan | Fix |
+|--------|-----|
+| `@unlink($filePath)` dengan error-suppress tidak memberitahu client jika file gagal dihapus | `if (file_exists($filePath) && !unlink($filePath)) error_response('Gagal menghapus file fisik.', 500)` — error 500 dilempar sebelum baris DB dihapus |
+
+---
+
+### T2 log — `api/routes/log.php`
+
+**Commit:** `9742960` — validasi panjang (3–200) dan karakter kontrol pada field `action`
+
+| Temuan | Fix |
+|--------|-----|
+| Field `action` dari client tidak divalidasi — string bebas termasuk karakter kontrol bisa dimasukkan | Cek `strlen($action) < 3 \|\| > 200` + reject ASCII control chars via `preg_match('/[\x00-\x08...]/')` |
+
+---
+
+### T1 pengguna — `api/routes/pengguna.php`
+
+**Status: ✅ Temuan awal salah — tidak ada perubahan kode**
+
+Setelah membaca ulang kode: `set_entity_access()` (`pengguna.php:23–35`) sudah pakai pola **DELETE-first** — semua akses lama dihapus sebelum INSERT baru, sehingga duplikat baru sudah mustahil sejak awal.
+
+**Query diagnostik untuk duplikat lama** (jalankan di prod, read-only):
+
+```sql
+SELECT userId, entityId, COUNT(*) AS cnt
+FROM UserEntityAccess
+GROUP BY userId, entityId
+HAVING cnt > 1
+ORDER BY cnt DESC;
+```
+
+---
+
+### T6 buku-besar — tidak ada perubahan kode
+
+**Status: ⏸ Tidak ada bukti drift — ditunda**
+
+Verifikasi di dev DB: akun `1100` (15 transaksi, semua nilai integer), running balance PHP vs rekalkukasi manual — selisih = 0. Ubah hanya jika ada bukti drift di data produksi dengan nilai desimal dan volume tinggi.
+
+---
+
+### T7, T9, T10, T11, T12 — Ditunda
+
+| # | Alasan tunda |
+|---|-------------|
+| T7 sync entity mapping | Risiko rendah; ubah hanya jika entitas baru ditambahkan di Sidamon |
+| T9 dashboard float | Aman untuk nilai < 1 miliar; bcmath hanya jika dipermasalahkan klien |
+| T10 neraca 4 kategori | Bergantung keputusan aset-tetap A–D |
+| T11 laporan-keuangan | Bergantung konfirmasi A2 (sumber data laba-rugi) |
+| T12 payroll PPh21 | Tidak ada bug aktif; feature future |
+
+---
+
 ## aset-tetap — `api/routes/aset-tetap.php`
 
 **Status: ⏸ Menunggu keputusan tim — kode tidak diubah**

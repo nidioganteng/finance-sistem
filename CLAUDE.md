@@ -4,6 +4,10 @@ Instruksi ini dibaca otomatis oleh Claude Code setiap sesi baru di repo ini. Isi
 project + konvensi yang sudah dipakai, supaya kerjaan lanjutannya konsisten dengan yang sudah ada,
 bukan mulai dari gaya/asumsi baru.
 
+> [!IMPORTANT]
+> **Panduan Blueprint Lengkap & Alur Kerja Bisnis End-to-End**:
+> Seluruh alur bisnis, aturan akuntansi, alur E-Faktur tagihan kuitansi bruto, multi-termin amrahan, realisasi kas masuk dari Jurnal Umum, perhitungan PPh 21 & Payroll, serta struktur inter-company crossing entry terdokumentasi lengkap di **`WORKFLOW.md`**. Baca file tersebut untuk pemahaman menyeluruh tentang alur sistem.
+
 ## Tentang project ini
 
 Sistem Data Keuangan internal untuk **Gaharu Sempana Group**, holding dengan 4 anak perusahaan

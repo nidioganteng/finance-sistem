@@ -30,6 +30,10 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronRight,
+  Car,
+  Armchair,
+  LandPlot,
+  RotateCcw,
 } from "lucide-react";
 
 const KATEGORI_OPTIONS = STANDAR_KATEGORI_ASET.map((k) => ({
@@ -311,97 +315,98 @@ export function AktivaTetapManager({
         </div>
       </div>
 
-      {/* ── Ringkasan 4 Kategori Aktiva Tetap Standar (Issue 88 Poin 3) ── */}
-      {summary.rekapPerKategori && summary.rekapPerKategori.length > 0 && (
-        <div className="bg-surface-card rounded-[22px] border border-border-soft p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-3.5">
+      {/* Ringkasan kategori mengikuti filter inventaris. */}
+      {summary.rekapPerKategori.length > 0 && (
+        <section className="bg-surface-card rounded-[22px] border border-border-soft shadow-xs overflow-hidden" aria-label="Ringkasan kategori aset">
+          <div className="px-5 sm:px-6 py-4 border-b border-border-soft flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-[13px] font-bold text-navy-text uppercase tracking-wider">
-                Standarisasi 4 Kategori Aktiva Tetap
-              </h3>
-              <p className="text-[12px] text-muted-faint mt-0.5">
-                Total per kategori disajikan terintegrasi ke Bagian II Aktiva Tetap Neraca
-              </p>
+              <h3 className="text-[15px] font-bold text-navy-text">Ringkasan kategori aset</h3>
+              <p className="text-[12px] text-muted-strong mt-1">Posisi per 31 Desember {year} · Terhubung ke Neraca</p>
             </div>
             {selectedKategori !== "ALL" && (
               <button
+                type="button"
                 onClick={() => setSelectedKategori("ALL")}
-                className="text-[11.5px] font-bold text-brand hover:underline"
+                className="inline-flex items-center gap-2 rounded-pill border border-border-soft px-3 py-2 text-[12px] font-semibold text-muted-strong hover:bg-surface-hover hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand transition-colors"
               >
-                Reset Filter
+                <RotateCcw size={13} /> Semua Kategori
               </button>
             )}
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className={`grid gap-3 p-4 sm:p-5 ${selectedKategori === "ALL" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"}`}>
             {summary.rekapPerKategori
               .filter((rekap) => selectedKategori === "ALL" || rekap.kategori === selectedKategori)
               .map((rekap) => {
-              const isSelected = selectedKategori === rekap.kategori;
-              return (
-                <button
-                  type="button"
-                  key={rekap.kategori}
-                  onClick={() =>
-                    setSelectedKategori(isSelected ? "ALL" : rekap.kategori)
-                  }
-                  className={`text-left p-3.5 rounded-[16px] border transition-all ${
-                    isSelected
-                      ? "bg-brand/5 border-brand ring-1 ring-brand shadow-xs"
-                      : "bg-surface-base border-border-soft hover:border-brand/40 hover:bg-surface-hover/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-bold text-[12.5px] text-navy-text">
-                      {rekap.label}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-[11px] font-semibold text-muted-faint">
-                      {rekap.jumlahAset} unit
-                    </span>
-                  </div>
-                  <div className="text-[14px] font-extrabold text-navy-text tabular-nums">
-                    {rekap.totalNilaiBukuFmt}
-                  </div>
-                  <div className="text-[11px] text-muted-faint mt-1 flex items-center justify-between">
-                    <span>Perolehan:</span>
-                    <span className="font-mono text-muted-strong">
-                      {rekap.totalHargaPerolehanFmt}
-                    </span>
-                  </div>
-                  {rekap.kategori !== "TANAH" ? (
-                    <div className="text-[11px] text-muted-faint mt-0.5 flex items-center justify-between">
-                      <span>Akumulasi:</span>
-                      <span className="font-mono text-status-amber">
-                        ({rekap.totalAkumulasiPenyusutanFmt})
-                      </span>
+                const isSelected = selectedKategori === rekap.kategori;
+                const CategoryIcon = {
+                  TANAH: LandPlot,
+                  BANGUNAN: Building2,
+                  KENDARAAN: Car,
+                  PERALATAN_KANTOR: Armchair,
+                }[rekap.kategori];
+                return (
+                  <button
+                    type="button"
+                    key={rekap.kategori}
+                    aria-pressed={isSelected}
+                    onClick={() => setSelectedKategori(isSelected ? "ALL" : rekap.kategori)}
+                    className={`group min-w-0 rounded-[16px] border p-5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${
+                      isSelected
+                        ? "grid gap-6 md:grid-cols-[minmax(200px,1fr)_2fr] md:items-center border-brand/30 bg-brand/5"
+                        : "border-border-soft bg-surface-card hover:border-brand/40 hover:bg-surface-hover"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                          <CategoryIcon size={20} strokeWidth={1.7} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[14px] font-bold text-navy-text">{rekap.label}</span>
+                          <span className="block text-[12px] text-muted-strong mt-0.5">{rekap.jumlahAset} unit aset</span>
+                        </span>
+                        {!isSelected && <ChevronRight size={15} className="shrink-0 text-muted-strong group-hover:text-brand" />}
+                      </div>
+                      <div className="text-[11px] font-medium text-muted-strong mb-1">Nilai buku awal {year + 1}</div>
+                      <div className={`${isSelected ? "text-[28px]" : "text-[22px]"} font-bold tracking-tight text-navy-text tabular-nums break-words`}>
+                        {rekap.totalNilaiBukuFmt}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-[10.5px] text-blue-600 dark:text-blue-400 mt-0.5 italic">
-                      Tidak disusutkan (PSAK 16)
+                    <div className={isSelected
+                      ? "grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-brand/15 pt-5 md:border-t-0 md:border-l md:pl-6 md:pt-0"
+                      : "mt-4 border-t border-border-soft pt-3 space-y-2"}>
+                      {[
+                        { label: "Harga perolehan", value: rekap.totalHargaPerolehanFmt, tone: "text-navy-text" },
+                        { label: `Beban ${year}`, value: rekap.totalBebanPenyusutanFmt, tone: "text-status-red" },
+                        { label: "Akumulasi penyusutan", value: rekap.totalAkumulasiPenyusutanFmt, tone: "text-status-amber" },
+                      ].map((metric) => (
+                        <span key={metric.label} className={isSelected ? "block min-w-0" : "flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1"}>
+                          <span className={`text-[11px] text-muted-strong ${isSelected ? "block mb-2" : ""}`}>{metric.label}</span>
+                          <span className={`${isSelected ? "text-[16px]" : "text-[12px]"} font-semibold tabular-nums break-words ${metric.tone}`}>{metric.value}</span>
+                        </span>
+                      ))}
+                      {rekap.kategori === "TANAH" && (
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium text-brand ${isSelected ? "sm:col-span-3" : "pt-1"}`}>
+                          <CheckCircle2 size={12} /> Tanah tidak disusutkan
+                        </span>
+                      )}
                     </div>
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* ── Info Banner Otomatisasi (Issue 39 & SRS v2.0) ── */}
-      <div className="bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/25 rounded-[18px] p-4 flex items-start gap-3.5">
-        <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 flex items-center justify-center flex-none mt-0.5">
-          <CheckCircle2 size={16} />
-        </div>
-        <div className="text-[12.5px] text-blue-900 dark:text-blue-200 leading-relaxed">
-          <span className="font-bold">Otomatisasi Penuh Terhubung (Linked): </span>
-          Biaya penyusutan aset tetap tidak perlu lagi diinput manual pada Jurnal Umum. Sistem secara otomatis menghitung penyusutan garis lurus (PSAK 16) dan menyalurkan nilainya ke akun <span className="font-semibold underline">Beban Penyusutan</span> di Laba Rugi serta akun kontra <span className="font-semibold underline">Akumulasi Penyusutan</span> di Neraca.
-        </div>
+      <div className="flex items-start gap-3 rounded-[16px] border border-border-soft bg-surface-subtle px-5 py-3.5 text-[12px] text-muted-strong leading-relaxed">
+        <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-brand" />
+        <p><span className="font-semibold text-navy-text">Laporan tersinkron otomatis.</span> Beban penyusutan masuk ke Laba Rugi dan akumulasi penyusutan ke Neraca, tanpa input jurnal manual.</p>
       </div>
 
       {/* ── Filter Bar & Actions ── */}
       <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-1">
-          <div className="relative flex-1 max-w-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto flex-1">
+          <div className="relative flex-1 sm:max-w-sm">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-faint" />
             <input
               type="text"
@@ -449,9 +454,9 @@ export function AktivaTetapManager({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
+        <div className="overflow-x-auto" role="region" aria-label="Tabel inventaris aset, geser horizontal untuk melihat seluruh kolom" tabIndex={0}>
+          <table className={`w-full text-left border-collapse ${filteredAssets.length > 0 ? "min-w-[1560px]" : ""}`}>
+            <thead className={filteredAssets.length === 0 ? "hidden" : "[&_th]:whitespace-nowrap"}>
               <tr className="border-b border-border-soft bg-surface-subtle/50 text-[11.5px] font-bold uppercase tracking-wider text-muted-faint">
                 <th className="py-3 px-5">Kode / Tagging</th>
                 <th className="py-3 px-5">Nama Aset</th>
@@ -469,8 +474,13 @@ export function AktivaTetapManager({
             <tbody className="divide-y divide-surface-subtle text-[13px]">
               {filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 px-6 text-center text-muted-faint italic">
-                    Belum ada data aset tetap. Klik tombol &quot;Tambah Aset Tetap&quot; untuk mencatat aset baru.
+                  <td colSpan={11} className="py-12 px-6 text-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[16px] bg-brand/10 text-brand"><Building2 size={23} strokeWidth={1.5} /></div>
+                    <div className="text-[15px] font-bold text-navy-text">{summary.assets.length === 0 ? "Inventaris aset masih kosong" : "Tidak ada aset yang cocok"}</div>
+                    <p className="mx-auto mt-2 max-w-sm text-[12px] leading-relaxed text-muted-strong">{summary.assets.length === 0 ? "Tambahkan aset pertama untuk mulai menghitung penyusutan dan nilai buku secara otomatis." : "Coba kata kunci lain atau pilih Semua Kategori untuk melihat aset yang tersedia."}</p>
+                    {summary.assets.length === 0 && (
+                      <button type="button" onClick={openAddModal} className="mt-5 inline-flex items-center gap-2 rounded-pill bg-navy px-4 py-2.5 text-[12px] font-semibold text-white hover:bg-navy-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"><Plus size={15} /> Tambah Aset Tetap</button>
+                    )}
                   </td>
                 </tr>
               ) : (

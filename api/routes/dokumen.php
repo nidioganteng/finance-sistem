@@ -151,8 +151,8 @@ if ($method === 'DELETE' && $id_param) {
 
     // Hapus file fisik
     $filePath = __DIR__ . '/../../' . $doc['fileUrl'];
-    if (file_exists($filePath)) {
-        @unlink($filePath);
+    if (file_exists($filePath) && !unlink($filePath)) {
+        error_response('Gagal menghapus file fisik.', 500);
     }
 
     $pdo->prepare("DELETE FROM Dokumen WHERE id = ?")->execute([$id_param]);

@@ -206,9 +206,20 @@ export function AktivaTetapManager({
   };
 
   // Preview hitungan live di modal
-  const liveDepreciable = Math.max(0, hargaPerolehan - nilaiResidu);
-  const livePenyusutanBulan = umurBulan > 0 ? liveDepreciable / umurBulan : 0;
+  const liveDepreciable = Math.max(0, hargaPerolehan);
+  const livePenyusutanBulan = kategori !== "TANAH" && umurBulan > 0 ? liveDepreciable / umurBulan : 0;
   const livePenyusutanTahun = livePenyusutanBulan * 12;
+
+  const filteredTotals = filteredAssets.reduce(
+    (total, asset) => ({
+      perolehan: total.perolehan + asset.hargaPerolehanNum,
+      awalTahun: total.awalTahun + asset.nilaiBukuAwalTahun,
+      beban: total.beban + asset.bebanPeriodeIni,
+      akumulasi: total.akumulasi + asset.akumulasiPenyusutan,
+      nilaiBuku: total.nilaiBuku + asset.nilaiBuku,
+    }),
+    { perolehan: 0, awalTahun: 0, beban: 0, akumulasi: 0, nilaiBuku: 0 }
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -443,6 +454,7 @@ export function AktivaTetapManager({
                 <th className="py-3 px-5 text-right">Harga Perolehan</th>
                 <th className="py-3 px-4 text-center">Umur</th>
                 <th className="py-3 px-5 text-right">Penyusutan/Bln</th>
+                <th className="py-3 px-5 text-right">Nilai Buku Awal {year}</th>
                 <th className="py-3 px-5 text-right">Beban {year}</th>
                 <th className="py-3 px-5 text-right">Akumulasi s/d {year}</th>
                 <th className="py-3 px-5 text-right">Nilai Buku (Net)</th>
@@ -452,7 +464,7 @@ export function AktivaTetapManager({
             <tbody className="divide-y divide-surface-subtle text-[13px]">
               {filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 px-6 text-center text-muted-faint italic">
+                  <td colSpan={11} className="py-12 px-6 text-center text-muted-faint italic">
                     Belum ada data aset tetap. Klik tombol &quot;Tambah Aset Tetap&quot; untuk mencatat aset baru.
                   </td>
                 </tr>
@@ -494,6 +506,9 @@ export function AktivaTetapManager({
                       <td className="py-3 px-5 text-right text-[12px] text-muted-strong tabular-nums whitespace-nowrap">
                         {asset.penyusutanPerBulanFmt}
                       </td>
+                      <td className="py-3 px-5 text-right font-semibold text-navy-text tabular-nums whitespace-nowrap" title={`Akumulasi s/d ${year - 1}: ${asset.akumulasiPenyusutanAwalTahunFmt}`}>
+                        {asset.nilaiBukuAwalTahunFmt}
+                      </td>
                       <td className="py-3 px-5 text-right font-bold text-status-red tabular-nums whitespace-nowrap">
                         {asset.bebanPeriodeIniFmt}
                       </td>
@@ -530,21 +545,24 @@ export function AktivaTetapManager({
               <tfoot>
                 <tr className="border-t-2 border-border-soft bg-surface-subtle/80 font-bold text-[13px]">
                   <td colSpan={3} className="py-3.5 px-5 text-navy-text uppercase tracking-wider">
-                    Total
+                    Total Ditampilkan
                   </td>
                   <td className="py-3.5 px-5 text-right text-navy-text tabular-nums whitespace-nowrap">
-                    {summary.totalHargaPerolehanFmt}
+                    {formatRupiah(filteredTotals.perolehan)}
                   </td>
                   <td></td>
                   <td></td>
+                  <td className="py-3.5 px-5 text-right text-navy-text tabular-nums whitespace-nowrap">
+                    {formatRupiah(filteredTotals.awalTahun)}
+                  </td>
                   <td className="py-3.5 px-5 text-right text-status-red tabular-nums whitespace-nowrap">
-                    {summary.totalBebanPenyusutanFmt}
+                    {formatRupiah(filteredTotals.beban)}
                   </td>
                   <td className="py-3.5 px-5 text-right text-status-amber tabular-nums whitespace-nowrap">
-                    ({summary.totalAkumulasiPenyusutanFmt})
+                    ({formatRupiah(filteredTotals.akumulasi)})
                   </td>
                   <td className="py-3.5 px-5 text-right text-status-green tabular-nums whitespace-nowrap">
-                    {summary.totalNilaiBukuFmt}
+                    {formatRupiah(filteredTotals.nilaiBuku)}
                   </td>
                   <td></td>
                 </tr>
@@ -658,7 +676,7 @@ export function AktivaTetapManager({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11.5px] font-bold text-muted-strong uppercase mb-1">
-                    Nilai Residu (Sisa) Rp
+                    Nilai Residu (Referensi) Rp
                   </label>
                   <input
                     type="text"
@@ -672,7 +690,7 @@ export function AktivaTetapManager({
                   <span className="text-[10.5px] text-muted-faint">
                     {kategori === "TANAH"
                       ? "Tanah tidak memiliki nilai residu terpisah"
-                      : "Biarkan 0 jika disusutkan habis"}
+                      : "Referensi saja; penyusutan dihitung dari harga perolehan penuh"}
                   </span>
                 </div>
 

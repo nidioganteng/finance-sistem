@@ -337,7 +337,13 @@ if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
 
 // ─── DELETE /api/pendapatan/faktur/:id ───────────────────────────────────────
 if ($method === 'DELETE' && $sub_action === 'faktur' && $record_id !== null) {
-    $pdo  = get_pdo();
+    $pdo = get_pdo();
+
+    // Lepaskan relasi fakturId dari Transaction sebelum hapus faktur,
+    // agar tidak ada baris Transaction yang merujuk ke faktur yang sudah dihapus.
+    $pdo->prepare('UPDATE `Transaction` SET fakturId = NULL WHERE fakturId = ?')
+        ->execute([$record_id]);
+
     $stmt = $pdo->prepare('DELETE FROM FakturPendapatan WHERE id = ?');
     $stmt->execute([$record_id]);
     if ($stmt->rowCount() === 0) error_response('Faktur tidak ditemukan.', 404);

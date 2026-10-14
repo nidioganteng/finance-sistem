@@ -118,12 +118,14 @@ export async function saveJurnalTransaksi(formData: FormData) {
       },
     });
     if (fakturId) {
-      await prisma.fakturPendapatan.deleteMany({
+      await prisma.fakturPendapatan.updateMany({
         where: { id: fakturId },
+        data: { tanggalTerima: null, bank: null, nominalDiterima: 0 },
       });
     } else {
-      await prisma.fakturPendapatan.deleteMany({
-        where: { noFaktur: editNoBukti },
+      await prisma.fakturPendapatan.updateMany({
+        where: { noFaktur: editNoBukti, entityId: entity.id },
+        data: { tanggalTerima: null, bank: null, nominalDiterima: 0 },
       });
     }
     await prisma.termin.deleteMany({
@@ -396,47 +398,68 @@ export async function saveJurnalTransaksi(formData: FormData) {
         },
       });
     } else {
+      const baseNoBukti = noBukti.split("-A")[0].trim();
       const existingFaktur = await prisma.fakturPendapatan.findFirst({
         where: {
-          noFaktur: noBukti,
           entityId: targetEntityIdForFaktur,
+          OR: [
+            { noFaktur: noBukti },
+            { noFaktur: baseNoBukti },
+          ],
+          ...(projectId ? { projectId } : {}),
         },
       });
-
-      const fakturData = {
-        entityId: targetEntityIdForFaktur,
-        npwp: "-",
-        noFaktur: noBukti,
-        masaPajak: txDate.getMonth() + 1,
-        tahunPajak: txDate.getFullYear(),
-        namaRekanan: project?.name ?? entity.name,
-        namaJkp: firstKeterangan || (project ? `Jasa Konsultansi ${project.name}` : `Pendapatan ${noBukti}`),
-        dpp,
-        dppNilaiLain,
-        tarifPpnPersen,
-        tarifPphPersen,
-        ppn,
-        pph,
-        nilaiProyek,
-        labaSetelahPajak,
-        kodeJenisProyek: 1,
-        pekerjaanPerusahaan: dpp,
-        pekerjaanYangDipinjam: 0,
-        tanggalTerima: txDate,
-        bank: bankName,
-        nominalDiterima,
-        projectId: projectId || null,
-        createdById: session.user.id,
-      };
 
       if (existingFaktur) {
         await prisma.fakturPendapatan.update({
           where: { id: existingFaktur.id },
-          data: fakturData,
+          data: {
+            tanggalTerima: txDate,
+            bank: bankName,
+            nominalDiterima: nominalDiterima > 0 ? nominalDiterima : Number(existingFaktur.nominalDiterima),
+            ...(projectId && !existingFaktur.projectId ? { projectId } : {}),
+          },
+        });
+
+        // Tautkan transaksi jurnal ke faktur yang cocok
+        await prisma.transaction.updateMany({
+          where: { noBukti, entityId: entity.id, fakturId: null },
+          data: { fakturId: existingFaktur.id },
         });
       } else {
-        await prisma.fakturPendapatan.create({
+        const fakturData = {
+          entityId: targetEntityIdForFaktur,
+          npwp: "-",
+          noFaktur: noBukti,
+          masaPajak: txDate.getMonth() + 1,
+          tahunPajak: txDate.getFullYear(),
+          namaRekanan: project?.name ?? entity.name,
+          namaJkp: firstKeterangan || (project ? `Jasa Konsultansi ${project.name}` : `Pendapatan ${noBukti}`),
+          dpp,
+          dppNilaiLain,
+          tarifPpnPersen,
+          tarifPphPersen,
+          ppn,
+          pph,
+          nilaiProyek,
+          labaSetelahPajak,
+          kodeJenisProyek: 1,
+          pekerjaanPerusahaan: dpp,
+          pekerjaanYangDipinjam: 0,
+          tanggalTerima: txDate,
+          bank: bankName,
+          nominalDiterima,
+          projectId: projectId || null,
+          createdById: session.user.id,
+        };
+
+        const createdFaktur = await prisma.fakturPendapatan.create({
           data: fakturData,
+        });
+
+        await prisma.transaction.updateMany({
+          where: { noBukti, entityId: entity.id, fakturId: null },
+          data: { fakturId: createdFaktur.id },
         });
       }
     }

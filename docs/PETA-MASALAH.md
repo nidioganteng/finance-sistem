@@ -15,12 +15,12 @@
 | **jenis-input** | 4 | Rapi | — | kecil |
 | **rekanan** | 1 | Rapi | — | kecil |
 | **notifikasi** | 4 | Rapi | — | kecil |
-| **log** | 2 | Rapi | Frontend-triggered log dapat diinjeksi (low risk) | kecil |
-| **dokumen** | 3 | Rapi | `unlink` tanpa error handling saat DELETE | kecil |
-| **jurnal** *(jurnal umum)* | 3 | Rapi | Tidak ada default pagination limit (Node.js ada) | kecil |
+| **log** | 2 | ✅ Selesai (`9742960`) | ~~Frontend-triggered log dapat diinjeksi~~ — validasi panjang (3–200) dan karakter kontrol ditambah | kecil → selesai |
+| **dokumen** | 3 | ✅ Selesai (`cab54e8`) | ~~`unlink` tanpa error handling saat DELETE~~ — cek return value + error 500 | kecil → selesai |
+| **jurnal** *(jurnal umum)* | 3 | ✅ Selesai (`6bbc82d`) | ~~Tidak ada default pagination limit~~ — parameter `?limit=` (default 25, max 100) | kecil → selesai |
 | **daftar-akun** | 1 | Rapi | — | kecil |
 | **jurnal-transaksi** | 4 | ✅ Selesai dan teruji (`a1f2f95`, `71957fd`, `c3fb1cd`) | ~~`syncProjectSpend` hilang, `fakturId` diabaikan, edit mode hapus faktur terlalu destruktif, `$now` null di edit path.~~ Semua diperbaiki. 13/13 assertion lulus. Catatan terbuka: duplikat noBukti auto-suffix (Node.js) vs 409 (PHP) — perbedaan desain yang disengaja. | sedang → selesai |
-| **kas** *(kecil+besar+bank)* | 6+ | Ada beda kecil | `LIMIT 2000` hardcoded di PHP; Node.js pakai pagination dinamis | kecil |
+| **kas** *(kecil+besar+bank)* | 6+ | ✅ Selesai (`0c329cf`) | ~~`LIMIT 2000` hardcoded~~ — LIMIT dihapus dari SQL; saldo berjalan dihitung di PHP atas semua grup sebelum paginasi | kecil → selesai |
 | **profitabilitas** | 2 | Ada beda kecil | Node.js hitung margin per proyek dari saldo COA — PHP hitung dari transaksi langsung, bisa beda hasil kalau ada saldo awal | sedang |
 | **dashboard** | 3 | Ada beda kecil | Float casting pada agregat revenue; Node.js pakai Prisma `Decimal`, PHP pakai `(float)` biasa | kecil |
 | **buku-besar** | 2 | Ada beda kecil | Running balance dihitung di PHP loop → floating point drift potensial pada akun dengan transaksi banyak | kecil |
@@ -31,7 +31,7 @@
 | **laporan-keuangan** | 2 | Ada beda kecil | Node.js mengonsolidasi 4 laporan dengan relasi yang konsisten; PHP masing-masing endpoint independen — potensi angka tidak sinkron antar laporan | sedang |
 | **payroll** | 8+ | Ada beda kecil | Node.js punya field `ptkp` di master Pegawai (untuk PPh21 otomatis di masa depan); PHP tidak punya — belum jadi masalah karena PPh21 masih diinput manual di kedua versi | kecil |
 | **pendapatan** | 8 | ✅ Selesai dan teruji (`5310d09`, `b34090f`, `71acd78`) | ~~rumus nilaiProyek salah (dpp+ppn), kuitansi bruto belum ada path-nya, DELETE tidak unlink fakturId, nominalDiterima null→crash.~~ Semua diperbaiki. 14/14 assertion lulus. `kuitansiJenis` tidak ada sebagai field DB; multi-termin adalah UI-only. | sedang → selesai |
-| **sync** | 2 | Ada beda kecil | Entity mapping hardcoded di PHP (`Gaharu` → `GH`, dll) — tidak fleksibel jika struktur entitas berubah | kecil |
+| **sync** | 2 | ✅ T8 selesai (`1ee355c`); T7 ditunda | T8: ~~curl ke Sidamon tanpa error handling~~ — cek errno+HTTP, log kegagalan, syncBack di response. T7: entity mapping hardcode — ditunda (risiko rendah, ubah hanya jika entitas bertambah) | kecil → selesai (T8) |
 | **neraca** | 1 | Ada beda kecil | Commit `feddf3e` di develop menambah rekap 4 kategori aktiva tetap ke neraca; `neraca.php` belum punya ini | sedang |
 | **aset-tetap** | 5+ | ⏸ Menunggu keputusan tim | PHP memakai 6 kategori custom; Node.js 4 kategori PSAK standar (Tanah, Bangunan, Kendaraan, Peralatan). Lebih kritis: PHP menyusutkan **Tanah** (salah — PSAK melarang); Node.js sudah fix ini di commit `887f4eb` + fix saldo tahunan + year-end rollover, **belum masuk ke PHP**. Tim perlu putuskan: (A) kategori PSAK, (B) migrasi data lama, (C) koreksi Tanah yang salah input, (D) dampak ke neraca. | **besar — ditunda** |
 

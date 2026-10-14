@@ -8,25 +8,24 @@
 
 ## Tabel Temuan
 
-| Modul | Temuan | Terbukti/Salah | Jenis | Risiko | Usulan |
+| Modul | Temuan | Terbukti/Salah | Jenis | Risiko | Status |
 |-------|--------|----------------|-------|--------|--------|
-| **pengguna** | POST `/api/pengguna/approve` dan `/entities` tidak cek duplikat sebelum INSERT ke `UserEntityAccess` — user bisa punya akses ganda ke entitas yang sama | TERBUKTI | TEKNIS | RENDAH | Tambah cek `SELECT COUNT(*) FROM UserEntityAccess WHERE userId=? AND entityId=?` sebelum INSERT di `set_entity_access()` (`pengguna.php:~23`) |
-| **log** | POST `/api/log` menerima field `action` dari client tanpa validasi whitelist — string bebas bisa dimasukkan sebagai action name | TERBUKTI | TEKNIS | RENDAH | Tambah in_array() atau min-length check pada `action` sebelum `log_activity()` dipanggil (`log.php:~13`) |
-| **dokumen** | `unlink($filePath)` dipanggil tanpa error handling saat DELETE — jika file sudah tidak ada di disk, PHP mencetak warning tapi tetap respons sukses (bergantung error_reporting) | TERBUKTI | TEKNIS | RENDAH | Ganti dengan: `if (file_exists($filePath)) { if (!unlink($filePath)) error_response('Gagal hapus file', 500); }` (`dokumen.php:~155`) |
-| **jurnal** | `page_size` hardcode 25 (`jurnal.php:~83`), tidak ada parameter `limit` dari client. Klaim PETA-MASALAH "tidak ada default pagination limit" terbukti | TERBUKTI | TEKNIS | RENDAH | Tambah parameter `?limit=` (default 25, max 100) pada query |
-| **kas** | `LIMIT 2000` hardcode di query ledger (`kas-helpers.php` atau `kas.php`) tanpa pagination — jika transaksi > 2000, data terpotong diam-diam | TERBUKTI | TEKNIS | SEDANG | Terapkan cursor/offset pagination, atau naikkan ke LIMIT 10000 jika volume data memungkinkan |
-| **buku-besar** | Running balance dihitung di PHP loop dengan `(float)` casting tanpa pembulatan intermediate — potensi floating-point drift pada akun dengan banyak transaksi | TERBUKTI | TEKNIS | RENDAH | Tambah `$running_balance = round($running_balance, 2)` setiap iterasi (`buku-besar.php:~110`) |
-| **sync** | Mapping entity hardcode di array PHP (`sync.php:~31`) — jika ada entitas baru di Sidamon, perlu ubah kode manual. Klaim PETA-MASALAH terbukti | TERBUKTI | TEKNIS | RENDAH | Refactor ke query `SELECT key, nama FROM Entity` + dynamic mapping. Atau env var `ENTITY_MAP_JSON` |
-| **sync** | `curl_exec()` ke Sidamon tanpa cek return value (`sync.php:~144`) — jika Sidamon down atau HTTP 5xx, error diabaikan dan response PHP tetap sukses | TERBUKTI | TEKNIS | RENDAH | Tambah: cek `curl_errno()` dan HTTP status code; jika gagal, log ke `log_activity()` dengan kategori `SYNC_FAILED` |
-| **dashboard** | Float casting `(float)$row['pendapatan']` pada agregat revenue (`dashboard.php:~43`). Klaim PETA-MASALAH terbukti | TERBUKTI | TEKNIS | RENDAH | Aman untuk nilai < 1 miliar. Pertimbangkan `bcmath` hanya jika presisi laporan keuangan dipermasalahkan |
-| **profitabilitas** | Margin dihitung dari `Project.contractValue - Project.spend` saja. Node.js hitung dari saldo COA BEBAN per proyek. Biaya overhead yang tidak ter-link ke proyek tidak terhitung | TERBUKTI | AKUNTANSI-PAJAK | SEDANG | Perlu konfirmasi: apakah `Project.spend` sudah mencerminkan semua beban proyek (via `sync_project_spend()`)? Jika ya, aman. Jika ada beban yang tidak ter-link, angka profitabilitas tidak akurat |
-| **laba-rugi** | PHP menarik Pendapatan dari COA kategori PENDAPATAN; Node.js dari `FakturPendapatan.nilaiProyek`. Jika ada faktur yang tidak diposting ke jurnal, angka berbeda | TERBUKTI | AKUNTANSI-PAJAK | SEDANG | Perlu konfirmasi: apakah semua FakturPendapatan otomatis diposting ke COA PENDAPATAN? Jika tidak, Laba Rugi PHP bisa undercount pendapatan |
-| **laba-rugi** | Klaim PETA-MASALAH terbukti: PHP dan Node.js pakai sumber data berbeda untuk baris Pendapatan | TERBUKTI | AKUNTANSI-PAJAK | SEDANG | Lihat temuan di atas |
-| **arus-kas** | PHP hanya endpoint GET dasar, Node.js punya `arus-kas-presisi.ts` + export Excel. Klaim PETA-MASALAH terbukti | TERBUKTI | UI | RENDAH | Tambah endpoint export jika dibutuhkan. Logic cash flow PHP sudah benar |
-| **neraca** | PHP tidak memiliki breakdown 4 kategori aktiva tetap yang ditambah commit `feddf3e` di develop. Hanya ada `aktiva_tetap` sebagai satu baris aggregate (`neraca.php:~93`) | TERBUKTI | TEKNIS | SEDANG | Tambah query GROUP BY kategori ke AsetTetap dan sertakan dalam response neraca. Tergantung keputusan aset-tetap (A–D) |
-| **laporan-keuangan** | PHP punya endpoint independen per laporan (laba-rugi, neraca, arus-kas). Klaim PETA-MASALAH "potensi tidak sinkron" terbukti — semua endpoint menarik dari Transaction, tapi rumus laba berbeda | TERBUKTI | TEKNIS | SEDANG | Fix laba-rugi source data (lihat temuan laba-rugi) akan menyelesaikan ini |
-| **pajak / validasi-3arah** | Tarif PPN tidak hardcode di `validasi-pajak-3arah.php` — diambil dari COA transaction langsung. Klaim "tarif 12% belum masuk" perlu dicek: apakah ada transaksi PPN dengan tarif 12% yang sudah diinput? | TERBUKTI (parsial) | AKUNTANSI-PAJAK | SEDANG | Verifikasi dengan klien: apakah ada periode di mana PPN 12% dipakai? Jika ya, pastikan formula rekonsiliasi menggunakan tarif aktual dari TarifPajak, bukan hardcode |
-| **payroll** | Field `ptkp` ada di master Pegawai tapi PPh21 masih diinput manual. Klaim PETA-MASALAH terbukti. Tidak ada bug aktif | TERBUKTI | TEKNIS | RENDAH | Feature future: `calculate_pph21(gajiKotor, ptkp)` saat PPh21 otomatis diaktifkan |
+| **pengguna** | Temuan awal salah: `set_entity_access()` pakai pola DELETE-first (`pengguna.php:25`) → duplikat baru sudah mustahil. Tidak ada kode yang perlu diubah. Query diagnostik duplikat lama tersedia di PROGRESS.md | SALAH | TEKNIS | — | ✅ Selesai (koreksi temuan) — commit `9742960` |
+| **log** | POST `/api/log` menerima field `action` dari client tanpa validasi — string bebas bisa dimasukkan | TERBUKTI | TEKNIS | RENDAH | ✅ Selesai — `log.php:13–17`, validasi panjang 3–200 dan karakter kontrol — commit `9742960` |
+| **dokumen** | `unlink($filePath)` dipanggil tanpa cek return value saat DELETE — jika gagal, response tetap sukses dan record DB terhapus | TERBUKTI | TEKNIS | RENDAH | ✅ Selesai — `dokumen.php:154–156`, check return value + error 500 — commit `cab54e8` |
+| **jurnal** | `page_size` hardcode 25 (`jurnal.php:83`), tidak ada parameter `limit` dari client | TERBUKTI | TEKNIS | RENDAH | ✅ Selesai — parameter `?limit=` (default 25, max 100) — commit `6bbc82d` |
+| **kas** | `LIMIT 2000` hardcode di query ledger SQL (`kas.php:61`) — transaksi > 2000 terpotong diam-diam | TERBUKTI | TEKNIS | SEDANG | ✅ Selesai — LIMIT dihapus dari SQL; saldo berjalan tetap benar karena dihitung di PHP atas semua grup sebelum array_slice() — commit `0c329cf` |
+| **buku-besar** | Running balance dihitung di PHP loop dengan `(float)` casting — potensi float drift | TERBUKTI | TEKNIS | RENDAH | ⏸ Ditunda — verifikasi dev DB: akun 1100 (15 transaksi, semua integer) tidak menunjukkan drift. Ubah hanya jika ada bukti drift di data produksi. |
+| **sync** | Mapping entity hardcode di array PHP (`sync.php:31`) | TERBUKTI | TEKNIS | RENDAH | ⏸ Ditunda — risiko rendah, perubahan hanya diperlukan jika ada entitas baru di Sidamon. |
+| **sync** | `curl_exec()` ke Sidamon tanpa cek return value (`sync.php:144`) | TERBUKTI | TEKNIS | RENDAH | ✅ Selesai — cek errno + HTTP status, log kegagalan, syncBack di response — commit `1ee355c` |
+| **dashboard** | Float casting `(float)$row['pendapatan']` pada agregat revenue | TERBUKTI | TEKNIS | RENDAH | ⏸ Ditunda — aman untuk nilai < 1 miliar. bcmath hanya jika presisi laporan dipermasalahkan klien. |
+| **profitabilitas** | Margin dihitung dari `Project.contractValue - Project.spend` saja | TERBUKTI | AKUNTANSI-PAJAK | SEDANG | ⏸ Menunggu konfirmasi tim (A1) |
+| **laba-rugi** | PHP menarik Pendapatan dari COA PENDAPATAN; Node.js dari `FakturPendapatan.nilaiProyek`. Jika ada faktur yang tidak diposting ke jurnal, angka berbeda | TERBUKTI | AKUNTANSI-PAJAK | SEDANG | ⏸ Ditunda — perlu konfirmasi A2 dulu. Lihat data A2 di bagian Keputusan Tim. |
+| **arus-kas** | PHP hanya endpoint GET dasar, Node.js punya `arus-kas-presisi.ts` + export Excel | TERBUKTI | UI | RENDAH | ⏸ Ditunda — logic cash flow PHP sudah benar. Export hanya jika diminta klien. |
+| **neraca** | PHP tidak punya breakdown 4 kategori aktiva tetap (`neraca.php:~93`) | TERBUKTI | TEKNIS | SEDANG | ⏸ Ditunda — bergantung keputusan aset-tetap (A–D). Kerjakan setelah A–D diputuskan. |
+| **laporan-keuangan** | PHP punya endpoint independen per laporan, potensi tidak sinkron — akan selesai setelah fix laba-rugi | TERBUKTI | TEKNIS | SEDANG | ⏸ Ditunda — bergantung konfirmasi A2 dan fix laba-rugi. |
+| **pajak / validasi-3arah** | Tarif PPN tidak hardcode — diambil dari COA transaction langsung | TERBUKTI (parsial) | AKUNTANSI-PAJAK | SEDANG | ⏸ Menunggu konfirmasi tim (A3) |
+| **payroll** | Field `ptkp` ada tapi PPh21 otomatis belum diimplementasi | TERBUKTI | TEKNIS | RENDAH | ⏸ Ditunda — tidak ada bug aktif. Feature future saat PPh21 otomatis diaktifkan. |
 | **auth** | Rapi, tidak ada perbedaan material dengan Node.js | TERBUKTI | — | — | — |
 | **coa** | Rapi | TERBUKTI | — | — | — |
 | **entities** | Rapi | TERBUKTI | — | — | — |
@@ -39,45 +38,59 @@
 
 ## Ringkasan per Jenis
 
-### TEKNIS — bisa diperbaiki tanpa keputusan tim (12 temuan)
+### TEKNIS — Tahap B selesai/ditunda
 
-| # | Modul | Temuan | Risiko |
-|---|-------|--------|--------|
-| T1 | pengguna | Duplikat UserEntityAccess tidak dicegah | RENDAH |
-| T2 | log | Action field tidak divalidasi | RENDAH |
-| T3 | dokumen | `unlink()` tanpa error handling | RENDAH |
-| T4 | jurnal | page_size tidak bisa dikontrol client | RENDAH |
-| T5 | kas | LIMIT 2000 hardcode tanpa pagination | SEDANG |
-| T6 | buku-besar | Float drift di running balance | RENDAH |
-| T7 | sync | Entity mapping hardcode | RENDAH |
-| T8 | sync | curl ke Sidamon tanpa error handling | RENDAH |
-| T9 | dashboard | Float casting agregat (aman untuk nilai saat ini) | RENDAH |
-| T10 | neraca | 4 kategori aktiva tetap belum ada (bergantung aset-tetap) | SEDANG |
-| T11 | laporan-keuangan | Sinkronisasi akan selesai setelah fix laba-rugi | SEDANG |
-| T12 | payroll | ptkp ada tapi PPh21 otomatis belum diimplementasi | RENDAH |
+| # | Modul | Temuan | Status | Commit |
+|---|-------|--------|--------|--------|
+| T1 | pengguna | Duplikat UserEntityAccess | ✅ Temuan salah — sudah dicegah DELETE-first | — |
+| T2 | log | Action field tidak divalidasi | ✅ Selesai | `9742960` |
+| T3 | dokumen | `unlink()` tanpa error handling | ✅ Selesai | `cab54e8` |
+| T4 | jurnal | page_size tidak bisa dikontrol client | ✅ Selesai | `6bbc82d` |
+| T5 | kas | LIMIT 2000 hardcode tanpa pagination | ✅ Selesai | `0c329cf` |
+| T6 | buku-besar | Float drift di running balance | ⏸ Ditunda — tidak terbukti di dev DB |
+| T7 | sync | Entity mapping hardcode | ⏸ Ditunda — risiko rendah, ubah hanya jika entitas bertambah |
+| T8 | sync | curl ke Sidamon tanpa error handling | ✅ Selesai | `1ee355c` |
+| T9 | dashboard | Float casting agregat | ⏸ Ditunda — aman untuk nilai saat ini |
+| T10 | neraca | 4 kategori aktiva tetap belum ada | ⏸ Ditunda — bergantung keputusan aset-tetap A–D |
+| T11 | laporan-keuangan | Sinkronisasi bergantung fix laba-rugi | ⏸ Ditunda — bergantung konfirmasi A2 |
+| T12 | payroll | ptkp ada tapi PPh21 otomatis belum diimplementasi | ⏸ Ditunda — tidak ada bug aktif |
 
-### AKUNTANSI-PAJAK — perlu konfirmasi klien/akuntan (3 temuan)
+### AKUNTANSI-PAJAK — perlu konfirmasi klien/akuntan
 
-| # | Modul | Pertanyaan untuk tim |
-|---|-------|---------------------|
-| A1 | profitabilitas | Apakah `Project.spend` (via `sync_project_spend()`) sudah mencerminkan SEMUA beban proyek, termasuk overhead? |
-| A2 | laba-rugi | Apakah semua FakturPendapatan otomatis diposting ke COA PENDAPATAN? Jika tidak, sumber data PHP (COA) vs Node.js (FakturPendapatan) akan menghasilkan angka berbeda |
-| A3 | pajak/validasi-3arah | Apakah ada periode di mana PPN 12% dipakai dan perlu direkonsiliasi? |
+| # | Modul | Pertanyaan untuk tim | Data Dev |
+|---|-------|---------------------|----------|
+| A1 | profitabilitas | Apakah `Project.spend` mencerminkan SEMUA beban proyek termasuk overhead? | Dev DB: GHR-PWS-007 spend=13,063,063 = total BEBAN dari transaksi (selisih=0). `sync_project_spend()` berjalan benar. Konfirmasi: apakah ada beban overhead yang tidak di-link ke proyek? |
+| A2 | laba-rugi | Apakah semua FakturPendapatan otomatis diposting ke COA PENDAPATAN? | Dev DB: Oct 2026 — FakturPendapatan nilaiProyek=100M, COA PENDAPATAN kredit=200M (selisih −100M). **Data dev tidak representatif** (ada transaksi manual yang mengembungkan COA). Perlu cek data produksi. |
+| A3 | pajak/validasi-3arah | Apakah ada periode di mana PPN 12% dipakai dan perlu direkonsiliasi? | Dev DB: hanya 2 faktur Oct 2026 dengan PPN 12%. TarifPajak punya PPN 12% (active since 2025-01-01) dan PPN 11% (active since 2022-04-01), keduanya `active=1`. `get_tarif_ppn_aktif()` mengembalikan 12% (ORDER BY tanggalMulai DESC). |
 
-### UI — tidak ada logic backend yang perlu berubah (1 temuan)
+### UI — tidak ada logic backend yang perlu berubah
 
-| # | Modul | Keterangan |
-|---|-------|-----------|
-| U1 | arus-kas | Export Excel hanya ada di Node.js; PHP endpoint GET sudah benar |
+| # | Modul | Status |
+|---|-------|--------|
+| U1 | arus-kas | ⏸ Ditunda — Export Excel hanya jika diminta klien |
 
 ---
 
-## Urutan pengerjaan Tahap B (menunggu persetujuan)
+## Query diagnostik T1 — duplikat lama UserEntityAccess
 
-**Prioritas SEDANG dulu (T5, T10, T11):**
-1. **kas T5** — LIMIT 2000 bisa potong data di produksi
-2. **neraca T10** — tergantung keputusan aset-tetap; kerjakan setelah A–D diputuskan
-3. **laba-rugi / laporan-keuangan T11** — perlu konfirmasi A2 dulu
+Jalankan di DB produksi (read-only, tidak ada efek):
 
-**Prioritas RENDAH (T1–T4, T6–T9, T12):**  
-Bisa dikerjakan berurutan tanpa risiko, satu commit per temuan.
+```sql
+SELECT userId, entityId, COUNT(*) AS cnt
+FROM UserEntityAccess
+GROUP BY userId, entityId
+HAVING cnt > 1
+ORDER BY cnt DESC;
+```
+
+Jika ada hasil, hapus duplikat dengan:
+
+```sql
+-- Preview dulu (baca saja):
+SELECT id, userId, entityId, createdAt FROM UserEntityAccess
+WHERE (userId, entityId) IN (
+    SELECT userId, entityId FROM UserEntityAccess
+    GROUP BY userId, entityId HAVING COUNT(*) > 1
+)
+ORDER BY userId, entityId, createdAt;
+```

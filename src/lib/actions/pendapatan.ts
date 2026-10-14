@@ -17,6 +17,7 @@ export type FakturPendapatanInput = {
   tahunPajak: number;
   namaRekanan: string;
   namaJkp: string;
+  nilaiKuitansi?: number; // Nilai Kuitansi Bruto (Input Utama)
   dpp: number;
   dppNilaiLain: number;
   tarifPpnPersen?: number;
@@ -46,10 +47,14 @@ export type RekonsiliasiPajakInput = {
 
 function revalidatePendapatanPaths() {
   revalidatePath("/pendapatan");
+  revalidatePath("/rekanan");
+  revalidatePath("/jurnal");
+  revalidatePath("/jurnal-transaksi");
   revalidatePath("/laporan");
   revalidatePath("/laporan-keuangan");
   revalidatePath("/dashboard");
 }
+
 
 export async function createFakturPendapatanAction(data: FakturPendapatanInput) {
   const session = await getServerSession(authOptions);
@@ -76,7 +81,7 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
 
   const tarifPpn = data.tarifPpnPersen ?? 11;
   const tarifPph = data.tarifPphPersen ?? 3.5;
-  const calculated = hitungPajakFaktur(data.dpp, data.dppNilaiLain, tarifPpn, tarifPph);
+  const calculated = hitungPajakFaktur(data.dpp, data.dppNilaiLain, tarifPpn, tarifPph, data.nilaiKuitansi);
 
   const created = await prisma.fakturPendapatan.create({
     data: {
@@ -96,7 +101,7 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
       nilaiProyek: calculated.nilaiProyek,
       labaSetelahPajak: calculated.labaSetelahPajak,
       kodeJenisProyek: data.kodeJenisProyek ?? 1,
-      pekerjaanPerusahaan: data.pekerjaanPerusahaan ?? 0,
+      pekerjaanPerusahaan: data.pekerjaanPerusahaan ?? data.dpp,
       pekerjaanYangDipinjam: data.pekerjaanYangDipinjam ?? 0,
       tanggalTerima: data.tanggalTerima ? new Date(data.tanggalTerima) : null,
       bank: data.bank?.trim() ? data.bank.trim() : null,
@@ -111,8 +116,8 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
   });
 
   // Auto-register atau sync ke Master Data Rekanan Terpusat jika rekanan baru
-  if (data.npwp && data.namaRekanan) {
-    await autoRegisterRekananIfNew(data.npwp, data.namaRekanan);
+  if (data.namaRekanan?.trim()) {
+    await autoRegisterRekananIfNew(data.npwp || "", data.namaRekanan);
   }
 
   logActivity(
@@ -199,8 +204,11 @@ export async function updateFakturPendapatanAction(
     },
   });
 
-  if (data.npwp && data.namaRekanan) {
-    await autoRegisterRekananIfNew(data.npwp, data.namaRekanan);
+  const effectiveNpwp = data.npwp !== undefined ? data.npwp : existing.npwp;
+  const effectiveNama = data.namaRekanan !== undefined ? data.namaRekanan : existing.namaRekanan;
+  // Auto-register atau sync ke Master Data Rekanan Terpusat jika rekanan baru
+  if (effectiveNama?.trim()) {
+    await autoRegisterRekananIfNew(effectiveNpwp || "", effectiveNama);
   }
 
   logActivity(
@@ -289,6 +297,12 @@ export async function deleteFakturPendapatanAction(id: string) {
   ) {
     return { error: "Kamu tidak punya akses ke entitas ini." };
   }
+
+  // Lepaskan relasi fakturId dari transaksi Jurnal Umum tanpa menghapus catatan transaksi riil
+  await prisma.transaction.updateMany({
+    where: { fakturId: id },
+    data: { fakturId: null },
+  });
 
   await prisma.fakturPendapatan.delete({ where: { id } });
 

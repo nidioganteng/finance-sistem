@@ -42,6 +42,23 @@ export function hitungDppNilaiLain(dpp: number): number {
   return Math.round((dpp * 11) / 12);
 }
 
+/**
+ * Menghitung DPP & PPN Otomatis berbasis Nilai Kuitansi Bruto:
+ * DPP = (100 / 111) * Nilai Kuitansi Bruto
+ * PPN = (11 / 111) * Nilai Kuitansi Bruto
+ */
+export function hitungDppDanPpnDariKuitansi(nilaiKwitansi: number, tarifPphPersen = 3.5) {
+  if (!nilaiKwitansi || nilaiKwitansi <= 0) {
+    return { dpp: 0, ppn: 0, pph: 0, nilaiProyek: 0, labaSetelahPajak: 0 };
+  }
+  const dpp = Math.round((nilaiKwitansi * 100) / 111);
+  const ppn = Math.round((nilaiKwitansi * 11) / 111);
+  const pph = Math.round((dpp * tarifPphPersen) / 100);
+  const nilaiProyek = nilaiKwitansi;
+  const labaSetelahPajak = Math.round(dpp - pph);
+  return { dpp, ppn, pph, nilaiProyek, labaSetelahPajak };
+}
+
 export function hitungPajakFaktur(
   dpp: number,
   dppNilaiLain: number,
@@ -49,12 +66,19 @@ export function hitungPajakFaktur(
   tarifPphPersen = 3.5,
   nilaiKwitansiManual?: number
 ): HitungPajakResult {
-  const ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
+  let ppn: number;
+  let nilaiProyek: number;
+
+  if (nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0) {
+    nilaiProyek = nilaiKwitansiManual;
+    ppn = Math.round((nilaiKwitansiManual * 11) / 111);
+  } else {
+    ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
+    nilaiProyek =
+      tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100);
+  }
+
   const pph = Math.round((dpp * tarifPphPersen) / 100);
-  const nilaiProyek =
-    nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0
-      ? nilaiKwitansiManual
-      : (tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100));
   const labaSetelahPajak = Math.round(nilaiProyek - ppn - pph);
 
   return {
@@ -240,6 +264,20 @@ export interface LaporanPendapatanData {
       nominal: number;
       nominalFmt: string;
     }>;
+    existingFakturs: Array<{
+      id: string;
+      noFaktur: string;
+      namaRekanan: string;
+      npwp: string;
+      namaJkp: string;
+      nilaiProyek: number;
+      dpp: number;
+      dppNilaiLain: number;
+      tarifPpnPersen: number;
+      tarifPphPersen: number;
+      bank: string | null;
+      createdAt: string;
+    }>;
   }>;
   bankOptions: Array<{
     id: string;
@@ -316,13 +354,30 @@ export async function getLaporanPendapatanData(
     orderBy: [{ jenis: "asc" }, { tarifPersen: "asc" }],
   });
 
-  // 4. Ambil opsi proyek beserta termin (semua proyek aktif, urutkan entitas ini dulu)
+  // 4. Ambil opsi proyek beserta termin dan riwayat faktur (semua proyek aktif, urutkan entitas ini dulu)
   const allProjectsRaw = await prisma.project.findMany({
     where: { status: "ACTIVE" },
     include: {
       entity: { select: { id: true, key: true, name: true } },
       termin: {
         orderBy: { createdAt: "asc" },
+      },
+      fakturPendapatan: {
+        select: {
+          id: true,
+          noFaktur: true,
+          namaRekanan: true,
+          npwp: true,
+          namaJkp: true,
+          nilaiProyek: true,
+          dpp: true,
+          dppNilaiLain: true,
+          tarifPpnPersen: true,
+          tarifPphPersen: true,
+          bank: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
       },
     },
     orderBy: { code: "asc" },
@@ -365,18 +420,20 @@ export async function getLaporanPendapatanData(
             OR: [
               ...(allFakturIds.length > 0 ? [{ fakturId: { in: allFakturIds } }] : []),
               ...(allNoFakturs.length > 0 ? [{ noBukti: { in: allNoFakturs } }] : []),
+              ...allNoFakturs.map((nf) => ({ noBukti: { startsWith: nf } })),
               ...allNoFakturs.map((nf) => ({ keterangan: { contains: nf } })),
             ],
           },
           include: {
             coaAccount: { select: { id: true, code: true, name: true, kategori: true } },
             jenisInput: { select: { id: true, key: true, nama: true } },
+            project: { select: { id: true, code: true, name: true } },
           },
           orderBy: { tanggal: "asc" },
         })
       : [];
 
-  // Helper untuk mengekstrak data pencairan riil dari Jurnal Umum berdasarkan Nomor Faktur & fakturId
+  // Helper untuk mengekstrak data pencairan riil dari Jurnal Umum berdasarkan Nomor Faktur, FakturId, dan Kode Proyek
   function extractJurnalDataForFaktur(
     fakturId: string,
     noFaktur: string,
@@ -384,21 +441,36 @@ export async function getLaporanPendapatanData(
     fBank: string | null,
     fNominalDiterima: number,
     fPpn: number,
-    fPph: number
+    fPph: number,
+    fProjectId?: string | null
   ) {
     const trimmed = noFaktur.trim().toLowerCase();
-    const rawMatches = matchingTransactions.filter(
-      (tx) =>
-        (tx.fakturId && tx.fakturId === fakturId) ||
-        (tx.noBukti && tx.noBukti.trim().toLowerCase() === trimmed) ||
-        (tx.keterangan && tx.keterangan.toLowerCase().includes(trimmed))
-    );
+    const rawMatches = matchingTransactions.filter((tx) => {
+      // 1. Explicit ID match (paling akurat dari dropdown Jurnal Transaksi)
+      if (tx.fakturId && tx.fakturId === fakturId) return true;
 
-    // Prioritaskan transaksi asli (jurnalTransaksi) dan abaikan salinan autoPostedFromJurnal ke Buku Bank
-    // agar nilai nominal masuk, PPN, dan PPh tidak terhitung dua kali lipat
+      // 2. Pencocokan nomor faktur pada noBukti atau keterangan
+      const matchesNoFaktur =
+        (tx.noBukti && (
+          tx.noBukti.trim().toLowerCase() === trimmed ||
+          tx.noBukti.trim().toLowerCase().startsWith(`${trimmed}-a`)
+        )) ||
+        (tx.keterangan && tx.keterangan.toLowerCase().includes(trimmed));
+
+      if (!matchesNoFaktur) return false;
+
+      // 3. Validasi proyek: jika faktur & transaksi jurnal memiliki projectId, keduanya harus cocok
+      if (fProjectId && tx.projectId) {
+        return tx.projectId === fProjectId;
+      }
+
+      return true;
+    });
+
+    // Prioritaskan transaksi asli (jurnalTransaksi) dan abaikan salinan autoPosted
     const nonAutoPosted = rawMatches.filter((tx) => {
       const extra = tx.extraFieldsJson as any;
-      return !extra?.autoPostedFromJurnal;
+      return !extra?.autoPostedFromJurnal && !extra?.autoPostedFromFaktur;
     });
     const matches = nonAutoPosted.length > 0 ? nonAutoPosted : rawMatches;
 
@@ -429,24 +501,26 @@ export async function getLaporanPendapatanData(
       );
       const totalPphDebit = pphRows.reduce((sum, tx) => sum + Number(tx.debit), 0);
 
-      const earliestDate = matches[0]?.tanggal ?? null;
-      const bankName = bankRows[0]?.coaAccount?.name || fBank || "Bank";
-      const nominalMasuk = totalBankDebit > 0 ? totalBankDebit : fNominalDiterima;
-      const isRealized = nominalMasuk > 0 || totalPpnDebit > 0 || totalPphDebit > 0;
+      const hasReceipt = totalBankDebit > 0 || totalPpnDebit > 0 || totalPphDebit > 0;
+      if (hasReceipt) {
+        const earliestDate = matches[0]?.tanggal ?? null;
+        const bankName = bankRows[0]?.coaAccount?.name || fBank || "Bank";
+        const nominalMasuk = totalBankDebit > 0 ? totalBankDebit : fNominalDiterima;
 
-      return {
-        isRealized,
-        nominalDiterima: nominalMasuk,
-        ppn: totalPpnDebit > 0 ? totalPpnDebit : (isRealized ? fPpn : 0),
-        pph: totalPphDebit > 0 ? totalPphDebit : (isRealized ? fPph : 0),
-        tanggalTerima: earliestDate
-          ? earliestDate.toISOString().split("T")[0]
-          : fTanggalTerima
-          ? fTanggalTerima.toISOString().split("T")[0]
-          : null,
-        bank: bankName,
-        matchedJurnalNoBukti: matches[0]?.noBukti ?? null,
-      };
+        return {
+          isRealized: true,
+          nominalDiterima: nominalMasuk,
+          ppn: totalPpnDebit > 0 ? totalPpnDebit : fPpn,
+          pph: totalPphDebit > 0 ? totalPphDebit : fPph,
+          tanggalTerima: earliestDate
+            ? earliestDate.toISOString().split("T")[0]
+            : fTanggalTerima
+            ? fTanggalTerima.toISOString().split("T")[0]
+            : null,
+          bank: bankName,
+          matchedJurnalNoBukti: matches[0]?.noBukti ?? null,
+        };
+      }
     }
 
     // Jika belum ada Jurnal pencairan, periksa input manual
@@ -484,7 +558,7 @@ export async function getLaporanPendapatanData(
     const calculated = hitungPajakFaktur(dpp, dppNilaiLain, tarifPpnPersen, tarifPphPersen);
     const nilaiProyek = Number(f.nilaiProyek) > 0 ? Number(f.nilaiProyek) : calculated.nilaiProyek;
 
-    // Tarik data riil dari Jurnal Umum berdasarkan fakturId & noFaktur
+    // Tarik data riil dari Jurnal Umum berdasarkan fakturId, noFaktur & projectId
     const real = extractJurnalDataForFaktur(
       f.id,
       f.noFaktur,
@@ -492,7 +566,8 @@ export async function getLaporanPendapatanData(
       f.bank,
       Number(f.nominalDiterima),
       Number(f.ppn) > 0 ? Number(f.ppn) : calculated.ppn,
-      Number(f.pph) > 0 ? Number(f.pph) : calculated.pph
+      Number(f.pph) > 0 ? Number(f.pph) : calculated.pph,
+      f.projectId
     );
 
     const ppn = real.ppn;
@@ -614,11 +689,11 @@ export async function getLaporanPendapatanData(
 
   totalPeriod.dppFmt = formatRupiah(totalPeriod.dpp);
   totalPeriod.dppNilaiLainFmt = formatRupiah(totalPeriod.dppNilaiLain);
-  totalPeriod.ppnFmt = formatRupiah(totalPeriod.ppn);
-  totalPeriod.pphFmt = formatRupiah(totalPeriod.pph);
+  totalPeriod.ppnFmt = totalPeriod.ppn > 0 ? formatRupiah(totalPeriod.ppn) : "-";
+  totalPeriod.pphFmt = totalPeriod.pph > 0 ? formatRupiah(totalPeriod.pph) : "-";
   totalPeriod.nilaiProyekFmt = formatRupiah(totalPeriod.nilaiProyek);
   totalPeriod.labaSetelahPajakFmt = formatRupiah(totalPeriod.labaSetelahPajak);
-  totalPeriod.nominalDiterimaFmt = formatRupiah(totalPeriod.nominalDiterima);
+  totalPeriod.nominalDiterimaFmt = totalPeriod.nominalDiterima > 0 ? formatRupiah(totalPeriod.nominalDiterima) : "-";
   totalPeriod.pekerjaanPerusahaanFmt = formatRupiah(totalPeriod.pekerjaanPerusahaan);
   totalPeriod.pekerjaanYangDipinjamFmt = formatRupiah(totalPeriod.pekerjaanYangDipinjam);
 
@@ -671,7 +746,8 @@ export async function getLaporanPendapatanData(
         f.bank,
         Number(f.nominalDiterima),
         Number(f.ppn) > 0 ? Number(f.ppn) : calculated.ppn,
-        Number(f.pph) > 0 ? Number(f.pph) : calculated.pph
+        Number(f.pph) > 0 ? Number(f.pph) : calculated.pph,
+        f.projectId
       );
 
       monthlyBuckets[m].jumlahFaktur += 1;
@@ -891,6 +967,21 @@ export async function getLaporanPendapatanData(
         };
       });
 
+      const existingFakturs = (p.fakturPendapatan || []).map((f) => ({
+        id: f.id,
+        noFaktur: f.noFaktur,
+        namaRekanan: f.namaRekanan,
+        npwp: f.npwp,
+        namaJkp: f.namaJkp,
+        nilaiProyek: Number(f.nilaiProyek),
+        dpp: Number(f.dpp),
+        dppNilaiLain: Number(f.dppNilaiLain),
+        tarifPpnPersen: Number(f.tarifPpnPersen),
+        tarifPphPersen: Number(f.tarifPphPersen),
+        bank: f.bank ?? null,
+        createdAt: f.createdAt.toISOString(),
+      }));
+
       return {
         id: p.id,
         code: p.code,
@@ -901,6 +992,7 @@ export async function getLaporanPendapatanData(
         contractValue,
         contractValueFmt: formatRupiah(contractValue),
         termins,
+        existingFakturs,
       };
     }),
     bankOptions: defaultBankList,

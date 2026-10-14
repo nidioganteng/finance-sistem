@@ -100,7 +100,7 @@ export function JurnalTransaksiClient({
   const totalKredit = coaRows.reduce((s, r) => s + (r.arah === "kredit" ? parseNum(r.nominalRaw) : 0), 0);
   const isBalanced = totalDebit > 0 && totalKredit > 0 && totalDebit === totalKredit;
   const validRowCount = coaRows.filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0).length;
-  const canSubmit = noBukti.trim().length > 0 && tanggal.length > 0 && validRowCount >= 1 && !isPending;
+  const canSubmit = tanggal.length > 0 && validRowCount >= 1 && !isPending;
 
   const selectedProject = projectOptions?.find((p) => p.id === projectId);
   const selectedFaktur = fakturOptions?.find((f) => f.id === fakturId);
@@ -498,9 +498,12 @@ export function JurnalTransaksiClient({
             {/* Header: No. Bukti + Tanggal */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">No. Bukti</label>
+                  <span className="text-[9.5px] text-muted-faint font-medium">Opsional</span>
+                </div>
                 <input type="text" value={noBukti} onChange={(e) => setNoBukti(e.target.value)}
-                  placeholder="JU/0922-001" required
+                  placeholder="Otomatis jika kosong (JU-...)"
                   className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text font-mono placeholder:text-muted focus:outline-none focus:border-brand transition-colors" />
               </div>
               <div className="flex flex-col gap-1.5">

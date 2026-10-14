@@ -103,6 +103,7 @@ export function LaporanPendapatanClient({
     tahunPajak: data.year,
     namaRekanan: "",
     namaJkp: "",
+    nilaiKuitansi: 0, // Input Utama
     dpp: 0,
     dppNilaiLain: 0,
     tarifPpnPersen: 12,
@@ -123,13 +124,17 @@ export function LaporanPendapatanClient({
   const [selectedTerminId, setSelectedTerminId] = useState<string>("");
   const [showManualDppFallback, setShowManualDppFallback] = useState(false);
 
-  // Auto-Fill Master Rekanan state (Issue 84)
+  // Amrahan / Multi-Termin detection state (Issue 101)
+  const [amrahanDetected, setAmrahanDetected] = useState<FakturPendapatanItem | null>(null);
+  // Mode input nomor faktur: "existing" (pilih dari riwayat nomor faktur proyek) atau "new" (input nomor faktur baru manual)
+  const [noFakturMode, setNoFakturMode] = useState<"existing" | "new">("new");
+
+  // Auto-Fill Master Rekanan state (Issue 84 & 102)
   const [rekananSuggestions, setRekananSuggestions] = useState<RekananItem[]>([]);
   const [showRekananDropdown, setShowRekananDropdown] = useState(false);
   const [matchedRekananMaster, setMatchedRekananMaster] = useState<RekananItem | null>(null);
   const [isSearchingRekanan, setIsSearchingRekanan] = useState(false);
-  const [selectedRekananNpwpId, setSelectedRekananNpwpId] = useState<string>("");
-  const [isManualNpwp, setIsManualNpwp] = useState(false);
+  const [selectedRekananId, setSelectedRekananId] = useState<string>("");
 
   // Form state for Rekonsiliasi
   const [formRecon, setFormRecon] = useState({
@@ -204,12 +209,88 @@ export function LaporanPendapatanClient({
     formFaktur.dpp,
     formFaktur.dppNilaiLain,
     formFaktur.tarifPpnPersen,
-    formFaktur.tarifPphPersen
+    formFaktur.tarifPphPersen,
+    formFaktur.nilaiKuitansi > 0 ? formFaktur.nilaiKuitansi : undefined
   );
 
   // Selected project & termin helpers for auto-syncing DPP
   const selectedProject = data.projectOptions.find((p) => p.id === formFaktur.projectId);
   const selectedTermin = selectedProject?.termins.find((t) => t.id === selectedTerminId);
+
+  // Riwayat nomor faktur unik pada proyek yang dipilih untuk dukungan Amrahan / Multi-Termin
+  const distinctProjectFakturs = useMemo(() => {
+    if (!selectedProject?.existingFakturs || selectedProject.existingFakturs.length === 0) {
+      return [];
+    }
+    const map = new Map<
+      string,
+      {
+        noFaktur: string;
+        count: number;
+        latest: (typeof selectedProject.existingFakturs)[0];
+      }
+    >();
+    for (const f of selectedProject.existingFakturs) {
+      const key = f.noFaktur.trim();
+      if (!key) continue;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, { noFaktur: key, count: 1, latest: f });
+      }
+    }
+    return Array.from(map.values());
+  }, [selectedProject]);
+
+  function handleSelectExistingProjectFaktur(chosenNoFaktur: string) {
+    if (!chosenNoFaktur || chosenNoFaktur === "__MANUAL_NEW__") {
+      setNoFakturMode("new");
+      setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+      setAmrahanDetected(null);
+      return;
+    }
+
+    const match =
+      selectedProject?.existingFakturs.find(
+        (f) => f.noFaktur.trim().toLowerCase() === chosenNoFaktur.trim().toLowerCase()
+      ) ||
+      data.fakturList.find(
+        (f) => f.noFaktur.trim().toLowerCase() === chosenNoFaktur.trim().toLowerCase()
+      );
+
+    if (match) {
+      setAmrahanDetected(match as any);
+      const prevKuitansi =
+        match.nilaiProyek || (match.dpp > 0 ? Math.round((match.dpp * 111) / 100) : 0);
+      setFormFaktur((prev) => ({
+        ...prev,
+        noFaktur: match.noFaktur,
+        namaRekanan: match.namaRekanan,
+        npwp: match.npwp,
+        namaJkp: match.namaJkp,
+        nilaiKuitansi: prevKuitansi,
+        dpp: match.dpp,
+        dppNilaiLain: match.dppNilaiLain,
+        tarifPpnPersen: match.tarifPpnPersen,
+        tarifPphPersen: match.tarifPphPersen,
+        bank: match.bank || prev.bank,
+      }));
+
+      const cleanNpwp = (match.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
+      const matchedRek = (data.rekananOptions || []).find(
+        (r) =>
+          (r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanNpwp) ||
+          r.nama.toLowerCase() === (match.namaRekanan || "").toLowerCase()
+      );
+      if (matchedRek) {
+        setSelectedRekananId(matchedRek.id);
+        setMatchedRekananMaster(matchedRek as any);
+      }
+    } else {
+      setFormFaktur((prev) => ({ ...prev, noFaktur: chosenNoFaktur }));
+    }
+  }
 
   function handleSelectTermin(terminId: string) {
     setSelectedTerminId(terminId);
@@ -223,11 +304,12 @@ export function LaporanPendapatanClient({
     if (term) {
       const nominal = term.nominal;
       const dpp = hitungDppDariKwitansi(nominal);
-      const dppNilaiLain = hitungDppNilaiLain(dpp);
+      const dppNilaiLain = dpp;
       const pphNominal = Math.round((dpp * formFaktur.tarifPphPersen) / 100);
       const netReceived = dpp - pphNominal;
       setFormFaktur((prev) => ({
         ...prev,
+        nilaiKuitansi: nominal,
         dpp,
         dppNilaiLain,
         pekerjaanPerusahaan: dpp,
@@ -262,6 +344,29 @@ export function LaporanPendapatanClient({
     });
   }
 
+  function handleSelectRekananFromDropdown(id: string) {
+    if (id === "__MANUAL__") {
+      setSelectedRekananId("__MANUAL__");
+      setMatchedRekananMaster(null);
+      return;
+    }
+    setSelectedRekananId(id);
+    if (!id) {
+      setMatchedRekananMaster(null);
+      return;
+    }
+    const sel = data.rekananOptions?.find((r) => r.id === id);
+    if (sel) {
+      setFormFaktur((prev) => ({
+        ...prev,
+        namaRekanan: sel.nama,
+        npwp: sel.npwp || prev.npwp,
+      }));
+      setMatchedRekananMaster(sel as any);
+      setShowRekananDropdown(false);
+    }
+  }
+
   async function handleNpwpChange(val: string) {
     setFormFaktur((prev) => ({ ...prev, npwp: val }));
     const trimmed = val.trim();
@@ -279,15 +384,18 @@ export function LaporanPendapatanClient({
 
           if (match) {
             setMatchedRekananMaster(match);
+            setSelectedRekananId(match.id);
             setFormFaktur((prev) => ({
               ...prev,
               namaRekanan: match.nama,
             }));
           } else {
             setMatchedRekananMaster(null);
+            setSelectedRekananId("__MANUAL__");
           }
         } else {
           setMatchedRekananMaster(null);
+          setSelectedRekananId("__MANUAL__");
         }
       } catch {
         // ignore
@@ -322,12 +430,7 @@ export function LaporanPendapatanClient({
   }
 
   function handleSelectRekanan(r: RekananItem) {
-    setSelectedRekananNpwpId(r.id);
-    if (!r.npwp) {
-      setIsManualNpwp(true);
-    } else {
-      setIsManualNpwp(false);
-    }
+    setSelectedRekananId(r.id);
     setFormFaktur((prev) => ({
       ...prev,
       namaRekanan: r.nama,
@@ -340,12 +443,13 @@ export function LaporanPendapatanClient({
   function openCreateFakturModal() {
     setEditingFaktur(null);
     setSelectedTerminId("");
-    setSelectedRekananNpwpId("");
-    setIsManualNpwp(false);
+    setSelectedRekananId("");
     setShowManualDppFallback(false);
     setMatchedRekananMaster(null);
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
+    setAmrahanDetected(null);
+    setNoFakturMode("new");
     setFormFaktur({
       npwp: "",
       noFaktur: "",
@@ -353,6 +457,7 @@ export function LaporanPendapatanClient({
       tahunPajak: data.year,
       namaRekanan: "",
       namaJkp: "",
+      nilaiKuitansi: 0,
       dpp: 0,
       dppNilaiLain: 0,
       tarifPpnPersen: 12,
@@ -374,6 +479,8 @@ export function LaporanPendapatanClient({
 
   function openEditFakturModal(f: FakturPendapatanItem) {
     setEditingFaktur(f);
+    setAmrahanDetected(null);
+    setNoFakturMode("new");
     const proj = data.projectOptions.find((p) => p.id === f.projectId);
     const matchedTermin = proj?.termins.find((t) => t.nominal === f.dpp);
     if (matchedTermin) {
@@ -385,13 +492,15 @@ export function LaporanPendapatanClient({
     }
     const cleanFakturNpwp = (f.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
     const matchedRek = (data.rekananOptions || []).find(
-      (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanFakturNpwp
+      (r) =>
+        (r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanFakturNpwp) ||
+        r.nama.toLowerCase() === (f.namaRekanan || "").toLowerCase()
     );
-    setSelectedRekananNpwpId(matchedRek?.id || "");
+    setSelectedRekananId(matchedRek?.id || "__MANUAL__");
     setMatchedRekananMaster((matchedRek as any) ?? null);
-    setIsManualNpwp(!matchedRek);
     setRekananSuggestions([]);
     setShowRekananDropdown(false);
+    const initialKuitansi = f.nilaiProyek || (f.dpp > 0 ? Math.round((f.dpp * 111) / 100) : 0);
     setFormFaktur({
       npwp: f.npwp,
       noFaktur: f.noFaktur,
@@ -399,6 +508,7 @@ export function LaporanPendapatanClient({
       tahunPajak: f.tahunPajak,
       namaRekanan: f.namaRekanan,
       namaJkp: f.namaJkp,
+      nilaiKuitansi: initialKuitansi,
       dpp: f.dpp,
       dppNilaiLain: f.dppNilaiLain,
       tarifPpnPersen: f.tarifPpnPersen,
@@ -416,6 +526,68 @@ export function LaporanPendapatanClient({
     });
     setErrorMessage(null);
     setIsFakturModalOpen(true);
+  }
+
+  function handleNoFakturChange(val: string) {
+    setFormFaktur((prev) => ({ ...prev, noFaktur: val }));
+    if (editingFaktur) return;
+
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed.length >= 3) {
+      let match = selectedProject?.existingFakturs.find(
+        (f) => f.noFaktur.trim().toLowerCase() === trimmed
+      ) as any;
+      if (!match) {
+        match = data.fakturList.find(
+          (f) => f.noFaktur.trim().toLowerCase() === trimmed
+        ) as any;
+      }
+      if (!match) {
+        for (const pr of data.projectOptions) {
+          const m = pr.existingFakturs?.find(
+            (f) => f.noFaktur.trim().toLowerCase() === trimmed
+          );
+          if (m) {
+            match = { ...m, projectId: pr.id } as any;
+            break;
+          }
+        }
+      }
+
+      if (match) {
+        setAmrahanDetected(match);
+        const prevKuitansi = match.nilaiProyek || (match.dpp > 0 ? Math.round((match.dpp * 111) / 100) : 0);
+        setFormFaktur((prev) => ({
+          ...prev,
+          noFaktur: val,
+          namaRekanan: match.namaRekanan,
+          npwp: match.npwp,
+          projectId: match.projectId || prev.projectId,
+          namaJkp: match.namaJkp,
+          nilaiKuitansi: prevKuitansi,
+          dpp: match.dpp,
+          dppNilaiLain: match.dppNilaiLain,
+          tarifPpnPersen: match.tarifPpnPersen,
+          tarifPphPersen: match.tarifPphPersen,
+          kodeJenisProyek: match.kodeJenisProyek,
+          bank: match.bank || prev.bank,
+        }));
+        const cleanNpwp = (match.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
+        const matchedRek = (data.rekananOptions || []).find(
+          (r) =>
+            (r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanNpwp) ||
+            r.nama.toLowerCase() === (match.namaRekanan || "").toLowerCase()
+        );
+        if (matchedRek) {
+          setSelectedRekananId(matchedRek.id);
+          setMatchedRekananMaster(matchedRek as any);
+        }
+      } else {
+        setAmrahanDetected(null);
+      }
+    } else {
+      setAmrahanDetected(null);
+    }
   }
 
   function handleToggleCeklis(fakturId: string, field: "ppn" | "pph" | "buktiPotong", currentValue: boolean) {
@@ -449,6 +621,8 @@ export function LaporanPendapatanClient({
     setErrorMessage(null);
 
     try {
+      const kuitansiVal = Number(formFaktur.nilaiKuitansi) || (formFaktur.dpp > 0 ? Math.round((formFaktur.dpp * 111) / 100) : 0);
+      const dppVal = formFaktur.dpp > 0 ? Number(formFaktur.dpp) : (kuitansiVal > 0 ? Math.round((kuitansiVal * 100) / 111) : 0);
       const payload: FakturPendapatanInput = {
         entityId: data.entity.id,
         npwp: formFaktur.npwp,
@@ -457,13 +631,14 @@ export function LaporanPendapatanClient({
         tahunPajak: Number(formFaktur.tahunPajak),
         namaRekanan: formFaktur.namaRekanan,
         namaJkp: formFaktur.namaJkp,
-        dpp: Number(formFaktur.dpp),
-        dppNilaiLain: Number(formFaktur.dppNilaiLain),
+        nilaiKuitansi: kuitansiVal,
+        dpp: dppVal,
+        dppNilaiLain: Number(formFaktur.dppNilaiLain) || dppVal,
         tarifPpnPersen: Number(formFaktur.tarifPpnPersen),
         tarifPphPersen: Number(formFaktur.tarifPphPersen),
         kodeJenisProyek: Number(formFaktur.kodeJenisProyek),
-        pekerjaanPerusahaan: Number(formFaktur.pekerjaanPerusahaan),
-        pekerjaanYangDipinjam: Number(formFaktur.pekerjaanYangDipinjam),
+        pekerjaanPerusahaan: dppVal,
+        pekerjaanYangDipinjam: 0,
         tanggalTerima: formFaktur.tanggalTerima.trim() ? formFaktur.tanggalTerima.trim() : null,
         bank: formFaktur.bank.trim() ? formFaktur.bank.trim() : null,
         nominalDiterima: Number(formFaktur.nominalDiterima) || 0,
@@ -858,7 +1033,7 @@ export function LaporanPendapatanClient({
                   <th className="p-3 text-right">PPN Realisasi</th>
                   <th className="p-3 text-right">PPh Realisasi</th>
                   <th className="p-3 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">
-                    Nilai Proyek (111%)
+                    Nilai Kuitansi Bruto (111%)
                   </th>
                   <th className="p-3 text-right text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10">
                     Netto Tagihan
@@ -1574,6 +1749,7 @@ export function LaporanPendapatanClient({
                       onClick={() => {
                         setSelectedTerminId("");
                         setShowManualDppFallback(false);
+                        setNoFakturMode("new");
                         setFormFaktur((prev) => ({
                           ...prev,
                           projectId: "",
@@ -1595,6 +1771,11 @@ export function LaporanPendapatanClient({
                     const p = data.projectOptions.find((x) => x.id === selectedProjId);
                     setSelectedTerminId("");
                     setShowManualDppFallback(false);
+                    if (p?.existingFakturs && p.existingFakturs.length > 0) {
+                      setNoFakturMode("existing");
+                    } else {
+                      setNoFakturMode("new");
+                    }
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
@@ -1692,141 +1873,67 @@ export function LaporanPendapatanClient({
               {/* Form Grid 1: Basic Faktur Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Nomor E-Faktur <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="010.000-24.00000001"
-                    value={formFaktur.noFaktur}
-                    onChange={(e) =>
-                      setFormFaktur({ ...formFaktur, noFaktur: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-navy-text">
-                      NPWP Rekanan <span className="text-rose-500">*</span>
+                    <label className="block text-xs font-semibold text-navy-text">
+                      Nomor E-Faktur <span className="text-rose-500">*</span>
                     </label>
-                    <div className="flex items-center gap-2">
-                      {isSearchingRekanan && (
-                        <span className="text-[10px] text-blue-600 animate-pulse font-medium">
-                          Mencari...
-                        </span>
-                      )}
-                      {isManualNpwp ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsManualNpwp(false);
-                            const cleanVal = formFaktur.npwp.replace(/[\s.\-_/]/g, "").toLowerCase();
-                            const matchInOptions = (data.rekananOptions || []).find(
-                              (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanVal
-                            );
-                            setSelectedRekananNpwpId(matchInOptions ? matchInOptions.id : "");
-                          }}
-                          className="text-[11px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 cursor-pointer"
-                        >
-                          Pilih dari Master
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsManualNpwp(true);
-                            setSelectedRekananNpwpId("__MANUAL__");
-                          }}
-                          className="text-[11px] font-medium text-navy-soft hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
-                        >
-                          Ketik Manual
-                        </button>
-                      )}
-                    </div>
+                    {distinctProjectFakturs.length > 0 && !editingFaktur && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMode = noFakturMode === "existing" ? "new" : "existing";
+                          setNoFakturMode(nextMode);
+                          if (nextMode === "new") {
+                            setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                            setAmrahanDetected(null);
+                          }
+                        }}
+                        className="text-[10.5px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                      >
+                        {noFakturMode === "existing" ? "Ketik Baru" : "Pilih dari Proyek"}
+                      </button>
+                    )}
                   </div>
 
-                  {isManualNpwp ? (
+                  {distinctProjectFakturs.length > 0 && noFakturMode === "existing" && !editingFaktur ? (
+                    <select
+                      value={formFaktur.noFaktur}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val || val === "__NEW__") {
+                          setNoFakturMode("new");
+                          setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
+                          setAmrahanDetected(null);
+                        } else {
+                          handleSelectExistingProjectFaktur(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono font-medium border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="">-- Pilih Nomor Faktur --</option>
+                      {distinctProjectFakturs.map((df) => (
+                        <option key={df.noFaktur} value={df.noFaktur}>
+                          {df.noFaktur} — {df.latest.namaJkp} (Amrahan ke-{df.count + 1})
+                        </option>
+                      ))}
+                      <option value="__NEW__">+ Ketik Nomor Baru Manual...</option>
+                    </select>
+                  ) : (
                     <input
                       type="text"
                       required
-                      placeholder="00.000.000.0-000.000"
-                      value={formFaktur.npwp}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const cleanVal = val.replace(/[\s.\-_/]/g, "").toLowerCase();
-                        const matchInOptions = (data.rekananOptions || []).find(
-                          (r) => r.npwp && r.npwp.replace(/[\s.\-_/]/g, "").toLowerCase() === cleanVal
-                        );
-                        setSelectedRekananNpwpId(matchInOptions ? matchInOptions.id : "__MANUAL__");
-                        handleNpwpChange(val);
-                      }}
+                      placeholder="010.000-24.00000001"
+                      value={formFaktur.noFaktur}
+                      onChange={(e) => handleNoFakturChange(e.target.value)}
                       className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      autoFocus
                     />
-                  ) : (
-                    <select
-                      required
-                      value={selectedRekananNpwpId}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        if (id === "__MANUAL__") {
-                          setIsManualNpwp(true);
-                          setSelectedRekananNpwpId("__MANUAL__");
-                          return;
-                        }
-                        setSelectedRekananNpwpId(id);
-                        if (!id) {
-                          setFormFaktur((prev) => ({ ...prev, npwp: "" }));
-                          setMatchedRekananMaster(null);
-                          return;
-                        }
-                        const sel = data.rekananOptions?.find((r) => r.id === id);
-                        if (sel) {
-                          if (!sel.npwp) {
-                            setIsManualNpwp(true);
-                            setFormFaktur((prev) => ({
-                              ...prev,
-                              namaRekanan: sel.nama || prev.namaRekanan,
-                            }));
-                            setMatchedRekananMaster(sel as any);
-                          } else {
-                            setFormFaktur((prev) => ({
-                              ...prev,
-                              npwp: sel.npwp || "",
-                              namaRekanan: sel.nama || prev.namaRekanan,
-                            }));
-                            setMatchedRekananMaster(sel as any);
-                          }
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
-                    >
-                      <option value="">-- Pilih dari Master Rekanan --</option>
-                      {data.rekananOptions && data.rekananOptions.length > 0 && (
-                        <optgroup label="Master Rekanan">
-                          {data.rekananOptions.map((r) => (
-                            <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
-                              {r.npwp ? `${r.npwp} — ${r.nama}` : `[Tanpa NPWP] ${r.nama}`}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      <optgroup label="Opsi Lainnya">
-                        <option value="__MANUAL__" className="bg-surface-card font-semibold text-blue-600 dark:text-blue-400">
-                          ✏️ Input Manual (Ketik Sendiri)...
-                        </option>
-                      </optgroup>
-                    </select>
                   )}
-
-                  {matchedRekananMaster && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Auto-Fill: {matchedRekananMaster.nama}</span>
-                    </div>
+                  {selectedProject && (
+                    <span className="text-[10px] text-navy-soft mt-1 block">
+                      {amrahanDetected
+                        ? `Nomor faktur amrahan untuk proyek ${selectedProject.code}.`
+                        : `Akan tersimpan ke proyek ${selectedProject.code}.`}
+                    </span>
                   )}
                 </div>
 
@@ -1851,65 +1958,6 @@ export function LaporanPendapatanClient({
                     ))}
                   </select>
                 </div>
-              </div>
-
-              {/* Form Grid 2: Rekanan & JKP */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-navy-text">
-                      Nama Rekanan / Klien <span className="text-rose-500">*</span>
-                    </label>
-                    <span className="text-[10px] text-navy-soft">
-                      Auto-Fill Rekanan
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: RSUD dr. Doris Sylvanus"
-                    value={formFaktur.namaRekanan}
-                    onChange={(e) => handleNamaRekananChange(e.target.value)}
-                    onFocus={() => {
-                      if (rekananSuggestions.length > 0) setShowRekananDropdown(true);
-                    }}
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-
-                  {/* Floating Auto-complete dropdown */}
-                  {showRekananDropdown && rekananSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-surface-card border border-border-soft rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border-soft">
-                      <div className="p-2 text-[10px] font-bold text-navy-soft uppercase tracking-wider bg-surface-subtle/50 flex items-center justify-between">
-                        <span>Pilih Rekanan:</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowRekananDropdown(false)}
-                          className="text-navy-soft hover:text-navy-text"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      {rekananSuggestions.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSelectRekanan(item)}
-                          className="w-full p-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-start justify-between gap-2 cursor-pointer"
-                        >
-                          <div>
-                            <div className="text-xs font-bold text-navy-text">{item.nama}</div>
-                            {item.npwp && (
-                              <div className="text-[10px] font-mono text-navy-soft">NPWP: {item.npwp}</div>
-                            )}
-                          </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-surface-subtle text-navy-soft border border-border-soft uppercase shrink-0">
-                            {item.tipe}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-navy-text mb-1">
@@ -1928,9 +1976,179 @@ export function LaporanPendapatanClient({
                 </div>
               </div>
 
-              {/* Form Section 3: Tax Rates & DPP Inputs */}
+              {/* Notifikasi Amrahan / Multi-Termin Berulang */}
+              {amrahanDetected && !editingFaktur && (
+                <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-amber-200/80 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-amber-900 dark:text-amber-200">
+                        Multi-Termin / Amrahan Terdeteksi ({amrahanDetected.noFaktur})
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                        Nomor Faktur Sama Diizinkan
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                      Sistem otomatis memanggil rincian proyek, rekanan, dan nominal lama. Seluruh uraian dan nominal tetap dapat diedit bebas (misal merubah kata &quot;Uang Muka&quot; menjadi &quot;Tagihan Amrahan Ke-2&quot;).
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Section: Data Rekanan & NPWP */}
+              <div className="p-4 rounded-2xl bg-surface-subtle/70 border border-border-soft space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-brand" />
+                    <span className="text-xs font-bold text-navy-text uppercase tracking-wide">
+                      Identitas Rekanan / Klien
+                    </span>
+                  </div>
+                  {selectedRekananId && selectedRekananId !== "__MANUAL__" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRekananId("__MANUAL__");
+                        setMatchedRekananMaster(null);
+                      }}
+                      className="text-[11px] font-semibold text-brand hover:underline cursor-pointer"
+                    >
+                      + Input Rekanan Baru
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  {/* Dropdown Master Rekanan */}
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      Pilih Master Rekanan
+                    </label>
+                    <select
+                      value={selectedRekananId}
+                      onChange={(e) => handleSelectRekananFromDropdown(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                    >
+                      <option value="">-- Pilih dari Master Rekanan --</option>
+                      {data.rekananOptions && data.rekananOptions.length > 0 && (
+                        <optgroup label="Database Master Rekanan">
+                          {data.rekananOptions.map((r) => (
+                            <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
+                              {r.nama} {r.npwp ? `(${r.npwp})` : "(Tanpa NPWP)"}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Input Manual">
+                        <option value="__MANUAL__" className="bg-surface-card font-semibold text-blue-600 dark:text-blue-400">
+                          ✏️ Rekanan Baru / Input Manual...
+                        </option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  {/* Input Nama Rekanan */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-navy-text">
+                        Nama Rekanan / Klien <span className="text-rose-500">*</span>
+                      </label>
+                      {isSearchingRekanan && (
+                        <span className="text-[10px] text-blue-600 animate-pulse font-medium">
+                          Mencari...
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: RSUD dr. Doris Sylvanus"
+                      value={formFaktur.namaRekanan}
+                      onChange={(e) => handleNamaRekananChange(e.target.value)}
+                      onFocus={() => {
+                        if (rekananSuggestions.length > 0) setShowRekananDropdown(true);
+                      }}
+                      className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+
+                    {/* Floating Auto-complete dropdown */}
+                    {showRekananDropdown && rekananSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-surface-card border border-border-soft rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border-soft">
+                        <div className="p-2 text-[10px] font-bold text-navy-soft uppercase tracking-wider bg-surface-subtle/50 flex items-center justify-between">
+                          <span>Saran Rekanan Terdaftar:</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowRekananDropdown(false)}
+                            className="text-navy-soft hover:text-navy-text cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {rekananSuggestions.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectRekanan(item)}
+                            className="w-full p-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-start justify-between gap-2 cursor-pointer"
+                          >
+                            <div>
+                              <div className="text-xs font-bold text-navy-text">{item.nama}</div>
+                              {item.npwp && (
+                                <div className="text-[10px] font-mono text-navy-soft">NPWP: {item.npwp}</div>
+                              )}
+                            </div>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-surface-subtle text-navy-soft border border-border-soft uppercase shrink-0">
+                              {item.tipe}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input NPWP Rekanan */}
+                  <div>
+                    <label className="block text-xs font-semibold text-navy-text mb-1">
+                      NPWP Rekanan <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="00.000.000.0-000.000"
+                      value={formFaktur.npwp}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleNpwpChange(val);
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Banner Status Auto-Fill / Auto-Save */}
+                {matchedRekananMaster ? (
+                  <div className="flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">
+                      Terhubung dengan Master Rekanan: <strong>{matchedRekananMaster.nama}</strong> {matchedRekananMaster.npwp ? `(${matchedRekananMaster.npwp})` : ""}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[11px] text-blue-700 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-xl border border-blue-200/60 dark:border-blue-800/40">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                    <span>
+                      Rekanan & NPWP baru ini akan <strong>otomatis disimpan</strong> ke Database Master Rekanan saat e-faktur disimpan.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Section 3: Input Nilai Kuitansi Bruto & Kalkulasi Pajak Otomatis */}
               <div className="p-4 sm:p-5 rounded-2xl bg-surface-subtle/50 border border-border-soft space-y-4">
-                {/* Header Section with Title & Explanation */}
+                {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-border-soft">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
@@ -1938,222 +2156,101 @@ export function LaporanPendapatanClient({
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-navy-text uppercase tracking-wider">
-                        Parameter Nilai & Perhitungan Pajak Otomatis
+                        Form E-Faktur Berbasis Nilai Kuitansi Bruto
                       </h4>
                       <p className="text-[11px] text-navy-soft">
-                        Masukkan nilai termin dan tentukan tarif. Pajak dan laba bersih dihitung otomatis secara real-time.
+                        Input utama adalah Nilai Kuitansi Bruto. Nilai DPP (100/111) dan PPN (11/111) dikalkulasi secara otomatis.
                       </p>
                     </div>
                   </div>
+                  {selectedTermin && (
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 self-start sm:self-auto flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Tersinkron dari Termin: {selectedTermin.name} ({selectedTermin.percentage}%)
+                    </span>
+                  )}
                 </div>
 
-                {/* 1. KASUS TERSEDIA TERMIN: Tampilan Nilai DPP Otomatis (Tanpa Input Box) */}
-                {selectedTermin && (
-                  <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/90 dark:border-emerald-800/60 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-2 text-emerald-950 dark:text-emerald-200 font-bold">
-                        <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Nilai DPP Otomatis Tersinkron dari {selectedTermin.name}</span>
-                      </div>
-                      <span className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold self-start sm:self-auto">
-                        Otomatis Tanpa Input Manual
+                {/* INPUT UTAMA: Nilai Kuitansi Bruto */}
+                <div className="p-4 rounded-xl bg-surface-card border-2 border-blue-500/40 dark:border-blue-500/50 shadow-xs space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5 uppercase tracking-wide">
+                      <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Nilai Kuitansi Bruto (Input Utama) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-navy-soft font-mono">
+                      Rumus otomatis: DPP = 100/111 × Kuitansi • PPN = 11/111 × Kuitansi
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-sm font-black text-blue-700 dark:text-blue-400">
+                      Rp
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      required
+                      placeholder="0"
+                      value={formatRupiahInput(
+                        formFaktur.nilaiKuitansi || (formFaktur.dpp > 0 ? Math.round((formFaktur.dpp * 111) / 100) : 0)
+                      )}
+                      onChange={(e) => {
+                        const kuitansi = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                        const dpp = hitungDppDariKwitansi(kuitansi);
+                        setFormFaktur((prev) => ({
+                          ...prev,
+                          nilaiKuitansi: kuitansi,
+                          dpp,
+                          dppNilaiLain: dpp,
+                          pekerjaanPerusahaan: dpp,
+                          pekerjaanYangDipinjam: 0,
+                        }));
+                      }}
+                      className="w-full pl-11 pr-4 py-2.5 text-base sm:text-lg font-mono font-black border border-blue-300 dark:border-blue-700 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                {/* Hasil Kalkulasi Otomatis: DPP & PPN */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Card DPP Dasar */}
+                  <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-navy-text uppercase tracking-wider">
+                        DPP Dasar (100/111 × Kuitansi)
+                      </span>
+                      <span className="text-[9.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-1.5 py-0.5 rounded">
+                        Otomatis
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Card DPP Dasar */}
-                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-navy-text">DPP Dasar (Nilai Termin)</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded">
-                            Basis PPh Final ({formFaktur.tarifPphPersen}%)
-                          </span>
-                        </div>
-                        <div className="text-xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                          {selectedTermin.nominalFmt}
-                        </div>
-                        <span className="text-[11px] text-navy-soft block">
-                          Sesuai termin keluar ({selectedTermin.percentage}% dari nilai kontrak)
-                        </span>
-                      </div>
-
-                      {/* Card DPP Nilai Lain */}
-                      <div className="p-4 rounded-xl bg-surface-card border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-navy-text">DPP Nilai Lain</span>
-                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded">
-                            Basis PPN ({formFaktur.tarifPpnPersen}%)
-                          </span>
-                        </div>
-                        <div className="text-xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                          {selectedTermin.nominalFmt}
-                        </div>
-                        <span className="text-[11px] text-navy-soft block">
-                          Otomatis disamakan dengan DPP Dasar termin
-                        </span>
-                      </div>
+                    <div className="text-lg font-bold font-mono text-navy-text">
+                      {formatRupiah(formFaktur.dpp)}
                     </div>
+                    <span className="text-[10px] text-navy-soft block">
+                      Dasar pengenaan PPh Final ({formFaktur.tarifPphPersen}%)
+                    </span>
                   </div>
-                )}
 
-                {/* 2. KASUS BELUM PILIH TERMIN: Informasi untuk memilih termin */}
-                {!selectedTermin && !showManualDppFallback && (
-                  <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold">Nilai DPP Tidak Perlu Diinput di Sini</span>
-                        <p className="text-blue-800 dark:text-blue-300 text-[11.5px] mt-0.5 leading-relaxed">
-                          Sistem akan mengambil nilai DPP secara otomatis dari termin proyek. Silakan pilih <strong>Kode Proyek</strong> dan <strong>Termin</strong> pada bagian atas formulir. Nilai DPP, PPh, PPN, dan laba setelah pajak akan langsung terisi otomatis.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-blue-700 dark:text-blue-400">Tidak ada data termin atau bukan faktur berbasis proyek?</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualDppFallback(true)}
-                        className="font-semibold text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-200 underline cursor-pointer"
-                      >
-                        Buka Opsi Input Manual
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. KASUS FALLBACK INPUT MANUAL (Hanya jika belum pilih termin & klik opsi manual) */}
-                {!selectedTermin && showManualDppFallback && (
-                  <div className="p-3.5 rounded-xl bg-surface-card border border-amber-200 dark:border-amber-800/60 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        Mode Input DPP Manual (Khusus Non-Termin)
+                  {/* Card PPN */}
+                  <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-navy-text uppercase tracking-wider">
+                        PPN (11/111 × Kuitansi)
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualDppFallback(false)}
-                        className="text-[10px] text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline cursor-pointer"
-                      >
-                        Tutup Input Manual
-                      </button>
+                      <span className="text-[9.5px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15 px-1.5 py-0.5 rounded">
+                        Otomatis
+                      </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* DPP Dasar Input */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-navy-text">
-                            DPP Dasar (Manual) <span className="text-rose-500">*</span>
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const raw = window.prompt("Masukkan Nilai Kwitansi (Bruto / Akun Pendapatan):");
-                              if (raw) {
-                                const parsed = Number(raw.replace(/[^\d.-]/g, ""));
-                                if (!isNaN(parsed) && parsed > 0) {
-                                  const dppVal = hitungDppDariKwitansi(parsed);
-                                  const dppNilaiLainVal = hitungDppNilaiLain(dppVal);
-                                  setFormFaktur((prev) => ({
-                                    ...prev,
-                                    dpp: dppVal,
-                                    dppNilaiLain: dppNilaiLainVal,
-                                    pekerjaanPerusahaan: dppVal,
-                                    pekerjaanYangDipinjam: 0,
-                                  }));
-                                }
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 cursor-pointer"
-                            title="Hitung DPP = 100/111 x Nilai Kwitansi"
-                          >
-                            <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            <span>100/111 Kwitansi</span>
-                          </button>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={formatRupiahInput(formFaktur.dpp)}
-                            onChange={(e) => {
-                              const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                              setFormFaktur((prev) => ({
-                                ...prev,
-                                dpp: val,
-                                dppNilaiLain: hitungDppNilaiLain(val),
-                                pekerjaanPerusahaan: val,
-                              }));
-                            }}
-                            className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* DPP Nilai Lain Input */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-navy-text">
-                            DPP Nilai Lain (Manual) <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFormFaktur((prev) => ({
-                                  ...prev,
-                                  dppNilaiLain: hitungDppNilaiLain(prev.dpp),
-                                }))
-                              }
-                              title="Hitung 11/12 x DPP Dasar"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-200 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span>11/12 × DPP</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFormFaktur((prev) => ({
-                                  ...prev,
-                                  dppNilaiLain: prev.dpp,
-                                }))
-                              }
-                              title="Samakan dengan DPP Dasar"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/60 cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
-                              <span>Samakan</span>
-                            </button>
-                          </div>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={formatRupiahInput(formFaktur.dppNilaiLain)}
-                            onChange={(e) =>
-                              setFormFaktur({
-                                ...formFaktur,
-                                dppNilaiLain: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                              })
-                            }
-                            className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
+                    <div className="text-lg font-bold font-mono text-purple-700 dark:text-purple-300">
+                      {formatRupiah(liveCalc.ppn)}
                     </div>
+                    <span className="text-[10px] text-navy-soft block">
+                      PPN terutang / dipungut rekanan ({formFaktur.tarifPpnPersen}%)
+                    </span>
                   </div>
-                )}
+                </div>
 
-                {/* Sub-grid 2: Tarif Pajak (2 Columns - No truncation!) */}
+                {/* Sub-grid 2: Tarif Pajak */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Tarif PPN */}
                   <div>
@@ -2170,12 +2267,12 @@ export function LaporanPendapatanClient({
                       }
                       className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl text-navy-text bg-surface-input focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                     >
-                      <option value={12}>PPN 12% (DPP Nilai Lain 11/12)</option>
-                      <option value={11}>PPN 11% (Tarif Standar Lama)</option>
+                      <option value={11}>PPN 11% (Standar Tarif Kuitansi 100/111)</option>
+                      <option value={12}>PPN 12%</option>
                       <option value={0}>Bebas PPN (0%)</option>
                     </select>
                     <span className="text-[10px] text-navy-soft mt-1 block">
-                      Dikalikan terhadap DPP Nilai Lain
+                      Kalkulasi standar: 11/111 × Kuitansi Bruto
                     </span>
                   </div>
 
@@ -2199,7 +2296,7 @@ export function LaporanPendapatanClient({
                       <option value={0}>Tanpa Pemotongan PPh (0%)</option>
                     </select>
                     <span className="text-[10px] text-navy-soft mt-1 block">
-                      Dipotong rekanan dari DPP Dasar termin keluar
+                      Dipotong rekanan dari DPP ({formFaktur.tarifPphPersen}% × DPP)
                     </span>
                   </div>
                 </div>
@@ -2212,7 +2309,7 @@ export function LaporanPendapatanClient({
                     </span>
                     <div className="inline-flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 font-medium">
                       <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>Di laporan, kolom PPN & PPh otomatis kosong (-) sampai uang cair di Jurnal Umum</span>
+                      <span>Di laporan, kolom PPN & PPh otomatis terisi saat transaksi tersimpan di Jurnal Umum</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -2229,7 +2326,7 @@ export function LaporanPendapatanClient({
                         {formatRupiah(liveCalc.ppn)}
                       </div>
                       <span className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 block truncate">
-                        {formFaktur.tarifPpnPersen}% × DPP Nilai Lain
+                        11/111 × Kuitansi
                       </span>
                     </div>
 
@@ -2246,24 +2343,24 @@ export function LaporanPendapatanClient({
                         {formatRupiah(liveCalc.pph)}
                       </div>
                       <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 block truncate">
-                        {formFaktur.tarifPphPersen}% × DPP Dasar
+                        {formFaktur.tarifPphPersen}% × DPP
                       </span>
                     </div>
 
-                    {/* Card 3: Nilai Proyek */}
+                    {/* Card 3: Nilai Kuitansi Bruto */}
                     <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 min-w-0 overflow-hidden flex flex-col justify-between">
                       <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 mb-1">
-                        <span className="text-[11px] font-semibold truncate">Nilai Proyek (111%)</span>
+                        <span className="text-[11px] font-semibold truncate">Kuitansi Bruto (111%)</span>
                         <TrendingUp className="w-3.5 h-3.5 shrink-0 ml-1" />
                       </div>
                       <div
                         className="text-xs sm:text-[13px] md:text-sm font-bold font-mono tracking-tight text-blue-800 dark:text-blue-200 truncate block"
-                        title={formatRupiah(liveCalc.nilaiProyek)}
+                        title={formatRupiah(formFaktur.nilaiKuitansi || liveCalc.nilaiProyek)}
                       >
-                        {formatRupiah(liveCalc.nilaiProyek)}
+                        {formatRupiah(formFaktur.nilaiKuitansi || liveCalc.nilaiProyek)}
                       </div>
                       <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 block truncate">
-                        Diakui Pendapatan Laba Rugi
+                        DPP + PPN 11%
                       </span>
                     </div>
 
@@ -2287,64 +2384,24 @@ export function LaporanPendapatanClient({
                 </div>
               </div>
 
-              {/* Form Grid 4: Jenis Proyek & Porsi Pekerjaan */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Jenis Proyek <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formFaktur.kodeJenisProyek}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        kodeJenisProyek: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
-                  >
-                    <option value={1} className="bg-surface-card text-navy-text">1 - Perencanaan</option>
-                    <option value={2} className="bg-surface-card text-navy-text">2 - Pengawasan</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Pekerjaan Perusahaan (Sendiri)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={formatRupiahInput(formFaktur.pekerjaanPerusahaan)}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        pekerjaanPerusahaan: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Pekerjaan yang Dipinjam
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={formatRupiahInput(formFaktur.pekerjaanYangDipinjam)}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        pekerjaanYangDipinjam: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              {/* Form Grid 4: Jenis Proyek */}
+              <div>
+                <label className="block text-xs font-semibold text-navy-text mb-1">
+                  Jenis Proyek <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formFaktur.kodeJenisProyek}
+                  onChange={(e) =>
+                    setFormFaktur({
+                      ...formFaktur,
+                      kodeJenisProyek: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                >
+                  <option value={1} className="bg-surface-card text-navy-text">1 - Perencanaan</option>
+                  <option value={2} className="bg-surface-card text-navy-text">2 - Pengawasan</option>
+                </select>
               </div>
 
               {/* Form Grid 5: Realisasi Pencairan Kas Bank */}

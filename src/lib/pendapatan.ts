@@ -420,18 +420,20 @@ export async function getLaporanPendapatanData(
             OR: [
               ...(allFakturIds.length > 0 ? [{ fakturId: { in: allFakturIds } }] : []),
               ...(allNoFakturs.length > 0 ? [{ noBukti: { in: allNoFakturs } }] : []),
+              ...allNoFakturs.map((nf) => ({ noBukti: { startsWith: nf } })),
               ...allNoFakturs.map((nf) => ({ keterangan: { contains: nf } })),
             ],
           },
           include: {
             coaAccount: { select: { id: true, code: true, name: true, kategori: true } },
             jenisInput: { select: { id: true, key: true, nama: true } },
+            project: { select: { id: true, code: true, name: true } },
           },
           orderBy: { tanggal: "asc" },
         })
       : [];
 
-  // Helper untuk mengekstrak data pencairan riil dari Jurnal Umum berdasarkan Nomor Faktur & fakturId
+  // Helper untuk mengekstrak data pencairan riil dari Jurnal Umum berdasarkan Nomor Faktur, FakturId, dan Kode Proyek
   function extractJurnalDataForFaktur(
     fakturId: string,
     noFaktur: string,
@@ -439,21 +441,36 @@ export async function getLaporanPendapatanData(
     fBank: string | null,
     fNominalDiterima: number,
     fPpn: number,
-    fPph: number
+    fPph: number,
+    fProjectId?: string | null
   ) {
     const trimmed = noFaktur.trim().toLowerCase();
-    const rawMatches = matchingTransactions.filter(
-      (tx) =>
-        (tx.fakturId && tx.fakturId === fakturId) ||
-        (tx.noBukti && tx.noBukti.trim().toLowerCase() === trimmed) ||
-        (tx.keterangan && tx.keterangan.toLowerCase().includes(trimmed))
-    );
+    const rawMatches = matchingTransactions.filter((tx) => {
+      // 1. Explicit ID match (paling akurat dari dropdown Jurnal Transaksi)
+      if (tx.fakturId && tx.fakturId === fakturId) return true;
 
-    // Prioritaskan transaksi asli (jurnalTransaksi) dan abaikan salinan autoPostedFromJurnal ke Buku Bank
-    // agar nilai nominal masuk, PPN, dan PPh tidak terhitung dua kali lipat
+      // 2. Pencocokan nomor faktur pada noBukti atau keterangan
+      const matchesNoFaktur =
+        (tx.noBukti && (
+          tx.noBukti.trim().toLowerCase() === trimmed ||
+          tx.noBukti.trim().toLowerCase().startsWith(`${trimmed}-a`)
+        )) ||
+        (tx.keterangan && tx.keterangan.toLowerCase().includes(trimmed));
+
+      if (!matchesNoFaktur) return false;
+
+      // 3. Validasi proyek: jika faktur & transaksi jurnal memiliki projectId, keduanya harus cocok
+      if (fProjectId && tx.projectId) {
+        return tx.projectId === fProjectId;
+      }
+
+      return true;
+    });
+
+    // Prioritaskan transaksi asli (jurnalTransaksi) dan abaikan salinan autoPosted
     const nonAutoPosted = rawMatches.filter((tx) => {
       const extra = tx.extraFieldsJson as any;
-      return !extra?.autoPostedFromJurnal;
+      return !extra?.autoPostedFromJurnal && !extra?.autoPostedFromFaktur;
     });
     const matches = nonAutoPosted.length > 0 ? nonAutoPosted : rawMatches;
 
@@ -484,24 +501,26 @@ export async function getLaporanPendapatanData(
       );
       const totalPphDebit = pphRows.reduce((sum, tx) => sum + Number(tx.debit), 0);
 
-      const earliestDate = matches[0]?.tanggal ?? null;
-      const bankName = bankRows[0]?.coaAccount?.name || fBank || "Bank";
-      const nominalMasuk = totalBankDebit > 0 ? totalBankDebit : fNominalDiterima;
-      const isRealized = nominalMasuk > 0 || totalPpnDebit > 0 || totalPphDebit > 0;
+      const hasReceipt = totalBankDebit > 0 || totalPpnDebit > 0 || totalPphDebit > 0;
+      if (hasReceipt) {
+        const earliestDate = matches[0]?.tanggal ?? null;
+        const bankName = bankRows[0]?.coaAccount?.name || fBank || "Bank";
+        const nominalMasuk = totalBankDebit > 0 ? totalBankDebit : fNominalDiterima;
 
-      return {
-        isRealized,
-        nominalDiterima: nominalMasuk,
-        ppn: totalPpnDebit > 0 ? totalPpnDebit : (isRealized ? fPpn : 0),
-        pph: totalPphDebit > 0 ? totalPphDebit : (isRealized ? fPph : 0),
-        tanggalTerima: earliestDate
-          ? earliestDate.toISOString().split("T")[0]
-          : fTanggalTerima
-          ? fTanggalTerima.toISOString().split("T")[0]
-          : null,
-        bank: bankName,
-        matchedJurnalNoBukti: matches[0]?.noBukti ?? null,
-      };
+        return {
+          isRealized: true,
+          nominalDiterima: nominalMasuk,
+          ppn: totalPpnDebit > 0 ? totalPpnDebit : fPpn,
+          pph: totalPphDebit > 0 ? totalPphDebit : fPph,
+          tanggalTerima: earliestDate
+            ? earliestDate.toISOString().split("T")[0]
+            : fTanggalTerima
+            ? fTanggalTerima.toISOString().split("T")[0]
+            : null,
+          bank: bankName,
+          matchedJurnalNoBukti: matches[0]?.noBukti ?? null,
+        };
+      }
     }
 
     // Jika belum ada Jurnal pencairan, periksa input manual
@@ -539,7 +558,7 @@ export async function getLaporanPendapatanData(
     const calculated = hitungPajakFaktur(dpp, dppNilaiLain, tarifPpnPersen, tarifPphPersen);
     const nilaiProyek = Number(f.nilaiProyek) > 0 ? Number(f.nilaiProyek) : calculated.nilaiProyek;
 
-    // Tarik data riil dari Jurnal Umum berdasarkan fakturId & noFaktur
+    // Tarik data riil dari Jurnal Umum berdasarkan fakturId, noFaktur & projectId
     const real = extractJurnalDataForFaktur(
       f.id,
       f.noFaktur,
@@ -547,7 +566,8 @@ export async function getLaporanPendapatanData(
       f.bank,
       Number(f.nominalDiterima),
       Number(f.ppn) > 0 ? Number(f.ppn) : calculated.ppn,
-      Number(f.pph) > 0 ? Number(f.pph) : calculated.pph
+      Number(f.pph) > 0 ? Number(f.pph) : calculated.pph,
+      f.projectId
     );
 
     const ppn = real.ppn;
@@ -669,11 +689,11 @@ export async function getLaporanPendapatanData(
 
   totalPeriod.dppFmt = formatRupiah(totalPeriod.dpp);
   totalPeriod.dppNilaiLainFmt = formatRupiah(totalPeriod.dppNilaiLain);
-  totalPeriod.ppnFmt = formatRupiah(totalPeriod.ppn);
-  totalPeriod.pphFmt = formatRupiah(totalPeriod.pph);
+  totalPeriod.ppnFmt = totalPeriod.ppn > 0 ? formatRupiah(totalPeriod.ppn) : "-";
+  totalPeriod.pphFmt = totalPeriod.pph > 0 ? formatRupiah(totalPeriod.pph) : "-";
   totalPeriod.nilaiProyekFmt = formatRupiah(totalPeriod.nilaiProyek);
   totalPeriod.labaSetelahPajakFmt = formatRupiah(totalPeriod.labaSetelahPajak);
-  totalPeriod.nominalDiterimaFmt = formatRupiah(totalPeriod.nominalDiterima);
+  totalPeriod.nominalDiterimaFmt = totalPeriod.nominalDiterima > 0 ? formatRupiah(totalPeriod.nominalDiterima) : "-";
   totalPeriod.pekerjaanPerusahaanFmt = formatRupiah(totalPeriod.pekerjaanPerusahaan);
   totalPeriod.pekerjaanYangDipinjamFmt = formatRupiah(totalPeriod.pekerjaanYangDipinjam);
 
@@ -726,7 +746,8 @@ export async function getLaporanPendapatanData(
         f.bank,
         Number(f.nominalDiterima),
         Number(f.ppn) > 0 ? Number(f.ppn) : calculated.ppn,
-        Number(f.pph) > 0 ? Number(f.pph) : calculated.pph
+        Number(f.pph) > 0 ? Number(f.pph) : calculated.pph,
+        f.projectId
       );
 
       monthlyBuckets[m].jumlahFaktur += 1;

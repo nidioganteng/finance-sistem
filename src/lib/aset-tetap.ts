@@ -59,11 +59,15 @@ export type AsetTetapWithDepreciation = AsetTetap & {
   bebanPeriodeIni: number;
   akumulasiPenyusutan: number;
   nilaiBuku: number;
+  akumulasiPenyusutanAwalTahun: number;
+  nilaiBukuAwalTahun: number;
   hargaPerolehanFmt: string;
   penyusutanPerBulanFmt: string;
   bebanPeriodeIniFmt: string;
   akumulasiPenyusutanFmt: string;
   nilaiBukuFmt: string;
+  akumulasiPenyusutanAwalTahunFmt: string;
+  nilaiBukuAwalTahunFmt: string;
   tanggalPerolehanFmt: string;
   umurTahun: number;
   kategoriStandar: KategoriAsetTetap;
@@ -87,12 +91,12 @@ export type PenyusutanSummary = {
 
 /**
  * Menghitung jadwal penyusutan garis lurus (Straight-Line Depreciation)
- * sesuai standar PSAK 16 dan ALUR_DAN_RUMUS_LAPORAN_KEUANGAN.md.
+ * sesuai kebutuhan modul Aktiva Tetap (issue 103).
  *
  * Rumus:
- *   Depreciable Base = Harga Perolehan - Nilai Residu
- *   Penyusutan Per Bulan = Depreciable Base / Umur Bulan
+ *   Penyusutan Per Bulan = Harga Perolehan / Umur Bulan
  *   Akumulasi Penyusutan = Bulan Efektif Terpakai * Penyusutan Per Bulan
+ *   Nilai Buku Awal Tahun = Harga Perolehan - Akumulasi Tahun Sebelumnya
  *   Nilai Buku = Harga Perolehan - Akumulasi Penyusutan
  */
 export function calculateAsetDepreciation(
@@ -123,17 +127,21 @@ export function calculateAsetDepreciation(
       bebanPeriodeIni: 0,
       akumulasiPenyusutan: 0,
       nilaiBuku: hargaPerolehan,
+      akumulasiPenyusutanAwalTahun: 0,
+      nilaiBukuAwalTahun: hargaPerolehan,
       hargaPerolehanFmt: formatRupiah(hargaPerolehan),
       penyusutanPerBulanFmt: "Rp 0",
       bebanPeriodeIniFmt: "Rp 0",
       akumulasiPenyusutanFmt: "Rp 0",
       nilaiBukuFmt: formatRupiah(hargaPerolehan),
+      akumulasiPenyusutanAwalTahunFmt: formatRupiah(0),
+      nilaiBukuAwalTahunFmt: formatRupiah(hargaPerolehan),
       tanggalPerolehanFmt: tglStr,
       umurTahun: 0,
     };
   }
   const umurBulan = Math.max(1, asset.umurBulan);
-  const depreciableBase = Math.max(0, hargaPerolehan - nilaiResidu);
+  const depreciableBase = hargaPerolehan;
   const penyusutanPerBulan = depreciableBase / umurBulan;
 
   const buyYear = tglBeli.getFullYear();
@@ -169,7 +177,13 @@ export function calculateAsetDepreciation(
   );
 
   const bebanPeriodeIni = Math.max(0, akumulasiPenyusutan - akumulasiPrior);
-  const nilaiBuku = Math.max(nilaiResidu, hargaPerolehan - akumulasiPenyusutan);
+  const nilaiBuku = Math.max(0, hargaPerolehan - akumulasiPenyusutan);
+  const monthsBeforeYear = Math.max(0, (targetYear - buyYear) * 12 - buyMonth + 1);
+  const akumulasiPenyusutanAwalTahun = Math.min(
+    depreciableBase,
+    Math.round(Math.min(umurBulan, monthsBeforeYear) * penyusutanPerBulan)
+  );
+  const nilaiBukuAwalTahun = hargaPerolehan - akumulasiPenyusutanAwalTahun;
 
   return {
     ...asset,
@@ -181,11 +195,15 @@ export function calculateAsetDepreciation(
     bebanPeriodeIni,
     akumulasiPenyusutan,
     nilaiBuku,
+    akumulasiPenyusutanAwalTahun,
+    nilaiBukuAwalTahun,
     hargaPerolehanFmt: formatRupiah(hargaPerolehan),
     penyusutanPerBulanFmt: formatRupiah(Math.round(penyusutanPerBulan)),
     bebanPeriodeIniFmt: formatRupiah(bebanPeriodeIni),
     akumulasiPenyusutanFmt: formatRupiah(akumulasiPenyusutan),
     nilaiBukuFmt: formatRupiah(nilaiBuku),
+    akumulasiPenyusutanAwalTahunFmt: formatRupiah(akumulasiPenyusutanAwalTahun),
+    nilaiBukuAwalTahunFmt: formatRupiah(nilaiBukuAwalTahun),
     tanggalPerolehanFmt: tglStr,
     umurTahun: Number((umurBulan / 12).toFixed(1)),
   };
@@ -212,8 +230,8 @@ export async function getPenyusutanSummary(
   const activeAssets = assets.filter((a) => {
     const tgl = new Date(a.tanggalPerolehan);
     const endMonth = month ? month : 12;
-    const endDate = new Date(year, endMonth - 1, 31, 23, 59, 59);
-    return tgl <= endDate;
+    const endDate = new Date(year, endMonth, 1);
+    return tgl < endDate;
   });
 
   const totalHargaPerolehan = activeAssets.reduce((s, a) => s + a.hargaPerolehanNum, 0);
@@ -245,7 +263,7 @@ export async function getPenyusutanSummary(
   });
 
   return {
-    assets,
+    assets: activeAssets,
     rekapPerKategori,
     totalHargaPerolehan,
     totalBebanPenyusutan,

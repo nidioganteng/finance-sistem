@@ -192,6 +192,8 @@ elseif ($method === 'POST' && $sub === '') {
     $kas_kecil_code_to_ek = array_flip(KAS_KECIL_COA);                    // code => entityKey
     $kas_besar_code_to_ek = array_flip(KAS_BESAR_COA);
 
+    $now       = date('Y-m-d H:i:s');
+
     // ─ EDIT mode: hapus lama ─────────────────────────────────────────────────
     $preserved_crossing = null;
     if ($edit_no_bukti) {
@@ -240,7 +242,6 @@ elseif ($method === 'POST' && $sub === '') {
         if ($stmt->fetchColumn()) return error_response("No. Bukti \"$no_bukti\" sudah dipakai di entitas ini.", 409);
     }
 
-    $now       = date('Y-m-d H:i:s');
     $staff_id  = $user['staffId'] ?? $user['id'];
     $tanggal_dt = $tanggal . ' 00:00:00';
     $first_keterangan = trim($valid_rows[0]['keterangan'] ?? '');

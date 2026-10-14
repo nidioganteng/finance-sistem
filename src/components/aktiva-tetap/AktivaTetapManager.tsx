@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AsetTetapWithDepreciation,
@@ -446,20 +446,78 @@ export function AktivaTetapManager({
         </button>
       </div>
 
-      {/* ── Tabel Daftar Aset Tetap ── */}
-      <div className="bg-surface-card rounded-[22px] border border-border-soft shadow-xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-border-soft flex items-center justify-between">
-          <div className="font-bold text-[13.5px] text-navy-text uppercase tracking-wider">
-            Daftar Inventaris Aset Tetap ({entityName})
+      {/* Inventaris dua tingkat: ringkasan kategori dan rincian unit. */}
+      <section className="bg-surface-card rounded-[22px] border border-border-soft shadow-xs overflow-hidden" aria-label="Inventaris aset tetap">
+        <div className="px-5 sm:px-6 py-5 border-b border-border-soft flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[15px] font-bold text-navy-text">Inventaris aset tetap</h3>
+            <p className="mt-1 text-[12px] text-muted-strong">{entityName} · Tahun {year} · Buka kategori untuk melihat rincian unit</p>
           </div>
-          <span className="text-[12px] font-semibold text-muted-faint">
-            {filteredAssets.length} aset ditampilkan
-          </span>
+          <span className="rounded-pill bg-brand/10 px-3 py-1.5 text-[12px] font-semibold text-brand">{filteredAssets.length} unit aset</span>
         </div>
-
-        <div className="overflow-x-auto" role="region" aria-label="Tabel inventaris aset, geser horizontal untuk melihat seluruh kolom" tabIndex={0}>
-          <table className={`w-full text-left border-collapse ${filteredAssets.length > 0 ? "min-w-[1560px]" : ""}`}>
-            <thead className={filteredAssets.length === 0 ? "hidden" : "[&_th]:whitespace-nowrap"}>
+        {filteredAssets.length === 0 ? (
+          <div className="py-12 px-6 text-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[16px] bg-brand/10 text-brand"><Building2 size={23} strokeWidth={1.5} /></div>
+                    <div className="text-[15px] font-bold text-navy-text">{summary.assets.length === 0 ? "Inventaris aset masih kosong" : "Tidak ada aset yang cocok"}</div>
+                    <p className="mx-auto mt-2 max-w-sm text-[12px] leading-relaxed text-muted-strong">{summary.assets.length === 0 ? "Tambahkan aset pertama untuk mulai menghitung penyusutan dan nilai buku secara otomatis." : "Coba kata kunci lain atau pilih Semua Kategori untuk melihat aset yang tersedia."}</p>
+                    {summary.assets.length === 0 && (
+                      <button type="button" onClick={openAddModal} className="mt-5 inline-flex items-center gap-2 rounded-pill bg-navy px-4 py-2.5 text-[12px] font-semibold text-white hover:bg-navy-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"><Plus size={15} /> Tambah Aset Tetap</button>
+                    )}
+          </div>
+        ) : (
+          <div className="divide-y divide-border-soft">
+            {STANDAR_KATEGORI_ASET
+              .filter((kat) => filteredAssets.some((asset) => asset.kategoriStandar === kat.key))
+              .map((kat) => {
+                const categoryAssets = filteredAssets.filter((asset) => asset.kategoriStandar === kat.key);
+                const isExpanded = expandedKategori.includes(kat.key);
+                const totals = categoryAssets.reduce(
+                  (total, asset) => ({
+                    perolehan: total.perolehan + asset.hargaPerolehanNum,
+                    beban: total.beban + asset.bebanPeriodeIni,
+                    akumulasi: total.akumulasi + asset.akumulasiPenyusutan,
+                    nilaiBuku: total.nilaiBuku + asset.nilaiBuku,
+                  }),
+                  { perolehan: 0, beban: 0, akumulasi: 0, nilaiBuku: 0 }
+                );
+                const CategoryIcon = { TANAH: LandPlot, BANGUNAN: Building2, KENDARAAN: Car, PERALATAN_KANTOR: Armchair }[kat.key];
+                return (
+                  <div key={kat.key}>
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      aria-controls={`rincian-${kat.key}`}
+                      onClick={() => setExpandedKategori((current) => current.includes(kat.key) ? current.filter((key) => key !== kat.key) : [...current, kat.key])}
+                      className={`group w-full p-5 sm:px-6 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:-outline-offset-2 ${isExpanded ? "bg-brand/5" : "hover:bg-surface-hover"}`}
+                    >
+                      <span className="grid grid-cols-1 xl:grid-cols-[minmax(210px,1.2fr)_3fr] gap-5 items-center">
+                        <span className="flex items-center gap-3">
+                          <span className="h-10 w-10 flex shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand"><CategoryIcon size={19} strokeWidth={1.7} /></span>
+                          <span className="flex-1">
+                            <span className="block text-[14px] font-bold text-navy-text">{kat.label}</span>
+                            <span className="block mt-0.5 text-[11px] text-muted-strong">{categoryAssets.length} unit · {isExpanded ? "Tutup rincian" : "Lihat rincian"}</span>
+                          </span>
+                          {isExpanded ? <ChevronDown size={17} className="text-brand xl:hidden" /> : <ChevronRight size={17} className="text-muted-strong xl:hidden" />}
+                        </span>
+                        <span className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-4">
+                          {[
+                            { label: "Harga perolehan", value: totals.perolehan, tone: "text-navy-text" },
+                            { label: `Beban ${year}`, value: totals.beban, tone: "text-status-red" },
+                            { label: "Akumulasi", value: totals.akumulasi, tone: "text-status-amber" },
+                            { label: `Saldo akhir ${year}`, value: totals.nilaiBuku, tone: "text-status-green" },
+                          ].map((metric) => (
+                            <span key={metric.label} className="block min-w-0">
+                              <span className="block text-[11px] font-medium text-muted-strong mb-1.5">{metric.label}</span>
+                              <span className={`block text-[13px] sm:text-[14px] font-bold tabular-nums break-words ${metric.tone}`}>{formatRupiah(metric.value)}</span>
+                            </span>
+                          ))}
+                        </span>
+                      </span>
+                    </button>
+                    <div id={`rincian-${kat.key}`} hidden={!isExpanded} className="border-t border-border-soft">
+                      <div className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" role="region" aria-label={`Rincian unit ${kat.label}, geser untuk melihat seluruh kolom`} tabIndex={0}>
+                        <table className="w-full min-w-[1560px] text-left border-collapse">
+            <thead className="[&_th]:whitespace-nowrap">
               <tr className="border-b border-border-soft bg-surface-subtle/50 text-[11.5px] font-bold uppercase tracking-wider text-muted-faint">
                 <th className="py-3 px-5">Kode / Tagging</th>
                 <th className="py-3 px-5">Nama Aset</th>
@@ -474,68 +532,8 @@ export function AktivaTetapManager({
                 <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-subtle text-[13px]">
-              {filteredAssets.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-12 px-6 text-center">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[16px] bg-brand/10 text-brand"><Building2 size={23} strokeWidth={1.5} /></div>
-                    <div className="text-[15px] font-bold text-navy-text">{summary.assets.length === 0 ? "Inventaris aset masih kosong" : "Tidak ada aset yang cocok"}</div>
-                    <p className="mx-auto mt-2 max-w-sm text-[12px] leading-relaxed text-muted-strong">{summary.assets.length === 0 ? "Tambahkan aset pertama untuk mulai menghitung penyusutan dan nilai buku secara otomatis." : "Coba kata kunci lain atau pilih Semua Kategori untuk melihat aset yang tersedia."}</p>
-                    {summary.assets.length === 0 && (
-                      <button type="button" onClick={openAddModal} className="mt-5 inline-flex items-center gap-2 rounded-pill bg-navy px-4 py-2.5 text-[12px] font-semibold text-white hover:bg-navy-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"><Plus size={15} /> Tambah Aset Tetap</button>
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                STANDAR_KATEGORI_ASET
-                  .filter((kat) => selectedKategori === "ALL" || selectedKategori === kat.key)
-                  .map((kat) => {
-                    const categoryAssets = filteredAssets.filter((asset) => asset.kategoriStandar === kat.key);
-                    const isExpanded = expandedKategori.includes(kat.key);
-                    const categoryTotals = categoryAssets.reduce(
-                      (total, asset) => ({
-                        perolehan: total.perolehan + asset.hargaPerolehanNum,
-                        beban: total.beban + asset.bebanPeriodeIni,
-                        akumulasi: total.akumulasi + asset.akumulasiPenyusutan,
-                        nilaiBuku: total.nilaiBuku + asset.nilaiBuku,
-                      }),
-                      { perolehan: 0, beban: 0, akumulasi: 0, nilaiBuku: 0 }
-                    );
-                    return (
-                      <Fragment key={kat.key}>
-                        <tr className="bg-surface-subtle/70">
-                          <td colSpan={11} className="px-5 py-3">
-                            <button
-                              type="button"
-                              aria-expanded={isExpanded}
-                              aria-controls={`rincian-${kat.key}`}
-                              onClick={() => setExpandedKategori((current) =>
-                                current.includes(kat.key)
-                                  ? current.filter((key) => key !== kat.key)
-                                  : [...current, kat.key]
-                              )}
-                              className="w-full text-left flex flex-wrap items-center gap-x-6 gap-y-2 text-navy-text rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
-                            >
-                              <span className="flex items-center gap-2 font-bold">
-                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                {kat.label} ({categoryAssets.length} unit)
-                              </span>
-                              <span className="text-[12px]">Perolehan: {formatRupiah(categoryTotals.perolehan)}</span>
-                              <span className="text-[12px]">Beban {year}: {formatRupiah(categoryTotals.beban)}</span>
-                              <span className="text-[12px]">Akumulasi: {formatRupiah(categoryTotals.akumulasi)}</span>
-                              <span className="text-[12px] font-bold">Saldo Akhir {year}: {formatRupiah(categoryTotals.nilaiBuku)}</span>
-                              <span className="ml-auto text-[12px] font-semibold text-brand">
-                                {isExpanded ? "Tutup rincian" : "Lihat rincian"}
-                              </span>
-                            </button>
-                          </td>
-                        </tr>
-                        <tr id={`rincian-${kat.key}`} hidden={!isExpanded}>
-                          <td colSpan={11} className="px-5 py-2 text-[12px] text-muted-faint">
-                            {categoryAssets.length === 0 ? "Tidak ada aset pada kategori ini sesuai filter." : `Rincian unit ${kat.label}`}
-                          </td>
-                        </tr>
-                        {isExpanded && categoryAssets.map((asset) => {
+                          <tbody className="divide-y divide-border-soft text-[13px]">
+                        {categoryAssets.map((asset) => {
                           const katLabel =
                             asset.kategoriLabel ||
                             getKategoriLabel(asset.kategoriStandar || asset.kategori);
@@ -605,41 +603,38 @@ export function AktivaTetapManager({
                             </tr>
                           );
                         })}
-                      </Fragment>
-                    );
-                  })
-              )}
-            </tbody>
-            {filteredAssets.length > 0 && (
-              <tfoot>
-                <tr className="border-t-2 border-border-soft bg-surface-subtle/80 font-bold text-[13px]">
-                  <td colSpan={3} className="py-3.5 px-5 text-navy-text uppercase tracking-wider">
-                    Total Ditampilkan
-                  </td>
-                  <td className="py-3.5 px-5 text-right text-navy-text tabular-nums whitespace-nowrap">
-                    {formatRupiah(filteredTotals.perolehan)}
-                  </td>
-                  <td></td>
-                  <td></td>
-                  <td className="py-3.5 px-5 text-right text-navy-text tabular-nums whitespace-nowrap">
-                    {formatRupiah(filteredTotals.awalTahun)}
-                  </td>
-                  <td className="py-3.5 px-5 text-right text-status-red tabular-nums whitespace-nowrap">
-                    {formatRupiah(filteredTotals.beban)}
-                  </td>
-                  <td className="py-3.5 px-5 text-right text-status-amber tabular-nums whitespace-nowrap">
-                    ({formatRupiah(filteredTotals.akumulasi)})
-                  </td>
-                  <td className="py-3.5 px-5 text-right text-status-green tabular-nums whitespace-nowrap">
-                    {formatRupiah(filteredTotals.nilaiBuku)}
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+        {filteredAssets.length > 0 && (
+          <div className="border-t border-border-soft bg-surface-subtle px-5 sm:px-6 py-5">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-[12px] font-bold text-navy-text">Total inventaris ditampilkan</span>
+              <span className="text-[11px] text-muted-strong">· {filteredAssets.length} unit sesuai filter</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+              {[
+                { label: "Harga perolehan", value: filteredTotals.perolehan, tone: "text-navy-text" },
+                { label: `Nilai buku awal ${year}`, value: filteredTotals.awalTahun, tone: "text-navy-text" },
+                { label: `Beban ${year}`, value: filteredTotals.beban, tone: "text-status-red" },
+                { label: "Akumulasi penyusutan", value: filteredTotals.akumulasi, tone: "text-status-amber" },
+                { label: `Saldo akhir ${year}`, value: filteredTotals.nilaiBuku, tone: "text-status-green" },
+              ].map((metric) => (
+                <div key={metric.label} className="min-w-0">
+                  <div className="text-[11px] text-muted-strong mb-1.5">{metric.label}</div>
+                  <div className={`text-[15px] font-bold tabular-nums break-words ${metric.tone}`}>{formatRupiah(metric.value)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ── Modal Dialog Form (Tambah / Edit Aset) ── */}
       {isModalOpen && (

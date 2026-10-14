@@ -11,6 +11,12 @@ if ($method === 'POST') {
     $detail   = $body['detail'] ?? null;
 
     if (!$action) error_response('action wajib diisi.', 400);
+    if (strlen($action) < 3 || strlen($action) > 200) {
+        error_response('action harus antara 3–200 karakter.', 400);
+    }
+    if (preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/', $action)) {
+        error_response('action mengandung karakter tidak valid.', 400);
+    }
     if (!in_array($category, ['USER_ACTIVITY', 'FINANCIAL_CHANGE'], true)) {
         error_response('category tidak valid.', 400);
     }

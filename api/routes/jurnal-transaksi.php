@@ -149,6 +149,7 @@ elseif ($method === 'POST' && $sub === '') {
     $keterangan  = trim($body['keterangan']  ?? '');
     $edit_no_bukti = trim($body['editNoBukti'] ?? '');
     $project_id  = trim($body['projectId']   ?? '') ?: null;
+    $faktur_id   = trim($body['fakturId']    ?? '') ?: null;
 
     if (!$tanggal)    return error_response('Tanggal wajib diisi.', 400);
     if (!$no_bukti)   return error_response('No. Bukti wajib diisi.', 400);
@@ -221,8 +222,14 @@ elseif ($method === 'POST' && $sub === '') {
             "DELETE FROM `Transaction` WHERE noBukti = ?
              AND JSON_VALUE(extraFieldsJson, '$.autoPostedFromJurnal') = 'true'"
         )->execute([$edit_no_bukti]);
-        // Hapus faktur
-        $pdo->prepare("DELETE FROM FakturPendapatan WHERE noFaktur = ?")->execute([$edit_no_bukti]);
+        // Hapus/clear faktur — jika fakturId ada, hanya clear payment fields (jangan hapus data faktur)
+        if ($faktur_id) {
+            $pdo->prepare(
+                "UPDATE FakturPendapatan SET tanggalTerima=NULL, bank=NULL, nominalDiterima=0, updatedAt=? WHERE id=?"
+            )->execute([$now, $faktur_id]);
+        } else {
+            $pdo->prepare("DELETE FROM FakturPendapatan WHERE noFaktur = ?")->execute([$edit_no_bukti]);
+        }
         // Hapus termin terkait
         $pdo->prepare("DELETE FROM Termin WHERE name LIKE ?")->execute(["%[$edit_no_bukti]%"]);
 
@@ -255,14 +262,14 @@ elseif ($method === 'POST' && $sub === '') {
             }
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                 debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                 debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, fakturId, createdAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )->execute([
                 uuid4(), $entity['id'], $jenis_input_id, $tanggal_dt,
                 $no_bukti, trim($row['keterangan'] ?? ''), $row['coaAccountId'],
                 (float)($row['debit'] ?? 0), (float)($row['kredit'] ?? 0),
                 0, $extra ? json_encode($extra) : null,
-                $staff_id, $project_id, $now,
+                $staff_id, $project_id, $faktur_id, $now,
             ]);
         }
 
@@ -439,46 +446,69 @@ elseif ($method === 'POST' && $sub === '') {
             $nama_rek = $project_obj['name'] ?? $entity['name'];
             $nama_jkp = $first_keterangan ?: ($project_obj ? "Jasa Konsultansi {$project_obj['name']}" : "Pendapatan $no_bukti");
 
-            // Upsert FakturPendapatan
-            $stmt_ef = $pdo->prepare(
-                "SELECT id FROM FakturPendapatan WHERE noFaktur = ? AND entityId = ? LIMIT 1"
-            );
-            $stmt_ef->execute([$no_bukti, $target_entity_for_faktur]);
-            $existing_faktur_id = $stmt_ef->fetchColumn();
-
-            $faktur_data = [
-                $target_entity_for_faktur, '-', $no_bukti, $masa, $tahun,
-                $nama_rek, $nama_jkp, $dpp, $dpp_nilai_lain,
-                $tarif_ppn, $tarif_pph, $ppn, $pph,
-                $nilai_proyek, $laba, 1, $dpp, 0,
-                $tanggal, $bank_name, $nominal_diterima, $project_id,
-                $user['id'],
-            ];
-
-            if ($existing_faktur_id) {
-                $pdo->prepare(
-                    "UPDATE FakturPendapatan SET
-                     entityId=?, npwp=?, noFaktur=?, masaPajak=?, tahunPajak=?,
-                     namaRekanan=?, namaJkp=?, dpp=?, dppNilaiLain=?,
-                     tarifPpnPersen=?, tarifPphPersen=?, ppn=?, pph=?,
-                     nilaiProyek=?, labaSetelahPajak=?, kodeJenisProyek=?,
-                     pekerjaanPerusahaan=?, pekerjaanYangDipinjam=?,
-                     tanggalTerima=?, bank=?, nominalDiterima=?, projectId=?,
-                     createdById=?, updatedAt=?
-                     WHERE id = ?"
-                )->execute(array_merge($faktur_data, [$now, $existing_faktur_id]));
+            // Upsert FakturPendapatan — jika fakturId ada, update faktur tersebut saja
+            if ($faktur_id) {
+                $s_cf = $pdo->prepare("SELECT dpp, ppn FROM FakturPendapatan WHERE id = ? LIMIT 1");
+                $s_cf->execute([$faktur_id]);
+                $cur_row = $s_cf->fetch(PDO::FETCH_ASSOC);
+                if ($cur_row) {
+                    $needs_fill = ((float)($cur_row['dpp'] ?? 0) == 0 || (float)($cur_row['ppn'] ?? 0) == 0) && $dpp > 0;
+                    $up = ['tanggalTerima' => $tanggal, 'bank' => $bank_name, 'updatedAt' => $now];
+                    if ($nominal_diterima > 0) $up['nominalDiterima'] = $nominal_diterima;
+                    if ($project_id) $up['projectId'] = $project_id;
+                    if ($needs_fill) {
+                        $up += [
+                            'dpp' => $dpp, 'dppNilaiLain' => $dpp_nilai_lain,
+                            'ppn' => $ppn, 'pph' => $pph,
+                            'nilaiProyek' => $nilai_proyek, 'labaSetelahPajak' => $laba,
+                            'pekerjaanPerusahaan' => $dpp,
+                        ];
+                    }
+                    $set_sql = implode(', ', array_map(fn($k) => "`$k`=?", array_keys($up)));
+                    $pdo->prepare("UPDATE FakturPendapatan SET $set_sql WHERE id=?")
+                        ->execute(array_merge(array_values($up), [$faktur_id]));
+                }
             } else {
-                $pdo->prepare(
-                    "INSERT INTO FakturPendapatan
-                     (id, entityId, npwp, noFaktur, masaPajak, tahunPajak,
-                      namaRekanan, namaJkp, dpp, dppNilaiLain,
-                      tarifPpnPersen, tarifPphPersen, ppn, pph,
-                      nilaiProyek, labaSetelahPajak, kodeJenisProyek,
-                      pekerjaanPerusahaan, pekerjaanYangDipinjam,
-                      tanggalTerima, bank, nominalDiterima, projectId,
-                      createdById, createdAt, updatedAt)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                )->execute(array_merge([uuid4()], $faktur_data, [$now, $now]));
+                $stmt_ef = $pdo->prepare(
+                    "SELECT id FROM FakturPendapatan WHERE noFaktur = ? AND entityId = ? LIMIT 1"
+                );
+                $stmt_ef->execute([$no_bukti, $target_entity_for_faktur]);
+                $existing_faktur_id = $stmt_ef->fetchColumn();
+
+                $faktur_data = [
+                    $target_entity_for_faktur, '-', $no_bukti, $masa, $tahun,
+                    $nama_rek, $nama_jkp, $dpp, $dpp_nilai_lain,
+                    $tarif_ppn, $tarif_pph, $ppn, $pph,
+                    $nilai_proyek, $laba, 1, $dpp, 0,
+                    $tanggal, $bank_name, $nominal_diterima, $project_id,
+                    $user['id'],
+                ];
+
+                if ($existing_faktur_id) {
+                    $pdo->prepare(
+                        "UPDATE FakturPendapatan SET
+                         entityId=?, npwp=?, noFaktur=?, masaPajak=?, tahunPajak=?,
+                         namaRekanan=?, namaJkp=?, dpp=?, dppNilaiLain=?,
+                         tarifPpnPersen=?, tarifPphPersen=?, ppn=?, pph=?,
+                         nilaiProyek=?, labaSetelahPajak=?, kodeJenisProyek=?,
+                         pekerjaanPerusahaan=?, pekerjaanYangDipinjam=?,
+                         tanggalTerima=?, bank=?, nominalDiterima=?, projectId=?,
+                         createdById=?, updatedAt=?
+                         WHERE id = ?"
+                    )->execute(array_merge($faktur_data, [$now, $existing_faktur_id]));
+                } else {
+                    $pdo->prepare(
+                        "INSERT INTO FakturPendapatan
+                         (id, entityId, npwp, noFaktur, masaPajak, tahunPajak,
+                          namaRekanan, namaJkp, dpp, dppNilaiLain,
+                          tarifPpnPersen, tarifPphPersen, ppn, pph,
+                          nilaiProyek, labaSetelahPajak, kodeJenisProyek,
+                          pekerjaanPerusahaan, pekerjaanYangDipinjam,
+                          tanggalTerima, bank, nominalDiterima, projectId,
+                          createdById, createdAt, updatedAt)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    )->execute(array_merge([uuid4()], $faktur_data, [$now, $now]));
+                }
             }
 
             // ── Update/Tambah Termin jika ada proyek

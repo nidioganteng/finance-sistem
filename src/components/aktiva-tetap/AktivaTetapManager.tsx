@@ -217,6 +217,9 @@ export function AktivaTetapManager({
   const livePenyusutanBulan = kategori !== "TANAH" && umurBulan > 0 ? liveDepreciable / umurBulan : 0;
   const livePenyusutanTahun = livePenyusutanBulan * 12;
 
+  const totalNilaiBukuAwal = summary.assets.reduce((total, asset) => total + asset.nilaiBukuAwalTahun, 0);
+  const totalNilaiBukuAwalFmt = formatRupiah(totalNilaiBukuAwal);
+
   const filteredTotals = filteredAssets.reduce(
     (total, asset) => ({
       perolehan: total.perolehan + asset.hargaPerolehanNum,
@@ -236,18 +239,18 @@ export function AktivaTetapManager({
         <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
-              Nilai Perolehan
+              Nilai Buku Awal {year}
             </span>
             <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-none">
               <Building2 size={16} />
             </div>
           </div>
           <div className="min-w-0">
-            <div className={`${getMetricValueFontSize(summary.totalHargaPerolehanFmt)} text-navy-text truncate`} title={summary.totalHargaPerolehanFmt}>
-              {summary.totalHargaPerolehanFmt}
+            <div className={`${getMetricValueFontSize(totalNilaiBukuAwalFmt)} text-navy-text truncate`} title={totalNilaiBukuAwalFmt}>
+              {totalNilaiBukuAwalFmt}
             </div>
             <div className="text-[11.5px] text-muted-faint mt-1 truncate">
-              Total {summary.assets.length} unit aset terdaftar
+              Saldo bawaan + perolehan baru {year}
             </div>
           </div>
         </div>
@@ -298,7 +301,7 @@ export function AktivaTetapManager({
         <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
-              Nilai Buku Awal {year + 1}
+              Saldo Akhir {year}
             </span>
             <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-none">
               <Landmark size={16} />
@@ -309,7 +312,7 @@ export function AktivaTetapManager({
               {summary.totalNilaiBukuFmt}
             </div>
             <div className="text-[11.5px] text-muted-faint mt-1 truncate">
-              Saldo akhir {year} = saldo awal {year + 1}
+              Menjadi saldo awal {year + 1}
             </div>
           </div>
         </div>
@@ -367,7 +370,7 @@ export function AktivaTetapManager({
                         </span>
                         {!isSelected && <ChevronRight size={15} className="shrink-0 text-muted-strong group-hover:text-brand" />}
                       </div>
-                      <div className="text-[11px] font-medium text-muted-strong mb-1">Nilai buku awal {year + 1}</div>
+                      <div className="text-[11px] font-medium text-muted-strong mb-1">Saldo akhir {year}</div>
                       <div className={`${isSelected ? "text-[28px]" : "text-[22px]"} font-bold tracking-tight text-navy-text tabular-nums break-words`}>
                         {rekap.totalNilaiBukuFmt}
                       </div>
@@ -467,7 +470,7 @@ export function AktivaTetapManager({
                 <th className="py-3 px-5 text-right">Nilai Buku Awal {year}</th>
                 <th className="py-3 px-5 text-right">Beban {year}</th>
                 <th className="py-3 px-5 text-right">Akumulasi s/d {year}</th>
-                <th className="py-3 px-5 text-right">Nilai Buku Awal {year + 1}</th>
+                <th className="py-3 px-5 text-right">Saldo Akhir {year}</th>
                 <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
@@ -520,7 +523,7 @@ export function AktivaTetapManager({
                               <span className="text-[12px]">Perolehan: {formatRupiah(categoryTotals.perolehan)}</span>
                               <span className="text-[12px]">Beban {year}: {formatRupiah(categoryTotals.beban)}</span>
                               <span className="text-[12px]">Akumulasi: {formatRupiah(categoryTotals.akumulasi)}</span>
-                              <span className="text-[12px] font-bold">Nilai Buku Awal {year + 1}: {formatRupiah(categoryTotals.nilaiBuku)}</span>
+                              <span className="text-[12px] font-bold">Saldo Akhir {year}: {formatRupiah(categoryTotals.nilaiBuku)}</span>
                               <span className="ml-auto text-[12px] font-semibold text-brand">
                                 {isExpanded ? "Tutup rincian" : "Lihat rincian"}
                               </span>

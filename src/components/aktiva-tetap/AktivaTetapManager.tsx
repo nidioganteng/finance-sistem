@@ -334,7 +334,9 @@ export function AktivaTetapManager({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {summary.rekapPerKategori.map((rekap) => {
+            {summary.rekapPerKategori
+              .filter((rekap) => selectedKategori === "ALL" || rekap.kategori === selectedKategori)
+              .map((rekap) => {
               const isSelected = selectedKategori === rekap.kategori;
               return (
                 <button

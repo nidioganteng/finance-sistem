@@ -268,7 +268,7 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
         (float)($body['pekerjaanYangDipinjam'] ?? 0),
         !empty($body['tanggalTerima']) ? $body['tanggalTerima'] : null,
         !empty($body['bank']) ? $body['bank'] : null,
-        isset($body['nominalDiterima']) && $body['nominalDiterima'] !== '' ? (float)$body['nominalDiterima'] : null,
+        isset($body['nominalDiterima']) && $body['nominalDiterima'] !== '' ? (float)$body['nominalDiterima'] : 0,
         $body['projectId'] ?? null,
         $body['bankTransactionId'] ?? null,
         $user['id'],

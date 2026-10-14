@@ -70,3 +70,58 @@
 - **Duplikat noBukti behavior**: Node.js auto-suffix (`-A2`, `-A3`) untuk multi-termin; PHP return 409. Ini perbedaan desain yang disengaja di PHP — lebih eksplisit. Tidak perlu diubah kecuali ada keluhan pengguna.
 
 ---
+
+## aset-tetap — `api/routes/aset-tetap.php`
+
+**Status: ⏸ Menunggu keputusan tim — kode tidak diubah**
+
+### Gap yang teridentifikasi (belum diperbaiki)
+
+| Gap | Deskripsi | Kode PHP | Kode Node.js |
+|-----|-----------|----------|--------------|
+| 6 kategori vs 4 PSAK | PHP: `KENDARAAN/PERALATAN/MESIN/GEDUNG/INVENTARIS/LAINNYA` | `aset-tetap.php:9` | `aset-tetap.ts:5` |
+| PHP menyusutkan Tanah | Tidak ada guard `kategori = TANAH` → umurBulan > 0 diterima dan disusutkan | `akuntansi-helpers.php:49` | `aset-tetap.ts:119` |
+| Tidak ada `akumulasiPenyusutanAwalTahun` | PHP hanya return `akumulasiPenyusutan` dan `nilaiBuku` untuk tahun target; tidak ada angka pembuka tahun | `aset-tetap.php:44–48` | `aset-tetap.ts:62–206` |
+
+### Keputusan tim yang diperlukan sebelum kode disentuh
+
+- **A** — Adopsi 4 kategori PSAK (Tanah/Bangunan/Kendaraan/Peralatan Kantor) atau tetap 6?
+- **B** — Migrasi data lama: GEDUNG→BANGUNAN, MESIN/INVENTARIS/LAINNYA→PERALATAN_KANTOR — otomatis atau manual per aset?
+- **C** — Aset Tanah dengan `umurBulan > 0` yang sudah dihitung penyusutannya: reset atau biarkan?
+- **D** — Laporan neraca perlu menyesuaikan setelah kategori distandarkan?
+
+### Query preview (baca saja, jangan dijalankan ke produksi)
+
+```sql
+-- Sebaran aset per kategori dengan umurBulan > 0
+SELECT kategori,
+       COUNT(*)                         AS jumlah_aset,
+       SUM(hargaPerolehan)              AS total_harga,
+       SUM(CASE WHEN umurBulan > 0 THEN 1 ELSE 0 END) AS aset_disusutkan,
+       SUM(CASE WHEN umurBulan = 0 THEN 1 ELSE 0 END) AS aset_tidak_disusutkan
+FROM AsetTetap
+GROUP BY kategori
+ORDER BY kategori;
+
+-- Aset yang terdampak migrasi kategori
+SELECT id, kode, nama, kategori, entityId,
+       hargaPerolehan, nilaiResidu, umurBulan,
+       tanggalPerolehan
+FROM AsetTetap
+WHERE kategori IN ('GEDUNG', 'MESIN', 'INVENTARIS', 'LAINNYA')
+ORDER BY kategori, entityId;
+
+-- Aset yang bernama/berkategori Tanah dengan umurBulan > 0 (harus 0 per PSAK 16)
+SELECT id, kode, nama, kategori, entityId,
+       hargaPerolehan, nilaiResidu, umurBulan,
+       tanggalPerolehan
+FROM AsetTetap
+WHERE (
+    LOWER(nama) LIKE '%tanah%'
+    OR LOWER(kode) LIKE '%tanah%'
+)
+AND umurBulan > 0
+ORDER BY entityId;
+```
+
+---

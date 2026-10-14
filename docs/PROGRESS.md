@@ -1,0 +1,68 @@
+# Progress Perbaikan PHP Backend
+
+> Dibuat setelah tes uji manual modul. Setiap modul dicatat setelah semua
+> skenario lulus. Modul yang belum diuji tidak ada di sini.
+
+---
+
+## piutang — `api/routes/piutang.php`
+
+**Commit 1:** `cadf998` — fix silent skip COA dan cek duplikat noBukti  
+**Commit 2:** `7d7ec8f` — koreksi kode COA piutang/hutang (Bug A dan B)
+
+### Skenario uji (dijalankan otomatis via `tests/manual/piutang-pelunasan.sh`)
+
+| # | Skenario | Hasil diharapkan | Hasil aktual | Status |
+|---|----------|-----------------|--------------|--------|
+| 1 | Pelunasan normal gaharu←tataring (kasKecil) | HTTP 201, 4 baris, COA 113/1200/312/1300 debit/kredit benar | HTTP 201, 4 baris, semua COA dan arah benar | ✓ Lulus |
+| 2 | jenisKasSumber=bankBuku (tidak ada di map) | HTTP 422, 0 baris di DB | HTTP 422, 0 baris | ✓ Lulus |
+| 3 | noBukti sama dikirim dua kali | Kirim-1 201, kirim-2 409, total 4 baris | Kirim-1 201, kirim-2 409, 4 baris | ✓ Lulus |
+| 4 | Pelunasan kencana←gaharu (kasBesar), verifikasi Bug A | HTTP 201, 4 baris, COA 112/110/311/120, COA 111+312 tidak ada | HTTP 201, COA benar, COA salah lama tidak ada | ✓ Lulus |
+
+**29 assertion lulus, 0 gagal.**
+
+### Bug yang diperbaiki
+
+| Bug | Deskripsi | Status |
+|-----|-----------|--------|
+| Silent skip COA | `coa_by_jenis()` mengembalikan null jika entitas belum punya transaksi kas → INSERT dilewati diam-diam, saldo tidak balance | Diperbaiki (Commit 1) |
+| Duplikat noBukti | Tidak ada cek → pelunasan sama bisa dikirim dua kali | Diperbaiki (Commit 1) |
+| Validasi nominal | `empty()` meloloskan nilai 0 atau negatif | Diperbaiki (Commit 1) |
+| Bug A — gaharu/kencana tertukar | `entity_code_map` menukar kode COA gaharu↔kencana | Diperbaiki (Commit 2) |
+| Bug B — ciptaAsri tidak cocok | `strtolower('ciptaAsri')` = `'ciptaasri'` tidak ditemukan di map | Diperbaiki (Commit 2) |
+
+### Catatan terbuka (belum diubah)
+
+- **Race condition `last_saldo()`** (`piutang.php:283`): dua request bersamaan membaca saldo yang sama sebelum commit → `saldoSetelah` tidak akurat. Fix yang benar butuh `SELECT ... FOR UPDATE` di dalam transaction. Dampaknya hanya angka running balance (tidak ada data hilang). Menunggu keputusan apakah ini prioritas.
+- **Data historis Bug A dan B**: transaksi sebelum Commit 2 yang melibatkan gaharu↔kencana atau ciptaAsri menggunakan kode COA yang salah. Data tidak disentuh. Query diagnostik tersedia di response sebelumnya.
+
+---
+
+## jurnal-transaksi — `api/routes/jurnal-transaksi.php`
+
+**Commit 1:** `a1f2f95` — tambah `sync_project_spend()` di POST dan DELETE  
+**Commit 2:** `71957fd` — tangani parameter `fakturId` (Transaction link + edit-safe)
+
+### Skenario uji (dijalankan otomatis via `tests/manual/jurnal-transaksi-syncspend.sh`)
+
+| # | Skenario | Hasil diharapkan | Hasil aktual | Status |
+|---|----------|-----------------|--------------|--------|
+| 1 | POST jurnal BEBAN 5jt ke proyek → Project.spend bertambah 5jt | HTTP 200, delta spend = 5.000.000 | HTTP 200, delta = 5.000.000 | ✓ Lulus |
+| 2 | DELETE jurnal yang sama → Project.spend berkurang 5jt | HTTP 200, delta spend = −5.000.000 | HTTP 200, delta = −5.000.000 | ✓ Lulus |
+
+**5 assertion lulus, 0 gagal.**
+
+### Bug yang diperbaiki
+
+| Bug | Deskripsi | Status |
+|-----|-----------|--------|
+| `syncProjectSpend` tidak ada | POST/DELETE jurnal tidak pernah memperbarui `Project.spend` — nilai selalu 0 (stale) | Diperbaiki (Commit 1) |
+| `fakturId` diabaikan di INSERT | Kolom `fakturId` di Transaction tidak diisi — transaksi tidak terhubung ke faktur | Diperbaiki (Commit 2) |
+| Edit mode hapus faktur | `DELETE FakturPendapatan WHERE noFaktur=?` menghapus faktur yang mungkin dibuat manual di modul pendapatan | Diperbaiki (Commit 2) |
+| Faktur sync salah sasaran | Saat `fakturId` ada, upsert by noFaktur bisa menimpa faktur yang salah | Diperbaiki (Commit 2) |
+
+### Catatan terbuka (belum diubah)
+
+- **Duplikat noBukti behavior**: Node.js auto-suffix (`-A2`, `-A3`) untuk multi-termin; PHP return 409. Ini perbedaan desain yang disengaja di PHP — lebih eksplisit. Tidak perlu diubah kecuali ada keluhan pengguna.
+
+---

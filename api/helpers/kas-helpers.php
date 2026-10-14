@@ -315,3 +315,111 @@ function hitung_dpp_dari_kwitansi(float $nilai_kwitansi): float {
 function hitung_dpp_nilai_lain(float $dpp): float {
     return round(($dpp * 11) / 12);
 }
+
+/**
+ * Hitung dan update Project.spend dari semua transaksi terkait proyek.
+ * Logika: 1:1 dengan syncProjectSpend() di src/lib/piutang.ts
+ *
+ * 4 prioritas: (1) crossing entries di entitas proyek, (2) transaksi normal BEBAN/5xx/6xx,
+ * (3) transaksi dari entitas lain yang belum di-cover crossing, (4) honor tenaga ahli.
+ */
+function sync_project_spend(PDO $pdo, string $project_id): float {
+    $stmt = $pdo->prepare('SELECT id, entityId FROM Project WHERE id = ?');
+    $stmt->execute([$project_id]);
+    $project = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$project) return 0.0;
+
+    $stmt = $pdo->prepare(
+        "SELECT t.noBukti, t.entityId, t.debit, t.kredit, t.keterangan, t.extraFieldsJson,
+                c.code as coa_code, c.name as coa_name, c.kategori as coa_kategori
+         FROM `Transaction` t
+         LEFT JOIN CoaAccount c ON t.coaAccountId = c.id
+         WHERE t.projectId = ?
+           AND (JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL
+                OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')"
+    );
+    $stmt->execute([$project_id]);
+    $jurnal = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Himpunan noBukti income dan noBukti semua jurnal (untuk cek HonorTenagaAhli)
+    $income_nb = [];
+    $jurnal_nb = [];
+    foreach ($jurnal as $j) {
+        if (empty($j['noBukti'])) continue;
+        $jurnal_nb[$j['noBukti']] = true;
+        if (
+            ($j['coa_kategori'] ?? '') === 'PENDAPATAN'
+            || ($j['coa_code'] ?? '') === '400'
+            || stripos($j['coa_name'] ?? '', 'pendapatan') !== false
+        ) {
+            $income_nb[$j['noBukti']] = true;
+        }
+    }
+
+    $seen  = [];
+    $total = 0.0;
+
+    // Prioritas 1: Crossing entries di entitas proyek (talangan dari entitas lain)
+    foreach ($jurnal as $j) {
+        if (!empty($j['noBukti']) && isset($income_nb[$j['noBukti']])) continue;
+        $extra = $j['extraFieldsJson'] ? json_decode($j['extraFieldsJson'], true) : [];
+        if ($j['entityId'] === $project['entityId'] && !empty($extra['isCrossingEntry']) && (float)$j['debit'] > 0) {
+            $total += (float)$j['debit'];
+            if (!empty($extra['crossingGroupId'])) $seen[$extra['crossingGroupId']] = true;
+            if (!empty($j['noBukti']))              $seen[$j['noBukti']]             = true;
+        }
+    }
+
+    // Prioritas 2: Transaksi normal di entitas proyek sendiri
+    foreach ($jurnal as $j) {
+        $extra = $j['extraFieldsJson'] ? json_decode($j['extraFieldsJson'], true) : [];
+        if (!empty($j['noBukti']) && isset($income_nb[$j['noBukti']])) {
+            // Potongan pajak dalam baris pendapatan tetap dihitung sebagai spend
+            $is_tax = (float)$j['debit'] > 0 && (
+                ($j['coa_kategori'] ?? '') === 'BEBAN'
+                || preg_match('/pph|pajak|ppn|bupot/i', $j['coa_name'] ?? '')
+                || preg_match('/pph|pajak|ppn|potongan/i', $j['keterangan'] ?? '')
+            );
+            if ($is_tax) $total += (float)$j['debit'];
+            continue;
+        }
+        if ($j['entityId'] === $project['entityId'] && empty($extra['isCrossingEntry'])) {
+            $code     = $j['coa_code'] ?? '';
+            $is_beban = ($j['coa_kategori'] ?? '') === 'BEBAN'
+                || str_starts_with($code, '5')
+                || str_starts_with($code, '6');
+            if ($is_beban && (float)$j['debit'] > 0) {
+                $total += (float)$j['debit'];
+            } elseif ((float)$j['debit'] > 0 && !preg_match('/bank|kas|piutang/i', $j['coa_name'] ?? '')) {
+                $total += (float)$j['debit'];
+            }
+        }
+    }
+
+    // Prioritas 3: Transaksi pengeluaran dari entitas lain untuk proyek ini
+    foreach ($jurnal as $j) {
+        if (!empty($j['noBukti']) && isset($income_nb[$j['noBukti']])) continue;
+        if ($j['entityId'] !== $project['entityId'] && (float)$j['debit'] > 0) {
+            $extra = $j['extraFieldsJson'] ? json_decode($j['extraFieldsJson'], true) : [];
+            $gid   = $extra['crossingGroupId'] ?? null;
+            if ($gid && isset($seen[$gid]))                              continue;
+            if (!empty($j['noBukti']) && isset($seen[$j['noBukti']])) continue;
+            $total += (float)$j['debit'];
+            if ($gid)                  $seen[$gid]             = true;
+            if (!empty($j['noBukti'])) $seen[$j['noBukti']]   = true;
+        }
+    }
+
+    // Prioritas 4: Honor Tenaga Ahli yang dibebankan ke proyek ini
+    $stmt = $pdo->prepare('SELECT nominalHonor, noBukti FROM HonorTenagaAhli WHERE projectId = ?');
+    $stmt->execute([$project_id]);
+    $honors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($honors as $h) {
+        $nb = $h['noBukti'] ?? null;
+        if ($nb && (isset($seen[$nb]) || isset($jurnal_nb[$nb]))) continue;
+        $total += (float)$h['nominalHonor'];
+    }
+
+    $pdo->prepare('UPDATE Project SET spend = ? WHERE id = ?')->execute([$total, $project_id]);
+    return $total;
+}

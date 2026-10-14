@@ -185,17 +185,40 @@ if ($method === 'GET' && $sub_action === 'faktur') {
     json_response(['data' => $rows]);
 }
 
+// ─── Helper: ambil tarif PPN aktif dari TarifPajak ───────────────────────────
+function get_tarif_ppn_aktif(PDO $pdo): float {
+    $stmt = $pdo->query(
+        "SELECT tarifPersen FROM TarifPajak
+          WHERE active = 1 AND jenis = 'PPN'
+          ORDER BY tanggalMulai DESC LIMIT 1"
+    );
+    $row = $stmt->fetch();
+    return $row ? (float)$row['tarifPersen'] : 11.0; // fallback jika TarifPajak kosong
+}
+
 // ─── Helper: hitung pajak dari input faktur ──────────────────────────────────
-function hitung_pajak_faktur(array $b): array {
+// nilaiProyek = round(dpp × 111/100), sesuai spec Nilai Proyek = DPP × 111%.
+// Path kuitansi bruto: jika nilaiKuitansi > 0, nilaiProyek = nilaiKuitansi dan
+// ppn = round(nilaiKuitansi × 11/111) — formula bruto PPN 11% dalam harga termasuk.
+function hitung_pajak_faktur(array $b, float $tarif_ppn_default = 11.0): array {
     $dpp            = (float)($b['dpp']            ?? 0);
     $dpp_nilai_lain = (float)($b['dppNilaiLain']   ?? $b['dpp_nilai_lain'] ?? 0);
-    $tarif_ppn      = (float)($b['tarifPpnPersen'] ?? $b['tarif_ppn_persen'] ?? 11.00);
+    $tarif_ppn      = (float)($b['tarifPpnPersen'] ?? $b['tarif_ppn_persen'] ?? $tarif_ppn_default);
     $tarif_pph      = (float)($b['tarifPphPersen'] ?? $b['tarif_pph_persen'] ?? 3.50);
+    $nilai_kuitansi = (float)($b['nilaiKuitansi']  ?? 0);
 
-    $ppn              = round($dpp_nilai_lain * $tarif_ppn / 100);
-    $pph              = round($dpp * $tarif_pph / 100);
-    $nilai_proyek     = $dpp + $ppn;
-    $laba_setelah_pajak = $dpp - $pph;
+    $pph = (int)round($dpp * $tarif_pph / 100);
+
+    if ($nilai_kuitansi > 0) {
+        // Kuitansi bruto: nilaiProyek = nilai kuitansi, ppn = 11/111 × nilaiKuitansi
+        $ppn          = (int)round($nilai_kuitansi * 11 / 111);
+        $nilai_proyek = (int)$nilai_kuitansi;
+    } else {
+        $ppn          = (int)round($dpp_nilai_lain * $tarif_ppn / 100);
+        $nilai_proyek = (int)round($dpp * 111 / 100); // fix: dpp×111/100, bukan dpp+ppn
+    }
+
+    $laba_setelah_pajak = (int)round($dpp - $pph);
 
     return compact('ppn', 'pph', 'nilai_proyek', 'laba_setelah_pajak');
 }
@@ -210,10 +233,11 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
         }
     }
 
-    $kalkulasi = hitung_pajak_faktur($body);
-    $pdo       = get_pdo();
-    $id        = uuid4();
-    $now       = date('Y-m-d H:i:s');
+    $pdo             = get_pdo();
+    $tarif_ppn_aktif = get_tarif_ppn_aktif($pdo);
+    $kalkulasi       = hitung_pajak_faktur($body, $tarif_ppn_aktif);
+    $id              = uuid4();
+    $now             = date('Y-m-d H:i:s');
 
     $pdo->prepare(
         'INSERT INTO FakturPendapatan
@@ -267,8 +291,10 @@ if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
     $stmt->execute([$record_id]);
     if (!$stmt->fetch()) error_response('Faktur tidak ditemukan.', 404);
 
-    $kalkulasi = hitung_pajak_faktur($body);
-    $now       = date('Y-m-d H:i:s');
+    // Gunakan tarif aktif dari DB sebagai default jika client tidak mengirim tarifPpnPersen
+    $tarif_ppn_aktif = get_tarif_ppn_aktif($pdo);
+    $kalkulasi       = hitung_pajak_faktur($body, $tarif_ppn_aktif);
+    $now             = date('Y-m-d H:i:s');
 
     // Bangun SET clause dinamis dari field yang dikirim
     $allowed_fields = [

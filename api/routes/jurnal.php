@@ -80,7 +80,7 @@ if ($method === 'GET' && $sub === '') {
 
     $where_sql = implode(' AND ', $where_parts);
 
-    $page_size = 25;
+    $page_size = min(100, max(10, (int)($_GET['limit'] ?? 25)));
 
     // Count total
     $count_sql = "SELECT COUNT(*) FROM `Transaction` t

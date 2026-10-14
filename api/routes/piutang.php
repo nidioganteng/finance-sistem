@@ -248,29 +248,30 @@ if ($method === 'POST' && $sub_action === 'pelunasan') {
     $jenis_tujuan = $stmt->fetch();
     if (!$jenis_tujuan) error_response('Jenis kas tujuan tidak ditemukan.', 404);
 
-    // Peta COA piutang/hutang antar entitas.
-    // Bug A (gaharu/kencana tertukar) dan Bug B (strtolower ciptaAsri) masih
-    // ada di sini — dikoreksi terpisah di commit berikutnya agar diff minimal.
+    // Peta COA piutang/hutang antar entitas — kunci sesuai key DB (exact case).
+    // Urutan: kencana→111/311, gaharu→112/312 mengikuti nama COA di seed
+    // (111=PIUTANG KAK/kencana, 112=PIUTANG GS/gaharu).
+    // Sebelumnya tertukar (Bug A) dan ciptaAsri tidak pernah cocok karena
+    // strtolower (Bug B) — keduanya dikoreksi di sini; data historis tidak diubah.
     $entity_code_map = [
-        'gaharu'   => ['piutang' => '111', 'hutang' => '311'],
-        'kencana'  => ['piutang' => '112', 'hutang' => '312'],
-        'tataring' => ['piutang' => '113', 'hutang' => '313'],
-        'ciptaAsri'=> ['piutang' => '114', 'hutang' => '314'],
-        'umum'     => ['piutang' => '115', 'hutang' => '315'],
+        'kencana'   => ['piutang' => '111', 'hutang' => '311'],
+        'gaharu'    => ['piutang' => '112', 'hutang' => '312'],
+        'tataring'  => ['piutang' => '113', 'hutang' => '313'],
+        'ciptaAsri' => ['piutang' => '114', 'hutang' => '314'],
+        'umum'      => ['piutang' => '115', 'hutang' => '315'],
     ];
-    $cok = strtolower($current_entity['key']);
-    $cpk = strtolower($counterparty_entity['key']);
+    // Gunakan key DB langsung (tanpa strtolower) agar ciptaAsri cocok.
+    $cok = $current_entity['key'];
+    $cpk = $counterparty_entity['key'];
 
-    // Peta COA kas hardcoded (sesuai seed/database), menggantikan coa_by_jenis()
-    // yang bergantung riwayat transaksi dan bisa mengembalikan null diam-diam.
-    // Kunci pakai lowercase agar cocok dengan strtolower di atas.
+    // Peta COA kas hardcoded (sesuai seed/database).
     $kas_kecil_map = [
         'gaharu' => '1200', 'kencana' => '1100', 'tataring' => '1300',
-        'ciptaasri' => '1400', 'umum' => '1500',
+        'ciptaAsri' => '1400', 'umum' => '1500',
     ];
     $kas_besar_map = [
         'gaharu' => '120', 'kencana' => '110', 'tataring' => '130',
-        'ciptaasri' => '140', 'umum' => '150',
+        'ciptaAsri' => '140', 'umum' => '150',
     ];
 
     function cari_coa(string $code): ?array {

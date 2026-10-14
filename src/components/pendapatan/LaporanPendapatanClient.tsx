@@ -1771,11 +1771,7 @@ export function LaporanPendapatanClient({
                     const p = data.projectOptions.find((x) => x.id === selectedProjId);
                     setSelectedTerminId("");
                     setShowManualDppFallback(false);
-                    if (p?.existingFakturs && p.existingFakturs.length > 0) {
-                      setNoFakturMode("existing");
-                    } else {
-                      setNoFakturMode("new");
-                    }
+                    setNoFakturMode("new");
                     setFormFaktur((prev) => ({
                       ...prev,
                       projectId: selectedProjId,
@@ -1806,97 +1802,57 @@ export function LaporanPendapatanClient({
                           </span>
                         </div>
 
-                        {/* Pilihan Nomor Faktur Proyek (Dukungan Multi-Termin / Amrahan) */}
-                        {distinctProjectFakturs.length > 0 ? (
-                          <div className="p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 space-y-2.5">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <label className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                                <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                <span>Nomor Faktur Proyek ({distinctProjectFakturs.length} Tersedia)</span>
+                        {/* Dropdown Nomor Faktur Proyek (Amrahan / Multi-Termin) */}
+                        {distinctProjectFakturs.length > 0 && (
+                          <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200/90 dark:border-blue-500/20 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                <span>Nomor Faktur Proyek (Amrahan)</span>
                               </label>
-                              <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
-                                Amrahan / Multi-Termin
+                              <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400 px-2 py-0.5 rounded-full font-semibold">
+                                {distinctProjectFakturs.length} Nomor Terdaftar
                               </span>
                             </div>
-
-                            <p className="text-[11px] text-blue-800 dark:text-blue-300/90 leading-relaxed">
-                              Proyek ini telah memiliki riwayat faktur. Anda dapat menggunakan nomor faktur yang sama untuk penagihan bertahap (Amrahan), atau membuat nomor faktur baru.
-                            </p>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setNoFakturMode("existing");
-                                  if (distinctProjectFakturs.length === 1) {
-                                    handleSelectExistingProjectFaktur(distinctProjectFakturs[0].noFaktur);
-                                  }
-                                }}
-                                className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all flex items-start gap-2 cursor-pointer border ${
-                                  noFakturMode === "existing"
-                                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                    : "bg-surface-card text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800/60 hover:bg-blue-100/50"
-                                }`}
-                              >
-                                <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${noFakturMode === "existing" ? "text-white" : "text-blue-600"}`} />
-                                <div>
-                                  <div className="font-bold">Gunakan No. Faktur yang Ada</div>
-                                  <div className={`text-[10.5px] ${noFakturMode === "existing" ? "text-blue-100" : "text-blue-700/80 dark:text-blue-300/80"}`}>
-                                    Lanjutkan penagihan Amrahan ke-{distinctProjectFakturs[0]?.count ? distinctProjectFakturs[0].count + 1 : 2}
-                                  </div>
-                                </div>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
+                            <select
+                              value={noFakturMode === "new" ? "__NEW__" : formFaktur.noFaktur}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val || val === "__NEW__") {
                                   setNoFakturMode("new");
                                   setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
                                   setAmrahanDetected(null);
-                                }}
-                                className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all flex items-start gap-2 cursor-pointer border ${
-                                  noFakturMode === "new"
-                                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                    : "bg-surface-card text-navy-text border-border-soft hover:bg-surface-subtle"
-                                }`}
-                              >
-                                <Plus className={`w-4 h-4 mt-0.5 shrink-0 ${noFakturMode === "new" ? "text-white" : "text-navy-muted"}`} />
-                                <div>
-                                  <div className="font-bold">Input No. Faktur Baru</div>
-                                  <div className={`text-[10.5px] ${noFakturMode === "new" ? "text-blue-100" : "text-navy-soft"}`}>
-                                    Ketik nomor faktur baru manual
-                                  </div>
-                                </div>
-                              </button>
-                            </div>
-
-                            {noFakturMode === "existing" && (
-                              <div className="pt-1">
-                                <label className="block text-[11px] font-bold text-blue-950 dark:text-blue-200 mb-1">
-                                  Pilih Nomor Faktur Lama:
-                                </label>
-                                <select
-                                  value={formFaktur.noFaktur}
-                                  onChange={(e) => handleSelectExistingProjectFaktur(e.target.value)}
-                                  className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-lg bg-surface-card text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-semibold cursor-pointer"
-                                >
-                                  <option value="">-- Pilih Nomor Faktur dari Proyek Ini --</option>
-                                  {distinctProjectFakturs.map((df) => (
-                                    <option key={df.noFaktur} value={df.noFaktur}>
-                                      {df.noFaktur} — {df.latest.namaJkp} ({formatRupiah(df.latest.nilaiProyek)}) [Tagihan ke-{df.count + 1}]
-                                    </option>
-                                  ))}
-                                  <option value="__MANUAL_NEW__">+ Buat / Ketik Nomor Faktur Baru...</option>
-                                </select>
+                                } else {
+                                  setNoFakturMode("existing");
+                                  handleSelectExistingProjectFaktur(val);
+                                }
+                              }}
+                              className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-lg bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold cursor-pointer"
+                            >
+                              <option value="__NEW__">+ Input Nomor Faktur Baru (Ketik Manual)</option>
+                              {distinctProjectFakturs.map((df) => (
+                                <option key={df.noFaktur} value={df.noFaktur}>
+                                  Gunakan {df.noFaktur} — {df.latest.namaJkp} ({formatRupiah(df.latest.nilaiProyek)})
+                                </option>
+                              ))}
+                            </select>
+                            {noFakturMode === "existing" && formFaktur.noFaktur ? (
+                              <div className="text-[11px] text-blue-900 dark:text-blue-300 bg-surface-input p-2 rounded-lg border border-blue-100 dark:border-blue-500/20 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                                  <span>
+                                    Amrahan: <strong className="font-mono">{formFaktur.noFaktur}</strong>
+                                  </span>
+                                </span>
+                                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-1.5 py-0.5 rounded">
+                                  Rincian & nominal otomatis dipanggil
+                                </span>
                               </div>
+                            ) : (
+                              <p className="text-[11px] text-blue-800 dark:text-blue-300">
+                                Pilih nomor faktur yang sudah ada untuk tagihan bertahap (Amrahan), atau pilih buat nomor baru.
+                              </p>
                             )}
-                          </div>
-                        ) : (
-                          <div className="p-2.5 rounded-lg bg-surface-subtle/60 border border-border-soft text-[11px] text-navy-soft flex items-center gap-2">
-                            <Info className="w-3.5 h-3.5 text-navy-muted shrink-0" />
-                            <span>
-                              Belum ada nomor faktur sebelumnya di proyek ini. Nomor faktur baru yang Anda input akan otomatis terhubung ke proyek <strong>{sel.code}</strong>.
-                            </span>
                           </div>
                         )}
 
@@ -1967,64 +1923,22 @@ export function LaporanPendapatanClient({
               {/* Form Grid 1: Basic Faktur Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-navy-text">
-                      Nomor E-Faktur <span className="text-rose-500">*</span>
-                    </label>
-                    {distinctProjectFakturs.length > 0 && !editingFaktur && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextMode = noFakturMode === "existing" ? "new" : "existing";
-                          setNoFakturMode(nextMode);
-                          if (nextMode === "new") {
-                            setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
-                            setAmrahanDetected(null);
-                          }
-                        }}
-                        className="text-[10.5px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
-                      >
-                        {noFakturMode === "existing" ? "✏️ Ketik Manual" : "📋 Pilih dari Proyek"}
-                      </button>
-                    )}
-                  </div>
-                  {distinctProjectFakturs.length > 0 && noFakturMode === "existing" && !editingFaktur ? (
-                    <select
-                      value={formFaktur.noFaktur}
-                      onChange={(e) => {
-                        if (e.target.value === "__MANUAL_NEW__") {
-                          setNoFakturMode("new");
-                          setFormFaktur((prev) => ({ ...prev, noFaktur: "" }));
-                          setAmrahanDetected(null);
-                        } else {
-                          handleSelectExistingProjectFaktur(e.target.value);
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-xs font-mono font-semibold border border-blue-300 dark:border-blue-500/40 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                    >
-                      <option value="">-- Pilih No. Faktur Proyek ({distinctProjectFakturs.length}) --</option>
-                      {distinctProjectFakturs.map((df) => (
-                        <option key={df.noFaktur} value={df.noFaktur}>
-                          {df.noFaktur} — {df.latest.namaJkp} (Kuitansi: {formatRupiah(df.latest.nilaiProyek)}) [Tagihan ke-{df.count + 1}]
-                        </option>
-                      ))}
-                      <option value="__MANUAL_NEW__">+ Input Nomor Faktur Baru / Manual...</option>
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      required
-                      placeholder="010.000-24.00000001"
-                      value={formFaktur.noFaktur}
-                      onChange={(e) => handleNoFakturChange(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  )}
+                  <label className="block text-xs font-semibold text-navy-text mb-1">
+                    Nomor E-Faktur <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="010.000-24.00000001"
+                    value={formFaktur.noFaktur}
+                    onChange={(e) => handleNoFakturChange(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-mono border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                   {selectedProject && (
                     <span className="text-[10px] text-navy-soft mt-1 block">
-                      {distinctProjectFakturs.length > 0 && noFakturMode === "existing"
-                        ? "Memilih nomor di atas otomatis memanggil rincian rekanan & nominal proyek lama untuk amrahan."
-                        : `Nomor faktur akan otomatis tersimpan dan terhubung ke proyek ${selectedProject.code}.`}
+                      {amrahanDetected
+                        ? `Nomor faktur amrahan untuk proyek ${selectedProject.code}.`
+                        : `Akan tersimpan ke proyek ${selectedProject.code}.`}
                     </span>
                   )}
                 </div>

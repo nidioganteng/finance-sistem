@@ -287,14 +287,21 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
 // ─── PUT /api/pendapatan/faktur/:id ──────────────────────────────────────────
 if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
     $pdo  = get_pdo();
-    $stmt = $pdo->prepare('SELECT id FROM FakturPendapatan WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, tarifPpnPersen, tarifPphPersen FROM FakturPendapatan WHERE id = ?');
     $stmt->execute([$record_id]);
-    if (!$stmt->fetch()) error_response('Faktur tidak ditemukan.', 404);
+    $existing = $stmt->fetch();
+    if (!$existing) error_response('Faktur tidak ditemukan.', 404);
 
-    // Gunakan tarif aktif dari DB sebagai default jika client tidak mengirim tarifPpnPersen
-    $tarif_ppn_aktif = get_tarif_ppn_aktif($pdo);
-    $kalkulasi       = hitung_pajak_faktur($body, $tarif_ppn_aktif);
-    $now             = date('Y-m-d H:i:s');
+    // Jika client tidak kirim tarifPpnPersen/tarifPphPersen, pakai nilai tersimpan di DB —
+    // bukan tarif terbaru. Sama dengan Node.js pendapatan.ts:169-174.
+    if (!array_key_exists('tarifPpnPersen', $body)) {
+        $body['tarifPpnPersen'] = (float)$existing['tarifPpnPersen'];
+    }
+    if (!array_key_exists('tarifPphPersen', $body)) {
+        $body['tarifPphPersen'] = (float)$existing['tarifPphPersen'];
+    }
+    $kalkulasi = hitung_pajak_faktur($body);
+    $now       = date('Y-m-d H:i:s');
 
     // Bangun SET clause dinamis dari field yang dikirim
     $allowed_fields = [

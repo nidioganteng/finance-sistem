@@ -152,14 +152,29 @@ if ($method === 'POST' && $sub === 'assignment') {
             'X-Internal-Secret: ' . INTERNAL_SECRET,
         ],
     ]);
-    curl_exec($ch);
+    $cb_response  = curl_exec($ch);
+    $cb_errno     = curl_errno($ch);
+    $cb_http_code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    $sync_back_ok = ($cb_errno === 0 && $cb_http_code >= 200 && $cb_http_code < 300);
+    if (!$sync_back_ok) {
+        $sync_err = $cb_errno !== 0
+            ? 'curl error ' . $cb_errno . ': ' . curl_strerror($cb_errno)
+            : "HTTP $cb_http_code dari Sidamon";
+        log_activity('system', "Sync-back ke Sidamon GAGAL untuk project $code: $sync_err",
+            'USER_ACTIVITY', ['projectId' => $project_id, 'assignmentId' => $assignment_id]);
+    }
 
     json_response([
         'success'   => true,
         'action'    => 'created',
         'projectId' => $project_id,
         'code'      => $code,
+        'syncBack'  => [
+            'success' => $sync_back_ok,
+            'error'   => $sync_back_ok ? null : $sync_err,
+        ],
     ]);
 }
 

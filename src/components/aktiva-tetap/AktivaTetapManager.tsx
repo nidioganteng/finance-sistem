@@ -291,7 +291,7 @@ export function AktivaTetapManager({
         <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 sm:p-5 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[12px] font-bold text-muted-faint uppercase tracking-wider truncate">
-              Nilai Buku Bersih
+              Nilai Buku Awal {year + 1}
             </span>
             <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-none">
               <Landmark size={16} />
@@ -302,7 +302,7 @@ export function AktivaTetapManager({
               {summary.totalNilaiBukuFmt}
             </div>
             <div className="text-[11.5px] text-muted-faint mt-1 truncate">
-              Perolehan − Akumulasi (Net)
+              Saldo akhir {year} = saldo awal {year + 1}
             </div>
           </div>
         </div>
@@ -457,7 +457,7 @@ export function AktivaTetapManager({
                 <th className="py-3 px-5 text-right">Nilai Buku Awal {year}</th>
                 <th className="py-3 px-5 text-right">Beban {year}</th>
                 <th className="py-3 px-5 text-right">Akumulasi s/d {year}</th>
-                <th className="py-3 px-5 text-right">Nilai Buku (Net)</th>
+                <th className="py-3 px-5 text-right">Nilai Buku Awal {year + 1}</th>
                 <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>

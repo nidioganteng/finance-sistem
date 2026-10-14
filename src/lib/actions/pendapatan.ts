@@ -55,293 +55,6 @@ function revalidatePendapatanPaths() {
   revalidatePath("/dashboard");
 }
 
-async function syncFakturToJurnalUmum(
-  fakturId: string,
-  entityId: string,
-  staffId: string,
-  fakturData: {
-    noFaktur: string;
-    namaRekanan: string;
-    namaJkp: string;
-    dpp: number;
-    ppn: number;
-    pph: number;
-    nilaiProyek: number;
-    tanggalTerima: Date | null;
-    tahunPajak: number;
-    masaPajak: number;
-    bank: string | null;
-    nominalDiterima: number;
-    projectId: string | null;
-  }
-) {
-  try {
-    let jenisInput = await prisma.jenisInputTransaksi.findUnique({
-      where: { key: "jurnalTransaksi" },
-    });
-    if (!jenisInput) {
-      jenisInput = await prisma.jenisInputTransaksi.create({
-        data: { key: "jurnalTransaksi", nama: "Jurnal Transaksi", active: true },
-      });
-    }
-
-    // Bersihkan transaksi jurnal lama untuk faktur ini
-    await prisma.transaction.deleteMany({
-      where: {
-        fakturId,
-      },
-    });
-
-    // Nomor Bukti untuk Jurnal Umum: gunakan Nomor Faktur atau suffix amrahan jika sudah ada
-    let jNoBukti = fakturData.noFaktur.trim();
-    const existingTxCount = await prisma.transaction.count({
-      where: {
-        entityId,
-        jenisInputId: jenisInput.id,
-        noBukti: jNoBukti,
-      },
-    });
-    if (existingTxCount > 0) {
-      const allSimilar = await prisma.transaction.count({
-        where: {
-          entityId,
-          jenisInputId: jenisInput.id,
-          noBukti: { startsWith: jNoBukti },
-        },
-      });
-      jNoBukti = `${jNoBukti}-A${allSimilar + 1}`;
-    }
-
-    // Resolve COA Kas / Bank
-    let bankCoa = null;
-    if (fakturData.bank?.trim()) {
-      bankCoa = await prisma.coaAccount.findFirst({
-        where: {
-          OR: [
-            { name: { contains: fakturData.bank.trim() } },
-            { code: fakturData.bank.trim() },
-          ],
-          kategori: "ASET",
-        },
-      });
-    }
-    if (!bankCoa) {
-      bankCoa = await prisma.coaAccount.findFirst({
-        where: {
-          kategori: "ASET",
-          OR: [
-            { name: { contains: "BPD" } },
-            { name: { contains: "Kas" } },
-            { code: { in: ["110", "120", "130", "140", "150", "11", "12", "21", "22", "31", "41", "51"] } },
-          ],
-        },
-        orderBy: { code: "asc" },
-      });
-    }
-
-    // Resolve COA Pendapatan (Akun 400)
-    const pendCoa = await prisma.coaAccount.findFirst({
-      where: {
-        OR: [{ code: "400" }, { kategori: "PENDAPATAN" }],
-      },
-      orderBy: { code: "asc" },
-    });
-
-    // Resolve COA PPN (Akun 535)
-    const ppnCoa = await prisma.coaAccount.findFirst({
-      where: {
-        OR: [{ code: "535" }, { code: "536" }, { name: { contains: "PPN" } }],
-      },
-      orderBy: { code: "asc" },
-    });
-
-    // Resolve COA PPh (Akun 533 / 534)
-    const pphCoa = await prisma.coaAccount.findFirst({
-      where: {
-        OR: [{ code: "533" }, { code: "534" }, { name: { contains: "PPh" } }],
-      },
-      orderBy: { code: "asc" },
-    });
-
-    if (bankCoa && pendCoa) {
-      const txDate = fakturData.tanggalTerima
-        ? fakturData.tanggalTerima
-        : (fakturData.tahunPajak && fakturData.masaPajak
-            ? new Date(fakturData.tahunPajak, fakturData.masaPajak - 1, 1)
-            : new Date());
-
-      const kuitansiBruto = fakturData.nilaiProyek || (fakturData.dpp + fakturData.ppn);
-      const dppNominal = fakturData.dpp;
-      const ppnNominal = fakturData.ppn;
-      const pphNominal = fakturData.pph;
-      const ketBase = `${fakturData.namaJkp.trim()} [${fakturData.noFaktur.trim()}]`;
-
-      const txOps = [];
-
-      if (fakturData.tanggalTerima || fakturData.nominalDiterima > 0) {
-        // Kasus Realisasi Pencairan
-        const netDiterima = fakturData.nominalDiterima > 0
-          ? fakturData.nominalDiterima
-          : Math.max(0, kuitansiBruto - ppnNominal - pphNominal);
-
-        // 1. Kas/Bank (Debit)
-        txOps.push(
-          prisma.transaction.create({
-            data: {
-              entityId,
-              jenisInputId: jenisInput.id,
-              tanggal: txDate,
-              noBukti: jNoBukti,
-              keterangan: `${ketBase} (Kas/Bank Masuk)`,
-              coaAccountId: bankCoa.id,
-              debit: netDiterima,
-              kredit: 0,
-              saldoSetelah: 0,
-              staffId,
-              projectId: fakturData.projectId,
-              fakturId,
-              extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-            },
-          })
-        );
-
-        // 2. Potongan PPN (Debit jika ada PPN)
-        if (ppnCoa && ppnNominal > 0) {
-          txOps.push(
-            prisma.transaction.create({
-              data: {
-                entityId,
-                jenisInputId: jenisInput.id,
-                tanggal: txDate,
-                noBukti: jNoBukti,
-                keterangan: `PPN Dipungut - ${ketBase}`,
-                coaAccountId: ppnCoa.id,
-                debit: ppnNominal,
-                kredit: 0,
-                saldoSetelah: 0,
-                staffId,
-                projectId: fakturData.projectId,
-                fakturId,
-                extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-              },
-            })
-          );
-        }
-
-        // 3. Potongan PPh (Debit jika ada PPh)
-        if (pphCoa && pphNominal > 0) {
-          txOps.push(
-            prisma.transaction.create({
-              data: {
-                entityId,
-                jenisInputId: jenisInput.id,
-                tanggal: txDate,
-                noBukti: jNoBukti,
-                keterangan: `Potongan PPh Final - ${ketBase}`,
-                coaAccountId: pphCoa.id,
-                debit: pphNominal,
-                kredit: 0,
-                saldoSetelah: 0,
-                staffId,
-                projectId: fakturData.projectId,
-                fakturId,
-                extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-              },
-            })
-          );
-        }
-
-        // 4. Pendapatan (Kredit)
-        txOps.push(
-          prisma.transaction.create({
-            data: {
-              entityId,
-              jenisInputId: jenisInput.id,
-              tanggal: txDate,
-              noBukti: jNoBukti,
-              keterangan: `${ketBase} (Pendapatan Usaha)`,
-              coaAccountId: pendCoa.id,
-              debit: 0,
-              kredit: kuitansiBruto,
-              saldoSetelah: 0,
-              staffId,
-              projectId: fakturData.projectId,
-              fakturId,
-              extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-            },
-          })
-        );
-      } else {
-        // Kasus Tagihan / Kuitansi Bruto Belum Cair
-        txOps.push(
-          prisma.transaction.create({
-            data: {
-              entityId,
-              jenisInputId: jenisInput.id,
-              tanggal: txDate,
-              noBukti: jNoBukti,
-              keterangan: `${ketBase} (Kuitansi Bruto Tagihan)`,
-              coaAccountId: bankCoa.id,
-              debit: kuitansiBruto,
-              kredit: 0,
-              saldoSetelah: 0,
-              staffId,
-              projectId: fakturData.projectId,
-              fakturId,
-              extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-            },
-          })
-        );
-
-        txOps.push(
-          prisma.transaction.create({
-            data: {
-              entityId,
-              jenisInputId: jenisInput.id,
-              tanggal: txDate,
-              noBukti: jNoBukti,
-              keterangan: `${ketBase} (DPP Pendapatan)`,
-              coaAccountId: pendCoa.id,
-              debit: 0,
-              kredit: dppNominal,
-              saldoSetelah: 0,
-              staffId,
-              projectId: fakturData.projectId,
-              fakturId,
-              extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-            },
-          })
-        );
-
-        if (ppnCoa && ppnNominal > 0) {
-          txOps.push(
-            prisma.transaction.create({
-              data: {
-                entityId,
-                jenisInputId: jenisInput.id,
-                tanggal: txDate,
-                noBukti: jNoBukti,
-                keterangan: `${ketBase} (PPN)`,
-                coaAccountId: ppnCoa.id,
-                debit: 0,
-                kredit: ppnNominal,
-                saldoSetelah: 0,
-                staffId,
-                projectId: fakturData.projectId,
-                fakturId,
-                extraFieldsJson: { autoPostedFromFaktur: true, noFaktur: fakturData.noFaktur },
-              },
-            })
-          );
-        }
-      }
-
-      await prisma.$transaction(txOps);
-    }
-  } catch (err) {
-    console.error("Gagal sinkronisasi auto-entry Jurnal Umum:", err);
-  }
-}
 
 export async function createFakturPendapatanAction(data: FakturPendapatanInput) {
   const session = await getServerSession(authOptions);
@@ -406,23 +119,6 @@ export async function createFakturPendapatanAction(data: FakturPendapatanInput) 
   if (data.namaRekanan?.trim()) {
     await autoRegisterRekananIfNew(data.npwp || "", data.namaRekanan);
   }
-
-  // Auto-entry ke Jurnal Umum (Kas/Bank, Pendapatan, DPP, PPN, Keterangan)
-  await syncFakturToJurnalUmum(created.id, data.entityId, session.user.id, {
-    noFaktur: created.noFaktur,
-    namaRekanan: created.namaRekanan,
-    namaJkp: created.namaJkp,
-    dpp: Number(created.dpp),
-    ppn: Number(created.ppn),
-    pph: Number(created.pph),
-    nilaiProyek: Number(created.nilaiProyek),
-    tanggalTerima: created.tanggalTerima,
-    tahunPajak: created.tahunPajak,
-    masaPajak: created.masaPajak,
-    bank: created.bank,
-    nominalDiterima: Number(created.nominalDiterima),
-    projectId: created.projectId,
-  });
 
   logActivity(
     session.user.id,
@@ -510,26 +206,10 @@ export async function updateFakturPendapatanAction(
 
   const effectiveNpwp = data.npwp !== undefined ? data.npwp : existing.npwp;
   const effectiveNama = data.namaRekanan !== undefined ? data.namaRekanan : existing.namaRekanan;
+  // Auto-register atau sync ke Master Data Rekanan Terpusat jika rekanan baru
   if (effectiveNama?.trim()) {
     await autoRegisterRekananIfNew(effectiveNpwp || "", effectiveNama);
   }
-
-  // Sinkronisasi otomatis ke Jurnal Umum
-  await syncFakturToJurnalUmum(updated.id, existing.entityId, session.user.id, {
-    noFaktur: updated.noFaktur,
-    namaRekanan: updated.namaRekanan,
-    namaJkp: updated.namaJkp,
-    dpp: Number(updated.dpp),
-    ppn: Number(updated.ppn),
-    pph: Number(updated.pph),
-    nilaiProyek: Number(updated.nilaiProyek),
-    tanggalTerima: updated.tanggalTerima,
-    tahunPajak: updated.tahunPajak,
-    masaPajak: updated.masaPajak,
-    bank: updated.bank,
-    nominalDiterima: Number(updated.nominalDiterima),
-    projectId: updated.projectId,
-  });
 
   logActivity(
     session.user.id,
@@ -618,9 +298,10 @@ export async function deleteFakturPendapatanAction(id: string) {
     return { error: "Kamu tidak punya akses ke entitas ini." };
   }
 
-  // Bersihkan transaksi Jurnal Umum terkait faktur ini
-  await prisma.transaction.deleteMany({
+  // Lepaskan relasi fakturId dari transaksi Jurnal Umum tanpa menghapus catatan transaksi riil
+  await prisma.transaction.updateMany({
     where: { fakturId: id },
+    data: { fakturId: null },
   });
 
   await prisma.fakturPendapatan.delete({ where: { id } });

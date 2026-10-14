@@ -71,6 +71,40 @@
 
 ---
 
+## pendapatan — `api/routes/pendapatan.php`
+
+**Commit 1:** `5310d09` — fix rumus nilaiProyek dan tambah path kuitansi bruto  
+**Commit 2:** `b34090f` — DELETE faktur unlink Transaction.fakturId dulu  
+**Commit 3:** `71acd78` — fix nominalDiterima null → crash (NOT NULL column)
+
+### Skenario uji (dijalankan otomatis via `tests/manual/pendapatan-faktur.sh`)
+
+| # | Skenario | Hasil diharapkan | Hasil aktual | Status |
+|---|----------|-----------------|--------------|--------|
+| 1 | POST faktur standar → nilaiProyek = round(dpp×111/100) | HTTP 201, nilaiProyek=111000 (bukan 110083), ppn=10083, laba=96500 | HTTP 201, semua angka benar | ✓ Lulus (4 assertion) |
+| 2 | POST faktur dengan nilaiKuitansi → path kuitansi bruto | HTTP 201, nilaiProyek=nilaiKuitansi=111000, ppn=11000 | HTTP 201, nilaiProyek=111000, ppn=11000 | ✓ Lulus (4 assertion) |
+| 3 | DELETE faktur → Transaction.fakturId dilepas ke NULL | HTTP 200, FakturPendapatan hilang, Transaction.fakturId=NULL | HTTP 200, faktur hilang, fakturId=NULL | ✓ Lulus (6 assertion) |
+
+**14 assertion lulus, 0 gagal.**
+
+### Bug yang diperbaiki
+
+| Bug | Deskripsi | Status |
+|-----|-----------|--------|
+| `nilaiProyek = dpp + ppn` | Dua pembulatan berantai: ppn dari dppNilaiLain yang dibulatkan → tambah ke dpp. Selisih hingga 917 dari spec (Nilai Proyek = DPP × 111/100) | Diperbaiki (Commit 1) |
+| Path kuitansi bruto tidak ada | `nilaiKuitansi` diabaikan; nilaiProyek dan ppn selalu dihitung dari dppNilaiLain | Diperbaiki (Commit 1) |
+| Tarif PPN hardcode 11.0 | Default tarif PPN ditulis langsung di kode, bukan dari tabel TarifPajak | Diperbaiki (Commit 1: `get_tarif_ppn_aktif()`) |
+| DELETE faktur tidak unlink Transaction | Baris Transaction dengan `fakturId` → UUID faktur yang dihapus menjadi orphaned reference | Diperbaiki (Commit 2) |
+| `nominalDiterima` null → crash | Kolom NOT NULL, tapi PHP kirim null saat field tidak ada di request | Diperbaiki (Commit 3) |
+
+### Catatan terbuka (belum diubah)
+
+- **`kuitansiJenis`**: tidak ada sebagai field DB — hanya konsep UI di `LaporanPendapatanClient.tsx`. Tidak perlu diubah di PHP.
+- **Multi-termin (amrahan)**: logic UI saja di client component. PHP backend sudah mendukung multiple FakturPendapatan per proyek tanpa perubahan.
+- **Auto-register rekanan**: Node.js memanggil `autoRegisterRekananIfNew()` saat create/update faktur. PHP tidak melakukan ini. Bisa dikerjakan nanti jika diperlukan.
+
+---
+
 ## aset-tetap — `api/routes/aset-tetap.php`
 
 **Status: ⏸ Menunggu keputusan tim — kode tidak diubah**

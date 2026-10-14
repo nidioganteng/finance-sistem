@@ -264,6 +264,20 @@ export interface LaporanPendapatanData {
       nominal: number;
       nominalFmt: string;
     }>;
+    existingFakturs: Array<{
+      id: string;
+      noFaktur: string;
+      namaRekanan: string;
+      npwp: string;
+      namaJkp: string;
+      nilaiProyek: number;
+      dpp: number;
+      dppNilaiLain: number;
+      tarifPpnPersen: number;
+      tarifPphPersen: number;
+      bank: string | null;
+      createdAt: string;
+    }>;
   }>;
   bankOptions: Array<{
     id: string;
@@ -340,13 +354,30 @@ export async function getLaporanPendapatanData(
     orderBy: [{ jenis: "asc" }, { tarifPersen: "asc" }],
   });
 
-  // 4. Ambil opsi proyek beserta termin (semua proyek aktif, urutkan entitas ini dulu)
+  // 4. Ambil opsi proyek beserta termin dan riwayat faktur (semua proyek aktif, urutkan entitas ini dulu)
   const allProjectsRaw = await prisma.project.findMany({
     where: { status: "ACTIVE" },
     include: {
       entity: { select: { id: true, key: true, name: true } },
       termin: {
         orderBy: { createdAt: "asc" },
+      },
+      fakturPendapatan: {
+        select: {
+          id: true,
+          noFaktur: true,
+          namaRekanan: true,
+          npwp: true,
+          namaJkp: true,
+          nilaiProyek: true,
+          dpp: true,
+          dppNilaiLain: true,
+          tarifPpnPersen: true,
+          tarifPphPersen: true,
+          bank: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
       },
     },
     orderBy: { code: "asc" },
@@ -915,6 +946,21 @@ export async function getLaporanPendapatanData(
         };
       });
 
+      const existingFakturs = (p.fakturPendapatan || []).map((f) => ({
+        id: f.id,
+        noFaktur: f.noFaktur,
+        namaRekanan: f.namaRekanan,
+        npwp: f.npwp,
+        namaJkp: f.namaJkp,
+        nilaiProyek: Number(f.nilaiProyek),
+        dpp: Number(f.dpp),
+        dppNilaiLain: Number(f.dppNilaiLain),
+        tarifPpnPersen: Number(f.tarifPpnPersen),
+        tarifPphPersen: Number(f.tarifPphPersen),
+        bank: f.bank ?? null,
+        createdAt: f.createdAt.toISOString(),
+      }));
+
       return {
         id: p.id,
         code: p.code,
@@ -925,6 +971,7 @@ export async function getLaporanPendapatanData(
         contractValue,
         contractValueFmt: formatRupiah(contractValue),
         termins,
+        existingFakturs,
       };
     }),
     bankOptions: defaultBankList,

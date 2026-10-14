@@ -41,7 +41,8 @@
 ## jurnal-transaksi — `api/routes/jurnal-transaksi.php`
 
 **Commit 1:** `a1f2f95` — tambah `sync_project_spend()` di POST dan DELETE  
-**Commit 2:** `71957fd` — tangani parameter `fakturId` (Transaction link + edit-safe)
+**Commit 2:** `71957fd` — tangani parameter `fakturId` (Transaction link + edit-safe)  
+**Commit 3:** `c3fb1cd` — fix `$now` null bug di edit mode FakturPendapatan UPDATE
 
 ### Skenario uji (dijalankan otomatis via `tests/manual/jurnal-transaksi-syncspend.sh`)
 
@@ -49,8 +50,10 @@
 |---|----------|-----------------|--------------|--------|
 | 1 | POST jurnal BEBAN 5jt ke proyek → Project.spend bertambah 5jt | HTTP 200, delta spend = 5.000.000 | HTTP 200, delta = 5.000.000 | ✓ Lulus |
 | 2 | DELETE jurnal yang sama → Project.spend berkurang 5jt | HTTP 200, delta spend = −5.000.000 | HTTP 200, delta = −5.000.000 | ✓ Lulus |
+| 3 | POST 7jt + DELETE → spend kembali ke nilai sebelum POST | HTTP 200 (keduanya), spend kembali tepat | HTTP 200, delta kembali = 0 | ✓ Lulus |
+| 4 | Edit jurnal dengan fakturId → FakturPendapatan tidak terhapus | HTTP 200 (edit), COUNT faktur = 1 | HTTP 200, COUNT = 1 | ✓ Lulus |
 
-**5 assertion lulus, 0 gagal.**
+**13 assertion lulus, 0 gagal.**
 
 ### Bug yang diperbaiki
 
@@ -60,6 +63,7 @@
 | `fakturId` diabaikan di INSERT | Kolom `fakturId` di Transaction tidak diisi — transaksi tidak terhubung ke faktur | Diperbaiki (Commit 2) |
 | Edit mode hapus faktur | `DELETE FakturPendapatan WHERE noFaktur=?` menghapus faktur yang mungkin dibuat manual di modul pendapatan | Diperbaiki (Commit 2) |
 | Faktur sync salah sasaran | Saat `fakturId` ada, upsert by noFaktur bisa menimpa faktur yang salah | Diperbaiki (Commit 2) |
+| `$now` null di edit mode | `$now` didefinisikan setelah blok edit selesai → `updatedAt cannot be null` di UPDATE FakturPendapatan | Diperbaiki (Commit 3) |
 
 ### Catatan terbuka (belum diubah)
 

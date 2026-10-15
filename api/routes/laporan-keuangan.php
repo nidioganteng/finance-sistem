@@ -102,10 +102,26 @@ if ($method === 'GET') {
         }
     }
 
-    // Beban penyusutan gabungan
-    $total_beban_penyusutan_gabungan = 0.0;
+    // Penyusutan gabungan (satu panggilan per entity untuk beban + akumulasi + rekap)
+    $total_beban_penyusutan_gabungan  = 0.0;
+    $total_akumulasi_penyusutan_gabungan = 0.0;
+    $rekap_aset_gabungan = [
+        'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'KENDARAAN'        => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'PERALATAN_KANTOR' => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+    ];
     foreach ($entity_ids as $eid) {
-        $total_beban_penyusutan_gabungan += total_beban_penyusutan($eid, $year);
+        $ps = get_penyusutan_summary($eid, $year);
+        $total_beban_penyusutan_gabungan     += $ps['total_beban'];
+        $total_akumulasi_penyusutan_gabungan += $ps['total_akumulasi'];
+        foreach ($ps['rekap'] as $kat => $rv) {
+            if (isset($rekap_aset_gabungan[$kat])) {
+                $rekap_aset_gabungan[$kat]['beban']     += $rv['beban'];
+                $rekap_aset_gabungan[$kat]['akumulasi'] += $rv['akumulasi'];
+                $rekap_aset_gabungan[$kat]['count']     += $rv['count'];
+            }
+        }
     }
     if ($total_beban_penyusutan_gabungan > 0) {
         $beban[] = [
@@ -114,6 +130,31 @@ if ($method === 'GET') {
             'saldo'  => $total_beban_penyusutan_gabungan,
             'debit'  => $total_beban_penyusutan_gabungan,
             'kredit' => 0.0,
+            'isAuto' => true,
+        ];
+    }
+
+    // Pendapatan dari FakturPendapatan yang belum dijurnal (dual-source)
+    $faktur_ph = implode(',', array_fill(0, count($entity_ids), '?'));
+    $stmt_faktur = $pdo->prepare(
+        "SELECT COALESCE(SUM(f.nilaiProyek), 0)
+         FROM FakturPendapatan f
+         WHERE f.entityId IN ($faktur_ph)
+           AND f.tahunPajak = ?
+           AND f.id NOT IN (
+               SELECT t.fakturId FROM `Transaction` t WHERE t.fakturId IS NOT NULL
+           )"
+    );
+    $stmt_faktur->execute(array_merge($entity_ids, [$year]));
+    $faktur_unlinked_gabungan = (float)$stmt_faktur->fetchColumn();
+
+    if ($faktur_unlinked_gabungan > 0) {
+        $pendapatan[] = [
+            'code'   => 'faktur_unlinked',
+            'name'   => 'Pendapatan dari E-Faktur (belum dijurnal)',
+            'saldo'  => $faktur_unlinked_gabungan,
+            'debit'  => 0.0,
+            'kredit' => $faktur_unlinked_gabungan,
             'isAuto' => true,
         ];
     }
@@ -207,11 +248,8 @@ if ($method === 'GET') {
         }
     }
 
-    // Akumulasi penyusutan gabungan
-    $akumulasi_penyusutan = 0.0;
-    foreach ($entity_ids as $eid) {
-        $akumulasi_penyusutan += total_akumulasi_penyusutan($eid, $year);
-    }
+    // Akumulasi penyusutan gabungan (sudah dihitung di atas via get_penyusutan_summary)
+    $akumulasi_penyusutan = $total_akumulasi_penyusutan_gabungan;
     if ($akumulasi_penyusutan > 0) {
         $aktiva_tetap[] = [
             'code'   => 'akumulasi_penyusutan',
@@ -277,19 +315,21 @@ if ($method === 'GET') {
             'totalBeban'      => $total_beban,
             'labaBersih'      => $laba_bersih,
             'bebanPenyusutan' => $total_beban_penyusutan_gabungan,
+            'fakturUnlinked'  => $faktur_unlinked_gabungan,
         ],
         'neraca' => [
-            'aktivaLancar'       => $aktiva_lancar,
-            'aktivaTetap'        => $aktiva_tetap,
-            'kewajiban'          => $kewajiban,
-            'modal'              => $modal,
-            'totalAktivaLancar'  => $total_aktiva_lancar,
-            'totalAktivaTetap'   => $total_aktiva_tetap,
-            'totalAktiva'        => $total_aktiva_lancar + $total_aktiva_tetap,
-            'totalKewajiban'     => $total_kewajiban,
-            'totalModal'         => $total_modal,
-            'totalKewajibanModal'=> $total_kewajiban + $total_modal,
-            'akumulasiPenyusutan'=> $akumulasi_penyusutan,
+            'aktivaLancar'          => $aktiva_lancar,
+            'aktivaTetap'           => $aktiva_tetap,
+            'kewajiban'             => $kewajiban,
+            'modal'                 => $modal,
+            'totalAktivaLancar'     => $total_aktiva_lancar,
+            'totalAktivaTetap'      => $total_aktiva_tetap,
+            'totalAktiva'           => $total_aktiva_lancar + $total_aktiva_tetap,
+            'totalKewajiban'        => $total_kewajiban,
+            'totalModal'            => $total_modal,
+            'totalKewajibanModal'   => $total_kewajiban + $total_modal,
+            'akumulasiPenyusutan'   => $akumulasi_penyusutan,
+            'rekapPerKategoriAset'  => $rekap_aset_gabungan,
         ],
         'arusKas' => [
             'monthly'     => $arus_kas_monthly,

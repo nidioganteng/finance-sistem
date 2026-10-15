@@ -37,6 +37,8 @@ export type RekapKategoriAset = {
   totalHargaPerolehanFmt: string;
   totalAkumulasiPenyusutan: number;
   totalAkumulasiPenyusutanFmt: string;
+  totalBebanPenyusutan: number;
+  totalBebanPenyusutanFmt: string;
   totalNilaiBuku: number;
   totalNilaiBukuFmt: string;
 };
@@ -48,11 +50,15 @@ export type AsetTetapWithDepreciation = AsetTetap & {
   bebanPeriodeIni: number;
   akumulasiPenyusutan: number;
   nilaiBuku: number;
+  akumulasiPenyusutanAwalTahun: number;
+  nilaiBukuAwalTahun: number;
   hargaPerolehanFmt: string;
   penyusutanPerBulanFmt: string;
   bebanPeriodeIniFmt: string;
   akumulasiPenyusutanFmt: string;
   nilaiBukuFmt: string;
+  akumulasiPenyusutanAwalTahunFmt: string;
+  nilaiBukuAwalTahunFmt: string;
   tanggalPerolehanFmt: string;
   umurTahun: number;
   kategoriStandar: string;
@@ -120,6 +126,13 @@ export function calculateAsetDepreciation(
   const bebanPeriodeIni = Math.max(0, akumulasiPenyusutan - akumulasiPrior);
   const nilaiBuku = Math.max(nilaiResidu, hargaPerolehan - akumulasiPenyusutan);
 
+  const monthsBeforeYear = Math.max(0, (targetYear - buyYear) * 12 - buyMonth + 1);
+  const akumulasiPenyusutanAwalTahun = Math.min(
+    depreciableBase,
+    Math.round(Math.min(umurBulan, monthsBeforeYear) * penyusutanPerBulan)
+  );
+  const nilaiBukuAwalTahun = hargaPerolehan - akumulasiPenyusutanAwalTahun;
+
   const tglStr = tglBeli.toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
@@ -135,11 +148,15 @@ export function calculateAsetDepreciation(
     bebanPeriodeIni,
     akumulasiPenyusutan,
     nilaiBuku,
+    akumulasiPenyusutanAwalTahun,
+    nilaiBukuAwalTahun,
     hargaPerolehanFmt: formatRupiah(hargaPerolehan),
     penyusutanPerBulanFmt: formatRupiah(Math.round(penyusutanPerBulan)),
     bebanPeriodeIniFmt: formatRupiah(bebanPeriodeIni),
     akumulasiPenyusutanFmt: formatRupiah(akumulasiPenyusutan),
     nilaiBukuFmt: formatRupiah(nilaiBuku),
+    akumulasiPenyusutanAwalTahunFmt: formatRupiah(akumulasiPenyusutanAwalTahun),
+    nilaiBukuAwalTahunFmt: formatRupiah(nilaiBukuAwalTahun),
     tanggalPerolehanFmt: tglStr,
     umurTahun: Number((umurBulan / 12).toFixed(1)),
     kategoriStandar: kat,
@@ -192,11 +209,15 @@ export async function getPenyusutanSummary(
       bebanPeriodeIni: row.bebanPenyusutan,
       akumulasiPenyusutan: row.akumulasiPenyusutan,
       nilaiBuku: row.nilaiBuku,
+      akumulasiPenyusutanAwalTahun: row.akumulasiPenyusutanAwalTahun,
+      nilaiBukuAwalTahun: row.nilaiBukuAwalTahun,
       hargaPerolehanFmt: formatRupiah(hargaPerolehan),
       penyusutanPerBulanFmt: formatRupiah(Math.round(penyusutanPerBulan)),
       bebanPeriodeIniFmt: formatRupiah(row.bebanPenyusutan),
       akumulasiPenyusutanFmt: formatRupiah(row.akumulasiPenyusutan),
       nilaiBukuFmt: formatRupiah(row.nilaiBuku),
+      akumulasiPenyusutanAwalTahunFmt: formatRupiah(row.akumulasiPenyusutanAwalTahun),
+      nilaiBukuAwalTahunFmt: formatRupiah(row.nilaiBukuAwalTahun),
       tanggalPerolehanFmt: tglFmt(row.tanggalPerolehan),
       umurTahun: Number((row.umurBulan / 12).toFixed(1)),
       kategoriStandar: normalizeKategori(row.kategori),
@@ -213,6 +234,7 @@ export async function getPenyusutanSummary(
     const group = assets.filter((a) => a.kategoriStandar === kat.key);
     const totalHP = group.reduce((s, a) => s + a.hargaPerolehanNum, 0);
     const totalAkum = group.reduce((s, a) => s + a.akumulasiPenyusutan, 0);
+    const totalBeban = group.reduce((s, a) => s + a.bebanPeriodeIni, 0);
     const totalNB = group.reduce((s, a) => s + a.nilaiBuku, 0);
     return {
       kategori: kat.key,
@@ -222,6 +244,8 @@ export async function getPenyusutanSummary(
       totalHargaPerolehanFmt: formatRupiah(totalHP),
       totalAkumulasiPenyusutan: totalAkum,
       totalAkumulasiPenyusutanFmt: formatRupiah(totalAkum),
+      totalBebanPenyusutan: totalBeban,
+      totalBebanPenyusutanFmt: formatRupiah(totalBeban),
       totalNilaiBuku: totalNB,
       totalNilaiBukuFmt: formatRupiah(totalNB),
     };

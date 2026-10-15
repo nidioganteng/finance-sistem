@@ -8,3 +8,4 @@ tsconfig.tsbuildinfo
 .env*
 .claude/
 *.tsbuildinfo
+workflow_dan_arsitektur_sistem.md

@@ -74,13 +74,12 @@ if ($method === 'GET') {
         }
     }
 
-    // Tambahkan beban penyusutan
-    $beban_penyusutan = total_beban_penyusutan($entity_id, $year);
-    $total_beban     += $beban_penyusutan;
-    $laba_bersih      = $total_pendapatan - $total_beban;
-
-    // ── Akumulasi penyusutan untuk neraca ────────────────────────────────────
-    $akumulasi_penyusutan = total_akumulasi_penyusutan($entity_id, $year);
+    // Tambahkan beban penyusutan (satu panggilan untuk beban + akumulasi + rekap)
+    $penyusutan_summary   = get_penyusutan_summary($entity_id, $year);
+    $beban_penyusutan     = $penyusutan_summary['total_beban'];
+    $akumulasi_penyusutan = $penyusutan_summary['total_akumulasi'];
+    $total_beban         += $beban_penyusutan;
+    $laba_bersih          = $total_pendapatan - $total_beban;
 
     // ── Mapping kode piutang ↔ hutang antar entitas untuk netting ────────────
     // 111↔311, 112↔312, 113↔313, 114↔314, 115↔315
@@ -189,25 +188,26 @@ if ($method === 'GET') {
     $total_kewajiban_modal = $total_kewajiban + $total_modal;
 
     json_response([
-        'entityId'           => $entity_id,
-        'year'               => $year,
-        'version'            => $version,
-        'aktivaLancar'       => $aktiva_lancar,
-        'aktivaTetap'        => $aktiva_tetap,
-        'kewajiban'          => $kewajiban,
-        'modal'              => $modal,
-        'totalAktivaLancar'  => $total_aktiva_lancar,
-        'totalAktivaTetap'   => $total_aktiva_tetap,
-        'totalAktiva'        => $total_aktiva,
-        'totalKewajiban'     => $total_kewajiban,
-        'totalModal'         => $total_modal,
-        'totalKewajibanModal'=> $total_kewajiban_modal,
-        'labaBersih'         => $laba_bersih,
-        'totalPendapatan'    => $total_pendapatan,
-        'totalBeban'         => $total_beban,
-        'bebanPenyusutan'    => $beban_penyusutan,
-        'akumulasiPenyusutan'=> $akumulasi_penyusutan,
-        'selisih'            => round($total_aktiva - $total_kewajiban_modal, 2),
+        'entityId'              => $entity_id,
+        'year'                  => $year,
+        'version'               => $version,
+        'aktivaLancar'          => $aktiva_lancar,
+        'aktivaTetap'           => $aktiva_tetap,
+        'kewajiban'             => $kewajiban,
+        'modal'                 => $modal,
+        'totalAktivaLancar'     => $total_aktiva_lancar,
+        'totalAktivaTetap'      => $total_aktiva_tetap,
+        'totalAktiva'           => $total_aktiva,
+        'totalKewajiban'        => $total_kewajiban,
+        'totalModal'            => $total_modal,
+        'totalKewajibanModal'   => $total_kewajiban_modal,
+        'labaBersih'            => $laba_bersih,
+        'totalPendapatan'       => $total_pendapatan,
+        'totalBeban'            => $total_beban,
+        'bebanPenyusutan'       => $beban_penyusutan,
+        'akumulasiPenyusutan'   => $akumulasi_penyusutan,
+        'rekapPerKategoriAset'  => $penyusutan_summary['rekap'],
+        'selisih'               => round($total_aktiva - $total_kewajiban_modal, 2),
     ]);
 }
 

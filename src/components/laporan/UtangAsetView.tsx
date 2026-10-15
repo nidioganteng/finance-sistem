@@ -25,7 +25,7 @@ function AkunTable({ rows, emptyMsg }: { rows: Row[]; emptyMsg: string }) {
             <tr key={r.code} className="border-b border-surface-subtle hover:bg-surface-hover/30 transition-colors">
               <td className="py-3 px-5 font-mono text-[12px] font-semibold text-muted">{r.code}</td>
               <td className="py-3 px-3 font-semibold text-navy-text text-[13px]">{r.name}</td>
-              <td className="py-3 px-3 text-right tabular-nums text-[13px] font-medium text-muted">{r.saldoAwalFmt}</td>
+              <td className="py-3 px-3 text-right tabular-nums text-[13px] font-medium text-muted">{r.saldoFmt}</td>
               <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-green font-medium">{r.masukFmt}</td>
               <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-red font-medium">{r.keluarFmt}</td>
               <td className="py-3 px-5 text-right tabular-nums text-[13px] font-bold">

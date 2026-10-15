@@ -4,10 +4,10 @@ import { AsetTetap } from "@/types/app-enums";
 
 // 4 kategori aktiva tetap standar PSAK 16
 export const STANDAR_KATEGORI_ASET = [
-  { key: "TANAH",     label: "Tanah" },
-  { key: "BANGUNAN",  label: "Bangunan & Gedung" },
-  { key: "KENDARAAN", label: "Kendaraan" },
-  { key: "PERALATAN", label: "Peralatan & Inventaris" },
+  { key: "TANAH",             label: "Tanah" },
+  { key: "BANGUNAN",          label: "Bangunan & Gedung" },
+  { key: "KENDARAAN",         label: "Kendaraan" },
+  { key: "PERALATAN_KANTOR",  label: "Peralatan & Inventaris" },
 ];
 
 export function getKategoriLabel(kategori: string): string {
@@ -20,12 +20,13 @@ function normalizeKategori(raw: string): string {
     BANGUNAN: "BANGUNAN",
     GEDUNG: "BANGUNAN",
     KENDARAAN: "KENDARAAN",
-    PERALATAN: "PERALATAN",
-    MESIN: "PERALATAN",
-    INVENTARIS: "PERALATAN",
-    LAINNYA: "PERALATAN",
+    PERALATAN_KANTOR: "PERALATAN_KANTOR",
+    PERALATAN: "PERALATAN_KANTOR",
+    MESIN: "PERALATAN_KANTOR",
+    INVENTARIS: "PERALATAN_KANTOR",
+    LAINNYA: "PERALATAN_KANTOR",
   };
-  return map[(raw ?? "").toUpperCase()] ?? "PERALATAN";
+  return map[(raw ?? "").toUpperCase()] ?? "PERALATAN_KANTOR";
 }
 
 export type RekapKategoriAset = {
@@ -152,19 +153,17 @@ export async function getPenyusutanSummary(
   month?: number
 ): Promise<PenyusutanSummary> {
   const token = await getPhpToken();
-  // PHP /api/aset-tetap returns a bare array with pre-computed penyusutan fields
-  // (bebanPenyusutan, akumulasiPenyusutan, nilaiBuku) calculated for the requested year.
-  // We build AsetTetapWithDepreciation from those raw values without re-running the local
-  // depreciation calculation, which requires a Prisma AsetTetap object with a Date field.
-  const rows = await phpFetch<RawAsetTetapRow[]>(
+  // PHP /api/aset-tetap returns { aset: [...], rekapPerKategori: {...} }
+  const response = await phpFetch<{ aset: RawAsetTetapRow[]; rekapPerKategori: unknown }>(
     `/api/aset-tetap?entityId=${encodeURIComponent(entityId)}&year=${year}`,
     token
   );
+  const rows = response?.aset ?? [];
 
   const tglFmt = (iso: string) =>
     new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 
-  const assets: AsetTetapWithDepreciation[] = (rows ?? []).map((row) => {
+  const assets: AsetTetapWithDepreciation[] = rows.map((row) => {
     const hargaPerolehan = row.hargaPerolehan;
     const nilaiResidu = row.nilaiResidu;
     const umurBulan = Math.max(1, row.umurBulan);
@@ -261,6 +260,8 @@ type RawAsetTetapRow = {
   // Pre-computed penyusutan fields from PHP helper
   bebanPenyusutan: number;
   akumulasiPenyusutan: number;
+  akumulasiPenyusutanAwalTahun: number;
+  nilaiBukuAwalTahun: number;
   nilaiBuku: number;
 };
 
@@ -286,12 +287,12 @@ export type AsetTetapListItem = {
 
 export async function getAsetTetapList(entityId: string, year: number): Promise<AsetTetapListItem[]> {
   const token = await getPhpToken();
-  // PHP returns a bare array (not wrapped in { data: [...] })
-  const rows = await phpFetch<RawAsetTetapRow[]>(
+  // PHP returns { aset: [...], rekapPerKategori: {...} }
+  const response = await phpFetch<{ aset: RawAsetTetapRow[]; rekapPerKategori: unknown }>(
     `/api/aset-tetap?entityId=${encodeURIComponent(entityId)}&year=${year}`,
     token
   );
-  return (rows ?? []).map((row) => ({
+  return (response?.aset ?? []).map((row) => ({
     ...row,
     hargaPerolehanFmt: formatRupiah(row.hargaPerolehan),
   }));

@@ -10,6 +10,7 @@ export type FakturPendapatanInput = {
   tahunPajak: number;
   namaRekanan: string;
   namaJkp: string;
+  nilaiKuitansi?: number;
   dpp: number;
   dppNilaiLain: number;
   tarifPpnPersen?: number;
@@ -17,8 +18,8 @@ export type FakturPendapatanInput = {
   kodeJenisProyek?: number;
   pekerjaanPerusahaan?: number;
   pekerjaanYangDipinjam?: number;
-  tanggalTerima: string;
-  bank: string;
+  tanggalTerima: string | null;
+  bank: string | null;
   nominalDiterima: number;
   projectId?: string | null;
   bankTransactionId?: string | null;

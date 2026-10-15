@@ -203,69 +203,77 @@ Verifikasi di dev DB: akun `1100` (15 transaksi, semua nilai integer), running b
 
 ---
 
-### T7, T9, T10, T11, T12 — Ditunda
+### T7, T9, T10, T11, T12 — Ditunda / Diselesaikan via modul lain
 
-| # | Alasan tunda |
-|---|-------------|
-| T7 sync entity mapping | Risiko rendah; ubah hanya jika entitas baru ditambahkan di Sidamon |
-| T9 dashboard float | Aman untuk nilai < 1 miliar; bcmath hanya jika dipermasalahkan klien |
-| T10 neraca 4 kategori | Bergantung keputusan aset-tetap A–D |
-| T11 laporan-keuangan | Bergantung konfirmasi A2 (sumber data laba-rugi) |
-| T12 payroll PPh21 | Tidak ada bug aktif; feature future |
+| # | Status | Catatan |
+|---|--------|---------|
+| T7 sync entity mapping | Ditunda | Risiko rendah; ubah hanya jika entitas baru ditambahkan di Sidamon |
+| T9 dashboard float | Ditunda | Aman untuk nilai < 1 miliar; bcmath hanya jika dipermasalahkan klien |
+| T10 neraca 4 kategori | ✅ Selesai via neraca (`3ae9539`) | rekapPerKategoriAset sudah ada setelah aset-tetap selesai |
+| T11 laporan-keuangan | ✅ Selesai via laporan-keuangan (`511bba4`) | dual-source + rekapPerKategoriAset |
+| T12 payroll PPh21 | Ditunda | Tidak ada bug aktif; feature future |
 
 ---
 
 ## aset-tetap — `api/routes/aset-tetap.php`
 
-**Status: ⏸ Menunggu keputusan tim — kode tidak diubah**
+**Commit 1:** `ee8b50c` — 4 kategori PSAK, TANAH guard, field awal tahun, get_penyusutan_summary
 
-### Gap yang teridentifikasi (belum diperbaiki)
+### Perubahan yang dilakukan
 
-| Gap | Deskripsi | Kode PHP | Kode Node.js |
-|-----|-----------|----------|--------------|
-| 6 kategori vs 4 PSAK | PHP: `KENDARAAN/PERALATAN/MESIN/GEDUNG/INVENTARIS/LAINNYA` | `aset-tetap.php:9` | `aset-tetap.ts:5` |
-| PHP menyusutkan Tanah | Tidak ada guard `kategori = TANAH` → umurBulan > 0 diterima dan disusutkan | `akuntansi-helpers.php:49` | `aset-tetap.ts:119` |
-| Tidak ada `akumulasiPenyusutanAwalTahun` | PHP hanya return `akumulasiPenyusutan` dan `nilaiBuku` untuk tahun target; tidak ada angka pembuka tahun | `aset-tetap.php:44–48` | `aset-tetap.ts:62–206` |
+| Gap | Solusi | Commit |
+|-----|--------|--------|
+| 6 kategori custom | Ubah ke 4 PSAK: TANAH/BANGUNAN/KENDARAAN/PERALATAN_KANTOR | `ee8b50c` |
+| PHP menyusutkan Tanah | Guard di POST/PUT (paksa umurBulan=0) + guard di hitung_penyusutan_aset() | `ee8b50c` |
+| Tidak ada field awal tahun | Tambah akumulasiPenyusutanAwalTahun + nilaiBukuAwalTahun di response | `ee8b50c` |
+| Tidak ada rekap per kategori | GET response punya rekapPerKategori | `ee8b50c` |
+| Tidak ada summary untuk neraca | Fungsi baru get_penyusutan_summary() di akuntansi-helpers.php | `ee8b50c` |
 
-### Keputusan tim yang diperlukan sebelum kode disentuh
+### Skenario uji (dijalankan otomatis via `tests/manual/aset-tetap-psak.sh`)
 
-- **A** — Adopsi 4 kategori PSAK (Tanah/Bangunan/Kendaraan/Peralatan Kantor) atau tetap 6?
-- **B** — Migrasi data lama: GEDUNG→BANGUNAN, MESIN/INVENTARIS/LAINNYA→PERALATAN_KANTOR — otomatis atau manual per aset?
-- **C** — Aset Tanah dengan `umurBulan > 0` yang sudah dihitung penyusutannya: reset atau biarkan?
-- **D** — Laporan neraca perlu menyesuaikan setelah kategori distandarkan?
+| # | Skenario | Status |
+|---|----------|--------|
+| 1 | POST kategori lama 'GEDUNG' → 400 | ✓ Lulus |
+| 2 | POST TANAH dengan umurBulan=120 → disimpan sebagai 0 | ✓ Lulus |
+| 3 | GET response punya rekapPerKategori + key 'aset' | ✓ Lulus |
+| 4 | Item TANAH: akumulasiPenyusutanAwalTahun=0, beban=0 | ✓ Lulus |
+| 5 | PUT TANAH dengan umurBulan=240 → tetap disimpan 0 | ✓ Lulus |
+| 6 | POST kategori BANGUNAN (PSAK) → 201 | ✓ Lulus |
 
-### Query preview (baca saja, jangan dijalankan ke produksi)
+**10 assertion lulus, 0 gagal.**
 
-```sql
--- Sebaran aset per kategori dengan umurBulan > 0
-SELECT kategori,
-       COUNT(*)                         AS jumlah_aset,
-       SUM(hargaPerolehan)              AS total_harga,
-       SUM(CASE WHEN umurBulan > 0 THEN 1 ELSE 0 END) AS aset_disusutkan,
-       SUM(CASE WHEN umurBulan = 0 THEN 1 ELSE 0 END) AS aset_tidak_disusutkan
-FROM AsetTetap
-GROUP BY kategori
-ORDER BY kategori;
+### Migrasi data lama (jika diperlukan di produksi)
 
--- Aset yang terdampak migrasi kategori
-SELECT id, kode, nama, kategori, entityId,
-       hargaPerolehan, nilaiResidu, umurBulan,
-       tanggalPerolehan
-FROM AsetTetap
-WHERE kategori IN ('GEDUNG', 'MESIN', 'INVENTARIS', 'LAINNYA')
-ORDER BY kategori, entityId;
+Jalankan `tests/manual/migrate-aset-psak.sh` di DB produksi setelah backup.
+Peta kategori: GEDUNG→BANGUNAN, MESIN/INVENTARIS/LAINNYA/PERALATAN→PERALATAN_KANTOR.
+DB dev kosong, tidak perlu migrasi.
 
--- Aset yang bernama/berkategori Tanah dengan umurBulan > 0 (harus 0 per PSAK 16)
-SELECT id, kode, nama, kategori, entityId,
-       hargaPerolehan, nilaiResidu, umurBulan,
-       tanggalPerolehan
-FROM AsetTetap
-WHERE (
-    LOWER(nama) LIKE '%tanah%'
-    OR LOWER(kode) LIKE '%tanah%'
-)
-AND umurBulan > 0
-ORDER BY entityId;
-```
+---
+
+## laba-rugi — `api/routes/laba-rugi.php`
+
+**Commit 1:** `7590f7a` — dual-source Pendapatan
+
+### Perubahan
+
+FakturPendapatan yang tahunPajak sesuai tahun laporan dan belum punya Transaction.fakturId terkait (belum dijurnal) kini dihitung sebagai Pendapatan tambahan. Field `fakturUnlinked` di response menyatakan total nilaiProyek dari faktur-faktur ini.
+
+**4 assertion lulus, 0 gagal.** (`tests/manual/laba-rugi-dual-source.sh`)
+
+---
+
+## laporan-keuangan — `api/routes/laporan-keuangan.php`
+
+**Commit 1:** `511bba4` — dual-source Pendapatan + rekapPerKategoriAset
+
+Sama seperti laba-rugi tetapi untuk laporan gabungan multi-entity. Neraca section sekarang menyertakan `rekapPerKategoriAset` (4 kategori PSAK). Memanggil `get_penyusutan_summary()` satu kali per entity, bukan dua kali.
+
+---
+
+## profitabilitas — `api/routes/profitabilitas.php`
+
+**Commit 1:** `d5107cd` — spend dari COA BEBAN per proyek
+
+Spend per proyek dihitung dari `SUM(Transaction.debit - kredit)` di akun COA kategori BEBAN yang terkait proyek tersebut. Fallback ke Project.spend jika belum ada transaksi BEBAN. Field `spendSource` ('COA_BEBAN' atau 'project_spend') di tiap baris response.
 
 ---

@@ -86,6 +86,7 @@ $routes = [
     'validasi-pajak-3arah'  => 'validasi-pajak-3arah',
     'rekanan'               => 'rekanan',
     'payroll'               => 'payroll',
+    'rekonsiliasi-pajak-gaji' => 'rekonsiliasi-pajak-gaji',
     'sync'                  => 'sync',
 ];
 

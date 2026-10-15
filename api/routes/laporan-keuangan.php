@@ -134,7 +134,9 @@ if ($method === 'GET') {
         ];
     }
 
-    // Pendapatan dari FakturPendapatan yang belum dijurnal (dual-source)
+    // Pendapatan dari FakturPendapatan yang belum dijurnal (dual-source).
+    // Eksklusif dua cara agar tidak terhitung ganda (sama seperti laba-rugi.php):
+    //   1. fakturId eksplisit, 2. pencocokan cadangan via COA+bulan+kredit≈nilaiProyek
     $faktur_ph = implode(',', array_fill(0, count($entity_ids), '?'));
     $stmt_faktur = $pdo->prepare(
         "SELECT COALESCE(SUM(f.nilaiProyek), 0)
@@ -143,6 +145,15 @@ if ($method === 'GET') {
            AND f.tahunPajak = ?
            AND f.id NOT IN (
                SELECT t.fakturId FROM `Transaction` t WHERE t.fakturId IS NOT NULL
+           )
+           AND NOT EXISTS (
+               SELECT 1 FROM `Transaction` t2
+               JOIN CoaAccount c ON c.id = t2.coaAccountId AND c.kategori = 'PENDAPATAN'
+               WHERE t2.entityId    = f.entityId
+                 AND YEAR(t2.tanggal)  = f.tahunPajak
+                 AND MONTH(t2.tanggal) = f.masaPajak
+                 AND t2.fakturId IS NULL
+                 AND ABS(t2.kredit - f.nilaiProyek) < 1
            )"
     );
     $stmt_faktur->execute(array_merge($entity_ids, [$year]));

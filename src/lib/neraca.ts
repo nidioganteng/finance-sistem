@@ -106,6 +106,8 @@ function transformRekapPenyusutan(raw?: PhpRekap): RekapKategoriAset[] {
       totalHargaPerolehanFmt: "-",
       totalAkumulasiPenyusutan: 0,
       totalAkumulasiPenyusutanFmt: formatRupiah(0),
+      totalBebanPenyusutan: 0,
+      totalBebanPenyusutanFmt: formatRupiah(0),
       totalNilaiBuku: 0,
       totalNilaiBukuFmt: formatRupiah(0),
     }));
@@ -114,6 +116,7 @@ function transformRekapPenyusutan(raw?: PhpRekap): RekapKategoriAset[] {
     const r = raw[kat] ?? {};
     const hp = Number(r.harga_perolehan ?? 0);
     const akum = Number(r.akumulasi ?? 0);
+    const beban = Number((r as { beban_penyusutan?: unknown }).beban_penyusutan ?? 0);
     const nb = Number(r.nilai_buku ?? Math.max(0, hp - akum));
     return {
       kategori: kat,
@@ -123,6 +126,8 @@ function transformRekapPenyusutan(raw?: PhpRekap): RekapKategoriAset[] {
       totalHargaPerolehanFmt: hp > 0 ? formatRupiah(hp) : "-",
       totalAkumulasiPenyusutan: akum,
       totalAkumulasiPenyusutanFmt: formatRupiah(akum),
+      totalBebanPenyusutan: beban,
+      totalBebanPenyusutanFmt: formatRupiah(beban),
       totalNilaiBuku: nb,
       totalNilaiBukuFmt: formatRupiah(nb),
     };

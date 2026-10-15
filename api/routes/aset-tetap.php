@@ -6,7 +6,7 @@ require_once __DIR__ . '/../helpers/akuntansi-helpers.php';
 $user      = require_auth();
 $record_id = $segments[1] ?? null;
 
-$allowed_kategori = ['KENDARAAN', 'PERALATAN', 'MESIN', 'GEDUNG', 'INVENTARIS', 'LAINNYA'];
+$allowed_kategori = ['TANAH', 'BANGUNAN', 'KENDARAAN', 'PERALATAN_KANTOR'];
 
 // ─── GET /api/aset-tetap?entityId=...&year=... ───────────────────────────────
 if ($method === 'GET' && $record_id === null) {
@@ -26,29 +26,48 @@ if ($method === 'GET' && $record_id === null) {
     $stmt->execute([$entity_id]);
     $rows = $stmt->fetchAll();
 
-    $result = [];
+    $result             = [];
+    $rekap_per_kategori = [
+        'TANAH'            => ['count' => 0, 'hargaPerolehan' => 0.0, 'akumulasi' => 0.0, 'nilaiBuku' => 0.0],
+        'BANGUNAN'         => ['count' => 0, 'hargaPerolehan' => 0.0, 'akumulasi' => 0.0, 'nilaiBuku' => 0.0],
+        'KENDARAAN'        => ['count' => 0, 'hargaPerolehan' => 0.0, 'akumulasi' => 0.0, 'nilaiBuku' => 0.0],
+        'PERALATAN_KANTOR' => ['count' => 0, 'hargaPerolehan' => 0.0, 'akumulasi' => 0.0, 'nilaiBuku' => 0.0],
+    ];
+
     foreach ($rows as $row) {
         $penyusutan = hitung_penyusutan_aset($row, $year);
-        $result[]   = [
-            'id'              => $row['id'],
-            'entityId'        => $row['entityId'],
-            'kode'            => $row['kode'],
-            'nama'            => $row['nama'],
-            'kategori'        => $row['kategori'],
-            'tanggalPerolehan'=> $row['tanggalPerolehan'],
-            'hargaPerolehan'  => (float)$row['hargaPerolehan'],
-            'nilaiResidu'     => (float)$row['nilaiResidu'],
-            'umurBulan'       => (int)$row['umurBulan'],
-            'metode'          => $row['metode'],
-            'keterangan'      => $row['keterangan'],
-            'createdAt'       => $row['createdAt'],
-            'bebanPenyusutan' => $penyusutan['beban_periode'],
-            'akumulasiPenyusutan' => $penyusutan['akumulasi'],
-            'nilaiBuku'       => (float)$row['hargaPerolehan'] - $penyusutan['akumulasi'],
+        $harga      = (float)$row['hargaPerolehan'];
+        $akum       = $penyusutan['akumulasi'];
+        $kat        = $row['kategori'];
+        if (!array_key_exists($kat, $rekap_per_kategori)) $kat = 'PERALATAN_KANTOR';
+
+        $rekap_per_kategori[$kat]['count']++;
+        $rekap_per_kategori[$kat]['hargaPerolehan'] += $harga;
+        $rekap_per_kategori[$kat]['akumulasi']      += $akum;
+        $rekap_per_kategori[$kat]['nilaiBuku']      += $harga - $akum;
+
+        $result[] = [
+            'id'                          => $row['id'],
+            'entityId'                    => $row['entityId'],
+            'kode'                        => $row['kode'],
+            'nama'                        => $row['nama'],
+            'kategori'                    => $row['kategori'],
+            'tanggalPerolehan'            => $row['tanggalPerolehan'],
+            'hargaPerolehan'              => $harga,
+            'nilaiResidu'                 => (float)$row['nilaiResidu'],
+            'umurBulan'                   => (int)$row['umurBulan'],
+            'metode'                      => $row['metode'],
+            'keterangan'                  => $row['keterangan'],
+            'createdAt'                   => $row['createdAt'],
+            'bebanPenyusutan'             => $penyusutan['beban_periode'],
+            'akumulasiPenyusutan'         => $akum,
+            'akumulasiPenyusutanAwalTahun'=> $penyusutan['akumulasi_awal_tahun'],
+            'nilaiBukuAwalTahun'          => $penyusutan['nilai_buku_awal_tahun'],
+            'nilaiBuku'                   => $harga - $akum,
         ];
     }
 
-    json_response($result);
+    json_response(['aset' => $result, 'rekapPerKategori' => $rekap_per_kategori]);
 }
 
 // ─── POST /api/aset-tetap ────────────────────────────────────────────────────
@@ -58,10 +77,13 @@ if ($method === 'POST' && $record_id === null) {
         if (empty($body[$field])) error_response("Field '$field' diperlukan.", 400);
     }
 
-    $kategori = $body['kategori'] ?? 'KENDARAAN';
+    $kategori = $body['kategori'] ?? 'BANGUNAN';
     if (!in_array($kategori, $allowed_kategori)) {
         error_response('Kategori tidak valid. Pilihan: ' . implode(', ', $allowed_kategori), 400);
     }
+
+    // PSAK 16: Tanah tidak disusutkan
+    $umur_bulan = $kategori === 'TANAH' ? 0 : (int)($body['umurBulan'] ?? 48);
 
     $pdo = get_pdo();
     $id  = uuid4();
@@ -81,7 +103,7 @@ if ($method === 'POST' && $record_id === null) {
         $body['tanggalPerolehan'],
         (float)$body['hargaPerolehan'],
         (float)($body['nilaiResidu'] ?? 0),
-        (int)($body['umurBulan'] ?? 48),
+        $umur_bulan,
         $body['metode'] ?? 'GARIS_LURUS',
         $body['keterangan'] ?? null,
         $now,
@@ -100,12 +122,19 @@ if ($method === 'POST' && $record_id === null) {
 // ─── PUT /api/aset-tetap/:id ─────────────────────────────────────────────────
 if ($method === 'PUT' && $record_id !== null) {
     $pdo  = get_pdo();
-    $stmt = $pdo->prepare('SELECT id FROM AsetTetap WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, kategori FROM AsetTetap WHERE id = ?');
     $stmt->execute([$record_id]);
-    if (!$stmt->fetch()) error_response('Aset tetap tidak ditemukan.', 404);
+    $existing = $stmt->fetch();
+    if (!$existing) error_response('Aset tetap tidak ditemukan.', 404);
 
     if (isset($body['kategori']) && !in_array($body['kategori'], $allowed_kategori)) {
         error_response('Kategori tidak valid. Pilihan: ' . implode(', ', $allowed_kategori), 400);
+    }
+
+    // PSAK 16: Tanah tidak disusutkan — paksa umurBulan=0 jika kategori efektif adalah TANAH
+    $effective_kategori = $body['kategori'] ?? $existing['kategori'];
+    if ($effective_kategori === 'TANAH') {
+        $body['umurBulan'] = 0;
     }
 
     $updatable = ['kode','nama','kategori','tanggalPerolehan','hargaPerolehan','nilaiResidu','umurBulan','metode','keterangan'];

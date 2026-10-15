@@ -35,19 +35,35 @@ function is_laba_ditahan(string $code, string $name): bool {
 /**
  * Hitung beban penyusutan aset tetap untuk periode tertentu (metode garis lurus).
  *
- * @param array $aset  Row dari tabel AsetTetap (tanggalPerolehan, hargaPerolehan, nilaiResidu, umurBulan)
+ * @param array $aset  Row dari tabel AsetTetap (tanggalPerolehan, hargaPerolehan, nilaiResidu, umurBulan, kategori)
  * @param int   $year  Tahun target perhitungan
- * @return array ['beban_periode' => float, 'akumulasi' => float]
+ * @return array ['beban_periode' => float, 'akumulasi' => float, 'akumulasi_awal_tahun' => float, 'nilai_buku_awal_tahun' => float]
  */
 function hitung_penyusutan_aset(array $aset, int $year): array {
+    $harga = (float)$aset['hargaPerolehan'];
+
+    // TANAH tidak disusutkan (PSAK 16)
+    if (isset($aset['kategori']) && $aset['kategori'] === 'TANAH') {
+        return [
+            'beban_periode'         => 0.0,
+            'akumulasi'             => 0.0,
+            'akumulasi_awal_tahun'  => 0.0,
+            'nilai_buku_awal_tahun' => $harga,
+        ];
+    }
+
     $tanggal_perolehan = new DateTime($aset['tanggalPerolehan']);
-    $harga   = (float)$aset['hargaPerolehan'];
-    $residu  = (float)$aset['nilaiResidu'];
-    $umur_bulan = (int)$aset['umurBulan'];
-    $nilai_tersusut = $harga - $residu;
+    $residu            = (float)$aset['nilaiResidu'];
+    $umur_bulan        = (int)$aset['umurBulan'];
+    $nilai_tersusut    = $harga - $residu;
 
     if ($umur_bulan <= 0 || $nilai_tersusut <= 0) {
-        return ['beban_periode' => 0.0, 'akumulasi' => 0.0];
+        return [
+            'beban_periode'         => 0.0,
+            'akumulasi'             => 0.0,
+            'akumulasi_awal_tahun'  => 0.0,
+            'nilai_buku_awal_tahun' => $harga,
+        ];
     }
 
     $beban_per_bulan = $nilai_tersusut / $umur_bulan;
@@ -56,15 +72,15 @@ function hitung_penyusutan_aset(array $aset, int $year): array {
     $bulan_perolehan = (int)$tanggal_perolehan->format('n');
 
     // Bulan absolut (year*12 + month_0indexed)
-    $abs_mulai_aset      = $tahun_perolehan * 12 + ($bulan_perolehan - 1); // 0-indexed
+    $abs_mulai_aset      = $tahun_perolehan * 12 + ($bulan_perolehan - 1);
     $abs_akhir_aset      = $abs_mulai_aset + $umur_bulan - 1;
 
-    $abs_mulai_tahun_ini = $year * 12;       // Januari tahun target (0-indexed)
-    $abs_akhir_tahun_ini = $year * 12 + 11;  // Desember tahun target
+    $abs_mulai_tahun_ini = $year * 12;
+    $abs_akhir_tahun_ini = $year * 12 + 11;
 
     // Irisan bulan aktif di tahun target
-    $start_irisan = max($abs_mulai_tahun_ini, $abs_mulai_aset);
-    $end_irisan   = min($abs_akhir_tahun_ini, $abs_akhir_aset);
+    $start_irisan          = max($abs_mulai_tahun_ini, $abs_mulai_aset);
+    $end_irisan            = min($abs_akhir_tahun_ini, $abs_akhir_aset);
     $bulan_aktif_tahun_ini = max(0, $end_irisan - $start_irisan + 1);
 
     $beban_periode = $beban_per_bulan * $bulan_aktif_tahun_ini;
@@ -74,9 +90,17 @@ function hitung_penyusutan_aset(array $aset, int $year): array {
     $bulan_akumulasi = max(0, $end_akumulasi - $abs_mulai_aset + 1);
     $akumulasi       = $beban_per_bulan * $bulan_akumulasi;
 
+    // Akumulasi awal tahun (s/d akhir tahun sebelumnya) — untuk year-end rollover
+    $abs_akhir_tahun_lalu = ($year - 1) * 12 + 11;
+    $end_akum_lalu        = min($abs_akhir_aset, $abs_akhir_tahun_lalu);
+    $bulan_akum_lalu      = max(0, $end_akum_lalu - $abs_mulai_aset + 1);
+    $akumulasi_awal_tahun = round($beban_per_bulan * $bulan_akum_lalu, 2);
+
     return [
-        'beban_periode' => round($beban_periode, 2),
-        'akumulasi'     => round($akumulasi, 2),
+        'beban_periode'         => round($beban_periode, 2),
+        'akumulasi'             => round($akumulasi, 2),
+        'akumulasi_awal_tahun'  => $akumulasi_awal_tahun,
+        'nilai_buku_awal_tahun' => round($harga - $akumulasi_awal_tahun, 2),
     ];
 }
 
@@ -126,4 +150,47 @@ function total_akumulasi_penyusutan(string $entity_id, int $year): float {
         $total += (float)$r['akumulasi'];
     }
     return $total;
+}
+
+/**
+ * Ringkasan penyusutan per kategori PSAK (4 kategori) untuk satu entity dan tahun.
+ * Lebih efisien dari memanggil total_beban + total_akumulasi secara terpisah.
+ *
+ * @return array ['total_beban' => float, 'total_akumulasi' => float, 'rekap' => [kategori => ['beban', 'akumulasi', 'count']]]
+ */
+function get_penyusutan_summary(string $entity_id, int $year): array {
+    $rows  = get_penyusutan_entity($entity_id, $year);
+    $rekap = [
+        'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'KENDARAAN'        => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'PERALATAN_KANTOR' => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+    ];
+    $total_beban     = 0.0;
+    $total_akumulasi = 0.0;
+
+    foreach ($rows as $r) {
+        $beban = (float)$r['beban_periode'];
+        $akum  = (float)$r['akumulasi'];
+        $kat   = $r['kategori'] ?? 'PERALATAN_KANTOR';
+        if (!array_key_exists($kat, $rekap)) $kat = 'PERALATAN_KANTOR';
+
+        $total_beban     += $beban;
+        $total_akumulasi += $akum;
+        $rekap[$kat]['beban']     += $beban;
+        $rekap[$kat]['akumulasi'] += $akum;
+        $rekap[$kat]['count']++;
+    }
+
+    foreach ($rekap as &$rv) {
+        $rv['beban']     = round($rv['beban'],     2);
+        $rv['akumulasi'] = round($rv['akumulasi'], 2);
+    }
+    unset($rv);
+
+    return [
+        'total_beban'     => round($total_beban,     2),
+        'total_akumulasi' => round($total_akumulasi, 2),
+        'rekap'           => $rekap,
+    ];
 }

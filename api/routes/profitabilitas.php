@@ -15,7 +15,7 @@ if ($method === 'GET') {
     $sql    = 'SELECT p.id, p.code, p.name, p.contractValue, p.spend, p.status,
                       p.deadline, p.createdAt,
                       MAX(tr.percentage) AS max_termin_pct,
-                      COUNT(tr.id)       AS termin_count
+                      COUNT(DISTINCT tr.id) AS termin_count
                FROM Project p
                LEFT JOIN Termin tr ON tr.projectId = p.id
                WHERE p.entityId = ?';
@@ -33,12 +33,33 @@ if ($method === 'GET') {
     $stmt->execute($params);
     $projects = $stmt->fetchAll();
 
+    // Hitung spend aktual dari COA BEBAN per proyek (lebih akurat dari Project.spend yang ter-cache)
+    $spend_sql    = 'SELECT t.projectId, SUM(t.debit - t.kredit) AS coa_spend
+                     FROM `Transaction` t
+                     JOIN CoaAccount c ON c.id = t.coaAccountId AND c.kategori = \'BEBAN\'
+                     WHERE t.entityId = ? AND t.projectId IS NOT NULL';
+    $spend_params = [$entity_id];
+    if ($year !== null) {
+        $spend_sql    .= ' AND YEAR(t.tanggal) = ?';
+        $spend_params[] = $year;
+    }
+    $spend_sql .= ' GROUP BY t.projectId';
+    $stmt_spend = $pdo->prepare($spend_sql);
+    $stmt_spend->execute($spend_params);
+    $coa_spend_map = [];
+    while ($sr = $stmt_spend->fetch()) {
+        $coa_spend_map[$sr['projectId']] = (float)$sr['coa_spend'];
+    }
+
     $result = [];
     foreach ($projects as $p) {
         $contract_value = (float)$p['contractValue'];
-        $spend          = (float)$p['spend'];
-        $profit         = $contract_value - $spend;
-        $margin         = $contract_value > 0 ? round($profit / $contract_value * 100, 2) : 0.0;
+        // Gunakan COA BEBAN sebagai sumber utama; fallback ke Project.spend
+        $spend  = isset($coa_spend_map[$p['id']])
+            ? max(0.0, $coa_spend_map[$p['id']])
+            : (float)$p['spend'];
+        $profit = $contract_value - $spend;
+        $margin = $contract_value > 0 ? round($profit / $contract_value * 100, 2) : 0.0;
 
         $result[] = [
             'id'             => $p['id'],
@@ -46,6 +67,7 @@ if ($method === 'GET') {
             'name'           => $p['name'],
             'contractValue'  => $contract_value,
             'spend'          => $spend,
+            'spendSource'    => isset($coa_spend_map[$p['id']]) ? 'COA_BEBAN' : 'project_spend',
             'profit'         => $profit,
             'marginPersen'   => $margin,
             'status'         => $p['status'],

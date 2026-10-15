@@ -85,6 +85,32 @@ if ($method === 'GET') {
         }
     }
 
+    // Tambahkan pendapatan dari FakturPendapatan yang belum dijurnal (dual-source)
+    $stmt_faktur = $pdo->prepare(
+        "SELECT COALESCE(SUM(f.nilaiProyek), 0)
+         FROM FakturPendapatan f
+         WHERE f.entityId = ?
+           AND f.tahunPajak = ?
+           AND f.id NOT IN (
+               SELECT t.fakturId FROM `Transaction` t WHERE t.fakturId IS NOT NULL
+           )"
+    );
+    $stmt_faktur->execute([$entity_id, $year_dari]);
+    $faktur_unlinked = (float)$stmt_faktur->fetchColumn();
+
+    if ($faktur_unlinked > 0) {
+        $pendapatan[] = [
+            'id'       => null,
+            'code'     => 'faktur_unlinked',
+            'name'     => 'Pendapatan dari E-Faktur (belum dijurnal)',
+            'kategori' => 'PENDAPATAN',
+            'debit'    => 0.0,
+            'kredit'   => $faktur_unlinked,
+            'saldo'    => $faktur_unlinked,
+            'isAuto'   => true,
+        ];
+    }
+
     // Tambahkan beban penyusutan otomatis dari AsetTetap
     $beban_penyusutan = total_beban_penyusutan($entity_id, $year_dari);
     if ($beban_penyusutan > 0) {
@@ -115,6 +141,7 @@ if ($method === 'GET') {
         'totalBeban'      => $total_beban,
         'labaBersih'      => $laba_bersih,
         'bebanPenyusutan' => $beban_penyusutan,
+        'fakturUnlinked'  => $faktur_unlinked,
     ]);
 }
 

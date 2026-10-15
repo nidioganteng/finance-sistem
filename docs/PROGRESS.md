@@ -277,3 +277,47 @@ Sama seperti laba-rugi tetapi untuk laporan gabungan multi-entity. Neraca sectio
 Spend per proyek dihitung dari `SUM(Transaction.debit - kredit)` di akun COA kategori BEBAN yang terkait proyek tersebut. Fallback ke Project.spend jika belum ada transaksi BEBAN. Field `spendSource` ('COA_BEBAN' atau 'project_spend') di tiap baris response.
 
 ---
+
+## laba-rugi — anti-double-count (dual-source)
+
+**Commit:** `1bbc97e` — cegah hitung ganda untuk faktur yang dijurnal manual tanpa fakturId
+
+### Masalah
+
+Faktur lama (atau entri manual) yang sudah ada di Transaction.coaAccountId=PENDAPATAN dengan `fakturId=NULL` tidak terdeteksi oleh filter `NOT IN (SELECT fakturId ...)` karena NULL tidak bisa di-IN. Akibatnya, faktur itu ikut dihitung lagi via dual-source → Total Pendapatan naik 2× nilaiProyek.
+
+### Fix
+
+Tambah klausa `NOT EXISTS` yang mencocokkan berdasarkan entity + tahun + bulan + kredit ≈ nilaiProyek (toleransi < Rp 1). Diterapkan di `laba-rugi.php` dan `laporan-keuangan.php`.
+
+### Tes (3/3 lulus — `tests/manual/laba-rugi-no-double-count.sh`)
+
+| Langkah | Yang diuji |
+|---------|-----------|
+| POST faktur baru nilaiProyek=555000 | Baseline meningkat 555000 setelah faktur ditambah |
+| INSERT Transaction manual ke COA PENDAPATAN, kredit=555000, fakturId=NULL | Simulasi data lama/entri manual |
+| GET laba-rugi setelah insersi | totalPendapatan naik tepat 555000 (bukan 1110000); fakturUnlinked=0 |
+
+---
+
+## Frontend — penyesuaian kategori dan shape response
+
+**Commit:** *(ini)* — PERALATAN→PERALATAN_KANTOR, fix shape respons PHP aset-tetap, rekapPerKategoriAset
+
+### Perubahan
+
+| File | Perubahan |
+|------|-----------|
+| `src/lib/aset-tetap.ts` | `STANDAR_KATEGORI_ASET` key PERALATAN → PERALATAN_KANTOR; `normalizeKategori` peta lama (PERALATAN, MESIN, INVENTARIS, LAINNYA) → PERALATAN_KANTOR; `getPenyusutanSummary()` dan `getAsetTetapList()` ekstrak `.aset` dari response `{aset:[...],rekapPerKategori:{...}}` |
+| `src/lib/aset-tetap.ts` | `RawAsetTetapRow` + field `akumulasiPenyusutanAwalTahun` dan `nilaiBukuAwalTahun` |
+| `src/lib/neraca.ts` | `NeracaData` + `rekapPerKategoriAset: RekapKategoriAset[]`; PHP rekap object ditransform via `transformRekapPenyusutan()` |
+| `src/lib/laporan-keuangan.ts` | `LaporanKeuanganData` + `rekapPerKategoriAset`; transform PHP rekap |
+| `api/helpers/akuntansi-helpers.php` | `get_penyusutan_summary()` tambah `harga_perolehan` dan `nilai_buku` per kategori |
+| `api/routes/laporan-keuangan.php` | `$rekap_aset_gabungan` akumulasikan `harga_perolehan` dan `nilai_buku` |
+| `src/components/laporan/UtangAsetView.tsx` | Fix typo `saldoAwalFmt` → `saldoFmt` (pre-existing TS error) |
+
+**TypeScript:** `npx tsc --noEmit` → 0 error.  
+**PERALATAN_KANTOR test:** POST 201, PUT 200, GET shape OK.  
+**Regression suite:** 91 assertion lulus, 0 gagal.
+
+---

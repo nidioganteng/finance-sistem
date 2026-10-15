@@ -1,5 +1,6 @@
 import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
+import type { RekapKategoriAset } from "./aset-tetap";
 
 export type CoaLine = {
   code: string;
@@ -62,6 +63,7 @@ export type LaporanKeuanganData = {
   penyesuaianNonKasFmt: string;
   penyusutanOtomatis: number;
   akumulasiPenyusutanOtomatis: number;
+  rekapPerKategoriAset: RekapKategoriAset[];
   kasAwalFmt: string;
   kasOperasiFmt: string;
   kasInvestasiFmt: string;
@@ -83,6 +85,8 @@ type PhpCoaLine = {
   isNetting?: boolean;
   labaBerjalan?: number;
 };
+
+type PhpRekap = Record<string, { beban?: number; akumulasi?: number; count?: number; harga_perolehan?: number; nilai_buku?: number }>;
 
 type PhpLaporanKeuanganRaw = {
   entityIds: string[];
@@ -109,6 +113,7 @@ type PhpLaporanKeuanganRaw = {
     totalModal: number;
     totalKewajibanModal: number;
     akumulasiPenyusutan: number;
+    rekapPerKategoriAset?: PhpRekap;
   };
   arusKas: {
     monthly: {
@@ -123,6 +128,34 @@ type PhpLaporanKeuanganRaw = {
     totalNeto: number;
   };
 };
+
+const _KATEGORI_LABELS: Record<string, string> = {
+  TANAH: "Tanah",
+  BANGUNAN: "Bangunan & Gedung",
+  KENDARAAN: "Kendaraan",
+  PERALATAN_KANTOR: "Peralatan & Inventaris",
+};
+const _KATEGORI_ORDER = ["TANAH", "BANGUNAN", "KENDARAAN", "PERALATAN_KANTOR"];
+
+function transformRekapPenyusutan(raw?: PhpRekap): RekapKategoriAset[] {
+  return _KATEGORI_ORDER.map((kat) => {
+    const r = raw?.[kat] ?? {};
+    const hp = Number(r.harga_perolehan ?? 0);
+    const akum = Number(r.akumulasi ?? 0);
+    const nb = Number(r.nilai_buku ?? Math.max(0, hp - akum));
+    return {
+      kategori: kat,
+      label: _KATEGORI_LABELS[kat] ?? kat,
+      jumlahAset: Number(r.count ?? 0),
+      totalHargaPerolehan: hp,
+      totalHargaPerolehanFmt: hp > 0 ? formatRupiah(hp) : "-",
+      totalAkumulasiPenyusutan: akum,
+      totalAkumulasiPenyusutanFmt: formatRupiah(akum),
+      totalNilaiBuku: nb,
+      totalNilaiBukuFmt: formatRupiah(nb),
+    };
+  });
+}
 
 function toCoaLine(item: PhpCoaLine): CoaLine {
   const saldo = Number(item.saldo) || 0;
@@ -283,6 +316,7 @@ export async function getLaporanKeuanganData(
     penyesuaianNonKasFmt: formatRupiah(penyesuaianNonKas),
     penyusutanOtomatis,
     akumulasiPenyusutanOtomatis: akumulasiPenyusutan,
+    rekapPerKategoriAset: transformRekapPenyusutan(neraca.rekapPerKategoriAset),
     kasAwalFmt: formatRupiah(kasAwal),
     kasOperasiFmt: formatRupiah(Math.abs(kasOperasi)),
     kasInvestasiFmt: formatRupiah(Math.abs(kasInvestasi)),

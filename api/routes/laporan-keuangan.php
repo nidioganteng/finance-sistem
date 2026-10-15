@@ -106,10 +106,10 @@ if ($method === 'GET') {
     $total_beban_penyusutan_gabungan  = 0.0;
     $total_akumulasi_penyusutan_gabungan = 0.0;
     $rekap_aset_gabungan = [
-        'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
-        'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
-        'KENDARAAN'        => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
-        'PERALATAN_KANTOR' => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
+        'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
+        'KENDARAAN'        => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
+        'PERALATAN_KANTOR' => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
     ];
     foreach ($entity_ids as $eid) {
         $ps = get_penyusutan_summary($eid, $year);
@@ -117,9 +117,11 @@ if ($method === 'GET') {
         $total_akumulasi_penyusutan_gabungan += $ps['total_akumulasi'];
         foreach ($ps['rekap'] as $kat => $rv) {
             if (isset($rekap_aset_gabungan[$kat])) {
-                $rekap_aset_gabungan[$kat]['beban']     += $rv['beban'];
-                $rekap_aset_gabungan[$kat]['akumulasi'] += $rv['akumulasi'];
-                $rekap_aset_gabungan[$kat]['count']     += $rv['count'];
+                $rekap_aset_gabungan[$kat]['beban']           += $rv['beban'];
+                $rekap_aset_gabungan[$kat]['akumulasi']       += $rv['akumulasi'];
+                $rekap_aset_gabungan[$kat]['count']           += $rv['count'];
+                $rekap_aset_gabungan[$kat]['harga_perolehan'] += $rv['harga_perolehan'] ?? 0.0;
+                $rekap_aset_gabungan[$kat]['nilai_buku']      += $rv['nilai_buku']      ?? 0.0;
             }
         }
     }

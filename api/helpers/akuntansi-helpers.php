@@ -156,15 +156,15 @@ function total_akumulasi_penyusutan(string $entity_id, int $year): float {
  * Ringkasan penyusutan per kategori PSAK (4 kategori) untuk satu entity dan tahun.
  * Lebih efisien dari memanggil total_beban + total_akumulasi secara terpisah.
  *
- * @return array ['total_beban' => float, 'total_akumulasi' => float, 'rekap' => [kategori => ['beban', 'akumulasi', 'count']]]
+ * @return array ['total_beban' => float, 'total_akumulasi' => float, 'rekap' => [kategori => ['beban', 'akumulasi', 'count', 'harga_perolehan', 'nilai_buku']]]
  */
 function get_penyusutan_summary(string $entity_id, int $year): array {
     $rows  = get_penyusutan_entity($entity_id, $year);
     $rekap = [
-        'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
-        'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
-        'KENDARAAN'        => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
-        'PERALATAN_KANTOR' => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0],
+        'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
+        'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
+        'KENDARAAN'        => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
+        'PERALATAN_KANTOR' => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
     ];
     $total_beban     = 0.0;
     $total_akumulasi = 0.0;
@@ -172,19 +172,24 @@ function get_penyusutan_summary(string $entity_id, int $year): array {
     foreach ($rows as $r) {
         $beban = (float)$r['beban_periode'];
         $akum  = (float)$r['akumulasi'];
+        $harga = (float)$r['hargaPerolehan'];
         $kat   = $r['kategori'] ?? 'PERALATAN_KANTOR';
         if (!array_key_exists($kat, $rekap)) $kat = 'PERALATAN_KANTOR';
 
         $total_beban     += $beban;
         $total_akumulasi += $akum;
-        $rekap[$kat]['beban']     += $beban;
-        $rekap[$kat]['akumulasi'] += $akum;
+        $rekap[$kat]['beban']            += $beban;
+        $rekap[$kat]['akumulasi']        += $akum;
         $rekap[$kat]['count']++;
+        $rekap[$kat]['harga_perolehan']  += $harga;
+        $rekap[$kat]['nilai_buku']       += max(0.0, $harga - $akum);
     }
 
     foreach ($rekap as &$rv) {
-        $rv['beban']     = round($rv['beban'],     2);
-        $rv['akumulasi'] = round($rv['akumulasi'], 2);
+        $rv['beban']           = round($rv['beban'],           2);
+        $rv['akumulasi']       = round($rv['akumulasi'],       2);
+        $rv['harga_perolehan'] = round($rv['harga_perolehan'], 2);
+        $rv['nilai_buku']      = round($rv['nilai_buku'],      2);
     }
     unset($rv);
 

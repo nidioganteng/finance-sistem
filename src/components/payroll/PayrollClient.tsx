@@ -34,6 +34,7 @@ import {
   History,
   Sparkles,
   RotateCcw,
+  Car,
 } from "lucide-react";
 import {
   type PegawaiItem,
@@ -58,6 +59,8 @@ import {
   updatePegawaiAction,
   updatePegawaiStatusAction,
   deletePegawaiAction,
+  updateBatchTransportAction,
+  updatePegawaiTransportAction,
   saveGajiBulananAction,
   bulkGenerateGajiBulananAction,
   deleteGajiBulananAction,
@@ -255,6 +258,10 @@ export function PayrollClient({
   const [bulkDefaultHariKerja, setBulkDefaultHariKerja] = useState<number>(20);
   const [bulkOverwrite, setBulkOverwrite] = useState<boolean>(false);
   const [bulkAutoCalculatePph, setBulkAutoCalculatePph] = useState<boolean>(true);
+  const [isBatchTransportModalOpen, setIsBatchTransportModalOpen] = useState<boolean>(false);
+  const [batchTarifTransport, setBatchTarifTransport] = useState<number>(15000);
+  const [quickTransportTarget, setQuickTransportTarget] = useState<PegawaiItem | null>(null);
+  const [quickTarifTransportVal, setQuickTarifTransportVal] = useState<number>(15000);
 
   // Sinkronisasi state form modal gaji bulanan saat modal dibuka atau pegawai berubah
   useEffect(() => {
@@ -821,18 +828,33 @@ export function PayrollClient({
                       <span>Buka Jurnal Umum</span>
                     </Link>
                   ) : pegawaiSubTab === "master" ? (
-                    <button
-                      onClick={() => {
-                        setEditingPegawai(null);
-                        setModalPegawaiStatus("AKTIF");
-                        setModalTanggalResign("");
-                        setIsPegawaiModalOpen(true);
-                      }}
-                      className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                    >
-                      <Plus size={14} />
-                      <span>Tambah Pegawai Baru</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBatchTarifTransport(15000);
+                          setIsBatchTransportModalOpen(true);
+                        }}
+                        className="h-8 px-3 rounded-xl border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        title="Atur tarif transport standar untuk seluruh karyawan"
+                      >
+                        <Car size={13} className="text-navy" />
+                        <span>Setting Biaya Transport</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingPegawai(null);
+                          setModalPegawaiStatus("AKTIF");
+                          setModalTanggalResign("");
+                          setIsPegawaiModalOpen(true);
+                        }}
+                        className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                      >
+                        <Plus size={14} />
+                        <span>Tambah Pegawai Baru</span>
+                      </button>
+                    </div>
                   ) : pegawaiSubTab === "gaji" ? (
                     <div className="flex items-center gap-2">
                       <button
@@ -1733,6 +1755,7 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">PTKP Tahunan</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Gaji Pokok Standar</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Tunj. Jabatan Master</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px]">Tarif Transport / Hari</th>
                       <th className="py-2.5 px-3.5 text-left whitespace-nowrap min-w-[160px]">Mulai Bekerja / Masa Kerja</th>
                       <th className="py-2.5 px-3.5 text-left whitespace-nowrap min-w-[120px]">Tanggal Resign</th>
                       <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[120px]">Status</th>
@@ -1742,7 +1765,7 @@ export function PayrollClient({
                   <tbody className="divide-y divide-border">
                     {filteredMasterList.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-8 text-center text-muted-faint">
+                        <td colSpan={12} className="py-8 text-center text-muted-faint">
                           Tidak ada data karyawan ditemukan.
                         </td>
                       </tr>
@@ -1781,9 +1804,30 @@ export function PayrollClient({
                                 BPJS: +{formatRupiah(p.tunjanganBpjs ?? 0)} / -{formatRupiah(p.potonganBpjs ?? 0)}
                               </div>
                             )}
-                            <div className="text-[10px] text-navy dark:text-navy-light font-mono font-medium">
-                              Transport: {p.tarifTransportHarianFmt || formatRupiah(p.tarifTransportHarian ?? 15000)}/hr
+                          </td>
+                          <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="font-mono font-bold text-navy-text">
+                                {p.tarifTransportHarianFmt || formatRupiah(p.tarifTransportHarian ?? 15000)}
+                                <span className="text-[10px] text-muted-faint font-normal font-sans ml-0.5">/hr</span>
+                              </span>
+                              {isManager && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setQuickTransportTarget(p);
+                                    setQuickTarifTransportVal(p.tarifTransportHarian ?? 15000);
+                                  }}
+                                  className="p-1 rounded-md text-muted-faint hover:text-navy hover:bg-surface-subtle transition-colors cursor-pointer"
+                                  title="Ubah tarif transport pegawai ini"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                              )}
                             </div>
+                            <span className="text-[10px] text-muted-faint block mt-0.5 font-sans">
+                              Otomatis × Hari Kerja
+                            </span>
                           </td>
                           <td className="py-3 px-3.5 whitespace-nowrap">
                             {p.tanggalMasukFmt ? (
@@ -6182,6 +6226,201 @@ export function PayrollClient({
                 >
                   <Sparkles size={13} className="text-amber-300" />
                   <span>{isPending ? "Memproses Gaji..." : "Proses Gaji Sekarang"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 7: SETTING BIAYA TRANSPORT STANDAR (DATABASE PEGAWAI) */}
+      {/* ========================================================= */}
+      {mounted && isBatchTransportModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
+              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                <Car size={16} className="text-navy" />
+                <span>Setting Biaya Transport Pegawai</span>
+              </h3>
+              <button
+                onClick={() => setIsBatchTransportModalOpen(false)}
+                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                startTransition(async () => {
+                  try {
+                    const res = await updateBatchTransportAction(
+                      data.entity?.id ?? "",
+                      batchTarifTransport
+                    );
+                    setSuccessMsg(res.message);
+                    setIsBatchTransportModalOpen(false);
+                    router.refresh();
+                  } catch (err: unknown) {
+                    setErrorMsg((err as Error).message);
+                  }
+                });
+              }}
+              className="p-5 space-y-4 text-xs"
+            >
+              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border space-y-1">
+                <div className="text-[10px] text-muted-faint uppercase font-bold tracking-wider">
+                  Entitas Terpilih
+                </div>
+                <div className="text-sm font-bold text-navy-text">
+                  {data.entity?.name}
+                </div>
+                <div className="text-xs text-muted-stronger">
+                  Diterapkan ke {allMasterPegawai.length} Pegawai Terdaftar
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-[11px] text-blue-900 dark:text-blue-200 space-y-1.5 leading-relaxed">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Info size={13} className="shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span>Rumus Perhitungan Otomatis:</span>
+                </p>
+                <p className="text-blue-800 dark:text-blue-300">
+                  Tarif ini disimpan di database master karyawan. Saat penggajian bulanan, Tim Finance cukup mengisi hari kerja dan tunjangan otomatis dihitung:
+                  <br />
+                  <strong className="font-mono text-navy dark:text-blue-200">
+                    Tunjangan Transport = Hari Kerja × Tarif Harian Master
+                  </strong>
+                </p>
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Tarif Transport Standar (Rp / Hari Kerja) *
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  value={formatRupiahInput(batchTarifTransport)}
+                  onChange={(e) => {
+                    const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                    setBatchTarifTransport(val);
+                  }}
+                  placeholder="15.000"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold text-sm"
+                />
+                <p className="text-[10px] text-muted-faint mt-1">
+                  Contoh standar: Rp 15.000 / hari (Rp 300.000 untuk 20 hari kerja).
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsBatchTransportModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || batchTarifTransport < 0}
+                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isPending ? "Menyimpan..." : "Terapkan ke Semua Karyawan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 8: UBAH TARIF TRANSPORT SATUAN KARYAWAN */}
+      {/* ========================================================= */}
+      {mounted && quickTransportTarget && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface-subtle/50">
+              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                <Car size={16} className="text-navy" />
+                <span>Ubah Biaya Transport Karyawan</span>
+              </h3>
+              <button
+                onClick={() => setQuickTransportTarget(null)}
+                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                startTransition(async () => {
+                  try {
+                    const res = await updatePegawaiTransportAction(
+                      quickTransportTarget.id,
+                      quickTarifTransportVal
+                    );
+                    setSuccessMsg(res.message);
+                    setQuickTransportTarget(null);
+                    router.refresh();
+                  } catch (err: unknown) {
+                    setErrorMsg((err as Error).message);
+                  }
+                });
+              }}
+              className="p-5 space-y-3.5 text-xs"
+            >
+              <div>
+                <div className="font-bold text-navy-text text-sm">{quickTransportTarget.nama}</div>
+                <div className="text-muted-faint font-mono text-[11px] mt-0.5">
+                  {quickTransportTarget.nik} · {quickTransportTarget.jabatan}
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Tarif Transport / Hari Kerja (Rp) *
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  value={formatRupiahInput(quickTarifTransportVal)}
+                  onChange={(e) => {
+                    const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                    setQuickTarifTransportVal(val);
+                  }}
+                  placeholder="15.000"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-bold text-sm"
+                />
+                <p className="text-[10px] text-muted-faint mt-1">
+                  Disimpan di master database karyawan ini. Otomatis dikalikan jumlah hari kerja saat penggajian.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setQuickTransportTarget(null)}
+                  className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || quickTarifTransportVal < 0}
+                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                >
+                  {isPending ? "Menyimpan..." : "Simpan Tarif"}
                 </button>
               </div>
             </form>

@@ -25,6 +25,74 @@ function fmt_tanggal_id(string $iso): string {
     return "$d {$months[$m]} $y";
 }
 
+function hitung_masa_kerja_id(?string $tgl_masuk): ?string {
+    if (!$tgl_masuk) return null;
+    $ts = strtotime($tgl_masuk);
+    if (!$ts) return null;
+    $now = time();
+    $y1 = (int)date('Y', $ts);
+    $m1 = (int)date('n', $ts);
+    $d1 = (int)date('j', $ts);
+    $y2 = (int)date('Y', $now);
+    $m2 = (int)date('n', $now);
+    $d2 = (int)date('j', $now);
+
+    $thn = $y2 - $y1;
+    $bln = $m2 - $m1;
+    if ($d2 < $d1) $bln--;
+    if ($bln < 0) { $thn--; $bln += 12; }
+    if ($thn < 0) return "0 bulan";
+    if ($thn === 0 && $bln === 0) return "< 1 bulan";
+    if ($thn === 0) return "{$bln} bulan";
+    if ($bln === 0) return "{$thn} tahun";
+    return "{$thn} tahun {$bln} bulan";
+}
+
+/**
+ * Menentukan apakah pegawai berhak muncul di daftar penggajian bulan & tahun tertentu.
+ * Aturan:
+ * 1. Jika sudah ada data gaji di bulan ini (historis), SELALU TAMPILKAN agar arsip & pajak tidak hilang.
+ * 2. Karyawan aktif otomatis muncul setiap bulan (sejak tanggal masuk).
+ * 3. Karyawan resign/pensiun otomatis tidak muncul lagi di bulan-bulan setelah tanggal resign.
+ */
+function is_pegawai_eligible_for_month(array $p, int $year, int $month, bool $has_gaji_this_month): bool {
+    if ($has_gaji_this_month) return true;
+
+    $status = !empty($p['status']) ? strtoupper(trim($p['status'])) : (!empty($p['isActive']) ? 'AKTIF' : 'RESIGN');
+
+    // Cek tanggal masuk (sebelum mulai kerja belum berhak muncul tanpa data gaji)
+    if (!empty($p['tanggalMasuk'])) {
+        $masuk_ts = strtotime($p['tanggalMasuk']);
+        if ($masuk_ts) {
+            $masuk_y = (int)date('Y', $masuk_ts);
+            $masuk_m = (int)date('n', $masuk_ts);
+            if ($year < $masuk_y || ($year === $masuk_y && $month < $masuk_m)) {
+                return false;
+            }
+        }
+    }
+
+    // Cek status resign / pensiun
+    if ($status === 'RESIGN' || $status === 'PENSIUN' || empty($p['isActive'])) {
+        if (!empty($p['tanggalResign'])) {
+            $resign_ts = strtotime($p['tanggalResign']);
+            if ($resign_ts) {
+                $resign_y = (int)date('Y', $resign_ts);
+                $resign_m = (int)date('n', $resign_ts);
+                // Bulan setelah tanggal resign: OTOMATIS TIDAK MUNCUL LAGI
+                if ($year > $resign_y || ($year === $resign_y && $month > $resign_m)) {
+                    return false;
+                }
+                // Bulan pada saat atau sebelum resign: tetap muncul
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return true;
+}
+
 // ─── GET /api/payroll?entityId=...&year=...&month=... ─────────────────────────
 // Logika: 1:1 dengan getPayrollData() di src/lib/payroll.ts
 if ($method === 'GET' && $sub === '') {
@@ -87,10 +155,10 @@ if ($method === 'GET' && $sub === '') {
         }
     }
 
-    // Build pegawaiList
-    $pegawai_list = [];
-    $gaji_bulan_ini = [];
-    $summary_bulan_ini = [
+    $pegawai_list       = [];
+    $all_pegawai_master = [];
+    $gaji_bulan_ini     = [];
+    $summary_bulan_ini  = [
         'totalPegawaiAktif'         => 0,
         'totalPegawaiInput'         => 0,
         'totalGajiPokok'            => 0.0,
@@ -111,10 +179,14 @@ if ($method === 'GET' && $sub === '') {
     ];
 
     foreach ($pegawai_map as $pid => $p) {
-        $gaji_months = $pegawai_gaji_map[$pid];
-        $ptkp_num    = (float)$p['ptkp'];
+        $gaji_months    = $pegawai_gaji_map[$pid];
+        $ptkp_num       = (float)$p['ptkp'];
         $gaji_pokok_num = (float)$p['gajiPokok'];
-        $is_active   = (bool)$p['isActive'];
+        $status_val     = !empty($p['status']) ? strtoupper(trim($p['status'])) : (!empty($p['isActive']) ? 'AKTIF' : 'RESIGN');
+        $is_active      = ($status_val === 'AKTIF');
+        $tgl_resign     = !empty($p['tanggalResign']) ? substr($p['tanggalResign'], 0, 10) : null;
+        $tgl_masuk      = !empty($p['tanggalMasuk']) ? substr($p['tanggalMasuk'], 0, 10) : null;
+        $masa_kerja     = hitung_masa_kerja_id($tgl_masuk);
 
         // Current month gaji
         $current_gaji = null;
@@ -137,6 +209,8 @@ if ($method === 'GET' && $sub === '') {
                 'pegawaiNama'              => $p['nama'],
                 'pegawaiNik'               => $p['nik'],
                 'pegawaiJabatan'           => $p['jabatan'],
+                'pegawaiTanggalMasuk'      => $tgl_masuk,
+                'pegawaiMasaKerja'         => $masa_kerja,
                 'bulan'                    => (int)$g['bulan'],
                 'tahun'                    => (int)$g['tahun'],
                 'gajiPokok'                => $gp,
@@ -189,10 +263,8 @@ if ($method === 'GET' && $sub === '') {
             $total_pph21_thn       += (float)$gm['gaji_pph21'];
         }
 
-        if ($is_active) $summary_bulan_ini['totalPegawaiAktif']++;
-
         $tj_master = (float)$p['tunjanganJabatan'];
-        $pegawai_list[] = [
+        $p_item = [
             'id'                    => $pid,
             'entityId'              => $p['entityId'],
             'nik'                   => $p['nik'],
@@ -205,15 +277,34 @@ if ($method === 'GET' && $sub === '') {
             'gajiPokokFmt'          => fmt_rp_payroll($gaji_pokok_num),
             'tunjanganJabatan'      => $tj_master,
             'tunjanganJabatanFmt'   => fmt_rp_payroll($tj_master),
-            'isActive'              => (bool)$p['isActive'],
-            'currentGaji'    => $current_gaji,
-            'akumulasiTahun' => [
-                'totalGajiKotor'  => $total_gaji_kotor_thn,
-                'totalGajiBersih' => $total_gaji_bersih_thn,
-                'totalPph21'      => $total_pph21_thn,
-                'bulanTerbayar'   => count($gaji_months),
+            'tanggalMasuk'          => $tgl_masuk,
+            'tanggalMasukFmt'       => $tgl_masuk ? fmt_tanggal_id($tgl_masuk) : null,
+            'masaKerja'             => $masa_kerja,
+            'status'                => $status_val,
+            'tanggalResign'         => $tgl_resign,
+            'tanggalResignFmt'      => $tgl_resign ? fmt_tanggal_id($tgl_resign) : null,
+            'isActive'              => $is_active,
+            'currentGaji'           => $current_gaji,
+            'akumulasiTahun'        => [
+                'totalGajiKotor'         => $total_gaji_kotor_thn,
+                'totalGajiTerlaporPajak' => $total_gaji_kotor_thn,
+                'totalGajiBersih'        => $total_gaji_bersih_thn,
+                'totalPph21'             => $total_pph21_thn,
+                'bulanTerbayar'          => count($gaji_months),
             ],
         ];
+
+        // 1. Masukkan ke profil master seluruh pegawai
+        $all_pegawai_master[] = $p_item;
+
+        // 2. Cek apakah karyawan berhak muncul di daftar penggajian bulan $month/$year ini
+        $is_eligible = is_pegawai_eligible_for_month($p, $year, $month, ($current_gaji !== null));
+        if ($is_eligible) {
+            $pegawai_list[] = $p_item;
+            if ($is_active || ($current_gaji !== null)) {
+                $summary_bulan_ini['totalPegawaiAktif']++;
+            }
+        }
     }
 
     // 6. Honor list for entity+year+month
@@ -768,6 +859,7 @@ if ($method === 'GET' && $sub === '') {
         'year'                  => $year,
         'month'                 => $month,
         'pegawaiList'           => $pegawai_list,
+        'allPegawaiMaster'      => $all_pegawai_master,
         'gajiBulanIni'          => $gaji_bulan_ini,
         'rekapBulananPegawai'   => $rekap_bulanan_pegawai,
         'summaryBulanIni'       => array_merge($summary_bulan_ini, [
@@ -815,9 +907,13 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     $status_kel     = trim($body['statusKeluarga'] ?? '') ?: 'TK/0';
     $ptkp           = (float)($body['ptkp'] ?? 54000000);
     $gaji_pokok     = (float)($body['gajiPokok'] ?? 0);
-    $is_active      = isset($body['isActive'])
-        ? ($body['isActive'] === true || $body['isActive'] === 'true' || $body['isActive'] === 'on')
-        : true;
+    $status         = strtoupper(trim($body['status'] ?? 'AKTIF'));
+    if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) {
+        $status = 'AKTIF';
+    }
+    $is_active      = ($status === 'AKTIF');
+    $tanggal_masuk  = !empty($body['tanggalMasuk']) ? trim($body['tanggalMasuk']) : null;
+    $tanggal_resign = !empty($body['tanggalResign']) ? trim($body['tanggalResign']) : null;
 
     if (!$entity_id || !$nik || !$nama) {
         return error_response('Entitas, NIK/Kode, dan Nama Pegawai wajib diisi.', 400);
@@ -834,9 +930,9 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     $now = date('Y-m-d H:i:s');
     $tunjangan_jabatan = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : 0.0;
     $pdo->prepare(
-        "INSERT INTO Pegawai (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok, tunjanganJabatan, isActive, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    )->execute([$id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $now, $now]);
+        "INSERT INTO Pegawai (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok, tunjanganJabatan, isActive, status, tanggalResign, tanggalMasuk, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )->execute([$id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $status, $tanggal_resign, $tanggal_masuk, $now, $now]);
 
     log_activity($user['id'], "Tambah Pegawai Tetap: $nama ($nik) - $jabatan", 'FINANCIAL_CHANGE', [
         'pegawaiId' => $id, 'entityId' => $entity_id,
@@ -867,9 +963,23 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
     $ptkp              = isset($body['ptkp']) ? (float)$body['ptkp'] : (float)$existing['ptkp'];
     $gaji_pokok        = isset($body['gajiPokok']) ? (float)$body['gajiPokok'] : (float)$existing['gajiPokok'];
     $tunjangan_jabatan = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : (float)$existing['tunjanganJabatan'];
-    $is_active         = isset($body['isActive'])
-        ? ($body['isActive'] === true || $body['isActive'] === 'true' || $body['isActive'] === 'on')
-        : (bool)$existing['isActive'];
+    
+    $status            = isset($body['status']) ? strtoupper(trim($body['status'])) : ($existing['status'] ?? 'AKTIF');
+    if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) {
+        $status = 'AKTIF';
+    }
+    $is_active         = ($status === 'AKTIF');
+
+    $tanggal_resign    = array_key_exists('tanggalResign', $body)
+        ? (!empty($body['tanggalResign']) ? trim($body['tanggalResign']) : null)
+        : ($existing['tanggalResign'] ?? null);
+    if ($status === 'AKTIF' && empty($body['tanggalResign'])) {
+        $tanggal_resign = null;
+    }
+
+    $tanggal_masuk     = array_key_exists('tanggalMasuk', $body)
+        ? (!empty($body['tanggalMasuk']) ? trim($body['tanggalMasuk']) : null)
+        : ($existing['tanggalMasuk'] ?? null);
 
     if (!$nik || !$nama) return error_response('NIK/Kode dan Nama Pegawai wajib diisi.', 400);
 
@@ -884,8 +994,8 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
 
     $now = date('Y-m-d H:i:s');
     $pdo->prepare(
-        "UPDATE Pegawai SET nik=?, nama=?, jabatan=?, statusKeluarga=?, ptkp=?, gajiPokok=?, tunjanganJabatan=?, isActive=?, updatedAt=? WHERE id=?"
-    )->execute([$nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $now, $id]);
+        "UPDATE Pegawai SET nik=?, nama=?, jabatan=?, statusKeluarga=?, ptkp=?, gajiPokok=?, tunjanganJabatan=?, isActive=?, status=?, tanggalResign=?, tanggalMasuk=?, updatedAt=? WHERE id=?"
+    )->execute([$nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $status, $tanggal_resign, $tanggal_masuk, $now, $id]);
 
     log_activity($user['id'], "Update Pegawai Tetap: $nama ($nik)", 'FINANCIAL_CHANGE', ['pegawaiId' => $id]);
 
@@ -905,6 +1015,17 @@ elseif ($method === 'DELETE' && $sub === 'pegawai' && $sub2 !== '') {
     $stmt->execute([$id]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$existing) return error_response('Data pegawai tidak ditemukan.', 404);
+
+    // Larangan Menghapus Data: Karyawan yang memiliki riwayat gaji tidak boleh dihapus dari sistem
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM GajiPegawaiBulanan WHERE pegawaiId = ?");
+    $stmt->execute([$id]);
+    $gaji_count = (int)$stmt->fetchColumn();
+    if ($gaji_count > 0) {
+        return error_response(
+            "Karyawan {$existing['nama']} tidak boleh dihapus karena memiliki {$gaji_count} riwayat penggajian yang harus diarsip untuk laporan keuangan & pajak tahunan. Silakan ubah status menjadi RESIGN atau PENSIUN.",
+            422
+        );
+    }
 
     $pdo->prepare("DELETE FROM Pegawai WHERE id = ?")->execute([$id]);
 
@@ -1166,9 +1287,9 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
     $count = 0;
 
     if (empty($prev_gaji_list)) {
-        // Buat dari master pegawai aktif
+        // Buat dari master pegawai aktif & eligible
         $stmt = $pdo->prepare(
-            "SELECT * FROM Pegawai WHERE entityId = ? AND isActive = 1"
+            "SELECT * FROM Pegawai WHERE entityId = ? AND (status = 'AKTIF' OR (isActive = 1 AND (status IS NULL OR status = '')))"
         );
         $stmt->execute([$entity_id]);
         $active_pegawai = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1178,6 +1299,11 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
         }
 
         foreach ($active_pegawai as $p) {
+            // Cek eligibility untuk bulan & tahun target
+            if (!is_pegawai_eligible_for_month($p, $target_year, $target_month, false)) {
+                continue;
+            }
+
             // Cek existing
             $stmt = $pdo->prepare(
                 "SELECT id FROM GajiPegawaiBulanan WHERE pegawaiId = ? AND bulan = ? AND tahun = ? LIMIT 1"
@@ -1186,12 +1312,14 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
             if ($stmt->fetchColumn()) continue;
 
             $gp = (float)$p['gajiPokok'];
+            $tj = (float)$p['tunjanganJabatan'];
+            $kotor = $gp + $tj;
             $pdo->prepare(
                 "INSERT INTO GajiPegawaiBulanan
-                 (id, entityId, pegawaiId, bulan, tahun, gajiPokok, totalGajiKotor, totalGajiBersih, catatan, createdAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                 (id, entityId, pegawaiId, bulan, tahun, gajiPokok, tunjanganJabatan, totalGajiKotor, totalGajiBersih, catatan, createdAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )->execute([uuid4(), $entity_id, $p['id'], $target_month, $target_year,
-                        $gp, $gp, $gp, 'Dibuat otomatis dari Gaji Pokok Master', $now]);
+                        $gp, $tj, $kotor, $kotor, 'Dibuat otomatis dari Gaji Pokok Master', $now]);
             $count++;
         }
 
@@ -1207,6 +1335,14 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
     }
 
     foreach ($prev_gaji_list as $prev) {
+        // Cek apakah pegawai masih aktif/eligible di bulan target (tidak resign sebelum bulan target)
+        $stmt = $pdo->prepare("SELECT * FROM Pegawai WHERE id = ? LIMIT 1");
+        $stmt->execute([$prev['pegawaiId']]);
+        $peg = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($peg && !is_pegawai_eligible_for_month($peg, $target_year, $target_month, false)) {
+            continue; // Otomatis lewati karyawan yang sudah resign untuk bulan target
+        }
+
         $stmt = $pdo->prepare(
             "SELECT id FROM GajiPegawaiBulanan WHERE pegawaiId = ? AND bulan = ? AND tahun = ? LIMIT 1"
         );

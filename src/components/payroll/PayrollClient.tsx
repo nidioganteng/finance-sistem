@@ -60,7 +60,6 @@ import {
   updateBatchTransportAction,
   updatePegawaiTransportAction,
   saveGajiBulananAction,
-  bulkGenerateGajiBulananAction,
   deleteGajiBulananAction,
   saveHonorTenagaAhliAction,
   deleteHonorTenagaAhliAction,
@@ -252,10 +251,6 @@ export function PayrollClient({
   const [modalPotonganLain, setModalPotonganLain] = useState<number>(0);
   const [modalCatatan, setModalCatatan] = useState<string>("");
   const [isCustomTarifTransport, setIsCustomTarifTransport] = useState<boolean>(false);
-  const [isBulkGenerateModalOpen, setIsBulkGenerateModalOpen] = useState<boolean>(false);
-  const [bulkDefaultHariKerja, setBulkDefaultHariKerja] = useState<number>(20);
-  const [bulkOverwrite, setBulkOverwrite] = useState<boolean>(false);
-  const [bulkAutoCalculatePph, setBulkAutoCalculatePph] = useState<boolean>(true);
   const [isBatchTransportModalOpen, setIsBatchTransportModalOpen] = useState<boolean>(false);
   const [batchTarifTransport, setBatchTarifTransport] = useState<number>(15000);
   const [quickTransportTarget, setQuickTransportTarget] = useState<PegawaiItem | null>(null);
@@ -856,22 +851,6 @@ export function PayrollClient({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
-                          setBulkDefaultHariKerja(20);
-                          setBulkOverwrite(false);
-                          setIsBulkGenerateModalOpen(true);
-                        }}
-                        className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                        title="Proses dan generate seluruh gaji karyawan bulan ini dari Master Data"
-                      >
-                        <span>Proses Gaji Semua Karyawan</span>
-                        {countBelumInput > 0 && (
-                          <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-900 font-bold text-[10px]">
-                            {countBelumInput} belum
-                          </span>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
                           const targetPegawai = data.pegawaiList.find((p) => !p.currentGaji) || data.pegawaiList[0];
                           if (targetPegawai) {
                             setEditingGaji({ pegawai: targetPegawai, gaji: targetPegawai.currentGaji });
@@ -880,11 +859,11 @@ export function PayrollClient({
                             setErrorMsg("Belum ada pegawai terdaftar di entitas ini. Silakan tambahkan pegawai terlebih dahulu.");
                           }
                         }}
-                        className="h-8 px-2.5 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
-                        title="Input atau sesuaikan gaji untuk 1 karyawan tertentu"
+                        className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                        title="Input atau sesuaikan gaji karyawan bulan ini"
                       >
-                        <Plus size={13} />
-                        <span>Input Satuan</span>
+                        <Plus size={14} />
+                        <span>Input Gaji Pegawai</span>
                       </button>
                     </div>
                   ) : (
@@ -6065,155 +6044,7 @@ export function PayrollClient({
         document.body
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 6: GENERATE OTOMATIS GAJI SEMUA KARYAWAN BULAN INI */}
-      {/* ========================================================= */}
-      {mounted && isBulkGenerateModalOpen && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
-              <h3 className="text-sm font-bold text-navy-text">
-                Proses Gaji Semua Karyawan
-              </h3>
-              <button
-                onClick={() => setIsBulkGenerateModalOpen(false)}
-                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                startTransition(async () => {
-                  try {
-                    const res = await bulkGenerateGajiBulananAction({
-                      entityId: data.entity?.id ?? "",
-                      bulan: selectedMonth,
-                      tahun: selectedYear,
-                      defaultHariKerja: bulkDefaultHariKerja,
-                      overwrite: bulkOverwrite,
-                      autoCalculatePph: bulkAutoCalculatePph,
-                    });
-                    setSuccessMsg(res.message);
-                    setIsBulkGenerateModalOpen(false);
-                    router.refresh();
-                  } catch (err: unknown) {
-                    setErrorMsg((err as Error).message);
-                  }
-                });
-              }}
-              className="p-5 space-y-4 text-xs"
-            >
-              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border space-y-1.5">
-                <div className="text-[10px] text-muted-faint uppercase font-bold tracking-wider">
-                  Periode & Entitas
-                </div>
-                <div className="text-sm font-bold text-navy-text">
-                  {BULAN_NAMES[selectedMonth - 1]} {selectedYear}
-                </div>
-                <div className="text-xs text-muted-stronger">
-                  {data.entity?.name} ({data.pegawaiList.length} Karyawan Aktif)
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-[11px] text-blue-900 dark:text-blue-200 space-y-1.5 leading-relaxed">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <Info size={13} className="shrink-0 text-blue-600 dark:text-blue-400" />
-                  <span>Kalkulasi Otomatis dari Master Data:</span>
-                </p>
-                <ul className="list-disc pl-4 space-y-1 text-blue-800 dark:text-blue-300">
-                  <li><strong>Gaji Pokok & Tunjangan Jabatan</strong> ditarik otomatis dari Master.</li>
-                  <li><strong>Iuran BPJS Kantor & Pegawai</strong> dihitung otomatis sesuai paket master.</li>
-                  <li><strong>Tunjangan Transport</strong> = Hari Kerja × Tarif Harian Master masing-masing pegawai.</li>
-                  <li><strong>PPh 21 TER PP 58/2023</strong> dihitung otomatis sesuai status PTKP dan penghasilan bruto.</li>
-                </ul>
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Jumlah Hari Kerja Standar Bulan Ini *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    required
-                    value={bulkDefaultHariKerja}
-                    onChange={(e) => setBulkDefaultHariKerja(Number(e.target.value) || 0)}
-                    placeholder="20"
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-faint text-[11px]">
-                    Hari
-                  </span>
-                </div>
-                <p className="text-[10px] text-muted-faint mt-1">
-                  Digunakan untuk mengalikan tarif harian master setiap karyawan (misal: 20 hari × Rp 15.000 = Rp 300.000).
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border bg-surface-card">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={bulkAutoCalculatePph}
-                    onChange={(e) => setBulkAutoCalculatePph(e.target.checked)}
-                    className="mt-0.5 rounded border-border text-navy focus:ring-navy cursor-pointer"
-                  />
-                  <div>
-                    <span className="font-semibold text-navy-text block text-xs">
-                      Hitung Otomatis PPh 21 (TER PP 58/2023)
-                    </span>
-                    <span className="text-[10px] text-muted-faint block mt-0.5">
-                      Pajak bulanan otomatis dihitung berdasarkan Tarif Efektif Rata-rata (Kategori A, B, atau C) sesuai PTKP dan total bruto masing-masing karyawan.
-                    </span>
-                  </div>
-                </label>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border bg-surface-card">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={bulkOverwrite}
-                    onChange={(e) => setBulkOverwrite(e.target.checked)}
-                    className="mt-0.5 rounded border-border text-navy focus:ring-navy cursor-pointer"
-                  />
-                  <div>
-                    <span className="font-semibold text-navy-text block text-xs">
-                      Perbarui / Timpa data yang sudah diinput sebelumnya
-                    </span>
-                    <span className="text-[10px] text-muted-faint block mt-0.5">
-                      Jika tidak dicentang, sistem hanya akan memproses {countBelumInput} karyawan yang belum ada data gajinya bulan ini.
-                    </span>
-                  </div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => setIsBulkGenerateModalOpen(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending || bulkDefaultHariKerja <= 0}
-                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <span>{isPending ? "Memproses Gaji..." : "Proses Gaji Sekarang"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* ========================================================= */}
       {/* MODAL 7: SETTING BIAYA TRANSPORT STANDAR (DATABASE PEGAWAI) */}

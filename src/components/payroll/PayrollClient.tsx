@@ -33,7 +33,6 @@ import {
   Lock,
   History,
   RotateCcw,
-  Car,
 } from "lucide-react";
 import {
   type PegawaiItem,
@@ -834,10 +833,9 @@ export function PayrollClient({
                           setBatchTarifTransport(15000);
                           setIsBatchTransportModalOpen(true);
                         }}
-                        className="h-8 px-3 rounded-xl border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        className="h-8 px-3 rounded-xl border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center transition-colors cursor-pointer shadow-2xs"
                         title="Atur tarif transport standar untuk seluruh karyawan"
                       >
-                        <Car size={13} className="text-navy" />
                         <span>Setting Biaya Transport</span>
                       </button>
                       <button
@@ -1030,18 +1028,6 @@ export function PayrollClient({
                       Gaji Pokok & BPJS terisi otomatis dari Master Data. Finance cukup menyesuaikan Hari Kerja/Transport dan Pajak bila ada perubahan.
                     </p>
                   </div>
-                  {isManager && countBelumInput > 0 && (
-                    <button
-                      onClick={() => {
-                        setBulkDefaultHariKerja(20);
-                        setBulkOverwrite(false);
-                        setIsBulkGenerateModalOpen(true);
-                      }}
-                      className="h-7 px-3 rounded-lg bg-navy hover:bg-navy-light text-white text-[11px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                    >
-                      <span>Generate Otomatis {countBelumInput} Karyawan Belum Diisi</span>
-                    </button>
-                  )}
                 </div>
 
               <div className="overflow-x-auto">
@@ -6236,9 +6222,8 @@ export function PayrollClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
-              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Car size={16} className="text-navy" />
-                <span>Setting Biaya Transport Pegawai</span>
+              <h3 className="text-sm font-bold text-navy-text">
+                Setting Biaya Transport Pegawai
               </h3>
               <button
                 onClick={() => setIsBatchTransportModalOpen(false)}
@@ -6343,9 +6328,8 @@ export function PayrollClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-sm bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface-subtle/50">
-              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Car size={16} className="text-navy" />
-                <span>Ubah Biaya Transport Karyawan</span>
+              <h3 className="text-sm font-bold text-navy-text">
+                Ubah Biaya Transport Karyawan
               </h3>
               <button
                 onClick={() => setQuickTransportTarget(null)}

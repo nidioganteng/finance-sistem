@@ -21,6 +21,13 @@ export async function createPegawaiAction(formData: FormData) {
     ptkp: Number(formData.get("ptkp")) || 54000000,
     gajiPokok: Number(formData.get("gajiPokok")) || 0,
     tunjanganJabatan: Number(formData.get("tunjanganJabatan")) || 0,
+    tunjanganBpjsKes: Number(formData.get("tunjanganBpjsKes")) || 0,
+    tunjanganBpjsTk: Number(formData.get("tunjanganBpjsTk")) || 0,
+    bpjsKesehatan: Number(formData.get("bpjsKesehatan")) || 0,
+    bpjsKetenagakerjaan: Number(formData.get("bpjsKetenagakerjaan")) || 0,
+    potonganBpjs:
+      Number(formData.get("potonganBpjs")) ||
+      (Number(formData.get("bpjsKesehatan")) || 0) + (Number(formData.get("bpjsKetenagakerjaan")) || 0),
     tanggalMasuk: (formData.get("tanggalMasuk") as string)?.trim() || null,
     status,
     tanggalResign,
@@ -55,6 +62,13 @@ export async function updatePegawaiAction(formData: FormData) {
     ptkp: Number(formData.get("ptkp")) || 54000000,
     gajiPokok: Number(formData.get("gajiPokok")) || 0,
     tunjanganJabatan: Number(formData.get("tunjanganJabatan")) || 0,
+    tunjanganBpjsKes: Number(formData.get("tunjanganBpjsKes")) || 0,
+    tunjanganBpjsTk: Number(formData.get("tunjanganBpjsTk")) || 0,
+    bpjsKesehatan: Number(formData.get("bpjsKesehatan")) || 0,
+    bpjsKetenagakerjaan: Number(formData.get("bpjsKetenagakerjaan")) || 0,
+    potonganBpjs:
+      Number(formData.get("potonganBpjs")) ||
+      (Number(formData.get("bpjsKesehatan")) || 0) + (Number(formData.get("bpjsKetenagakerjaan")) || 0),
     tanggalMasuk: (formData.get("tanggalMasuk") as string)?.trim() || null,
     status,
     tanggalResign,

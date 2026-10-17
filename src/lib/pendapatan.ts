@@ -90,6 +90,10 @@ export function hitungPajakFaktur(
 }
 
 export interface FakturPendapatanItem {
+  ppnRealisasi: number | null;
+  pphRealisasi: number | null;
+  ppnRealisasiFmt: string;
+  pphRealisasiFmt: string;
   id: string;
   entityId: string;
   npwp: string;
@@ -204,6 +208,10 @@ export interface LaporanPendapatanData {
   masaPajak: number | null;
   fakturList: FakturPendapatanItem[];
   totalPeriod: {
+    ppnRealisasi: number;
+    pphRealisasi: number;
+    ppnRealisasiFmt: string;
+    pphRealisasiFmt: string;
     jumlahFaktur: number;
     dpp: number;
     dppNilaiLain: number;
@@ -254,6 +262,9 @@ export interface LaporanPendapatanData {
     id: string;
     code: string;
     name: string;
+    entityId?: string | null;
+    entityKey?: string | null;
+    entityName?: string | null;
     contractValue: number;
     contractValueFmt: string;
     clientName: string | null;
@@ -292,12 +303,15 @@ export interface LaporanPendapatanData {
     id: string;
     nama: string;
     npwp: string | null;
+    tipe?: string;
   }>;
 }
 
 // ─── Raw shapes returned directly by PHP ────────────────────────────────────
 
 type RawFaktur = {
+  ppnRealisasi: number | null;
+  pphRealisasi: number | null;
   id: string;
   entityId: string;
   npwp: string;
@@ -328,6 +342,7 @@ type RawFaktur = {
   ceklisPpn: boolean | number;
   ceklisPph: boolean | number;
   ceklisBuktiPotong: boolean | number;
+  isRealized?: boolean;
 };
 
 type RawRekonsiliasi = {
@@ -352,6 +367,9 @@ type RawProjectTermin = {
   id: string;
   code: string;
   name: string;
+  entityId?: string;
+  entityKey?: string;
+  entityName?: string;
   contractValue: number;
   termins: Array<{
     id: string;
@@ -370,7 +388,13 @@ const JENIS_PROYEK_LABEL: Record<number, string> = {
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 function makeFakturItem(f: RawFaktur): FakturPendapatanItem {
+  const isRealized = f.isRealized !== undefined ? Boolean(f.isRealized) : (f.nominalDiterima > 0);
+  const selisihBank = isRealized ? f.nominalDiterima - f.labaSetelahPajak : 0;
   return {
+    ppnRealisasi: f.ppnRealisasi,
+    pphRealisasi: f.pphRealisasi,
+    ppnRealisasiFmt: f.ppnRealisasi == null ? "-" : formatRupiah(f.ppnRealisasi),
+    pphRealisasiFmt: f.pphRealisasi == null ? "-" : formatRupiah(f.pphRealisasi),
     id: f.id,
     entityId: f.entityId,
     npwp: f.npwp,
@@ -412,10 +436,10 @@ function makeFakturItem(f: RawFaktur): FakturPendapatanItem {
     ceklisPpn: Boolean(f.ceklisPpn),
     ceklisPph: Boolean(f.ceklisPph),
     ceklisBuktiPotong: Boolean(f.ceklisBuktiPotong),
-    isRealized: f.nominalDiterima > 0,
-    selisihBank: 0,
-    selisihBankFmt: formatRupiah(0),
-    balanceStatus: f.nominalDiterima > 0 ? "BALANCE" : "BELUM_CAIR",
+    isRealized,
+    selisihBank,
+    selisihBankFmt: formatRupiah(selisihBank),
+    balanceStatus: isRealized ? (selisihBank === 0 ? "BALANCE" : "SELISIH") : "BELUM_CAIR",
   };
 }
 
@@ -499,10 +523,12 @@ export async function getLaporanPendapatanData(
 
     // 2. Also fetch entity info, tarif pajak, and project options in parallel (best-effort)
     const [entityRow, tarifRaw, projectsRaw] = await Promise.all([
-      phpFetch<{ id: string; key: string; name: string; legalName: string }>(
-        `/api/entities?key=${encodeURIComponent(entityKeyOrId)}`,
+      phpFetch<Array<{ id: string; key: string; name: string; legalName: string }>>(
+        `/api/entities`,
         token
-      ).catch(() => null),
+      ).then((entities) => entities.find((entity) =>
+        entity.id === entityKeyOrId || entity.key === entityKeyOrId
+      ) ?? null).catch(() => null),
       phpFetch<RawTarifPajak[]>(`/api/tarifpajak`, token).catch(() => [] as RawTarifPajak[]),
       phpFetch<RawProjectTermin[]>(
         `/api/pendapatan/projects?entityId=${encodeURIComponent(entityKeyOrId)}`,
@@ -547,7 +573,14 @@ export async function getLaporanPendapatanData(
     totalTahunanRekap.namaBulan = "Total Tahunan";
 
     // 6. totalPeriod — same as totalTahunanRekap but with extra fields
+    const ppnRealisasi = fakturList.reduce((sum, f) => sum + (f.ppnRealisasi ?? 0), 0);
+    const pphRealisasi = fakturList.reduce((sum, f) => sum + (f.pphRealisasi ?? 0), 0);
+    const hasRealisasi = fakturList.some((f) => f.isRealized);
     const totalPeriod = {
+      ppnRealisasi,
+      pphRealisasi,
+      ppnRealisasiFmt: hasRealisasi ? formatRupiah(ppnRealisasi) : "-",
+      pphRealisasiFmt: hasRealisasi ? formatRupiah(pphRealisasi) : "-",
       jumlahFaktur: fakturList.length,
       dpp: totalTahunanRekap.dpp,
       dppNilaiLain: totalTahunanRekap.dppNilaiLain,
@@ -664,6 +697,9 @@ export async function getLaporanPendapatanData(
       id: p.id,
       code: p.code,
       name: p.name,
+      entityId: p.entityId ?? null,
+      entityKey: p.entityKey ?? null,
+      entityName: p.entityName ?? null,
       contractValue: p.contractValue,
       contractValueFmt: formatRupiah(p.contractValue),
       clientName: (p as any).clientName ?? null,
@@ -727,10 +763,10 @@ export async function getLaporanPendapatanData(
       tarifList,
       projectOptions,
       bankOptions,
-      rekananOptions: await phpFetch<{ data: Array<{ id: string; nama: string; npwp: string | null }> }>(
+      rekananOptions: await phpFetch<{ data: Array<{ id: string; nama: string; npwp: string | null; tipe?: string }> }>(
         `/api/rekanan?entityId=${encodeURIComponent(entity.id)}`,
         token
-      ).then((r) => r.data).catch(() => []),
+      ).then((r) => r.data ?? []).catch(() => []),
     };
   } catch {
     return null;

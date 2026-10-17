@@ -1443,16 +1443,16 @@ export function PayrollClient({
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[750px] text-left text-xs">
+                  <table className="w-full min-w-[850px] text-left text-xs">
                     <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                       <tr>
-                        <th className="py-2.5 px-3.5">Tanggal & No Bukti</th>
-                        <th className="py-2.5 px-3.5">Sumber Jurnal</th>
-                        <th className="py-2.5 px-3.5">Kode & Nama Akun</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px]">Tanggal & No Bukti</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[100px]">Sumber Jurnal</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px]">Kode & Nama Akun</th>
                         <th className="py-2.5 px-3.5">Keterangan / Uraian</th>
-                        <th className="py-2.5 px-3.5">Proyek</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Pengeluaran (Debit)</th>
-                        <th className="py-2.5 px-3.5 text-center">Staff</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[120px]">Proyek</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Pengeluaran (Debit)</th>
+                        <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[90px]">Staff</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y border-b border-border">
@@ -1486,19 +1486,19 @@ export function PayrollClient({
                           : data.penyesuaianJurnal.pegawai.transaksiTahun
                         ).map((tx) => (
                           <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <div className="font-semibold text-navy-text">{tx.tanggalFmt}</div>
                               <div className="font-mono text-[11px] text-muted-faint mt-0.5">
                                 Bukti: {tx.noBukti}
                               </div>
                             </td>
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
                                 {tx.jenisInputNama}
                               </span>
                             </td>
                             <td className="py-3 px-3.5">
-                              <div className="font-mono font-bold text-navy-text text-xs">
+                              <div className="font-mono font-bold text-navy-text text-xs whitespace-nowrap">
                                 {tx.coaCode}
                               </div>
                               <div className="text-[11px] text-muted-faint">
@@ -1508,7 +1508,7 @@ export function PayrollClient({
                             <td className="py-3 px-3.5 text-muted-stronger">
                               {tx.keterangan}
                             </td>
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               {tx.namaProyek ? (
                                 <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
                                   <Briefcase size={11} />
@@ -1518,10 +1518,10 @@ export function PayrollClient({
                                 <span className="text-muted-faint text-[11px]">-</span>
                               )}
                             </td>
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm">
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm whitespace-nowrap">
                               {tx.debitFmt}
                             </td>
-                            <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint">
+                            <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint whitespace-nowrap">
                               {tx.staffName || "-"}
                             </td>
                           </tr>
@@ -1613,20 +1613,20 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1020px] text-left text-xs">
+                <table className="w-full min-w-[1150px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3.5">NIK / Kode</th>
-                      <th className="py-2.5 px-3.5">Nama Pegawai</th>
-                      <th className="py-2.5 px-3.5">Jabatan</th>
-                      <th className="py-2.5 px-3.5">Status PTKP</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">PTKP Tahunan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Gaji Pokok Standar</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Tunj. Jabatan Master</th>
-                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Mulai Bekerja / Masa Kerja</th>
-                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Tanggal Resign</th>
-                      <th className="py-2.5 px-3.5 text-center">Status</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[110px]">NIK / Kode</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[160px]">Nama Pegawai</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px]">Jabatan</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[100px]">Status PTKP</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">PTKP Tahunan</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Gaji Pokok Standar</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Tunj. Jabatan Master</th>
+                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap min-w-[160px]">Mulai Bekerja / Masa Kerja</th>
+                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap min-w-[120px]">Tanggal Resign</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[120px]">Status</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -1639,24 +1639,24 @@ export function PayrollClient({
                     ) : (
                       filteredMasterList.map((p) => (
                         <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3 px-3.5 font-mono font-semibold text-navy-text">
+                          <td className="py-3 px-3.5 font-mono font-semibold text-navy-text whitespace-nowrap">
                             {p.nik}
                           </td>
-                          <td className="py-3 px-3.5 font-bold text-navy-text">
+                          <td className="py-3 px-3.5 font-bold text-navy-text whitespace-nowrap">
                             {p.nama}
                           </td>
-                          <td className="py-3 px-3.5 text-muted-stronger">
+                          <td className="py-3 px-3.5 text-muted-stronger whitespace-nowrap">
                             {p.jabatan}
                           </td>
-                          <td className="py-3 px-3.5">
+                          <td className="py-3 px-3.5 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-mono text-[11px] font-semibold">
                               {p.statusKeluarga}
                             </span>
                           </td>
-                          <td className="py-3 px-3.5 text-right font-mono text-muted-stronger">
+                          <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
                             {p.ptkpFmt}
                           </td>
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text">
+                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                             {p.gajiPokokFmt}
                           </td>
                           <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap">
@@ -1826,15 +1826,15 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-xs">
+                <table className="w-full min-w-[880px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3.5">Pegawai</th>
-                      <th className="py-2.5 px-3.5">Status PTKP</th>
-                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Bulan Dibayar</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Akumulasi Gaji Bruto</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Akumulasi PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Akumulasi Net (THP)</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[180px]">Pegawai</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[100px]">Status PTKP</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[130px]">Bulan Dibayar</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px]">Akumulasi Gaji Bruto</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Akumulasi PPh 21</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px]">Akumulasi Net (THP)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -1842,27 +1842,27 @@ export function PayrollClient({
                       const ak = p.akumulasiTahun;
                       return (
                         <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3 px-3.5">
+                          <td className="py-3 px-3.5 whitespace-nowrap">
                             <div className="font-bold text-navy-text">{p.nama}</div>
                             <div className="text-[11px] text-muted-faint font-mono mt-0.5">
                               {p.nik} · {p.jabatan}
                             </div>
                           </td>
-                          <td className="py-3 px-3.5">
+                          <td className="py-3 px-3.5 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-mono text-[11px] font-semibold">
                               {p.statusKeluarga}
                             </span>
                           </td>
-                          <td className="py-3 px-3.5 text-center font-mono font-bold text-navy-text">
+                          <td className="py-3 px-3.5 text-center font-mono font-bold text-navy-text whitespace-nowrap">
                             {ak?.bulanTerbayar ?? 0} / 12 Bulan
                           </td>
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text">
+                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                             {formatRupiah(ak?.totalGajiKotor ?? 0)}
                           </td>
-                          <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300">
+                          <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap">
                             {formatRupiah(ak?.totalPph21 ?? 0)}
                           </td>
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
+                          <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                             {formatRupiah(ak?.totalGajiBersih ?? 0)}
                           </td>
                         </tr>
@@ -2797,16 +2797,16 @@ export function PayrollClient({
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[750px] text-left text-xs">
+                  <table className="w-full min-w-[850px] text-left text-xs">
                     <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                       <tr>
-                        <th className="py-2.5 px-3.5">Tanggal & No Bukti</th>
-                        <th className="py-2.5 px-3.5">Sumber Jurnal</th>
-                        <th className="py-2.5 px-3.5">Kode & Nama Akun</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px]">Tanggal & No Bukti</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[100px]">Sumber Jurnal</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px]">Kode & Nama Akun</th>
                         <th className="py-2.5 px-3.5">Keterangan / Uraian</th>
-                        <th className="py-2.5 px-3.5">Proyek</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Pengeluaran (Debit)</th>
-                        <th className="py-2.5 px-3.5 text-center">Staff</th>
+                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[120px]">Proyek</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Pengeluaran (Debit)</th>
+                        <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[90px]">Staff</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -2840,19 +2840,19 @@ export function PayrollClient({
                           : data.penyesuaianJurnal.tenagaAhli.transaksiTahun
                         ).map((tx) => (
                           <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <div className="font-semibold text-navy-text">{tx.tanggalFmt}</div>
                               <div className="font-mono text-[11px] text-muted-faint mt-0.5">
                                 Bukti: {tx.noBukti}
                               </div>
                             </td>
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
                                 {tx.jenisInputNama}
                               </span>
                             </td>
                             <td className="py-3 px-3.5">
-                              <div className="font-mono font-bold text-navy-text text-xs">
+                              <div className="font-mono font-bold text-navy-text text-xs whitespace-nowrap">
                                 {tx.coaCode}
                               </div>
                               <div className="text-[11px] text-muted-faint">
@@ -2862,7 +2862,7 @@ export function PayrollClient({
                             <td className="py-3 px-3.5 text-muted-stronger">
                               {tx.keterangan}
                             </td>
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               {tx.namaProyek ? (
                                 <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
                                   <Briefcase size={11} />
@@ -2872,10 +2872,10 @@ export function PayrollClient({
                                 <span className="text-muted-faint text-[11px]">-</span>
                               )}
                             </td>
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm">
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm whitespace-nowrap">
                               {tx.debitFmt}
                             </td>
-                            <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint">
+                            <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint whitespace-nowrap">
                               {tx.staffName || "-"}
                             </td>
                           </tr>
@@ -2923,14 +2923,14 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px] text-left text-xs">
+                <table className="w-full min-w-[760px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3.5">Nama & Spesialisasi</th>
-                      <th className="py-2.5 px-3.5">NIK (16 Digit Terdaftar)</th>
-                      <th className="py-2.5 px-3.5">NPWP</th>
-                      <th className="py-2.5 px-3.5">Status PTKP</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[180px]">Nama & Spesialisasi</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px]">NIK (16 Digit Terdaftar)</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px]">NPWP</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[90px]">Status PTKP</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[160px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -2947,7 +2947,7 @@ export function PayrollClient({
                         const hasNpwp = !!(r.npwp && r.npwp.trim());
                         return (
                           <tr key={r.id} className="hover:bg-surface-hover/30 transition-colors">
-                            <td className="py-3 px-3.5">
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <div className="font-bold text-navy-text text-sm">{r.nama}</div>
                               {r.kategori && (
                                 <div className="text-[11px] text-muted-faint mt-0.5 inline-flex items-center gap-1">
@@ -2957,7 +2957,7 @@ export function PayrollClient({
                                 </div>
                               )}
                             </td>
-                            <td className="py-3 px-3.5 font-mono">
+                            <td className="py-3 px-3.5 font-mono whitespace-nowrap">
                               {r.nik ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
                                   <CheckCircle size={12} />
@@ -2969,10 +2969,10 @@ export function PayrollClient({
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-3.5 font-mono text-muted-stronger">
+                            <td className="py-3 px-3.5 font-mono text-muted-stronger whitespace-nowrap">
                               {hasNpwp ? r.npwp : <span className="text-muted-faint">-</span>}
                             </td>
-                            <td className="py-3 px-3.5 font-mono font-bold text-navy-text">
+                            <td className="py-3 px-3.5 font-mono font-bold text-navy-text whitespace-nowrap">
                               <span className="px-2 py-0.5 rounded-md bg-surface-subtle border border-border text-[11px]">
                                 {r.ptkp || "TK/0"}
                               </span>
@@ -3092,13 +3092,13 @@ export function PayrollClient({
                 <table className="w-full min-w-[850px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3.5">NIK & Tenaga Ahli</th>
-                      <th className="py-2.5 px-3.5">🏢 Entitas Mana Saja</th>
-                      <th className="py-2.5 px-3.5">🏗️ Proyek Mana Saja</th>
-                      <th className="py-2.5 px-3.5">📅 Bulan Apa Saja</th>
-                      <th className="py-2.5 px-3.5 text-center">Jml Transaksi</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px]">Total Honorarium</th>
-                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Rincian</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px]">NIK & Tenaga Ahli</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px]">🏢 Entitas Mana Saja</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px]">🏗️ Proyek Mana Saja</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px]">📅 Bulan Apa Saja</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px]">Jml Transaksi</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px]">Total Honorarium</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px]">Rincian</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -3118,7 +3118,7 @@ export function PayrollClient({
                                 isExpanded ? "bg-surface-subtle/60" : ""
                               }`}
                             >
-                              <td className="py-3 px-3.5">
+                              <td className="py-3 px-3.5 whitespace-nowrap">
                                 <div className="font-bold text-navy-text text-sm">{r.nama}</div>
                                 <div className="font-mono text-[11px] text-muted-faint font-semibold mt-0.5">
                                   NIK: <span className="text-navy font-bold">{r.nik}</span>
@@ -3180,7 +3180,7 @@ export function PayrollClient({
                                 </div>
                               </td>
 
-                              <td className="py-3 px-3.5 text-center font-mono">
+                              <td className="py-3 px-3.5 text-center font-mono whitespace-nowrap">
                                 <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-bold text-[11px]">
                                   {r.totalTransaksi}x
                                 </span>
@@ -3236,12 +3236,12 @@ export function PayrollClient({
                                       <table className="w-full text-left text-xs">
                                         <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                                           <tr>
-                                            <th className="py-2 px-3">Tanggal & Bukti</th>
-                                            <th className="py-2 px-3">Entitas Pembayar</th>
-                                            <th className="py-2 px-3">Bulan</th>
-                                            <th className="py-2 px-3">Nama Proyek</th>
+                                            <th className="py-2 px-3 whitespace-nowrap">Tanggal & Bukti</th>
+                                            <th className="py-2 px-3 whitespace-nowrap">Entitas Pembayar</th>
+                                            <th className="py-2 px-3 whitespace-nowrap">Bulan</th>
+                                            <th className="py-2 px-3 whitespace-nowrap">Nama Proyek</th>
                                             <th className="py-2 px-3">Uraian Tugas / Jasa</th>
-                                            <th className="py-2 px-3 text-right">Nominal Honorarium</th>
+                                            <th className="py-2 px-3 text-right whitespace-nowrap">Nominal Honorarium</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
@@ -3325,13 +3325,13 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[650px] text-left text-xs">
+                <table className="w-full min-w-[700px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3.5">Tenaga Ahli</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[180px]">Tenaga Ahli</th>
                       <th className="py-2.5 px-3.5">Rincian Per Entitas Pembayar</th>
-                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Frekuensi</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Total Honorarium</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[120px]">Frekuensi</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px]">Total Honorarium</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -3344,7 +3344,7 @@ export function PayrollClient({
                     ) : (
                       filteredKonsolidasi.map((k) => (
                         <tr key={k.nik} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3 px-3.5">
+                          <td className="py-3 px-3.5 whitespace-nowrap">
                             <div className="font-bold text-navy-text text-sm">{k.nama}</div>
                             <div className="text-[11px] text-muted-faint font-mono mt-0.5">
                               NIK: {k.nik} {k.npwp ? `· NPWP: ${k.npwp}` : ""}
@@ -3366,7 +3366,7 @@ export function PayrollClient({
                             </div>
                           </td>
 
-                          <td className="py-3 px-3.5 text-center font-mono font-bold text-navy-text">
+                          <td className="py-3 px-3.5 text-center font-mono font-bold text-navy-text whitespace-nowrap">
                             {k.totalTransaksi} Transaksi
                           </td>
 
@@ -3541,16 +3541,16 @@ export function PayrollClient({
 
               {/* Tabel Transaksi Tab Terpilih */}
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full min-w-[700px] text-left text-xs">
+                <table className="w-full min-w-[780px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3">Tanggal & Bukti</th>
-                      <th className="py-2.5 px-3">Sumber Jurnal</th>
-                      <th className="py-2.5 px-3">Kode Akun</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap min-w-[130px]">Tanggal & Bukti</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap min-w-[100px]">Sumber Jurnal</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap min-w-[150px]">Kode Akun</th>
                       <th className="py-2.5 px-3">Keterangan</th>
-                      <th className="py-2.5 px-3">Proyek</th>
-                      <th className="py-2.5 px-3 text-right">Debit (Beban)</th>
-                      <th className="py-2.5 px-3 text-center">Staff</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap min-w-[120px]">Proyek</th>
+                      <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[130px]">Debit (Beban)</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[90px]">Staff</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -3569,22 +3569,22 @@ export function PayrollClient({
                         : data.syncData.jurnalTenagaAhliRows
                       ).map((tx) => (
                         <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-2.5 px-3 font-medium">
+                          <td className="py-2.5 px-3 font-medium whitespace-nowrap">
                             <div className="text-navy-text">{tx.tanggalFmt}</div>
                             <div className="text-[10px] font-mono text-muted-faint">{tx.noBukti}</div>
                           </td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2.5 px-3 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
                               {tx.jenisInputNama}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-navy-text">
+                          <td className="py-2.5 px-3 font-mono font-bold text-navy-text whitespace-nowrap">
                             {tx.coaCode} - {tx.coaName}
                           </td>
                           <td className="py-2.5 px-3 text-muted-stronger">
                             {tx.keterangan}
                           </td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2.5 px-3 whitespace-nowrap">
                             {tx.namaProyek ? (
                               <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
                                 <Briefcase size={11} />
@@ -3597,7 +3597,7 @@ export function PayrollClient({
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap">
                             {tx.debitFmt}
                           </td>
-                          <td className="py-2.5 px-3 text-center text-[11px] text-muted-faint">
+                          <td className="py-2.5 px-3 text-center text-[11px] text-muted-faint whitespace-nowrap">
                             {tx.staffName || "-"}
                           </td>
                         </tr>
@@ -5138,15 +5138,15 @@ export function PayrollClient({
                     Penerimaan (Earnings)
                   </h4>
                   <div className="space-y-1.5 text-[11px]">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Gaji Pokok:</span>
-                      <span className="font-mono">{slipModalItem.gajiPokokFmt}</span>
+                      <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.gajiPokokFmt}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Tunjangan Jabatan:</span>
-                      <span className="font-mono">{slipModalItem.tunjanganJabatanFmt}</span>
+                      <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganJabatanFmt}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">
                         Tunjangan Transport
                         {slipModalItem.hariKerja > 0 && (
@@ -5155,47 +5155,47 @@ export function PayrollClient({
                           </span>
                         )}:
                       </span>
-                      <span className="font-mono">{slipModalItem.tunjanganTransportFmt}</span>
+                      <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganTransportFmt}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Tunjangan Lainnya:</span>
-                      <span className="font-mono">{slipModalItem.tunjanganLainnyaFmt || slipModalItem.insentifFmt}</span>
+                      <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganLainnyaFmt || slipModalItem.insentifFmt}</span>
                     </div>
                     {slipModalItem.thr > 0 && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-2">
                         <span className="text-muted-faint">Tunjangan THR:</span>
-                        <span className="font-mono">{slipModalItem.thrFmt}</span>
+                        <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.thrFmt}</span>
                       </div>
                     )}
                     {slipModalItem.tunjanganBpjsKes > 0 && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-2">
                         <span className="text-muted-faint">Tunjangan BPJS Kesehatan:</span>
-                        <span className="font-mono">{slipModalItem.tunjanganBpjsKesFmt}</span>
+                        <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganBpjsKesFmt}</span>
                       </div>
                     )}
                     {slipModalItem.tunjanganBpjsTk > 0 && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-2">
                         <span className="text-muted-faint">Tunjangan BPJS Ketenagakerjaan:</span>
-                        <span className="font-mono">{slipModalItem.tunjanganBpjsTkFmt}</span>
+                        <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganBpjsTkFmt}</span>
                       </div>
                     )}
                     {slipModalItem.tunjanganBpjsKes === 0 &&
                       slipModalItem.tunjanganBpjsTk === 0 &&
                       slipModalItem.tunjanganBpjs > 0 && (
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center gap-2">
                           <span className="text-muted-faint">Tunjangan BPJS Kes/TK:</span>
-                          <span className="font-mono">{slipModalItem.tunjanganBpjsFmt}</span>
+                          <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganBpjsFmt}</span>
                         </div>
                       )}
                     {slipModalItem.tunjanganPph > 0 && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-2">
                         <span className="text-muted-faint">Tunjangan PPh:</span>
-                        <span className="font-mono">{slipModalItem.tunjanganPphFmt}</span>
+                        <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.tunjanganPphFmt}</span>
                       </div>
                     )}
-                    <div className="flex justify-between pt-1 border-t border-border font-bold">
+                    <div className="flex justify-between items-center gap-2 pt-1 border-t border-border font-bold">
                       <span className="text-blue-900 dark:text-blue-300">Total Bruto Terlapor Pajak:</span>
-                      <span className="font-mono text-blue-900 dark:text-blue-300">
+                      <span className="font-mono text-blue-900 dark:text-blue-300 whitespace-nowrap shrink-0">
                         {slipModalItem.totalGajiTerlaporPajakFmt || slipModalItem.totalGajiKotorFmt}
                       </span>
                     </div>
@@ -5208,31 +5208,31 @@ export function PayrollClient({
                     Potongan (Deductions)
                   </h4>
                   <div className="space-y-1.5 text-[11px]">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Potongan BPJS Kesehatan:</span>
-                      <span className="font-mono">
+                      <span className="font-mono whitespace-nowrap shrink-0">
                         {slipModalItem.bpjsKesehatanFmt || formatRupiah(slipModalItem.bpjsKesehatan)}
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Potongan BPJS TK:</span>
-                      <span className="font-mono">
+                      <span className="font-mono whitespace-nowrap shrink-0">
                         {slipModalItem.bpjsKetenagakerjaanFmt || formatRupiah(slipModalItem.bpjsKetenagakerjaan)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Potongan PPh 21:</span>
-                      <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold text-[10px]">
+                      <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] whitespace-nowrap shrink-0">
                         Rp 0 (Ditanggung Kantor)
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-faint">Potongan Lainnya / Kasbon:</span>
-                      <span className="font-mono">{slipModalItem.potonganLainFmt}</span>
+                      <span className="font-mono whitespace-nowrap shrink-0">{slipModalItem.potonganLainFmt}</span>
                     </div>
-                    <div className="flex justify-between pt-1 border-t border-border font-bold text-rose-700 dark:text-rose-400">
+                    <div className="flex justify-between items-center gap-2 pt-1 border-t border-border font-bold text-rose-700 dark:text-rose-400">
                       <span>Total Potongan Karyawan:</span>
-                      <span className="font-mono">
+                      <span className="font-mono whitespace-nowrap shrink-0">
                         {formatRupiah(
                           (slipModalItem.potonganBpjs ||
                             slipModalItem.bpjsKesehatan + slipModalItem.bpjsKetenagakerjaan) +

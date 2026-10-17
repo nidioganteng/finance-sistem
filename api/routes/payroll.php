@@ -48,6 +48,15 @@ function hitung_masa_kerja_id(?string $tgl_masuk): ?string {
     return "{$thn} tahun {$bln} bulan";
 }
 
+function parse_rupiah_num($val, float $fallback = 0.0): float {
+    if ($val === null || $val === '') return $fallback;
+    if (is_numeric($val)) return (float)$val;
+    $str = preg_replace('/[^0-9,-]/', '', (string)$val);
+    $str = str_replace(',', '.', $str);
+    return is_numeric($str) ? (float)$str : $fallback;
+}
+
+
 /**
  * Menentukan apakah pegawai berhak muncul di daftar penggajian bulan & tahun tertentu.
  * Aturan:
@@ -1029,8 +1038,8 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     $nama           = trim($body['nama'] ?? '');
     $jabatan        = trim($body['jabatan'] ?? '') ?: 'Karyawan';
     $status_kel     = trim($body['statusKeluarga'] ?? '') ?: 'TK/0';
-    $ptkp           = (float)($body['ptkp'] ?? 54000000);
-    $gaji_pokok     = (float)($body['gajiPokok'] ?? 0);
+    $ptkp           = parse_rupiah_num($body['ptkp'] ?? null, 54000000.0);
+    $gaji_pokok     = parse_rupiah_num($body['gajiPokok'] ?? null, 0.0);
     $status         = strtoupper(trim($body['status'] ?? 'AKTIF'));
     if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) {
         $status = 'AKTIF';
@@ -1052,13 +1061,13 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
 
     $id  = uuid4();
     $now = date('Y-m-d H:i:s');
-    $tunjangan_jabatan  = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : 0.0;
-    $tunjangan_bpjs_kes = isset($body['tunjanganBpjsKes']) ? (float)$body['tunjanganBpjsKes'] : 0.0;
-    $tunjangan_bpjs_tk  = isset($body['tunjanganBpjsTk']) ? (float)$body['tunjanganBpjsTk'] : 0.0;
-    $bpjs_kes           = isset($body['bpjsKesehatan']) ? (float)$body['bpjsKesehatan'] : 0.0;
-    $bpjs_tk            = isset($body['bpjsKetenagakerjaan']) ? (float)$body['bpjsKetenagakerjaan'] : 0.0;
-    $potongan_bpjs      = isset($body['potonganBpjs']) && (float)$body['potonganBpjs'] > 0
-        ? (float)$body['potonganBpjs']
+    $tunjangan_jabatan  = parse_rupiah_num($body['tunjanganJabatan'] ?? null, 0.0);
+    $tunjangan_bpjs_kes = parse_rupiah_num($body['tunjanganBpjsKes'] ?? null, 0.0);
+    $tunjangan_bpjs_tk  = parse_rupiah_num($body['tunjanganBpjsTk'] ?? null, 0.0);
+    $bpjs_kes           = parse_rupiah_num($body['bpjsKesehatan'] ?? null, 0.0);
+    $bpjs_tk            = parse_rupiah_num($body['bpjsKetenagakerjaan'] ?? null, 0.0);
+    $potongan_bpjs      = isset($body['potonganBpjs']) && parse_rupiah_num($body['potonganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['potonganBpjs'])
         : ($bpjs_kes + $bpjs_tk);
 
     $pdo->prepare(
@@ -1096,15 +1105,15 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
     $nama               = trim($body['nama'] ?? $existing['nama']);
     $jabatan            = trim($body['jabatan'] ?? $existing['jabatan']) ?: 'Karyawan';
     $status_kel         = trim($body['statusKeluarga'] ?? $existing['statusKeluarga']) ?: 'TK/0';
-    $ptkp               = isset($body['ptkp']) ? (float)$body['ptkp'] : (float)$existing['ptkp'];
-    $gaji_pokok         = isset($body['gajiPokok']) ? (float)$body['gajiPokok'] : (float)$existing['gajiPokok'];
-    $tunjangan_jabatan  = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : (float)$existing['tunjanganJabatan'];
-    $tunjangan_bpjs_kes = array_key_exists('tunjanganBpjsKes', $body) ? (float)$body['tunjanganBpjsKes'] : (float)($existing['tunjanganBpjsKes'] ?? 0);
-    $tunjangan_bpjs_tk  = array_key_exists('tunjanganBpjsTk', $body) ? (float)$body['tunjanganBpjsTk'] : (float)($existing['tunjanganBpjsTk'] ?? 0);
-    $bpjs_kes           = array_key_exists('bpjsKesehatan', $body) ? (float)$body['bpjsKesehatan'] : (float)($existing['bpjsKesehatan'] ?? 0);
-    $bpjs_tk            = array_key_exists('bpjsKetenagakerjaan', $body) ? (float)$body['bpjsKetenagakerjaan'] : (float)($existing['bpjsKetenagakerjaan'] ?? 0);
-    $potongan_bpjs      = array_key_exists('potonganBpjs', $body) && (float)$body['potonganBpjs'] > 0
-        ? (float)$body['potonganBpjs']
+    $ptkp               = isset($body['ptkp']) ? parse_rupiah_num($body['ptkp'], (float)$existing['ptkp']) : (float)$existing['ptkp'];
+    $gaji_pokok         = isset($body['gajiPokok']) ? parse_rupiah_num($body['gajiPokok'], (float)$existing['gajiPokok']) : (float)$existing['gajiPokok'];
+    $tunjangan_jabatan  = isset($body['tunjanganJabatan']) ? parse_rupiah_num($body['tunjanganJabatan'], (float)$existing['tunjanganJabatan']) : (float)$existing['tunjanganJabatan'];
+    $tunjangan_bpjs_kes = array_key_exists('tunjanganBpjsKes', $body) ? parse_rupiah_num($body['tunjanganBpjsKes'], (float)($existing['tunjanganBpjsKes'] ?? 0)) : (float)($existing['tunjanganBpjsKes'] ?? 0);
+    $tunjangan_bpjs_tk  = array_key_exists('tunjanganBpjsTk', $body) ? parse_rupiah_num($body['tunjanganBpjsTk'], (float)($existing['tunjanganBpjsTk'] ?? 0)) : (float)($existing['tunjanganBpjsTk'] ?? 0);
+    $bpjs_kes           = array_key_exists('bpjsKesehatan', $body) ? parse_rupiah_num($body['bpjsKesehatan'], (float)($existing['bpjsKesehatan'] ?? 0)) : (float)($existing['bpjsKesehatan'] ?? 0);
+    $bpjs_tk            = array_key_exists('bpjsKetenagakerjaan', $body) ? parse_rupiah_num($body['bpjsKetenagakerjaan'], (float)($existing['bpjsKetenagakerjaan'] ?? 0)) : (float)($existing['bpjsKetenagakerjaan'] ?? 0);
+    $potongan_bpjs      = array_key_exists('potonganBpjs', $body) && parse_rupiah_num($body['potonganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['potonganBpjs'])
         : (float)($existing['potonganBpjs'] ?? ($bpjs_kes + $bpjs_tk));
     
     $status            = isset($body['status']) ? strtoupper(trim($body['status'])) : ($existing['status'] ?? 'AKTIF');
@@ -1191,27 +1200,27 @@ elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === '') {
     $entity_id           = trim($body['entityId'] ?? '');
     $bulan               = (int)($body['bulan'] ?? 0);
     $tahun               = (int)($body['tahun'] ?? 0);
-    $gaji_pokok          = (float)($body['gajiPokok'] ?? 0);
-    $tunjangan_jabatan   = (float)($body['tunjanganJabatan'] ?? 0);
-    $hari_kerja          = (int)($body['hariKerja'] ?? 0);
-    $tarif_transport     = (float)($body['tarifTransportHarian'] ?? 15000);
-    $tunjangan_transport = (float)($body['tunjanganTransport'] ?? 0);
-    $insentif            = (float)($body['insentif'] ?? 0);
-    $tunjangan_lainnya   = (float)($body['tunjanganLainnya'] ?? $insentif);
-    $thr                 = (float)($body['thr'] ?? 0);
-    $tunjangan_bpjs_kes  = (float)($body['tunjanganBpjsKes'] ?? 0);
-    $tunjangan_bpjs_tk   = (float)($body['tunjanganBpjsTk'] ?? 0);
-    $tunjangan_bpjs      = isset($body['tunjanganBpjs']) && (float)$body['tunjanganBpjs'] > 0
-        ? (float)$body['tunjanganBpjs']
+    $gaji_pokok          = parse_rupiah_num($body['gajiPokok'] ?? null, 0.0);
+    $tunjangan_jabatan   = parse_rupiah_num($body['tunjanganJabatan'] ?? null, 0.0);
+    $hari_kerja          = (int)parse_rupiah_num($body['hariKerja'] ?? null, 0.0);
+    $tarif_transport     = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    $tunjangan_transport = parse_rupiah_num($body['tunjanganTransport'] ?? null, 0.0);
+    $insentif            = parse_rupiah_num($body['insentif'] ?? null, 0.0);
+    $tunjangan_lainnya   = parse_rupiah_num($body['tunjanganLainnya'] ?? null, $insentif);
+    $thr                 = parse_rupiah_num($body['thr'] ?? null, 0.0);
+    $tunjangan_bpjs_kes  = parse_rupiah_num($body['tunjanganBpjsKes'] ?? null, 0.0);
+    $tunjangan_bpjs_tk   = parse_rupiah_num($body['tunjanganBpjsTk'] ?? null, 0.0);
+    $tunjangan_bpjs      = isset($body['tunjanganBpjs']) && parse_rupiah_num($body['tunjanganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['tunjanganBpjs'])
         : ($tunjangan_bpjs_kes + $tunjangan_bpjs_tk);
-    $tunjangan_pph       = (float)($body['tunjanganPph'] ?? 0);
-    $bpjs_kes            = (float)($body['bpjsKesehatan'] ?? 0);
-    $bpjs_tk             = (float)($body['bpjsKetenagakerjaan'] ?? 0);
-    $potongan_bpjs       = isset($body['potonganBpjs']) && (float)$body['potonganBpjs'] > 0
-        ? (float)$body['potonganBpjs']
+    $tunjangan_pph       = parse_rupiah_num($body['tunjanganPph'] ?? null, 0.0);
+    $bpjs_kes            = parse_rupiah_num($body['bpjsKesehatan'] ?? null, 0.0);
+    $bpjs_tk             = parse_rupiah_num($body['bpjsKetenagakerjaan'] ?? null, 0.0);
+    $potongan_bpjs       = isset($body['potonganBpjs']) && parse_rupiah_num($body['potonganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['potonganBpjs'])
         : ($bpjs_kes + $bpjs_tk);
-    $potongan_lain       = (float)($body['potonganLain'] ?? 0);
-    $pph21               = (float)($body['pph21'] ?? 0);
+    $potongan_lain       = parse_rupiah_num($body['potonganLain'] ?? null, 0.0);
+    $pph21               = parse_rupiah_num($body['pph21'] ?? null, 0.0);
     $catatan             = trim($body['catatan'] ?? '') ?: null;
 
     if (!$pegawai_id || !$entity_id || !$bulan || !$tahun) {
@@ -1320,9 +1329,9 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
     $npwp            = trim($body['npwp'] ?? '') ?: null;
     $uraian          = trim($body['uraian'] ?? '');
     $tanggal_str     = trim($body['tanggal'] ?? '');
-    $nominal_honor   = (float)($body['nominalHonor'] ?? 0);
-    $tarif_pph       = (float)($body['tarifPph21Persen'] ?? 0);
-    $pph21           = (float)($body['pph21'] ?? 0);
+    $nominal_honor   = parse_rupiah_num($body['nominalHonor'] ?? null, 0.0);
+    $tarif_pph       = parse_rupiah_num($body['tarifPph21Persen'] ?? null, 0.0);
+    $pph21           = parse_rupiah_num($body['pph21'] ?? null, 0.0);
     $project_id      = trim($body['projectId'] ?? '') ?: null;
     $nama_proyek     = trim($body['namaProyek'] ?? '') ?: null;
     $no_bukti        = trim($body['noBukti'] ?? '') ?: null;

@@ -1,5 +1,6 @@
 import { phpFetch, getPhpToken } from "./api-client";
 import { formatRupiah } from "./dashboard-data";
+import { isContraAset } from "./akuntansi";
 import type { RekapKategoriAset } from "./aset-tetap";
 
 export type CoaLine = {
@@ -60,6 +61,7 @@ type PhpCoaEntry = {
   saldo: number;
   isNetting?: boolean;
   isAuto?: boolean;
+  isContra?: boolean;
   labaBerjalan?: number;
 };
 
@@ -135,12 +137,14 @@ function transformRekapPenyusutan(raw?: PhpRekap): RekapKategoriAset[] {
 }
 
 function toCoaLine(e: PhpCoaEntry): CoaLine {
+  const isContra = Boolean(e.isContra || isContraAset(e.code) || (e.isAuto && e.code === "1001"));
+  const abs = formatRupiah(Math.abs(e.saldo));
   return {
     code: e.code,
     name: e.name,
     saldo: e.saldo,
-    saldoFmt: formatRupiah(Math.abs(e.saldo)),
-    isContra: e.isAuto ? true : undefined,
+    saldoFmt: isContra ? `(${abs})` : (e.saldo < 0 ? `-${abs}` : abs),
+    isContra,
   };
 }
 

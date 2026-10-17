@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { TerminStatus } from "@/types/app-enums";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";
 import {
@@ -84,7 +85,14 @@ export function PiutangClient({
   isGrup?: boolean;
   initialTab?: "berjalan" | "selesai" | "dock";
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<"berjalan" | "selesai" | "dock">(initialTab);
+  const [projects, setProjects] = useState<ProjectItem[]>(projectList);
+
+  useEffect(() => {
+    setProjects(projectList);
+  }, [projectList]);
+
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -98,8 +106,8 @@ export function PiutangClient({
 
   const isManajer = userRole === "MANAJER_KEUANGAN" || userRole === "STAF_KEUANGAN" || userRole === "SUPER_ADMIN";
 
-  const runningProjects = projectList.filter((p) => p.status === "ACTIVE");
-  const completedProjects = projectList.filter((p) => p.status === "COMPLETED" || p.status === "CANCELLED");
+  const runningProjects = projects.filter((p) => p.status === "ACTIVE");
+  const completedProjects = projects.filter((p) => p.status === "COMPLETED" || p.status === "CANCELLED");
   const overdueProjectsCount = runningProjects.filter((p) => p.isOverdue).length;
 
   const totalCompletedKontrak = completedProjects.reduce((sum, p) => sum + p.contractValue, 0);
@@ -121,6 +129,7 @@ export function PiutangClient({
     startTransition(async () => {
       try {
         await auditTermin(id);
+        router.refresh();
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -130,6 +139,7 @@ export function PiutangClient({
   function handleStatusChange(id: string, status: TerminStatus) {
     startTransition(async () => {
       await updateTerminStatus(id, status);
+      router.refresh();
     });
   }
 
@@ -147,12 +157,25 @@ export function PiutangClient({
       try {
         if (type === "complete") {
           await completeProject(projectId);
+          setProjects((prev) =>
+            prev.map((p) => (p.id === projectId ? { ...p, status: "COMPLETED" as const } : p))
+          );
+          setTab("selesai");
         } else if (type === "cancel") {
           await cancelProject(projectId);
+          setProjects((prev) =>
+            prev.map((p) => (p.id === projectId ? { ...p, status: "CANCELLED" as const } : p))
+          );
+          setTab("selesai");
         } else if (type === "reopen") {
           await reopenProject(projectId);
+          setProjects((prev) =>
+            prev.map((p) => (p.id === projectId ? { ...p, status: "ACTIVE" as const } : p))
+          );
+          setTab("berjalan");
         }
         setConfirmModal(null);
+        router.refresh();
       } catch (e: unknown) {
         setError((e as Error).message);
       }
@@ -247,8 +270,8 @@ export function PiutangClient({
                   <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                     Total Nilai Kontrak Aktif
                   </div>
-                  <div className={`${getMetricValueFontSize(summary.totalKontrakFmt)} text-navy-text truncate`} title={summary.totalKontrakFmt}>
-                    {summary.totalKontrakFmt}
+                  <div className={`${getMetricValueFontSize(summary?.totalKontrakFmt ?? "Rp 0")} text-navy-text truncate`} title={summary?.totalKontrakFmt ?? "Rp 0"}>
+                    {summary?.totalKontrakFmt ?? "Rp 0"}
                   </div>
                   <div className="text-[12px] text-muted mt-0.5 truncate">{runningProjects.length} proyek berjalan</div>
                 </div>
@@ -256,12 +279,12 @@ export function PiutangClient({
                   <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                     Total Termin Tertagih
                   </div>
-                  <div className={`${getMetricValueFontSize(summary.totalTerminTagihFmt)} text-status-green truncate`} title={summary.totalTerminTagihFmt}>
-                    {summary.totalTerminTagihFmt}
+                  <div className={`${getMetricValueFontSize(summary?.totalTerminTagihFmt ?? "Rp 0")} text-status-green truncate`} title={summary?.totalTerminTagihFmt ?? "Rp 0"}>
+                    {summary?.totalTerminTagihFmt ?? "Rp 0"}
                   </div>
                   <div className="text-[12px] text-muted mt-0.5 truncate">
-                    {summary.totalKontrak > 0
-                      ? `${Math.round((summary.totalTerminTagih / summary.totalKontrak) * 100)}% dari total kontrak`
+                    {(summary?.totalKontrak ?? 0) > 0
+                      ? `${Math.round(((summary?.totalTerminTagih ?? 0) / summary.totalKontrak) * 100)}% dari total kontrak`
                       : "—"}
                   </div>
                 </div>
@@ -269,8 +292,8 @@ export function PiutangClient({
                   <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5 truncate">
                     Sisa Piutang Belum Tertagih
                   </div>
-                  <div className={`${getMetricValueFontSize(summary.sisaPiutangFmt)} text-status-red truncate`} title={summary.sisaPiutangFmt}>
-                    {summary.sisaPiutangFmt}
+                  <div className={`${getMetricValueFontSize(summary?.sisaPiutangFmt ?? "Rp 0")} text-status-red truncate`} title={summary?.sisaPiutangFmt ?? "Rp 0"}>
+                    {summary?.sisaPiutangFmt ?? "Rp 0"}
                   </div>
                   <div className="text-[12px] text-muted mt-0.5 truncate">belum masuk kas</div>
                 </div>
@@ -1069,17 +1092,17 @@ export function PiutangClient({
               </tr>
             </thead>
             <tbody>
-              {loadingDockList.length === 0 && (
+              {(loadingDockList ?? []).length === 0 && (
                 <tr>
                   <td colSpan={4} className="py-10 text-center text-sm text-muted">
                     Belum ada transaksi loading dock.
                   </td>
                 </tr>
               )}
-              {loadingDockList.map((d) => (
+              {(loadingDockList ?? []).map((d) => (
                 <tr key={d.id} className="border-b border-surface-subtle hover:bg-surface-hover/30">
                   <td className="py-3 px-6 font-semibold text-navy-text">{d.nama}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-[13px] whitespace-nowrap">{d.totalFmt}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-[13px] whitespace-nowrap">{d?.totalFmt ?? "Rp 0"}</td>
                   <td className="py-3 px-3">
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-surface-hover text-muted-stronger">
                       {DOCK_STATUS_LABEL[d.status] ?? d.status}

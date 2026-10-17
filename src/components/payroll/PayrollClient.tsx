@@ -3711,25 +3711,39 @@ export function PayrollClient({
       {/* MODAL 1: FORM TAMBAH / EDIT PEGAWAI TETAP */}
       {/* ========================================================= */}
       {mounted && isPegawaiModalOpen && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
-              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Users size={16} />
-                <span>{editingPegawai ? "Edit Data Pegawai Tetap" : "Tambah Pegawai Tetap Baru"}</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-navy/10 text-navy font-sans">
-                  {data.entity?.name}
-                </span>
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-4xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            {/* Header Sticky */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border bg-surface-subtle/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-navy/10 text-navy flex items-center justify-center shrink-0">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-navy-text">
+                      {editingPegawai ? "Edit Data Pegawai Tetap" : "Tambah Pegawai Tetap Baru"}
+                    </h3>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-navy/10 text-navy font-sans">
+                      {data.entity?.name}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-faint mt-0.5">
+                    Kelola identitas, masa kerja, status kepegawaian, dan master komponen gaji tetap (auto-fill bulanan).
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setIsPegawaiModalOpen(false)}
-                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors"
+                className="p-1.5 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
             <form
+              id="pegawai-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
@@ -3750,288 +3764,337 @@ export function PayrollClient({
                   }
                 });
               }}
-              className="p-5 space-y-4 text-xs"
+              className="flex flex-col flex-1 min-h-0 overflow-hidden"
             >
               <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
               {editingPegawai && <input type="hidden" name="id" value={editingPegawai.id} />}
 
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">NIK / Kode Karyawan *</label>
-                <input
-                  type="text"
-                  name="nik"
-                  required
-                  defaultValue={editingPegawai?.nik ?? ""}
-                  placeholder="Contoh: KRY-001 atau 16 digit NIK"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                />
+              {/* Scrollable Body: 2 Kolom Responsif */}
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  {/* =================================================== */}
+                  {/* KOLOM 1: IDENTITAS & STATUS KEPEGAWAIAN */}
+                  {/* =================================================== */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-1 border-b border-border/60">
+                      <Briefcase size={14} className="text-navy" />
+                      <span className="font-bold text-navy-text text-xs uppercase tracking-wider">
+                        1. Identitas & Kepegawaian
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">NIK / Kode Karyawan *</label>
+                      <input
+                        type="text"
+                        name="nik"
+                        required
+                        defaultValue={editingPegawai?.nik ?? ""}
+                        placeholder="Contoh: KRY-001 atau 16 digit NIK"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Nama Lengkap *</label>
+                      <input
+                        type="text"
+                        name="nama"
+                        required
+                        defaultValue={editingPegawai?.nama ?? ""}
+                        placeholder="Nama lengkap pegawai"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Jabatan / Posisi *</label>
+                      <input
+                        type="text"
+                        name="jabatan"
+                        required
+                        defaultValue={editingPegawai?.jabatan ?? ""}
+                        placeholder="Contoh: Drafter, Engineer, Keuangan, dsb."
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Status PTKP *</label>
+                        <select
+                          name="statusKeluarga"
+                          defaultValue={editingPegawai?.statusKeluarga ?? "TK/0"}
+                          onChange={(e) => {
+                            const form = e.target.form;
+                            if (form && PTKP_RATES[e.target.value]) {
+                              const ptkpInput = form.elements.namedItem("ptkp") as HTMLInputElement;
+                              if (ptkpInput) ptkpInput.value = formatRupiahInput(PTKP_RATES[e.target.value]);
+                            }
+                          }}
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        >
+                          {Object.keys(PTKP_RATES).map((key) => (
+                            <option key={key} value={key}>
+                              {key}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">Nominal PTKP (Thn)</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          name="ptkp"
+                          defaultValue={formatRupiahInput(editingPegawai?.ptkp ?? 54000000)}
+                          onChange={(e) => {
+                            const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                            e.target.value = formatRupiahInput(num);
+                          }}
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">
+                        Bulan & Tahun Mulai Bekerja (Tanggal Masuk)
+                      </label>
+                      <input
+                        type="date"
+                        name="tanggalMasuk"
+                        defaultValue={
+                          editingPegawai?.tanggalMasuk
+                            ? new Date(editingPegawai.tanggalMasuk).toISOString().split("T")[0]
+                            : ""
+                        }
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <p className="text-[10px] text-muted-faint mt-0.5">
+                        Mencatat tanggal mulai bekerja untuk riwayat arsip dan kalkulasi masa kerja otomatis.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Status Karyawan *</label>
+                      <select
+                        name="status"
+                        value={modalPegawaiStatus}
+                        onChange={(e) => {
+                          const val = e.target.value as "AKTIF" | "RESIGN" | "PENSIUN";
+                          setModalPegawaiStatus(val);
+                          if (val === "AKTIF") {
+                            setModalTanggalResign("");
+                          }
+                        }}
+                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                      >
+                        <option value="AKTIF">AKTIF – Bekerja Aktif (Otomatis muncul di daftar gaji tiap bulan)</option>
+                        <option value="RESIGN">RESIGN – Berhenti / Mengundurkan Diri</option>
+                        <option value="PENSIUN">PENSIUN – Pensiun</option>
+                      </select>
+                      <p className="text-[10px] text-muted-faint mt-1">
+                        Karyawan berstatus <strong>Aktif</strong> otomatis terdaftar di penggajian bulanan tanpa input ulang.
+                      </p>
+                    </div>
+
+                    {modalPegawaiStatus !== "AKTIF" && (
+                      <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 space-y-2 animate-in fade-in">
+                        <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-semibold text-xs">
+                          <AlertCircle size={14} />
+                          <span>Tanggal Efektif {modalPegawaiStatus === "PENSIUN" ? "Pensiun" : "Resign"} *</span>
+                        </div>
+                        <input
+                          type="date"
+                          name="tanggalResign"
+                          required
+                          value={modalTanggalResign}
+                          onChange={(e) => setModalTanggalResign(e.target.value)}
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                        <p className="text-[10px] text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
+                          <strong>Arsip & Perpajakan:</strong> Data rekam gaji karyawan <strong>tidak dihapus</strong> dari sistem untuk arsip SPT tahunan. Namanya otomatis berhenti muncul di daftar gaji setelah tanggal ini.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* =================================================== */}
+                  {/* KOLOM 2: KOMPONEN GAJI TETAP (AUTO-FILL MASTER) */}
+                  {/* =================================================== */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-1 border-b border-border/60">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck size={14} className="text-navy" />
+                        <span className="font-bold text-navy-text text-xs uppercase tracking-wider">
+                          2. Komponen Gaji Tetap (Auto-Fill)
+                        </span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
+                        Master Data
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-surface-subtle border border-border text-[11px] text-muted-faint leading-relaxed">
+                      Komponen gaji tetap diset di awal/master data ini dan akan <strong>otomatis terisi setiap bulan</strong>. Tim finance hanya perlu menginput komponen variabel bulanan (insentif, transport harian, THR).
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Gaji Pokok Standar (Rp) *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        name="gajiPokok"
+                        required
+                        defaultValue={formatRupiahInput(editingPegawai?.gajiPokok ? editingPegawai.gajiPokok : "")}
+                        onChange={(e) => {
+                          const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                          e.target.value = formatRupiahInput(num);
+                        }}
+                        placeholder="0"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-navy-text block mb-1">Tunjangan Jabatan Rutin (Rp)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        name="tunjanganJabatan"
+                        defaultValue={formatRupiahInput(editingPegawai?.tunjanganJabatan ? editingPegawai.tunjanganJabatan : "")}
+                        onChange={(e) => {
+                          const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                          e.target.value = formatRupiahInput(num);
+                        }}
+                        placeholder="0"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                    </div>
+
+                    {/* Paket Iuran BPJS Tetap Master Data (Auto-Fill) */}
+                    <div className="p-3.5 rounded-xl bg-surface-subtle/80 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-navy-text text-xs flex items-center gap-1.5">
+                          <ShieldCheck size={14} className="text-navy" />
+                          <span>Paket Iuran BPJS Tetap Rutin</span>
+                        </div>
+                        <span className="text-[10px] text-muted-faint font-medium">Kantor & Pegawai</span>
+                      </div>
+
+                      {/* Tunjangan BPJS (Kantor) */}
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[10px] font-bold text-navy uppercase tracking-wider block">
+                          Tunjangan BPJS (Ditanggung Kantor)
+                        </span>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] font-semibold text-muted-stronger block mb-1">
+                              BPJS Kesehatan (Kantor)
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              name="tunjanganBpjsKes"
+                              defaultValue={formatRupiahInput(editingPegawai?.tunjanganBpjsKes ? editingPegawai.tunjanganBpjsKes : "")}
+                              onChange={(e) => {
+                                const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                                e.target.value = formatRupiahInput(num);
+                              }}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-muted-stronger block mb-1">
+                              BPJS TK (Kantor)
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              name="tunjanganBpjsTk"
+                              defaultValue={formatRupiahInput(editingPegawai?.tunjanganBpjsTk ? editingPegawai.tunjanganBpjsTk : "")}
+                              onChange={(e) => {
+                                const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                                e.target.value = formatRupiahInput(num);
+                              }}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Potongan BPJS (Pegawai) */}
+                      <div className="space-y-1.5 pt-2 border-t border-border/50">
+                        <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider block">
+                          Potongan BPJS (Dipotong dari Pegawai)
+                        </span>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 block mb-1">
+                              BPJS Kesehatan (Pegawai)
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              name="bpjsKesehatan"
+                              defaultValue={formatRupiahInput(editingPegawai?.bpjsKesehatan ? editingPegawai.bpjsKesehatan : "")}
+                              onChange={(e) => {
+                                const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                                e.target.value = formatRupiahInput(num);
+                              }}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 block mb-1">
+                              BPJS TK (Pegawai)
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              name="bpjsKetenagakerjaan"
+                              defaultValue={formatRupiahInput(editingPegawai?.bpjsKetenagakerjaan ? editingPegawai.bpjsKetenagakerjaan : "")}
+                              onChange={(e) => {
+                                const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                                e.target.value = formatRupiahInput(num);
+                              }}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Nama Lengkap *</label>
-                <input
-                  type="text"
-                  name="nama"
-                  required
-                  defaultValue={editingPegawai?.nama ?? ""}
-                  placeholder="Nama lengkap pegawai"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Jabatan / Posisi *</label>
-                <input
-                  type="text"
-                  name="jabatan"
-                  required
-                  defaultValue={editingPegawai?.jabatan ?? ""}
-                  placeholder="Contoh: Drafter, Engineer, Keuangan, dsb."
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">Status PTKP *</label>
-                  <select
-                    name="statusKeluarga"
-                    defaultValue={editingPegawai?.statusKeluarga ?? "TK/0"}
-                    onChange={(e) => {
-                      const form = e.target.form;
-                      if (form && PTKP_RATES[e.target.value]) {
-                        const ptkpInput = form.elements.namedItem("ptkp") as HTMLInputElement;
-                        if (ptkpInput) ptkpInput.value = formatRupiahInput(PTKP_RATES[e.target.value]);
-                      }
-                    }}
-                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+              {/* Sticky Footer */}
+              <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 border-t border-border bg-surface-subtle/50 shrink-0">
+                <p className="text-[11px] text-muted-faint hidden sm:block">
+                  * Kolom bertanda bintang wajib diisi
+                </p>
+                <div className="flex items-center gap-2.5 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsPegawaiModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
                   >
-                    {Object.keys(PTKP_RATES).map((key) => (
-                      <option key={key} value={key}>
-                        {key}
-                      </option>
-                    ))}
-                  </select>
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-5 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-light transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {isPending ? "Menyimpan..." : (editingPegawai ? "Simpan Perubahan" : "Simpan Pegawai Baru")}
+                  </button>
                 </div>
-
-                <div>
-                  <label className="font-semibold text-navy-text block mb-1">Nominal PTKP (Thn)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="ptkp"
-                    defaultValue={formatRupiahInput(editingPegawai?.ptkp ?? 54000000)}
-                    onChange={(e) => {
-                      const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                      e.target.value = formatRupiahInput(num);
-                    }}
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Gaji Pokok Standar (Rp) *</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  name="gajiPokok"
-                  required
-                  defaultValue={formatRupiahInput(editingPegawai?.gajiPokok ? editingPegawai.gajiPokok : "")}
-                  onChange={(e) => {
-                    const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                    e.target.value = formatRupiahInput(num);
-                  }}
-                  placeholder="0"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Tunjangan Jabatan Rutin (Rp)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  name="tunjanganJabatan"
-                  defaultValue={formatRupiahInput(editingPegawai?.tunjanganJabatan ? editingPegawai.tunjanganJabatan : "")}
-                  onChange={(e) => {
-                    const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                    e.target.value = formatRupiahInput(num);
-                  }}
-                  placeholder="0"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                />
-                <p className="text-[10px] text-muted-faint mt-0.5">
-                  Disimpan permanen di master data dan otomatis terisi saat input gaji bulanan tanpa perlu ketik ulang.
-                </p>
-              </div>
-
-              {/* Komponen BPJS Tetap Master Data (Auto-Fill) */}
-              <div className="p-3.5 rounded-xl bg-surface-subtle/80 border border-border space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-bold text-navy-text text-xs flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-navy" />
-                    <span>Paket Iuran BPJS Tetap (Auto-Fill Master)</span>
-                  </div>
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
-                    Master Data
-                  </span>
-                </div>
-                <p className="text-[10px] text-muted-faint">
-                  Komponen iuran BPJS diset di awal/master data dan akan otomatis terisi setiap bulan saat input gaji. Finance tidak perlu mengetik ulang setiap bulan, namun tetap fleksibel disesuaikan jika ada perubahan tarif.
-                </p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-semibold text-navy-text block mb-1">
-                      Tunjangan BPJS Kesehatan (Kantor)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      name="tunjanganBpjsKes"
-                      defaultValue={formatRupiahInput(editingPegawai?.tunjanganBpjsKes ? editingPegawai.tunjanganBpjsKes : "")}
-                      onChange={(e) => {
-                        const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                        e.target.value = formatRupiahInput(num);
-                      }}
-                      placeholder="0"
-                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-navy-text block mb-1">
-                      Tunjangan BPJS TK (Kantor)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      name="tunjanganBpjsTk"
-                      defaultValue={formatRupiahInput(editingPegawai?.tunjanganBpjsTk ? editingPegawai.tunjanganBpjsTk : "")}
-                      onChange={(e) => {
-                        const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                        e.target.value = formatRupiahInput(num);
-                      }}
-                      placeholder="0"
-                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 block mb-1">
-                      Potongan BPJS Kesehatan (Pegawai)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      name="bpjsKesehatan"
-                      defaultValue={formatRupiahInput(editingPegawai?.bpjsKesehatan ? editingPegawai.bpjsKesehatan : "")}
-                      onChange={(e) => {
-                        const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                        e.target.value = formatRupiahInput(num);
-                      }}
-                      placeholder="0"
-                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 block mb-1">
-                      Potongan BPJS TK (Pegawai)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      name="bpjsKetenagakerjaan"
-                      defaultValue={formatRupiahInput(editingPegawai?.bpjsKetenagakerjaan ? editingPegawai.bpjsKetenagakerjaan : "")}
-                      onChange={(e) => {
-                        const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                        e.target.value = formatRupiahInput(num);
-                      }}
-                      placeholder="0"
-                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Bulan & Tahun Mulai Bekerja (Tanggal Masuk)
-                </label>
-                <input
-                  type="date"
-                  name="tanggalMasuk"
-                  defaultValue={
-                    editingPegawai?.tanggalMasuk
-                      ? new Date(editingPegawai.tanggalMasuk).toISOString().split("T")[0]
-                      : ""
-                  }
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                />
-                <p className="text-[10px] text-muted-faint mt-0.5">
-                  Mencatat tanggal/bulan/tahun mulai bekerja (misalnya masuk tahun 2014) untuk histori dan otomatis menghitung masa kerja karyawan.
-                </p>
-              </div>
-
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">Status Karyawan *</label>
-                <select
-                  name="status"
-                  value={modalPegawaiStatus}
-                  onChange={(e) => {
-                    const val = e.target.value as "AKTIF" | "RESIGN" | "PENSIUN";
-                    setModalPegawaiStatus(val);
-                    if (val === "AKTIF") {
-                      setModalTanggalResign("");
-                    }
-                  }}
-                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
-                >
-                  <option value="AKTIF">AKTIF – Bekerja Aktif (Otomatis muncul di daftar gaji setiap bulan)</option>
-                  <option value="RESIGN">RESIGN – Berhenti / Mengundurkan Diri</option>
-                  <option value="PENSIUN">PENSIUN – Pensiun</option>
-                </select>
-                <p className="text-[10px] text-muted-faint mt-1">
-                  Karyawan berstatus <strong>Aktif</strong> otomatis muncul di daftar gaji setiap bulan tanpa perlu di-input ulang.
-                </p>
-              </div>
-
-              {modalPegawaiStatus !== "AKTIF" && (
-                <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 space-y-2 animate-in fade-in">
-                  <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-semibold text-xs">
-                    <AlertCircle size={14} />
-                    <span>Tanggal {modalPegawaiStatus === "PENSIUN" ? "Pensiun" : "Resign"}</span>
-                  </div>
-                  <input
-                    type="date"
-                    name="tanggalResign"
-                    value={modalTanggalResign}
-                    onChange={(e) => setModalTanggalResign(e.target.value)}
-                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                  />
-                  <p className="text-[10px] text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
-                    <strong>Arsip & Perpajakan:</strong> Data rekam gaji karyawan ini <strong>tidak boleh dihapus</strong> untuk arsip dan SPT tahunan. Namanya secara otomatis tidak akan muncul lagi di daftar gaji setelah tanggal {modalPegawaiStatus === "PENSIUN" ? "pensiun" : "resign"} ini.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => setIsPegawaiModalOpen(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
-                >
-                  {isPending ? "Menyimpan..." : "Simpan Pegawai"}
-                </button>
               </div>
             </form>
           </div>

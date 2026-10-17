@@ -32,6 +32,7 @@ export type PegawaiItem = {
   tanggalResignFmt?: string | null;
   isActive: boolean;
   currentGaji?: GajiBulananItem | null;
+  riwayatGajiBulan?: Record<number, GajiBulananItem>;
   akumulasiTahun?: {
     totalGajiKotor: number;
     totalGajiTerlaporPajak: number;

@@ -74,6 +74,33 @@ export async function updatePegawaiAction(formData: FormData) {
   }
 }
 
+export async function updatePegawaiStatusAction(
+  id: string,
+  status: "AKTIF" | "RESIGN" | "PENSIUN",
+  tanggalResign: string | null = null
+) {
+  const token = await getPhpToken();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await phpFetch<{ success: boolean; data: any }>(
+      `/api/payroll/pegawai/${id}`,
+      token,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          status,
+          tanggalResign,
+          isActive: status === "AKTIF",
+        }),
+      }
+    );
+    return { success: true, data: result.data };
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw new Error("Gagal mengubah status pegawai.");
+  }
+}
+
 export async function deletePegawaiAction(id: string) {
   const token = await getPhpToken();
   try {

@@ -156,7 +156,7 @@ export function ArusKasPresisiClient({ data, entityId }: ArusKasPresisiClientPro
               </tr>
             </thead>
             <tbody>
-              {data.rows.map((row, idx) => {
+              {(data?.rows ?? []).map((row, idx) => {
                 const isHeader = row.isHeader;
                 const isSubtotal = row.isSubtotal;
                 const isTotal = row.isTotal;

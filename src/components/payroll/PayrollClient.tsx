@@ -206,6 +206,17 @@ export function PayrollClient({
     tanggal: string;
   } | null>(null);
 
+  // Modal konfirmasi hapus kustom (menggantikan browser confirm)
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemName: string;
+    itemSub?: string;
+    warningNote?: string;
+    confirmLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+
   const [isGajiModalOpen, setIsGajiModalOpen] = useState(false);
   const [editingGaji, setEditingGaji] = useState<{
     pegawai: PegawaiItem;
@@ -1760,17 +1771,26 @@ export function PayrollClient({
                                 ) : (
                                   <button
                                     onClick={() => {
-                                      if (confirm(`Hapus pegawai ${p.nama} (${p.nik})?`)) {
-                                        startTransition(async () => {
+                                      setDeleteDialog({
+                                        isOpen: true,
+                                        title: "Hapus Pegawai Tetap",
+                                        itemName: `${p.nama} (${p.nik})`,
+                                        itemSub: `${p.jabatan} · Gaji Pokok Master: ${p.gajiPokokFmt}`,
+                                        warningNote:
+                                          "Jika karyawan ini sudah berhenti bekerja, disarankan untuk mengubah status menjadi Resign atau Pensiun agar rekam arsip penggajian dan pajak tahunan tetap terjaga.",
+                                        confirmLabel: "Ya, Hapus Pegawai",
+                                        onConfirm: async () => {
                                           try {
                                             await deletePegawaiAction(p.id);
                                             setSuccessMsg(`Pegawai ${p.nama} berhasil dihapus.`);
+                                            setDeleteDialog(null);
                                             router.refresh();
                                           } catch (e: unknown) {
                                             setErrorMsg((e as Error).message);
+                                            setDeleteDialog(null);
                                           }
-                                        });
-                                      }
+                                        },
+                                      });
                                     }}
                                     className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
                                     title="Hapus Pegawai"
@@ -2275,19 +2295,29 @@ export function PayrollClient({
                                   </button>
                                   <button
                                     onClick={() => {
-                                      if (confirm(`Hapus honorarium ${h.nama} sebesar ${h.nominalHonorFmt}?`)) {
-                                        startTransition(async () => {
+                                      setDeleteDialog({
+                                        isOpen: true,
+                                        title: "Hapus Honorarium Tenaga Ahli",
+                                        itemName: h.nama,
+                                        itemSub: `Nominal: ${h.nominalHonorFmt} · ${h.uraian}`,
+                                        warningNote:
+                                          "Data transaksi honorarium ini akan dihapus dari rekapitulasi penggajian dan jurnal beban honor.",
+                                        confirmLabel: "Ya, Hapus Honor",
+                                        onConfirm: async () => {
                                           try {
                                             await deleteHonorTenagaAhliAction(h.id);
                                             setSuccessMsg("Honorarium berhasil dihapus.");
+                                            setDeleteDialog(null);
                                             router.refresh();
                                           } catch (e: unknown) {
                                             setErrorMsg((e as Error).message);
+                                            setDeleteDialog(null);
                                           }
-                                        });
-                                      }
+                                        },
+                                      });
                                     }}
                                     className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
+                                    title="Hapus Honorarium"
                                   >
                                     <Trash2 size={12} />
                                   </button>
@@ -2972,21 +3002,26 @@ export function PayrollClient({
                                     </button>
                                     <button
                                       onClick={() => {
-                                        if (
-                                          confirm(
-                                            `Hapus ${r.nama} dari database tenaga ahli? Tindakan ini hanya diperbolehkan jika belum ada riwayat pembayaran honor.`
-                                          )
-                                        ) {
-                                          startTransition(async () => {
+                                        setDeleteDialog({
+                                          isOpen: true,
+                                          title: "Hapus Master Tenaga Ahli",
+                                          itemName: r.nama,
+                                          itemSub: `NIK: ${r.nik || "-"} · NPWP: ${r.npwp || "-"}`,
+                                          warningNote:
+                                            "Tindakan ini hanya diperbolehkan jika belum ada riwayat pembayaran honorarium pada tenaga ahli ini.",
+                                          confirmLabel: "Ya, Hapus Rekanan",
+                                          onConfirm: async () => {
                                             try {
                                               const res = await deleteTenagaAhliMasterAction(r.id);
                                               setSuccessMsg(res.message);
+                                              setDeleteDialog(null);
                                               router.refresh();
                                             } catch (err: unknown) {
                                               setErrorMsg((err as Error).message);
+                                              setDeleteDialog(null);
                                             }
-                                          });
-                                        }
+                                          },
+                                        });
                                       }}
                                       className="h-7 w-7 rounded-lg border border-rose-200 dark:border-rose-900 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 inline-flex items-center justify-center cursor-pointer transition-colors"
                                       title="Hapus Tenaga Ahli"
@@ -3947,6 +3982,89 @@ export function PayrollClient({
       )}
 
       {/* ========================================================= */}
+      {/* MODAL 1C: DIALOG KONFIRMASI HAPUS DATA KUSTOM */}
+      {/* ========================================================= */}
+      {mounted && deleteDialog && deleteDialog.isOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface-subtle/50">
+              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                <Trash2 size={16} className="text-rose-600" />
+                <span>{deleteDialog.title}</span>
+              </h3>
+              <button
+                onClick={() => setDeleteDialog(null)}
+                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center shrink-0 mt-0.5">
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-navy-text">
+                    Apakah Anda yakin ingin menghapus data ini?
+                  </h4>
+                  <p className="text-muted-faint mt-1 leading-relaxed">
+                    Tindakan ini tidak dapat dibatalkan. Pastikan data yang dipilih sudah benar.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border space-y-1">
+                <div className="text-[10px] font-bold text-muted-faint uppercase tracking-wider">
+                  Rincian Data
+                </div>
+                <div className="text-sm font-bold text-navy-text">
+                  {deleteDialog.itemName}
+                </div>
+                {deleteDialog.itemSub && (
+                  <div className="text-xs text-muted-stronger">
+                    {deleteDialog.itemSub}
+                  </div>
+                )}
+              </div>
+
+              {deleteDialog.warningNote && (
+                <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <span>{deleteDialog.warningNote}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => setDeleteDialog(null)}
+                  className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      await deleteDialog.onConfirm();
+                    });
+                  }}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {isPending ? "Menghapus..." : deleteDialog.confirmLabel || "Ya, Hapus"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================= */}
       {/* MODAL 2: FORM INPUT / EDIT GAJI BULANAN */}
       {/* ========================================================= */}
       {mounted && isGajiModalOpen && editingGaji && typeof document !== "undefined" && (() => {
@@ -4465,18 +4583,29 @@ export function PayrollClient({
                     <button
                       type="button"
                       onClick={() => {
-                        if (confirm("Hapus data input gaji bulan ini untuk pegawai ini?")) {
-                          startTransition(async () => {
+                        const gajiId = editingGaji.gaji!.id;
+                        const pegawaiNama = editingGaji.pegawai.nama;
+                        setDeleteDialog({
+                          isOpen: true,
+                          title: "Hapus Input Gaji Bulan Ini",
+                          itemName: `Gaji ${pegawaiNama}`,
+                          itemSub: `Periode: ${BULAN_NAMES[modalGajiBulan]} ${modalGajiTahun}`,
+                          warningNote:
+                            "Data input gaji bulan ini akan dihapus dan nilai komponen gaji akan kembali mengikuti standar gaji pokok master.",
+                          confirmLabel: "Ya, Hapus Input Gaji",
+                          onConfirm: async () => {
                             try {
-                              await deleteGajiBulananAction(editingGaji.gaji!.id);
+                              await deleteGajiBulananAction(gajiId);
                               setSuccessMsg("Input gaji bulan ini berhasil dihapus.");
                               setIsGajiModalOpen(false);
+                              setDeleteDialog(null);
                               router.refresh();
                             } catch (err: unknown) {
                               setErrorMsg((err as Error).message);
+                              setDeleteDialog(null);
                             }
-                          });
-                        }
+                          },
+                        });
                       }}
                       className="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold cursor-pointer"
                     >

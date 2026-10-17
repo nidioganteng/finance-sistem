@@ -8,6 +8,10 @@ import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
 export async function createPegawaiAction(formData: FormData) {
   const token = await getPhpToken();
+  const rawStatus = ((formData.get("status") as string) || "AKTIF").toUpperCase();
+  const status = ["AKTIF", "RESIGN", "PENSIUN"].includes(rawStatus) ? rawStatus : "AKTIF";
+  const tanggalResign = (formData.get("tanggalResign") as string)?.trim() || null;
+
   const body = {
     entityId: formData.get("entityId"),
     nik: formData.get("nik"),
@@ -18,9 +22,9 @@ export async function createPegawaiAction(formData: FormData) {
     gajiPokok: Number(formData.get("gajiPokok")) || 0,
     tunjanganJabatan: Number(formData.get("tunjanganJabatan")) || 0,
     tanggalMasuk: (formData.get("tanggalMasuk") as string)?.trim() || null,
-    isActive:
-      formData.get("isActive") === "true" ||
-      formData.get("isActive") === "on",
+    status,
+    tanggalResign,
+    isActive: status === "AKTIF",
   };
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,6 +43,10 @@ export async function createPegawaiAction(formData: FormData) {
 export async function updatePegawaiAction(formData: FormData) {
   const token = await getPhpToken();
   const id = formData.get("id") as string;
+  const rawStatus = ((formData.get("status") as string) || "AKTIF").toUpperCase();
+  const status = ["AKTIF", "RESIGN", "PENSIUN"].includes(rawStatus) ? rawStatus : "AKTIF";
+  const tanggalResign = (formData.get("tanggalResign") as string)?.trim() || null;
+
   const body = {
     nik: formData.get("nik"),
     nama: formData.get("nama"),
@@ -48,9 +56,9 @@ export async function updatePegawaiAction(formData: FormData) {
     gajiPokok: Number(formData.get("gajiPokok")) || 0,
     tunjanganJabatan: Number(formData.get("tunjanganJabatan")) || 0,
     tanggalMasuk: (formData.get("tanggalMasuk") as string)?.trim() || null,
-    isActive:
-      formData.get("isActive") === "true" ||
-      formData.get("isActive") === "on",
+    status,
+    tanggalResign,
+    isActive: status === "AKTIF",
   };
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

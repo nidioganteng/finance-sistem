@@ -52,6 +52,7 @@ import { type RekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
 import {
   createPegawaiAction,
   updatePegawaiAction,
+  updatePegawaiStatusAction,
   deletePegawaiAction,
   saveGajiBulananAction,
   deleteGajiBulananAction,
@@ -199,6 +200,11 @@ export function PayrollClient({
   const [modalPegawaiStatus, setModalPegawaiStatus] = useState<"AKTIF" | "RESIGN" | "PENSIUN">("AKTIF");
   const [modalTanggalResign, setModalTanggalResign] = useState<string>("");
   const [masterStatusFilter, setMasterStatusFilter] = useState<"ALL" | "AKTIF" | "RESIGN" | "PENSIUN">("ALL");
+  const [quickStatusTarget, setQuickStatusTarget] = useState<{
+    pegawai: PegawaiItem;
+    status: "AKTIF" | "RESIGN" | "PENSIUN";
+    tanggal: string;
+  } | null>(null);
 
   const [isGajiModalOpen, setIsGajiModalOpen] = useState(false);
   const [editingGaji, setEditingGaji] = useState<{
@@ -1667,17 +1673,64 @@ export function PayrollClient({
                             )}
                           </td>
                           <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                            {p.status === "RESIGN" ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                                Resign
-                              </span>
-                            ) : p.status === "PENSIUN" ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
-                                Pensiun
-                              </span>
+                            {isManager ? (
+                              <div className="relative inline-flex items-center">
+                                <select
+                                  value={p.status ?? (p.isActive ? "AKTIF" : "RESIGN")}
+                                  onChange={(e) => {
+                                    const newStatus = e.target.value as "AKTIF" | "RESIGN" | "PENSIUN";
+                                    const currentStatus = p.status ?? (p.isActive ? "AKTIF" : "RESIGN");
+                                    if (newStatus === currentStatus) return;
+
+                                    if (newStatus === "AKTIF") {
+                                      startTransition(async () => {
+                                        try {
+                                          await updatePegawaiStatusAction(p.id, "AKTIF", null);
+                                          setSuccessMsg(`Status ${p.nama} berhasil diubah menjadi Aktif.`);
+                                          router.refresh();
+                                        } catch (err: unknown) {
+                                          setErrorMsg((err as Error).message);
+                                        }
+                                      });
+                                    } else {
+                                      setQuickStatusTarget({
+                                        pegawai: p,
+                                        status: newStatus,
+                                        tanggal:
+                                          p.tanggalResign?.split("T")[0] ||
+                                          new Date().toISOString().split("T")[0],
+                                      });
+                                    }
+                                  }}
+                                  className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-full border cursor-pointer appearance-none text-center outline-none transition-all shadow-2xs ${
+                                    (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "AKTIF"
+                                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100"
+                                      : (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "RESIGN"
+                                      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 hover:bg-amber-100"
+                                      : "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60 hover:bg-purple-100"
+                                  }`}
+                                  title="Klik untuk mengubah status (Aktif, Resign, atau Pensiun)"
+                                >
+                                  <option value="AKTIF" className="bg-surface-card text-foreground font-semibold">Aktif</option>
+                                  <option value="RESIGN" className="bg-surface-card text-foreground font-semibold">Resign</option>
+                                  <option value="PENSIUN" className="bg-surface-card text-foreground font-semibold">Pensiun</option>
+                                </select>
+                                <ChevronDown
+                                  size={11}
+                                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-70"
+                                />
+                              </div>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                                Aktif
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  p.status === "RESIGN"
+                                    ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
+                                    : p.status === "PENSIUN"
+                                    ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60"
+                                    : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
+                                }`}
+                              >
+                                {p.status === "RESIGN" ? "Resign" : p.status === "PENSIUN" ? "Pensiun" : "Aktif"}
                               </span>
                             )}
                           </td>
@@ -3788,6 +3841,106 @@ export function PayrollClient({
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 1B: QUICK DIALOG STATUS RESIGN / PENSIUN */}
+      {/* ========================================================= */}
+      {mounted && quickStatusTarget && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface-subtle/50">
+              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                <AlertCircle size={16} className={quickStatusTarget.status === "PENSIUN" ? "text-purple-600" : "text-amber-600"} />
+                <span>Ubah Status Pegawai</span>
+              </h3>
+              <button
+                onClick={() => setQuickStatusTarget(null)}
+                className="p-1 text-muted-faint hover:text-navy-text rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5 text-xs">
+              <div>
+                <div className="font-bold text-navy-text text-sm">{quickStatusTarget.pegawai.nama}</div>
+                <div className="text-muted-faint font-mono text-[11px] mt-0.5">
+                  {quickStatusTarget.pegawai.nik} · {quickStatusTarget.pegawai.jabatan}
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-surface-subtle border border-border space-y-1">
+                <div className="text-[11px] text-muted-faint font-medium">Status Baru:</div>
+                <div className="font-bold text-xs">
+                  {quickStatusTarget.status === "PENSIUN" ? (
+                    <span className="text-purple-700 dark:text-purple-300">Pensiun</span>
+                  ) : (
+                    <span className="text-amber-700 dark:text-amber-300">Resign / Berhenti Bekerja</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Tanggal Efektif {quickStatusTarget.status === "PENSIUN" ? "Pensiun" : "Resign"} *
+                </label>
+                <input
+                  type="date"
+                  value={quickStatusTarget.tanggal}
+                  onChange={(e) =>
+                    setQuickStatusTarget((prev) =>
+                      prev ? { ...prev, tanggal: e.target.value } : null
+                    )
+                  }
+                  required
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                />
+                <p className="text-[10px] text-muted-faint mt-1 leading-relaxed">
+                  Data penggajian sebelum dan pada tanggal ini tetap diarsip utuh. Karyawan otomatis tidak muncul di daftar gaji pada bulan-bulan setelah tanggal ini.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setQuickStatusTarget(null)}
+                  className="px-3.5 py-1.5 rounded-lg border border-border text-muted-stronger hover:bg-surface-hover transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending || !quickStatusTarget.tanggal}
+                  onClick={() => {
+                    startTransition(async () => {
+                      try {
+                        await updatePegawaiStatusAction(
+                          quickStatusTarget.pegawai.id,
+                          quickStatusTarget.status,
+                          quickStatusTarget.tanggal
+                        );
+                        setSuccessMsg(
+                          `Status ${quickStatusTarget.pegawai.nama} berhasil diubah menjadi ${
+                            quickStatusTarget.status === "PENSIUN" ? "Pensiun" : "Resign"
+                          }.`
+                        );
+                        setQuickStatusTarget(null);
+                        router.refresh();
+                      } catch (err: unknown) {
+                        setErrorMsg((err as Error).message);
+                      }
+                    });
+                  }}
+                  className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+                >
+                  {isPending ? "Menyimpan..." : "Simpan Status"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>,
         document.body

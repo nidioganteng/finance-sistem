@@ -3820,6 +3820,7 @@ export function PayrollClient({
             </div>
 
             <form
+              key={editingPegawai ? editingPegawai.id : "new-pegawai"}
               id="pegawai-form"
               onSubmit={(e) => {
                 e.preventDefault();

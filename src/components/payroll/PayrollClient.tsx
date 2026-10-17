@@ -30,6 +30,7 @@ import {
   HelpCircle,
   ExternalLink,
   Info,
+  Lock,
 } from "lucide-react";
 import {
   type PegawaiItem,
@@ -69,6 +70,7 @@ type PayrollData = {
   year: number;
   month: number;
   pegawaiList: PegawaiItem[];
+  allPegawaiMaster?: PegawaiItem[];
   gajiBulanIni: GajiBulananItem[];
   rekapBulananPegawai: RekapBulanPegawaiItem[];
   summaryBulanIni: {
@@ -194,6 +196,9 @@ export function PayrollClient({
   // Modals state
   const [isPegawaiModalOpen, setIsPegawaiModalOpen] = useState(false);
   const [editingPegawai, setEditingPegawai] = useState<PegawaiItem | null>(null);
+  const [modalPegawaiStatus, setModalPegawaiStatus] = useState<"AKTIF" | "RESIGN" | "PENSIUN">("AKTIF");
+  const [modalTanggalResign, setModalTanggalResign] = useState<string>("");
+  const [masterStatusFilter, setMasterStatusFilter] = useState<"ALL" | "AKTIF" | "RESIGN" | "PENSIUN">("ALL");
 
   const [isGajiModalOpen, setIsGajiModalOpen] = useState(false);
   const [editingGaji, setEditingGaji] = useState<{
@@ -404,13 +409,46 @@ export function PayrollClient({
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  // Filter items based on query
+  // Filter items based on query untuk penggajian bulanan
   const filteredPegawaiList = data.pegawaiList.filter(
     (p) =>
       p.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.jabatan.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Master Pegawai Tetap (seluruh profil karyawan)
+  const allMasterPegawai = data.allPegawaiMaster ?? data.pegawaiList;
+  const filteredMasterList = allMasterPegawai.filter((p) => {
+    const matchesSearch =
+      p.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.jabatan.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    const currentStatus = p.status ?? (p.isActive ? "AKTIF" : "RESIGN");
+    if (masterStatusFilter === "ALL") return true;
+    return currentStatus === masterStatusFilter;
+  });
+
+  const masterCountAktif = allMasterPegawai.filter(
+    (p) => (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "AKTIF"
+  ).length;
+  const masterCountResign = allMasterPegawai.filter(
+    (p) => (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "RESIGN"
+  ).length;
+  const masterCountPensiun = allMasterPegawai.filter(
+    (p) => (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "PENSIUN"
+  ).length;
+
+  // Filter rekapitulasi tahunan (menampilkan seluruh pegawai yang pernah digaji tahun ini atau berstatus aktif)
+  const filteredTahunanList = allMasterPegawai.filter((p) => {
+    const matchesSearch =
+      p.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.jabatan.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    return (p.akumulasiTahun?.bulanTerbayar ?? 0) > 0 || (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "AKTIF";
+  });
 
   const baseHonorList =
     honorFilterScope === "holding"
@@ -713,6 +751,8 @@ export function PayrollClient({
                     <button
                       onClick={() => {
                         setEditingPegawai(null);
+                        setModalPegawaiStatus("AKTIF");
+                        setModalTanggalResign("");
                         setIsPegawaiModalOpen(true);
                       }}
                       className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
@@ -893,7 +933,25 @@ export function PayrollClient({
                         return (
                           <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
                             <td className="py-3 px-3.5">
-                              <div className="font-bold text-navy-text text-sm">{p.nama}</div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-navy-text text-sm">{p.nama}</span>
+                                {p.status === "RESIGN" && (
+                                  <span
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
+                                    title={`Karyawan Resign: ${p.tanggalResignFmt ?? "-"}`}
+                                  >
+                                    Resign {p.tanggalResignFmt ? `(${p.tanggalResignFmt})` : ""}
+                                  </span>
+                                )}
+                                {p.status === "PENSIUN" && (
+                                  <span
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60"
+                                    title={`Karyawan Pensiun: ${p.tanggalResignFmt ?? "-"}`}
+                                  >
+                                    Pensiun {p.tanggalResignFmt ? `(${p.tanggalResignFmt})` : ""}
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[11px] text-muted-faint mt-0.5 flex items-center gap-1.5 flex-wrap">
                                 <span className="font-mono">{p.nik}</span>
                                 <span>·</span>
@@ -1483,18 +1541,62 @@ export function PayrollClient({
           {/* Sub-Tab Content 2: Master Database Karyawan */}
           {pegawaiSubTab === "master" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-              <div className="p-4 border-b border-border">
-                <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                  <Users size={16} className="text-navy" />
-                  <span>Database Pegawai Tetap (Master Karyawan)</span>
-                </h3>
-                <p className="text-xs text-muted-faint mt-0.5">
-                  Daftar profil seluruh pegawai tetap. NIK dan gaji pokok didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar.
-                </p>
+              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
+                    <Users size={16} className="text-navy" />
+                    <span>Database Pegawai Tetap (Master Karyawan)</span>
+                  </h3>
+                  <p className="text-xs text-muted-faint mt-0.5">
+                    Daftar profil seluruh pegawai tetap. NIK dan gaji pokok didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-subtle border border-border text-xs">
+                  <button
+                    onClick={() => setMasterStatusFilter("ALL")}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                      masterStatusFilter === "ALL"
+                        ? "bg-surface-card text-navy font-bold shadow-2xs"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    Semua ({allMasterPegawai.length})
+                  </button>
+                  <button
+                    onClick={() => setMasterStatusFilter("AKTIF")}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                      masterStatusFilter === "AKTIF"
+                        ? "bg-surface-card text-emerald-700 dark:text-emerald-400 font-bold shadow-2xs"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    Aktif ({masterCountAktif})
+                  </button>
+                  <button
+                    onClick={() => setMasterStatusFilter("RESIGN")}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                      masterStatusFilter === "RESIGN"
+                        ? "bg-surface-card text-amber-700 dark:text-amber-400 font-bold shadow-2xs"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    Resign ({masterCountResign})
+                  </button>
+                  <button
+                    onClick={() => setMasterStatusFilter("PENSIUN")}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                      masterStatusFilter === "PENSIUN"
+                        ? "bg-surface-card text-purple-700 dark:text-purple-400 font-bold shadow-2xs"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    Pensiun ({masterCountPensiun})
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[960px] text-left text-xs">
+                <table className="w-full min-w-[1020px] text-left text-xs">
                   <thead className="bg-surface-subtle border-b border-border text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5">NIK / Kode</th>
@@ -1505,19 +1607,20 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Gaji Pokok Standar</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Tunj. Jabatan Master</th>
                       <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Mulai Bekerja / Masa Kerja</th>
+                      <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Tanggal Resign</th>
                       <th className="py-2.5 px-3.5 text-center">Status</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredPegawaiList.length === 0 ? (
+                    {filteredMasterList.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-8 text-center text-muted-faint">
+                        <td colSpan={11} className="py-8 text-center text-muted-faint">
                           Tidak ada data karyawan ditemukan.
                         </td>
                       </tr>
                     ) : (
-                      filteredPegawaiList.map((p) => (
+                      filteredMasterList.map((p) => (
                         <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
                           <td className="py-3 px-3.5 font-mono font-semibold text-navy-text">
                             {p.nik}
@@ -1554,16 +1657,29 @@ export function PayrollClient({
                               <span className="text-muted-faint text-[11px]">-</span>
                             )}
                           </td>
-                          <td className="py-3 px-3.5 text-center">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                p.isActive
-                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-                                  : "bg-surface-subtle text-muted-faint"
-                              }`}
-                            >
-                              {p.isActive ? "Aktif" : "Non-Aktif"}
-                            </span>
+                          <td className="py-3 px-3.5 whitespace-nowrap">
+                            {p.tanggalResignFmt ? (
+                              <span className="font-mono text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                {p.tanggalResignFmt}
+                              </span>
+                            ) : (
+                              <span className="text-muted-faint text-[11px]">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                            {p.status === "RESIGN" ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                                Resign
+                              </span>
+                            ) : p.status === "PENSIUN" ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
+                                Pensiun
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                                Aktif
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-3.5 text-right whitespace-nowrap">
                             {isManager && (
@@ -1571,6 +1687,8 @@ export function PayrollClient({
                                 <button
                                   onClick={() => {
                                     setEditingPegawai(p);
+                                    setModalPegawaiStatus(p.status ?? (p.isActive ? "AKTIF" : "RESIGN"));
+                                    setModalTanggalResign(p.tanggalResign ? p.tanggalResign.split("T")[0] : "");
                                     setIsPegawaiModalOpen(true);
                                   }}
                                   className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
@@ -1578,25 +1696,35 @@ export function PayrollClient({
                                   <Pencil size={11} />
                                   <span>Edit</span>
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    if (confirm(`Hapus pegawai ${p.nama} (${p.nik})?`)) {
-                                      startTransition(async () => {
-                                        try {
-                                          await deletePegawaiAction(p.id);
-                                          setSuccessMsg(`Pegawai ${p.nama} berhasil dihapus.`);
-                                          router.refresh();
-                                        } catch (e: unknown) {
-                                          setErrorMsg((e as Error).message);
-                                        }
-                                      });
-                                    }
-                                  }}
-                                  className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
-                                  title="Hapus Pegawai"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
+                                {(p.akumulasiTahun?.bulanTerbayar ?? 0) > 0 ? (
+                                  <button
+                                    disabled
+                                    className="h-7 px-2 rounded-lg border border-border bg-surface-subtle text-muted-faint cursor-not-allowed opacity-60 inline-flex items-center gap-1 shadow-2xs"
+                                    title="Data terkunci: Memiliki riwayat penggajian arsip laporan tahunan & pajak. Karyawan resign/pensiun tidak boleh dihapus, cukup ubah status."
+                                  >
+                                    <Lock size={12} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Hapus pegawai ${p.nama} (${p.nik})?`)) {
+                                        startTransition(async () => {
+                                          try {
+                                            await deletePegawaiAction(p.id);
+                                            setSuccessMsg(`Pegawai ${p.nama} berhasil dihapus.`);
+                                            router.refresh();
+                                          } catch (e: unknown) {
+                                            setErrorMsg((e as Error).message);
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
+                                    title="Hapus Pegawai"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
                               </div>
                             )}
                           </td>
@@ -1636,7 +1764,7 @@ export function PayrollClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredPegawaiList.map((p) => {
+                    {filteredTahunanList.map((p) => {
                       const ak = p.akumulasiTahun;
                       return (
                         <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
@@ -3601,18 +3729,47 @@ export function PayrollClient({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  id="isActive"
-                  defaultChecked={editingPegawai?.isActive ?? true}
-                  className="rounded border-border text-navy"
-                />
-                <label htmlFor="isActive" className="text-xs text-navy-text cursor-pointer">
-                  Pegawai aktif bekerja
-                </label>
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">Status Karyawan *</label>
+                <select
+                  name="status"
+                  value={modalPegawaiStatus}
+                  onChange={(e) => {
+                    const val = e.target.value as "AKTIF" | "RESIGN" | "PENSIUN";
+                    setModalPegawaiStatus(val);
+                    if (val === "AKTIF") {
+                      setModalTanggalResign("");
+                    }
+                  }}
+                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
+                >
+                  <option value="AKTIF">AKTIF – Bekerja Aktif (Otomatis muncul di daftar gaji setiap bulan)</option>
+                  <option value="RESIGN">RESIGN – Berhenti / Mengundurkan Diri</option>
+                  <option value="PENSIUN">PENSIUN – Pensiun</option>
+                </select>
+                <p className="text-[10px] text-muted-faint mt-1">
+                  Karyawan berstatus <strong>Aktif</strong> otomatis muncul di daftar gaji setiap bulan tanpa perlu di-input ulang.
+                </p>
               </div>
+
+              {modalPegawaiStatus !== "AKTIF" && (
+                <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 space-y-2 animate-in fade-in">
+                  <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-semibold text-xs">
+                    <AlertCircle size={14} />
+                    <span>Tanggal {modalPegawaiStatus === "PENSIUN" ? "Pensiun" : "Resign"}</span>
+                  </div>
+                  <input
+                    type="date"
+                    name="tanggalResign"
+                    value={modalTanggalResign}
+                    onChange={(e) => setModalTanggalResign(e.target.value)}
+                    className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                  />
+                  <p className="text-[10px] text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
+                    <strong>Arsip & Perpajakan:</strong> Data rekam gaji karyawan ini <strong>tidak boleh dihapus</strong> untuk arsip dan SPT tahunan. Namanya secara otomatis tidak akan muncul lagi di daftar gaji setelah tanggal {modalPegawaiStatus === "PENSIUN" ? "pensiun" : "resign"} ini.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
                 <button

@@ -27,6 +27,9 @@ export type PegawaiItem = {
   tanggalMasuk?: string | null;
   tanggalMasukFmt?: string | null;
   masaKerja?: string | null;
+  status?: "AKTIF" | "RESIGN" | "PENSIUN";
+  tanggalResign?: string | null;
+  tanggalResignFmt?: string | null;
   isActive: boolean;
   currentGaji?: GajiBulananItem | null;
   akumulasiTahun?: {

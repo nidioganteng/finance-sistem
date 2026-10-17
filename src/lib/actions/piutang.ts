@@ -1,6 +1,7 @@
 "use server";
 
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
+import { revalidatePath } from "next/cache";
 
 export type CreatePelunasanInput = {
   currentEntityKey: string;
@@ -61,6 +62,9 @@ export async function completeProject(projectId: string) {
       method: "POST",
       body: JSON.stringify({ projectId }),
     });
+    revalidatePath("/piutang");
+    revalidatePath("/laporan");
+    revalidatePath("/dashboard");
   } catch (e) {
     if (e instanceof ApiError) throw new Error(e.message);
     throw e;
@@ -74,6 +78,9 @@ export async function cancelProject(projectId: string) {
       method: "POST",
       body: JSON.stringify({ projectId }),
     });
+    revalidatePath("/piutang");
+    revalidatePath("/laporan");
+    revalidatePath("/dashboard");
   } catch (e) {
     if (e instanceof ApiError) throw new Error(e.message);
     throw e;
@@ -87,6 +94,9 @@ export async function reopenProject(projectId: string) {
       method: "POST",
       body: JSON.stringify({ projectId }),
     });
+    revalidatePath("/piutang");
+    revalidatePath("/laporan");
+    revalidatePath("/dashboard");
   } catch (e) {
     if (e instanceof ApiError) throw new Error(e.message);
     throw e;

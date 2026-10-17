@@ -41,8 +41,9 @@ interface ArusKasViewProps {
 }
 
 export function ArusKasView({ data, year, entityName }: ArusKasViewProps) {
+  const monthly = data?.monthly ?? [];
   const maxFlow = Math.max(
-    ...data.monthly.map((m) => Math.max(m.masuk, m.keluar)),
+    ...monthly.map((m) => Math.max(m.masuk, m.keluar)),
     1
   );
 
@@ -211,7 +212,7 @@ export function ArusKasView({ data, year, entityName }: ArusKasViewProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-subtle">
-              {data.monthly.map((m) => (
+              {monthly.map((m) => (
                 <tr key={m.bulan} className={`hover:bg-surface-hover/30 transition-colors ${!m.hasData ? "opacity-40" : ""}`}>
                   <td className="py-3.5 px-6 font-bold text-[13px] text-navy-text">{m.bulan}</td>
                   <td className="py-3.5 px-4 text-right text-[13px] font-semibold text-status-green tabular-nums">

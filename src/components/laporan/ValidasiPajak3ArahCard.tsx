@@ -74,7 +74,7 @@ export function ValidasiPajak3ArahCard({
             </tr>
           </thead>
           <tbody className="divide-y divide-border-soft text-navy-text">
-            {data.items.map((item) => (
+            {(data?.items ?? []).map((item) => (
               <tr
                 key={item.key}
                 className={`hover:bg-surface-hover/50 transition-colors ${

@@ -21,7 +21,7 @@ export function PiutangView({
       loadingDockList={[]}
       userRole={userRole}
       isUmumEntity={false}
-      showTabs={false}
+      showTabs={true}
       isGrup={isGrup}
     />
   );

@@ -53,8 +53,16 @@ if ($method === 'GET' && $sub === '') {
     $params      = [$entity_id];
 
     if ($jenis_input_key && $jenis_input_key !== 'semua') {
-        $where_parts[] = 'ji.`key` = ?';
-        $params[]      = $jenis_input_key;
+        if ($jenis_input_key === 'jurnalTransaksi') {
+            $where_parts[] = "(ji.`key` = 'jurnalTransaksi' AND (t.extraFieldsJson IS NULL OR JSON_VALID(t.extraFieldsJson) = 0 OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') = false))";
+        } elseif (in_array($jenis_input_key, ['kasKecil', 'kasBesar', 'bankBuku'], true)) {
+            $where_parts[] = "(ji.`key` = ? OR (JSON_VALID(t.extraFieldsJson) = 1 AND JSON_UNQUOTE(JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry')) = 'true' AND JSON_UNQUOTE(JSON_EXTRACT(t.extraFieldsJson, '$.crossingFromJenisInputKey')) = ?))";
+            $params[]      = $jenis_input_key;
+            $params[]      = $jenis_input_key;
+        } else {
+            $where_parts[] = 'ji.`key` = ?';
+            $params[]      = $jenis_input_key;
+        }
     }
     if ($tanggal_gte) {
         $where_parts[] = 't.tanggal >= ?';
@@ -104,8 +112,8 @@ if ($method === 'GET' && $sub === '') {
     $global_kredit    = (float)$sum_row['sum_kredit'];
     $global_balanced  = round($global_debit * 100) === round($global_kredit * 100);
 
-    // Fetch halaman
-    $sql = "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit,
+    // Fetch halaman — urut tanggal DESC, createdAt DESC agar transaksi terbaru langsung tampil di atas
+    $sql = "SELECT t.id, t.tanggal, t.createdAt, t.noBukti, t.keterangan, t.debit, t.kredit,
                    t.extraFieldsJson, t.projectId,
                    ji.`key` as jenis_key, ji.nama as jenis_nama,
                    c.id as coa_id, c.code as coa_code, c.name as coa_name, c.kategori as coa_kategori,
@@ -117,7 +125,7 @@ if ($method === 'GET' && $sub === '') {
             LEFT JOIN Project p ON t.projectId = p.id
             LEFT JOIN User s ON t.staffId = s.id
             WHERE $where_sql
-            ORDER BY t.tanggal DESC, t.noBukti DESC, t.createdAt DESC
+            ORDER BY t.tanggal DESC, t.createdAt DESC, t.noBukti DESC, t.debit DESC
             LIMIT ? OFFSET ?";
     $params[] = $page_size;
     $params[] = ($page - 1) * $page_size;
@@ -135,7 +143,7 @@ if ($method === 'GET' && $sub === '') {
         // Hapus exclude & akun_code filter dari extra query
         $extra_params = array_merge([$entity_id], $no_buktis);
         $stmt_kas = $pdo->prepare(
-            "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit,
+            "SELECT t.id, t.tanggal, t.createdAt, t.noBukti, t.keterangan, t.debit, t.kredit,
                     t.extraFieldsJson, t.projectId,
                     ji.`key` as jenis_key, ji.nama as jenis_nama,
                     c.id as coa_id, c.code as coa_code, c.name as coa_name, c.kategori as coa_kategori,
@@ -161,12 +169,18 @@ if ($method === 'GET' && $sub === '') {
         }
     }
 
-    // Sort: tanggal DESC, lalu dalam noBukti sama debit di atas kredit
-    // Logika: 1:1 dengan sort di getJurnalRows() src/lib/jurnal.ts
+    // Sort: tanggal DESC, createdAt DESC, noBukti, debit di atas kredit
     usort($rows, function($a, $b) {
         $date_diff = strtotime($b['tanggal']) - strtotime($a['tanggal']);
         if ($date_diff !== 0) return $date_diff;
-        if ($a['noBukti'] !== $b['noBukti']) return strcmp($b['noBukti'], $a['noBukti']);
+
+        $a_time = !empty($a['createdAt']) ? strtotime($a['createdAt']) : 0;
+        $b_time = !empty($b['createdAt']) ? strtotime($b['createdAt']) : 0;
+        $created_diff = $b_time - $a_time;
+        if ($created_diff !== 0) return $created_diff;
+
+        if ($a['noBukti'] !== $b['noBukti']) return strcmp((string)$b['noBukti'], (string)$a['noBukti']);
+
         $a_is_debit = (float)$a['debit'] > 0;
         $b_is_debit = (float)$b['debit'] > 0;
         if ($a_is_debit !== $b_is_debit) return $a_is_debit ? -1 : 1;
@@ -309,7 +323,7 @@ elseif ($method === 'PATCH' && $sub === 'kode-akun') {
 
     // Cari transaksi
     $stmt = $pdo->prepare(
-        "SELECT t.id, c.code as old_code, c.name as old_name
+        "SELECT t.id, t.projectId, c.code as old_code, c.name as old_name
          FROM `Transaction` t
          LEFT JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.id = ? AND t.entityId = ? LIMIT 1"
@@ -334,6 +348,10 @@ elseif ($method === 'PATCH' && $sub === 'kode-akun') {
     $stmt = $pdo->prepare("UPDATE `Transaction` SET coaAccountId = ? WHERE id = ? AND entityId = ?");
     $stmt->execute([$target_coa_id, $transaction_id, $entity_id]);
     if ($stmt->rowCount() === 0) return error_response('Transaksi tidak ditemukan.', 404);
+
+    if (!empty($tx['projectId'])) {
+        sync_project_spend($pdo, $tx['projectId']);
+    }
 
     log_activity($user['id'], "Edit kode akun jurnal {$tx['old_code']} → $new_code ({$entity['name']})", 'FINANCIAL_CHANGE', [
         'transactionId' => $transaction_id, 'entityId' => $entity_id,
@@ -391,6 +409,13 @@ elseif ($method === 'PATCH' && $sub === 'proyek') {
     // Update faktur pendapatan
     $pdo->prepare("UPDATE FakturPendapatan SET projectId = ? WHERE noFaktur = ?")
         ->execute([$new_project_id, $tx['noBukti']]);
+
+    if (!empty($tx['projectId'])) {
+        sync_project_spend($pdo, $tx['projectId']);
+    }
+    if (!empty($new_project_id)) {
+        sync_project_spend($pdo, $new_project_id);
+    }
 
     $proj_label = $target_project ? $target_project['code'] : 'Bukan Proyek';
     log_activity($user['id'], "Update proyek transaksi {$tx['noBukti']} ({$entity['name']}): $proj_label", 'FINANCIAL_CHANGE', [

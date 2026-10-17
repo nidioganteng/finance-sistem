@@ -69,34 +69,34 @@ export function RingkasanTab({
 
   // Filter rows Jurnal
   const filteredJurnalRows = useMemo(() => {
-    return jurnal.rows.filter((r) => {
+    return (jurnal?.rows ?? []).filter((r) => {
       const matchSumber = jurnalSumberFilter === "semua" || r.sumberKey === jurnalSumberFilter;
-      const q = jurnalSearch.toLowerCase();
+      const q = (jurnalSearch ?? "").toLowerCase();
       const matchSearch =
         !q ||
-        r.keterangan.toLowerCase().includes(q) ||
-        r.noBukti.toLowerCase().includes(q) ||
-        r.kodeAkun.toLowerCase().includes(q) ||
-        r.namaAkun.toLowerCase().includes(q) ||
-        r.entityName.toLowerCase().includes(q);
+        (r.keterangan ?? "").toLowerCase().includes(q) ||
+        (r.noBukti ?? "").toLowerCase().includes(q) ||
+        (r.kodeAkun ?? "").toLowerCase().includes(q) ||
+        (r.namaAkun ?? "").toLowerCase().includes(q) ||
+        (r.entityName ?? "").toLowerCase().includes(q);
       return matchSumber && matchSearch;
     });
-  }, [jurnal.rows, jurnalSumberFilter, jurnalSearch]);
+  }, [jurnal?.rows, jurnalSumberFilter, jurnalSearch]);
 
   // Filter rows Bank
   const filteredBankRows = useMemo(() => {
-    return bank.rows.filter((r) => {
-      const q = bankSearch.toLowerCase();
+    return (bank?.rows ?? []).filter((r) => {
+      const q = (bankSearch ?? "").toLowerCase();
       return (
         !q ||
-        r.keterangan.toLowerCase().includes(q) ||
-        r.noBukti.toLowerCase().includes(q) ||
-        r.rekeningNama.toLowerCase().includes(q) ||
-        r.namaAkun.toLowerCase().includes(q) ||
-        r.entityName.toLowerCase().includes(q)
+        (r.keterangan ?? "").toLowerCase().includes(q) ||
+        (r.noBukti ?? "").toLowerCase().includes(q) ||
+        (r.rekeningNama ?? "").toLowerCase().includes(q) ||
+        (r.namaAkun ?? "").toLowerCase().includes(q) ||
+        (r.entityName ?? "").toLowerCase().includes(q)
       );
     });
-  }, [bank.rows, bankSearch]);
+  }, [bank?.rows, bankSearch]);
 
   return (
     <div className="flex flex-col gap-8">

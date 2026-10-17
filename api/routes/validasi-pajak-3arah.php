@@ -107,7 +107,8 @@ foreach ($entity_ids as $eid) {
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId = ?
            AND (c.code = '535' OR c.name LIKE '%ppn%')
-           AND t.tanggal BETWEEN ? AND ?"
+           AND t.tanggal BETWEEN ? AND ?
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')"
     );
     $stmt->execute([$eid, $date_start, $date_end]);
     $total_lr_ppn += (float)$stmt->fetchColumn();
@@ -119,7 +120,8 @@ foreach ($entity_ids as $eid) {
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId = ?
            AND (c.code = '534' OR (c.name LIKE '%pph%' AND c.name LIKE '%final%'))
-           AND t.tanggal BETWEEN ? AND ?"
+           AND t.tanggal BETWEEN ? AND ?
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')"
     );
     $stmt->execute([$eid, $date_start, $date_end]);
     $total_lr_pph += (float)$stmt->fetchColumn();

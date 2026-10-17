@@ -45,13 +45,14 @@ interface NeracaViewProps {
 }
 
 export function NeracaView({ data, year, entityName }: NeracaViewProps) {
-  const selisih = Math.abs(data.totalAset - data.totalPassiva);
+  const selisih = Math.abs((data?.totalAset ?? 0) - (data?.totalPassiva ?? 0));
 
-  const aktivaLancar = data.aktivaLancar ?? data.aset.filter((i) => i.code !== "100" && i.code !== "1001");
-  const aktivaTetap = data.aktivaTetap ?? data.aset.filter((i) => i.code === "100" || i.code === "1001");
-  const totalLancarFmt = data.totalAktivaLancarFmt ?? data.totalAsetFmt;
-  const totalTetapFmt = data.totalAktivaTetapFmt ?? "Rp 0";
-  const totalEkuitasFmt = data.totalEkuitasFmt ?? data.totalModalDanLabaFmt ?? data.totalPassivaFmt;
+  const safeAset = data?.aset ?? [];
+  const aktivaLancar = data?.aktivaLancar ?? safeAset.filter((i) => i.code !== "100" && i.code !== "1001");
+  const aktivaTetap = data?.aktivaTetap ?? safeAset.filter((i) => i.code === "100" || i.code === "1001");
+  const totalLancarFmt = data?.totalAktivaLancarFmt ?? data?.totalAsetFmt ?? "Rp 0";
+  const totalTetapFmt = data?.totalAktivaTetapFmt ?? "Rp 0";
+  const totalEkuitasFmt = data?.totalEkuitasFmt ?? data?.totalModalDanLabaFmt ?? data?.totalPassivaFmt ?? "Rp 0";
 
   const rekapKategoriList = data.rekapPerKategoriAset && data.rekapPerKategoriAset.length === 4
     ? data.rekapPerKategoriAset

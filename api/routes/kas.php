@@ -362,66 +362,22 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
 
         // Crossing entries (saat keluar ke entitas lain → masuk sebagai Jurnal Transaksi di entitas tujuan)
         if ($crossing_group_id && !empty($crossing_keys)) {
-            $jurnal_jenis_id = get_or_create_jurnal_transaksi_jenis($pdo);
-            $hutang_code     = HUTANG_COA_CODE[$entity_key] ?? null;
-            $hutang_coa_id   = null;
-            if ($hutang_code) {
-                $stmt2 = $pdo->prepare('SELECT id FROM CoaAccount WHERE code = ?');
-                $stmt2->execute([$hutang_code]);
-                $hutang_coa_id = $stmt2->fetchColumn() ?: null;
-            }
-            $primary_coa_id = $valid_rows[0]['coaAccountId'] ?? null;
-            $debit_target   = resolve_crossing_debit_coa($pdo, $primary_coa_id);
-
-            foreach ($crossing_keys as $cross_key) {
-                $stmt3 = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
-                $stmt3->execute([$cross_key]);
-                $cross_entity_id = $stmt3->fetchColumn();
-                if (!$cross_entity_id) continue;
-
-                $cross_common_extra_base = [
-                    'isCrossingEntry'          => true,
-                    'crossingGroupId'          => $crossing_group_id,
-                    'crossingFromEntityKey'    => $entity_key,
-                    'crossingFromJenisInputKey'=> $jenis_input_key,
-                    'crossingFromRekeningId'   => $rekening_id,
-                    'crossingFromRekeningNama' => $rekening_nama,
-                ];
-                if ($proj_id) $cross_common_extra_base['projectId'] = $proj_id;
-
-                // Baris debit (PIUTANG atau BEBAN)
-                if ($debit_target) {
-                    $ex = array_merge($cross_common_extra_base, ['crossingRole' => $debit_target['role']]);
-                    $stmt4 = $pdo->prepare(
-                        "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                         debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    );
-                    $stmt4->execute([
-                        uuid4(), $cross_entity_id, $jurnal_jenis_id, $tanggal_dt,
-                        $no_bukti, $keterangan, $debit_target['coaAccountId'],
-                        $total, 0, 0, json_encode($ex), $staff_id, $proj_id, $now,
-                    ]);
-                }
-
-                // Baris kredit (HUTANG entitas asal)
-                if ($hutang_coa_id) {
-                    $ex = array_merge($cross_common_extra_base, [
-                        'crossingRole'        => 'HUTANG',
-                        'originalHutangCoaCode' => $hutang_code,
-                    ]);
-                    $stmt5 = $pdo->prepare(
-                        "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                         debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    );
-                    $stmt5->execute([
-                        uuid4(), $cross_entity_id, $jurnal_jenis_id, $tanggal_dt,
-                        $no_bukti, $keterangan, $hutang_coa_id,
-                        0, $total, 0, json_encode($ex), $staff_id, $proj_id, $now,
-                    ]);
-                }
-            }
+            create_crossing_entries(
+                $pdo,
+                $crossing_group_id,
+                $crossing_keys,
+                $entity_key,
+                $jenis_input_key,
+                $rekening_id,
+                $rekening_nama,
+                $proj_id,
+                $no_bukti,
+                $keterangan,
+                $tanggal_dt,
+                $valid_rows,
+                $staff_id,
+                $now
+            );
         }
 
         // Otomatis buat Termin jika uang masuk dan ada projectId
@@ -498,20 +454,25 @@ elseif ($method === 'DELETE' && $sub === 'transaksi') {
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi untuk dihapus.', 400);
 
-    // Cari crossingGroupIds dari source transactions
+    // Cari crossingGroupIds dan projectIds dari source transactions sebelum dihapus
     $placeholders = implode(',', array_fill(0, count($tx_ids), '?'));
-    $stmt = $pdo->prepare("SELECT extraFieldsJson FROM `Transaction` WHERE id IN ($placeholders)");
+    $stmt = $pdo->prepare("SELECT extraFieldsJson, projectId FROM `Transaction` WHERE id IN ($placeholders)");
     $stmt->execute(array_values($tx_ids));
-    $source_txs = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $source_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $crossing_group_ids = [];
-    foreach ($source_txs as $json) {
-        $extra = $json ? json_decode($json, true) : [];
+    $crossing_group_ids   = [];
+    $affected_project_ids = [];
+    foreach ($source_rows as $row) {
+        $extra = $row['extraFieldsJson'] ? json_decode($row['extraFieldsJson'], true) : [];
         if (!empty($extra['crossingGroupId'])) {
             $crossing_group_ids[] = $extra['crossingGroupId'];
         }
+        if (!empty($row['projectId'])) {
+            $affected_project_ids[] = $row['projectId'];
+        }
     }
-    $crossing_group_ids = array_unique($crossing_group_ids);
+    $crossing_group_ids   = array_unique($crossing_group_ids);
+    $affected_project_ids = array_unique($affected_project_ids);
 
     $pdo->beginTransaction();
     try {
@@ -527,6 +488,10 @@ elseif ($method === 'DELETE' && $sub === 'transaksi') {
     } catch (Throwable $e) {
         $pdo->rollBack();
         return error_response('Gagal menghapus transaksi: ' . $e->getMessage(), 500);
+    }
+
+    foreach ($affected_project_ids as $pid) {
+        if ($pid) sync_project_spend($pdo, $pid);
     }
 
     log_activity($user['id'], 'Hapus transaksi (' . count($tx_ids) . ' baris)', 'FINANCIAL_CHANGE', ['txIds' => $tx_ids]);
@@ -578,18 +543,21 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
     $jenis_input = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$jenis_input) return error_response('Jenis input tidak ditemukan.', 404);
 
-    // Temukan crossingGroupId dari transaksi lama sebelum dihapus
+    // Temukan crossingGroupId dan projectId dari transaksi lama sebelum dihapus
     $placeholders_old = implode(',', array_fill(0, count($existing_tx_ids), '?'));
-    $stmt = $pdo->prepare("SELECT extraFieldsJson FROM `Transaction` WHERE id IN ($placeholders_old)");
+    $stmt = $pdo->prepare("SELECT extraFieldsJson, projectId FROM `Transaction` WHERE id IN ($placeholders_old)");
     $stmt->execute(array_values($existing_tx_ids));
-    $old_txs = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $old_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $old_crossing_ids = [];
-    foreach ($old_txs as $json) {
-        $extra = $json ? json_decode($json, true) : [];
+    $old_project_ids  = [];
+    foreach ($old_rows as $row) {
+        $extra = $row['extraFieldsJson'] ? json_decode($row['extraFieldsJson'], true) : [];
         if (!empty($extra['crossingGroupId'])) $old_crossing_ids[] = $extra['crossingGroupId'];
+        if (!empty($row['projectId']))         $old_project_ids[]  = $row['projectId'];
     }
     $old_crossing_ids = array_unique($old_crossing_ids);
+    $old_project_ids  = array_unique($old_project_ids);
 
     $pdo->beginTransaction();
     try {
@@ -663,63 +631,33 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
 
         // Crossing entries
         if ($crossing_group_id && !empty($crossing_keys)) {
-            $jurnal_jenis_id = get_or_create_jurnal_transaksi_jenis($pdo);
-            $hutang_code     = HUTANG_COA_CODE[$entity_key] ?? null;
-            $hutang_coa_id   = null;
-            if ($hutang_code) {
-                $s = $pdo->prepare('SELECT id FROM CoaAccount WHERE code = ?');
-                $s->execute([$hutang_code]);
-                $hutang_coa_id = $s->fetchColumn() ?: null;
-            }
-            $primary_coa_id = $valid_rows[0]['coaAccountId'] ?? null;
-            $debit_target   = resolve_crossing_debit_coa($pdo, $primary_coa_id);
-
-            foreach ($crossing_keys as $cross_key) {
-                $s = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
-                $s->execute([$cross_key]);
-                $cross_entity_id = $s->fetchColumn();
-                if (!$cross_entity_id) continue;
-
-                $base_extra = [
-                    'isCrossingEntry' => true, 'crossingGroupId' => $crossing_group_id,
-                    'crossingFromEntityKey' => $entity_key, 'crossingFromJenisInputKey' => $jenis_input_key,
-                    'crossingFromRekeningId' => $rekening_id, 'crossingFromRekeningNama' => $rekening_nama,
-                ];
-                if ($proj_id) $base_extra['projectId'] = $proj_id;
-
-                if ($debit_target) {
-                    $pdo->prepare(
-                        "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                         debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    )->execute([
-                        uuid4(), $cross_entity_id, $jurnal_jenis_id, $tanggal_dt,
-                        $no_bukti, $keterangan, $debit_target['coaAccountId'],
-                        $total, 0, 0,
-                        json_encode(array_merge($base_extra, ['crossingRole' => $debit_target['role']])),
-                        $staff_id, $proj_id, $now,
-                    ]);
-                }
-                if ($hutang_coa_id) {
-                    $pdo->prepare(
-                        "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                         debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    )->execute([
-                        uuid4(), $cross_entity_id, $jurnal_jenis_id, $tanggal_dt,
-                        $no_bukti, $keterangan, $hutang_coa_id,
-                        0, $total, 0,
-                        json_encode(array_merge($base_extra, ['crossingRole' => 'HUTANG', 'originalHutangCoaCode' => $hutang_code])),
-                        $staff_id, $proj_id, $now,
-                    ]);
-                }
-            }
+            create_crossing_entries(
+                $pdo,
+                $crossing_group_id,
+                $crossing_keys,
+                $entity_key,
+                $jenis_input_key,
+                $rekening_id,
+                $rekening_nama,
+                $proj_id,
+                $no_bukti,
+                $keterangan,
+                $tanggal_dt,
+                $valid_rows,
+                $staff_id,
+                $now
+            );
         }
 
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
         return error_response('Gagal mengubah transaksi: ' . $e->getMessage(), 500);
+    }
+
+    $all_affected_pids = array_unique(array_filter(array_merge($old_project_ids, [$proj_id])));
+    foreach ($all_affected_pids as $pid) {
+        if ($pid) sync_project_spend($pdo, $pid);
     }
 
     log_activity($user['id'], "Edit transaksi – $no_bukti", 'FINANCIAL_CHANGE', [

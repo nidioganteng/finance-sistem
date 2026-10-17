@@ -184,7 +184,20 @@ export async function getInterEntityBalances(entityId: string): Promise<InterEnt
     });
 }
 
-export type ProjectOption = { id: string; code: string; name: string };
+export type ProjectOption = {
+  id: string;
+  code: string;
+  name: string;
+  entityId?: string;
+  entityKey?: string;
+  entityName?: string;
+  contractValue?: number;
+  contractValueFmt?: string;
+  maxPercentage?: number;
+  terminCount?: number;
+  totalTerminTagih?: number;
+  status?: string;
+};
 
 export async function getProjectOptions(currentEntityKey?: string): Promise<ProjectOption[]> {
   const token = await getPhpToken();
@@ -247,7 +260,55 @@ type PhpRawProject = {
     auditedAt: string | null;
     auditedById: string | null;
     createdAt: string;
+    breakdown?: {
+      noBukti: string | null;
+      tanggalTerima: string | null;
+      bank: string | null;
+      gross: number;
+      dpp: number;
+      dppNilaiLain: number;
+      ppn: number;
+      tarifPpnPersen: number;
+      pph: number;
+      tarifPphPersen: number;
+      pphItems: Array<{ name: string; amount: number }>;
+      netBank: number;
+      jurnalRows: Array<{
+        coaCode: string;
+        coaName: string;
+        debit: number;
+        kredit: number;
+      }>;
+    } | null;
   }>;
+  expensesSummary?: {
+    totalPengeluaran: number;
+    totalMaterial: number;
+    totalGaji: number;
+    totalOperasional: number;
+    totalPajak: number;
+    totalLainnya: number;
+    items: Array<{
+      id: string;
+      tanggal: string;
+      noBukti: string;
+      keterangan: string;
+      coaCode: string;
+      coaName: string;
+      kategoriBeban: "Gaji & Upah" | "Bahan & Material" | "Operasional & Transport" | "Pajak Proyek" | "Lainnya";
+      nominal: number;
+      sumberKasBank: string;
+    }>;
+  } | null;
+  breakdownSummary?: {
+    totalGross: number;
+    totalDpp: number;
+    totalDppNilaiLain: number;
+    totalPpn: number;
+    totalPph: number;
+    totalNetBank: number;
+    sisaKontrak: number;
+  } | null;
 };
 
 type PhpRawLoadingDock = {
@@ -296,77 +357,128 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
 
   const termins: TerminItem[] = p.termin.map((t) => {
     const nom = Number(t.nominal) || 0;
-    const emptyBreakdown: TerminBreakdown = {
-      noBukti: null,
-      tanggalTerimaFmt: null,
-      bank: null,
-      gross: nom,
-      grossFmt: fmt(nom),
-      dpp: nom,
-      dppFmt: fmt(nom),
-      dppNilaiLain: 0,
-      dppNilaiLainFmt: fmt(0),
-      ppn: 0,
-      ppnFmt: fmt(0),
-      tarifPpnPersen: 0,
-      pph: 0,
-      pphFmt: fmt(0),
-      tarifPphPersen: 0,
-      pphItems: [],
-      netBank: nom,
-      netBankFmt: fmt(nom),
-      jurnalRows: [],
-    };
+    const bd = t.breakdown;
+    const breakdown: TerminBreakdown = bd
+      ? {
+          noBukti: bd.noBukti ?? null,
+          tanggalTerimaFmt: fmtDate(bd.tanggalTerima),
+          bank: bd.bank ?? null,
+          gross: Number(bd.gross) || nom,
+          grossFmt: fmt(Number(bd.gross) || nom),
+          dpp: Number(bd.dpp) || nom,
+          dppFmt: fmt(Number(bd.dpp) || nom),
+          dppNilaiLain: Number(bd.dppNilaiLain) || 0,
+          dppNilaiLainFmt: fmt(Number(bd.dppNilaiLain) || 0),
+          ppn: Number(bd.ppn) || 0,
+          ppnFmt: fmt(Number(bd.ppn) || 0),
+          tarifPpnPersen: Number(bd.tarifPpnPersen) || 0,
+          pph: Number(bd.pph) || 0,
+          pphFmt: fmt(Number(bd.pph) || 0),
+          tarifPphPersen: Number(bd.tarifPphPersen) || 0,
+          pphItems: (bd.pphItems || []).map((pi) => ({
+            name: pi.name,
+            amount: Number(pi.amount) || 0,
+            amountFmt: fmt(Number(pi.amount) || 0),
+          })),
+          netBank: Number(bd.netBank) || nom,
+          netBankFmt: fmt(Number(bd.netBank) || nom),
+          jurnalRows: (bd.jurnalRows || []).map((jr) => ({
+            coaCode: jr.coaCode,
+            coaName: jr.coaName,
+            debit: Number(jr.debit) || 0,
+            kredit: Number(jr.kredit) || 0,
+            debitFmt: fmt(Number(jr.debit) || 0),
+            kreditFmt: fmt(Number(jr.kredit) || 0),
+          })),
+        }
+      : {
+          noBukti: null,
+          tanggalTerimaFmt: null,
+          bank: null,
+          gross: nom,
+          grossFmt: fmt(nom),
+          dpp: nom,
+          dppFmt: fmt(nom),
+          dppNilaiLain: 0,
+          dppNilaiLainFmt: fmt(0),
+          ppn: 0,
+          ppnFmt: fmt(0),
+          tarifPpnPersen: 0,
+          pph: 0,
+          pphFmt: fmt(0),
+          tarifPphPersen: 0,
+          pphItems: [],
+          netBank: nom,
+          netBankFmt: fmt(nom),
+          jurnalRows: [],
+        };
 
     return {
       id: t.id,
       name: t.name,
-      percentage: t.percentage ?? undefined,
+      percentage: t.percentage != null ? Number(t.percentage) : undefined,
       nominal: nom,
       nominalFmt: fmt(nom),
       status: t.status,
       auditedAt: t.auditedAt,
       auditedByName: null,
-      breakdown: emptyBreakdown,
+      breakdown,
     };
   });
 
-  const totalGross = terminTagih;
-  const emptyBreakdownSummary: ProjectBreakdownSummary = {
+  const bds = p.breakdownSummary;
+  const totalGross = bds ? Number(bds.totalGross) : terminTagih;
+  const breakdownSummary: ProjectBreakdownSummary = {
     totalGross,
     totalGrossFmt: fmt(totalGross),
-    totalDpp: totalGross,
-    totalDppFmt: fmt(totalGross),
-    totalDppNilaiLain: 0,
-    totalDppNilaiLainFmt: fmt(0),
-    totalPpn: 0,
-    totalPpnFmt: fmt(0),
-    totalPph: 0,
-    totalPphFmt: fmt(0),
-    totalNetBank: totalGross,
-    totalNetBankFmt: fmt(totalGross),
-    sisaKontrak: sisaTagih,
-    sisaKontrakFmt: fmt(sisaTagih),
+    totalDpp: bds ? Number(bds.totalDpp) : totalGross,
+    totalDppFmt: fmt(bds ? Number(bds.totalDpp) : totalGross),
+    totalDppNilaiLain: bds ? Number(bds.totalDppNilaiLain) : 0,
+    totalDppNilaiLainFmt: fmt(bds ? Number(bds.totalDppNilaiLain) : 0),
+    totalPpn: bds ? Number(bds.totalPpn) : 0,
+    totalPpnFmt: fmt(bds ? Number(bds.totalPpn) : 0),
+    totalPph: bds ? Number(bds.totalPph) : 0,
+    totalPphFmt: fmt(bds ? Number(bds.totalPph) : 0),
+    totalNetBank: bds ? Number(bds.totalNetBank) : totalGross,
+    totalNetBankFmt: fmt(bds ? Number(bds.totalNetBank) : totalGross),
+    sisaKontrak: bds ? Number(bds.sisaKontrak) : sisaTagih,
+    sisaKontrakFmt: fmt(bds ? Number(bds.sisaKontrak) : sisaTagih),
   };
 
-  const spend = Number(p.spend) || 0;
+  const es = p.expensesSummary;
+  const spend = es ? Number(es.totalPengeluaran) : (Number(p.spend) || 0);
   const labaKotor = terminTagih - spend;
-  const emptyExpensesSummary: ProjectExpensesSummary = {
+
+  const expenseItems: ProjectExpenseItem[] = (es?.items || []).map((item) => ({
+    id: item.id,
+    tanggal: item.tanggal,
+    tanggalFmt: fmtDate(item.tanggal),
+    noBukti: item.noBukti,
+    keterangan: item.keterangan,
+    coaCode: item.coaCode,
+    coaName: item.coaName,
+    kategoriBeban: item.kategoriBeban,
+    nominal: Number(item.nominal) || 0,
+    nominalFmt: fmt(Number(item.nominal) || 0),
+    sumberKasBank: item.sumberKasBank || "Kas / Bank",
+  }));
+
+  const expensesSummary: ProjectExpensesSummary = {
     totalPengeluaran: spend,
     totalPengeluaranFmt: fmt(spend),
-    totalGaji: 0,
-    totalGajiFmt: fmt(0),
-    totalMaterial: 0,
-    totalMaterialFmt: fmt(0),
-    totalOperasional: 0,
-    totalOperasionalFmt: fmt(0),
-    totalPajak: 0,
-    totalPajakFmt: fmt(0),
-    totalLainnya: spend,
-    totalLainnyaFmt: fmt(spend),
+    totalGaji: es ? Number(es.totalGaji) : 0,
+    totalGajiFmt: fmt(es ? Number(es.totalGaji) : 0),
+    totalMaterial: es ? Number(es.totalMaterial) : 0,
+    totalMaterialFmt: fmt(es ? Number(es.totalMaterial) : 0),
+    totalOperasional: es ? Number(es.totalOperasional) : 0,
+    totalOperasionalFmt: fmt(es ? Number(es.totalOperasional) : 0),
+    totalPajak: es ? Number(es.totalPajak) : 0,
+    totalPajakFmt: fmt(es ? Number(es.totalPajak) : 0),
+    totalLainnya: es ? Number(es.totalLainnya) : spend,
+    totalLainnyaFmt: fmt(es ? Number(es.totalLainnya) : spend),
     labaKotor,
     labaKotorFmt: fmt(labaKotor),
-    items: [],
+    items: expenseItems,
   };
 
   return {
@@ -386,8 +498,8 @@ function mapRawProject(p: PhpRawProject): ProjectItem {
     sisaTagih,
     sisaTagihFmt: fmt(sisaTagih),
     termin: termins,
-    breakdownSummary: emptyBreakdownSummary,
-    expensesSummary: emptyExpensesSummary,
+    breakdownSummary,
+    expensesSummary,
   };
 }
 

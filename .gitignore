@@ -9,3 +9,4 @@ tsconfig.tsbuildinfo
 .claude/
 *.tsbuildinfo
 workflow_dan_arsitektur_sistem.md
+backup_transaksi_*.json

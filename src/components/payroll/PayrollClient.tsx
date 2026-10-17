@@ -248,6 +248,7 @@ export function PayrollClient({
   const [modalPph21, setModalPph21] = useState<number>(0);
   const [modalPotonganLain, setModalPotonganLain] = useState<number>(0);
   const [modalCatatan, setModalCatatan] = useState<string>("");
+  const [isCustomTarifTransport, setIsCustomTarifTransport] = useState<boolean>(false);
 
   // Sinkronisasi state form modal gaji bulanan saat modal dibuka atau pegawai berubah
   useEffect(() => {
@@ -278,10 +279,11 @@ export function PayrollClient({
 
       // 2. Komponen Variabel Bulanan (Rutin Finance)
       const hk = g?.hariKerja ?? 20;
-      const tarif = g?.tarifTransportHarian ?? 15000;
+      const tarif = g?.tarifTransportHarian ?? p.tarifTransportHarian ?? 15000;
       setModalHariKerja(hk);
       setModalTarifTransport(tarif);
       setModalTunjanganTransport(g ? g.tunjanganTransport : (hk * tarif));
+      setIsCustomTarifTransport(false);
       const tLain = g ? (g.tunjanganLainnya || g.insentif) : 0;
       setModalInsentif(tLain);
       setModalTunjanganLainnya(tLain);
@@ -320,10 +322,11 @@ export function PayrollClient({
 
     // 2. Komponen Variabel Bulanan
     const hk = g?.hariKerja ?? 20;
-    const tarif = g?.tarifTransportHarian ?? modalTarifTransport ?? 15000;
+    const tarif = g?.tarifTransportHarian ?? target.tarifTransportHarian ?? 15000;
     setModalHariKerja(hk);
     setModalTarifTransport(tarif);
     setModalTunjanganTransport(g ? g.tunjanganTransport : (hk * tarif));
+    setIsCustomTarifTransport(false);
     const tLain = g ? (g.tunjanganLainnya || g.insentif) : 0;
     setModalInsentif(tLain);
     setModalTunjanganLainnya(tLain);
@@ -345,6 +348,10 @@ export function PayrollClient({
     setModalBpjsKes(p.bpjsKesehatan ?? 0);
     setModalBpjsTk(p.bpjsKetenagakerjaan ?? 0);
     setModalPotonganBpjs(p.potonganBpjs ?? ((p.bpjsKesehatan ?? 0) + (p.bpjsKetenagakerjaan ?? 0)));
+    const masterTarif = p.tarifTransportHarian ?? 15000;
+    setModalTarifTransport(masterTarif);
+    setModalTunjanganTransport(modalHariKerja * masterTarif);
+    setIsCustomTarifTransport(false);
   }
 
   const [isHonorModalOpen, setIsHonorModalOpen] = useState(false);
@@ -1713,6 +1720,9 @@ export function PayrollClient({
                                 BPJS: +{formatRupiah(p.tunjanganBpjs ?? 0)} / -{formatRupiah(p.potonganBpjs ?? 0)}
                               </div>
                             )}
+                            <div className="text-[10px] text-navy dark:text-navy-light font-mono font-medium">
+                              Transport: {p.tarifTransportHarianFmt || formatRupiah(p.tarifTransportHarian ?? 15000)}/hr
+                            </div>
                           </td>
                           <td className="py-3 px-3.5 whitespace-nowrap">
                             {p.tanggalMasukFmt ? (
@@ -3974,6 +3984,28 @@ export function PayrollClient({
                       />
                     </div>
 
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-navy-text block">Tarif Transport Harian (Rp)</label>
+                        <span className="text-[10px] text-muted-faint">Master hitung otomatis</span>
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        name="tarifTransportHarian"
+                        defaultValue={formatRupiahInput(editingPegawai?.tarifTransportHarian ? editingPegawai.tarifTransportHarian : 15000)}
+                        onChange={(e) => {
+                          const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                          e.target.value = formatRupiahInput(num);
+                        }}
+                        placeholder="15.000"
+                        className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                      />
+                      <p className="text-[10px] text-muted-faint mt-1">
+                        Tarif dasar per hari kerja (default Rp 15.000). Saat input gaji bulanan, Tim Finance cukup mengisi jumlah hari kerja.
+                      </p>
+                    </div>
+
                     {/* Paket Iuran BPJS Tetap Master Data (Auto-Fill) */}
                     <div className="p-3.5 rounded-xl bg-surface-subtle/80 border border-border space-y-3">
                       <div className="flex items-center justify-between">
@@ -4593,59 +4625,130 @@ export function PayrollClient({
                   </div>
 
                   {/* Tunjangan Transport */}
-                  <div className="p-3 rounded-xl bg-surface-card border border-border space-y-2">
-                    <div className="font-semibold text-navy-text text-xs">
-                      Tunjangan Transport
+                  <div className="p-3 rounded-xl bg-surface-card border border-border space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold text-navy-text text-xs">
+                        Tunjangan Transport
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomTarifTransport((prev) => !prev)}
+                        className="text-[10px] font-semibold text-navy hover:text-navy-light underline cursor-pointer"
+                        title="Klik untuk menyesuaikan tarif harian atau nominal khusus bulan ini"
+                      >
+                        {isCustomTarifTransport ? "Sembunyikan Penyesuaian" : "Sesuaikan Tarif"}
+                      </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-[10px] text-muted-stronger block mb-0.5">Hari Kerja (Hari)</label>
-                        <input
-                          type="number"
-                          name="hariKerja"
-                          min={0}
-                          max={31}
-                          value={modalHariKerja || ""}
-                          onChange={(e) => {
-                            const val = Number(e.target.value) || 0;
-                            setModalHariKerja(val);
-                            setModalTunjanganTransport(val * modalTarifTransport);
-                          }}
-                          placeholder="0"
-                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
-                        />
+
+                    {!isCustomTarifTransport ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] text-muted-stronger block mb-1">
+                            Jumlah Hari Kerja (Hari) *
+                          </label>
+                          <input
+                            type="number"
+                            name="hariKerja"
+                            min={0}
+                            max={31}
+                            required
+                            value={modalHariKerja || ""}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              setModalHariKerja(val);
+                              setModalTunjanganTransport(val * modalTarifTransport);
+                            }}
+                            placeholder="0"
+                            className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                          />
+                          <span className="text-[10px] text-muted-faint mt-1 block">
+                            Tarif master: {formatRupiah(modalTarifTransport)} / hari
+                          </span>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-muted-stronger font-semibold block mb-1">
+                            Total Transport (Rp) – Otomatis
+                          </label>
+                          <div className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-subtle text-navy-text font-bold font-mono text-xs flex items-center justify-between">
+                            <span>{formatRupiah(modalTunjanganTransport)}</span>
+                            <span className="text-[10px] font-normal text-muted-faint font-sans">
+                              {modalHariKerja} hr × {formatRupiah(modalTarifTransport)}
+                            </span>
+                          </div>
+                          <input type="hidden" name="tunjanganTransport" value={modalTunjanganTransport} />
+                          <input type="hidden" name="tarifTransportHarian" value={modalTarifTransport} />
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-[10px] text-muted-stronger block mb-0.5">Tarif Harian (Rp)</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          name="tarifTransportHarian"
-                          value={formatRupiahInput(modalTarifTransport)}
-                          onChange={(e) => {
-                            const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                            setModalTarifTransport(val);
-                            setModalTunjanganTransport(modalHariKerja * val);
-                          }}
-                          placeholder="0"
-                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
-                        />
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] text-muted-stronger block mb-0.5">Hari Kerja (Hari)</label>
+                            <input
+                              type="number"
+                              name="hariKerja"
+                              min={0}
+                              max={31}
+                              value={modalHariKerja || ""}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 0;
+                                setModalHariKerja(val);
+                                setModalTunjanganTransport(val * modalTarifTransport);
+                              }}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-stronger block mb-0.5">Tarif Harian Bulan Ini (Rp)</label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              name="tarifTransportHarian"
+                              value={formatRupiahInput(modalTarifTransport)}
+                              onChange={(e) => {
+                                const val = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                                setModalTarifTransport(val);
+                                setModalTunjanganTransport(modalHariKerja * val);
+                              }}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-stronger font-semibold block mb-0.5">
+                              Total Transport (Rp)
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              name="tunjanganTransport"
+                              value={formatRupiahInput(modalTunjanganTransport)}
+                              onChange={(e) => setModalTunjanganTransport(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                              placeholder="0"
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-subtle text-navy-text font-bold font-mono text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-muted-faint pt-1">
+                          <span>
+                            Tarif master standar: {formatRupiah(editingGaji.pegawai.tarifTransportHarian ?? 15000)} / hari.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const baseTarif = editingGaji.pegawai.tarifTransportHarian ?? 15000;
+                              setModalTarifTransport(baseTarif);
+                              setModalTunjanganTransport(modalHariKerja * baseTarif);
+                            }}
+                            className="text-navy hover:underline font-semibold cursor-pointer"
+                          >
+                            Reset ke Tarif Master
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-[10px] text-muted-stronger font-semibold block mb-0.5">
-                          Total Transport (Rp)
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          name="tunjanganTransport"
-                          value={formatRupiahInput(modalTunjanganTransport)}
-                          onChange={(e) => setModalTunjanganTransport(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                          placeholder="0"
-                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-subtle text-navy-text font-bold font-mono text-xs"
-                        />
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Insentif Bulanan & THR */}

@@ -109,16 +109,21 @@ export function KasTransactionForm({
     if (newArah === "masuk") {
       // Feature 2/4: clear crossing when switching to masuk
       setCrossingEntityKeys([]);
-      // Feature 3: bankBuku masuk → auto-set first row to COA 400
-      if (jenisInputKey === "bankBuku") {
-        const coa400 = coaOptions.find((c) => c.code === "400");
-        if (coa400) {
-          setRows((prev) => {
-            const rest = prev.slice(1);
-            return [{ ...prev[0], coaAccountId: coa400.id }, ...rest];
-          });
+      // Clear crossing PIUTANG rows that were auto-added
+      const piutangIds = Object.values(PIUTANG_COA_MAP)
+        .map((code) => coaOptions.find((c) => c.code === code)?.id)
+        .filter(Boolean);
+      setRows((prev) => {
+        const filtered = prev.filter((r) => !piutangIds.includes(r.coaAccountId));
+        const base = filtered.length === 0 ? [{ id: ++rowIdSeq, coaAccountId: "", nominal: "", keterangan: "" }] : filtered;
+        if (jenisInputKey === "bankBuku") {
+          const coa400 = coaOptions.find((c) => c.code === "400");
+          if (coa400) {
+            return [{ ...base[0], coaAccountId: coa400.id }, ...base.slice(1)];
+          }
         }
-      }
+        return base;
+      });
     }
 
     // Auto-update teks keterangan: uang masuk jadi Pendapatan, keluar jadi Pengeluaran (tetap bisa diedit manual)
@@ -230,6 +235,18 @@ export function KasTransactionForm({
 
   function removeRow(id: number) {
     if (rows.length === 1) return;
+    const targetRow = rows.find((r) => r.id === id);
+    if (targetRow?.coaAccountId) {
+      const coa = coaOptions.find((c) => c.id === targetRow.coaAccountId);
+      if (coa) {
+        for (const [eKey, pCode] of Object.entries(PIUTANG_COA_MAP)) {
+          if (pCode === coa.code) {
+            setCrossingEntityKeys((prev) => prev.filter((k) => k !== eKey));
+            break;
+          }
+        }
+      }
+    }
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
 
@@ -405,6 +422,13 @@ export function KasTransactionForm({
           const currentEntityProjects = projectOptions.filter((p) => !p.entityKey || p.entityKey === entityKey);
           const otherEntityProjects = projectOptions.filter((p) => p.entityKey && p.entityKey !== entityKey);
 
+          const otherByEntity = otherEntityProjects.reduce((acc, p) => {
+            const key = p.entityName || p.entityKey || "Entitas Lain";
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(p);
+            return acc;
+          }, {} as Record<string, typeof otherEntityProjects>);
+
           const contractVal = selectedProject?.contractValue ?? 0;
           const maxPctSoFar = selectedProject?.maxPercentage ?? 0;
           const terminCount = selectedProject?.terminCount ?? 0;
@@ -467,15 +491,15 @@ export function KasTransactionForm({
                     ))}
                   </optgroup>
                 )}
-                {otherEntityProjects.length > 0 && (
-                  <optgroup label="Proyek Entitas Lain (Lintas Entitas)">
-                    {otherEntityProjects.map((p) => (
+                {Object.entries(otherByEntity).map(([entName, projs]) => (
+                  <optgroup key={entName} label={`Proyek ${entName} (Lintas Entitas)`}>
+                    {projs.map((p) => (
                       <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name} ({p.entityName ?? p.entityKey})
+                        [{p.code}] {p.name}
                       </option>
                     ))}
                   </optgroup>
-                )}
+                ))}
               </select>
 
               {!selectedProject ? null : (
@@ -623,21 +647,32 @@ export function KasTransactionForm({
                       setCrossingEntityKeys((prev) =>
                         selected ? prev.filter((k) => k !== e.key) : [...prev, e.key]
                       );
-                      // Auto-add PIUTANG COA row for the added crossing entity
+                      const piutangCode = PIUTANG_COA_MAP[e.key];
+                      const piutangCoa = piutangCode ? coaOptions.find((c) => c.code === piutangCode) : null;
+
                       if (isAdding) {
-                        const piutangCode = PIUTANG_COA_MAP[e.key];
-                        if (piutangCode) {
-                          const piutangCoa = coaOptions.find((c) => c.code === piutangCode);
-                          if (piutangCoa) {
-                            setRows((prev) => {
-                              const emptyIdx = prev.findIndex((r) => !r.coaAccountId);
-                              if (emptyIdx !== -1) {
-                                return prev.map((r, i) => i === emptyIdx ? { ...r, coaAccountId: piutangCoa.id } : r);
-                              }
+                        // Auto-add PIUTANG COA row for the added crossing entity
+                        if (piutangCoa) {
+                          setRows((prev) => {
+                            const emptyIdx = prev.findIndex((r) => !r.coaAccountId);
+                            if (emptyIdx !== -1) {
+                              return prev.map((r, i) => (i === emptyIdx ? { ...r, coaAccountId: piutangCoa.id } : r));
+                            }
+                            rowIdSeq += 1;
+                            return [...prev, { id: rowIdSeq, coaAccountId: piutangCoa.id, nominal: "", keterangan: "" }];
+                          });
+                        }
+                      } else {
+                        // Auto-remove PIUTANG COA row for the un-clicked crossing entity
+                        if (piutangCoa) {
+                          setRows((prev) => {
+                            const filtered = prev.filter((r) => r.coaAccountId !== piutangCoa.id);
+                            if (filtered.length === 0) {
                               rowIdSeq += 1;
-                              return [...prev, { id: rowIdSeq, coaAccountId: piutangCoa.id, nominal: "", keterangan: "" }];
-                            });
-                          }
+                              return [{ id: rowIdSeq, coaAccountId: "", nominal: "", keterangan: "" }];
+                            }
+                            return filtered;
+                          });
                         }
                       }
                     }}

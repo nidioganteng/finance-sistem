@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Role } from "@/types/app-enums";
@@ -150,7 +151,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className={`flex-none bg-[#0f1729] dark:bg-[#0c0c14] flex flex-col p-4 pt-5 sticky top-0 h-screen transition-all duration-300 relative ${collapsed ? "w-[68px]" : "w-[280px]"}`}>
+    <aside className={`flex-none bg-[#0f1729] dark:bg-[#0c0c14] flex flex-col p-4 pt-5 sticky top-0 h-screen transition-all duration-300 relative overflow-x-hidden ${collapsed ? "w-[68px]" : "w-[280px]"}`}>
       {/* Toggle collapse button */}
       {onToggleCollapse && (
         <button
@@ -163,10 +164,14 @@ export function Sidebar({
 
       {/* Brand row */}
       <div className={`flex items-center pb-6 ${collapsed ? "justify-center px-0" : "gap-3 px-2"}`}>
-        <div className="w-9 h-9 flex-none flex items-center justify-center">
-          <img
+        <div className="w-9 h-9 flex-none flex items-center justify-center overflow-hidden">
+          <Image
             src="/logo-entitas/logo-simatra-dark.png"
             alt="SIMATRA"
+            width={36}
+            height={36}
+            priority
+            style={{ width: "36px", height: "36px" }}
             className="w-9 h-9 object-contain"
           />
         </div>
@@ -219,27 +224,57 @@ export function Sidebar({
                 if (item.subItems && item.subItems.length > 0) {
                   const isDefaultOpen = isParentActive;
                   const isOpen = openDropdowns[item.href] !== undefined ? openDropdowns[item.href] : isDefaultOpen;
+                  const hasPage = !item.href.startsWith("/operasional-");
+
                   return (
                     <div key={item.href} className="flex flex-col" ref={(el) => { dropdownRefs.current[item.href] = el; }}>
-                      <button
-                        type="button"
-                        onClick={() => collapsed ? undefined : toggleDropdown(item.href, isDefaultOpen)}
-                        title={collapsed ? item.label : undefined}
-                        className={`w-full flex items-center transition-all duration-150 cursor-pointer rounded-pill text-sm font-semibold ${collapsed ? "justify-center px-0 py-3" : "justify-between px-3.5 py-3"} ${
+                      <div
+                        className={`w-full flex items-center transition-all duration-150 rounded-pill text-sm font-semibold ${
+                          collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3.5 py-1.5"
+                        } ${
                           isParentActive
                             ? "bg-white/15 text-white font-bold"
                             : "text-white/70 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className={`flex items-center min-w-0 ${collapsed ? "" : "gap-2.5"}`}>
-                          <Icon size={17} strokeWidth={1.8} className="flex-none" />
-                          {!collapsed && <span className="truncate">{item.label}</span>}
-                        </div>
-                        {!collapsed && <ChevronDown
-                          size={15}
-                          className={`text-white/40 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                        />}
-                      </button>
+                        {hasPage ? (
+                          <Link
+                            href={getItemHref(item.href)}
+                            onClick={onClose}
+                            className={`flex items-center min-w-0 flex-1 py-1.5 ${collapsed ? "justify-center" : "gap-2.5"}`}
+                            title={collapsed ? item.label : undefined}
+                          >
+                            <Icon size={17} strokeWidth={1.8} className="flex-none" />
+                            {!collapsed && <span className="truncate">{item.label}</span>}
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => collapsed ? undefined : toggleDropdown(item.href, isDefaultOpen)}
+                            title={collapsed ? item.label : undefined}
+                            className={`flex items-center min-w-0 flex-1 py-1.5 text-left ${collapsed ? "justify-center" : "gap-2.5"}`}
+                          >
+                            <Icon size={17} strokeWidth={1.8} className="flex-none" />
+                            {!collapsed && <span className="truncate">{item.label}</span>}
+                          </button>
+                        )}
+
+                        {!collapsed && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleDropdown(item.href, isDefaultOpen);
+                            }}
+                            className="p-1 hover:bg-white/15 rounded-lg text-white/50 hover:text-white transition-colors flex-none ml-1"
+                          >
+                            <ChevronDown
+                              size={15}
+                              className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                            />
+                          </button>
+                        )}
+                      </div>
 
                       {isOpen && !collapsed && (
                         <div className="ml-4 pl-3.5 border-l-2 border-white/15 flex flex-col gap-0.5 mt-1 mb-1.5">

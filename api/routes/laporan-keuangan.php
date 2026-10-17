@@ -28,7 +28,6 @@ if ($method === 'GET' && ($_GET['type'] ?? '') === 'tx-count') {
 
 // GET /api/laporan-keuangan?entityIds[]=...&year=...&version=INTERNAL|UMUM
 if ($method === 'GET') {
-    // entityIds[] bisa dari query string: ?entityIds[]=id1&entityIds[]=id2
     $entity_ids_raw = $_GET['entityIds'] ?? [];
     if (!is_array($entity_ids_raw)) {
         $entity_ids_raw = [$entity_ids_raw];
@@ -47,7 +46,7 @@ if ($method === 'GET') {
 
     $report_cat_filter = $version === 'INTERNAL'
         ? "c.report_category IN ('INTERNAL','SEMUA')"
-        : "c.report_category IN ('UMUM','SEMUA')";
+        : "(c.report_category IN ('UMUM','SEMUA') OR c.code = '628')";
 
     $date_from = "$year-01-01 00:00:00";
     $date_to   = "$year-12-31 23:59:59";
@@ -58,10 +57,21 @@ if ($method === 'GET') {
     // Nama entity untuk label
     $stmt_e = $pdo->prepare("SELECT id, `key`, name FROM Entity WHERE id IN ($placeholders)");
     $stmt_e->execute($entity_ids);
-    $entities = $stmt_e->fetchAll();
+    $entities = $stmt_e->fetchAll(PDO::FETCH_ASSOC);
+
+    // ── Exclusion list noBukti untuk seluruh entity yang dipilih ─────────────
+    $all_excluded_nobukti = get_excluded_no_bukti_for_version($pdo, $entity_ids, $year, $version);
+
+    $nobukti_sql = '';
+    $nobukti_params = [];
+    if (!empty($all_excluded_nobukti)) {
+        $ph_ex = implode(',', array_fill(0, count($all_excluded_nobukti), '?'));
+        $nobukti_sql = " AND (t.noBukti IS NULL OR t.noBukti NOT IN ($ph_ex))";
+        $nobukti_params = $all_excluded_nobukti;
+    }
 
     // ── Laba Rugi Gabungan ────────────────────────────────────────────────────
-    $params_lr = array_merge($entity_ids, [$date_from, $date_to]);
+    $params_lr = array_merge($entity_ids, [$date_from, $date_to], $nobukti_params);
     $stmt_lr   = $pdo->prepare(
         "SELECT c.id, c.code, c.name, c.kategori,
                 COALESCE(SUM(t.debit),  0) AS total_debit,
@@ -72,11 +82,13 @@ if ($method === 'GET') {
            AND t.tanggal BETWEEN ? AND ?
            AND c.kategori IN ('PENDAPATAN','BEBAN')
            AND $report_cat_filter
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')
+           $nobukti_sql
          GROUP BY c.id, c.code, c.name, c.kategori
          ORDER BY c.code ASC"
     );
     $stmt_lr->execute($params_lr);
-    $lr_rows = $stmt_lr->fetchAll();
+    $lr_rows = $stmt_lr->fetchAll(PDO::FETCH_ASSOC);
 
     $pendapatan = [];
     $beban      = [];
@@ -85,26 +97,36 @@ if ($method === 'GET') {
         $total_k = (float)$row['total_kredit'];
         if ($row['kategori'] === 'PENDAPATAN') {
             $pendapatan[] = [
-                'code'    => $row['code'],
-                'name'    => $row['name'],
-                'saldo'   => $total_k - $total_d,
-                'debit'   => $total_d,
-                'kredit'  => $total_k,
+                'id'       => $row['id'],
+                'code'     => $row['code'],
+                'name'     => $row['name'],
+                'kategori' => $row['kategori'],
+                'saldo'    => $total_k - $total_d,
+                'debit'    => $total_d,
+                'kredit'   => $total_k,
             ];
         } else {
+            $is_mkt = ($row['code'] === '628');
+            $code   = ($version === 'UMUM' && $is_mkt) ? '150' : $row['code'];
+            $name   = ($version === 'UMUM' && $is_mkt) ? 'Kas Titipan' : $row['name'];
+            $saldo  = $total_d - $total_k;
+
             $beban[] = [
-                'code'    => $row['code'],
-                'name'    => $row['name'],
-                'saldo'   => $total_d - $total_k,
-                'debit'   => $total_d,
-                'kredit'  => $total_k,
+                'id'       => $row['id'],
+                'code'     => $code,
+                'name'     => $name,
+                'kategori' => $row['kategori'],
+                'saldo'    => $saldo,
+                'debit'    => $total_d,
+                'kredit'   => $total_k,
             ];
         }
     }
 
-    // Penyusutan gabungan (satu panggilan per entity untuk beban + akumulasi + rekap)
-    $total_beban_penyusutan_gabungan  = 0.0;
+    // Penyusutan gabungan
+    $total_beban_penyusutan_gabungan     = 0.0;
     $total_akumulasi_penyusutan_gabungan = 0.0;
+    $total_harga_perolehan_gabungan      = 0.0;
     $rekap_aset_gabungan = [
         'TANAH'            => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
         'BANGUNAN'         => ['beban' => 0.0, 'akumulasi' => 0.0, 'count' => 0, 'harga_perolehan' => 0.0, 'nilai_buku' => 0.0],
@@ -113,8 +135,9 @@ if ($method === 'GET') {
     ];
     foreach ($entity_ids as $eid) {
         $ps = get_penyusutan_summary($eid, $year);
-        $total_beban_penyusutan_gabungan     += $ps['total_beban'];
-        $total_akumulasi_penyusutan_gabungan += $ps['total_akumulasi'];
+        $total_beban_penyusutan_gabungan     += (float)$ps['total_beban'];
+        $total_akumulasi_penyusutan_gabungan += (float)$ps['total_akumulasi'];
+        $total_harga_perolehan_gabungan      += (float)($ps['total_harga_perolehan'] ?? 0);
         foreach ($ps['rekap'] as $kat => $rv) {
             if (isset($rekap_aset_gabungan[$kat])) {
                 $rekap_aset_gabungan[$kat]['beban']           += $rv['beban'];
@@ -125,51 +148,95 @@ if ($method === 'GET') {
             }
         }
     }
+
+    // Tambahkan beban penyusutan ke akun 512
     if ($total_beban_penyusutan_gabungan > 0) {
-        $beban[] = [
-            'code'   => 'penyusutan_otomatis',
-            'name'   => 'Beban Penyusutan Aset Tetap (otomatis)',
-            'saldo'  => $total_beban_penyusutan_gabungan,
-            'debit'  => $total_beban_penyusutan_gabungan,
-            'kredit' => 0.0,
-            'isAuto' => true,
-        ];
+        $found_depr = -1;
+        foreach ($beban as $idx => $b) {
+            if (in_array($b['code'], ['512', '540']) || preg_match('/penyusutan/i', $b['name'])) {
+                $found_depr = $idx;
+                break;
+            }
+        }
+        if ($found_depr !== -1) {
+            $beban[$found_depr]['saldo'] = $total_beban_penyusutan_gabungan;
+            $beban[$found_depr]['debit'] = $total_beban_penyusutan_gabungan;
+        } else {
+            $beban[] = [
+                'id'       => null,
+                'code'     => '512',
+                'name'     => 'Beban Penyusutan Aset Tetap',
+                'kategori' => 'BEBAN',
+                'saldo'    => $total_beban_penyusutan_gabungan,
+                'debit'    => $total_beban_penyusutan_gabungan,
+                'kredit'   => 0.0,
+                'isAuto'   => true,
+            ];
+        }
     }
 
-    // Pendapatan dari FakturPendapatan yang belum dijurnal (dual-source).
-    // Eksklusif dua cara agar tidak terhitung ganda (sama seperti laba-rugi.php):
-    //   1. fakturId eksplisit, 2. pencocokan cadangan via COA+bulan+kredit≈nilaiProyek
-    $faktur_ph = implode(',', array_fill(0, count($entity_ids), '?'));
-    $stmt_faktur = $pdo->prepare(
-        "SELECT COALESCE(SUM(f.nilaiProyek), 0)
-         FROM FakturPendapatan f
-         WHERE f.entityId IN ($faktur_ph)
-           AND f.tahunPajak = ?
-           AND f.id NOT IN (
-               SELECT t.fakturId FROM `Transaction` t WHERE t.fakturId IS NOT NULL
-           )
-           AND NOT EXISTS (
-               SELECT 1 FROM `Transaction` t2
-               JOIN CoaAccount c ON c.id = t2.coaAccountId AND c.kategori = 'PENDAPATAN'
-               WHERE t2.entityId    = f.entityId
-                 AND YEAR(t2.tanggal)  = f.tahunPajak
-                 AND MONTH(t2.tanggal) = f.masaPajak
-                 AND t2.fakturId IS NULL
-                 AND ABS(t2.kredit - f.nilaiProyek) < 1
-           )"
+    // Pendapatan dari FakturPendapatan yang belum dijurnal
+    $stmt_rec = $pdo->prepare(
+        "SELECT DISTINCT t.noBukti, t.fakturId, JSON_VALUE(t.extraFieldsJson, '$.fakturId') AS extraFakturId
+         FROM `Transaction` t
+         JOIN CoaAccount c ON t.coaAccountId = c.id
+         WHERE t.entityId IN ($placeholders) AND t.tanggal BETWEEN ? AND ? AND c.kategori = 'PENDAPATAN'
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')"
     );
-    $stmt_faktur->execute(array_merge($entity_ids, [$year]));
+    $stmt_rec->execute(array_merge($entity_ids, [$date_from, $date_to]));
+    $rec_nobukti = [];
+    $rec_faktur_ids = [];
+    foreach ($stmt_rec->fetchAll(PDO::FETCH_ASSOC) as $rec) {
+        if (!empty($rec['noBukti']))       $rec_nobukti[]    = $rec['noBukti'];
+        if (!empty($rec['fakturId']))      $rec_faktur_ids[] = $rec['fakturId'];
+        if (!empty($rec['extraFakturId'])) $rec_faktur_ids[] = $rec['extraFakturId'];
+    }
+    $rec_nobukti    = array_unique(array_filter($rec_nobukti));
+    $rec_faktur_ids = array_unique(array_filter($rec_faktur_ids));
+
+    $faktur_conds  = ["f.entityId IN ($placeholders)", "f.tahunPajak = ?"];
+    $faktur_params = array_merge($entity_ids, [$year]);
+
+    if (!empty($rec_nobukti)) {
+        $ph = implode(',', array_fill(0, count($rec_nobukti), '?'));
+        $faktur_conds[] = "f.noFaktur NOT IN ($ph)";
+        $faktur_params  = array_merge($faktur_params, $rec_nobukti);
+    }
+    if (!empty($rec_faktur_ids)) {
+        $ph = implode(',', array_fill(0, count($rec_faktur_ids), '?'));
+        $faktur_conds[] = "f.id NOT IN ($ph)";
+        $faktur_params  = array_merge($faktur_params, $rec_faktur_ids);
+    }
+
+    $stmt_faktur = $pdo->prepare(
+        "SELECT COALESCE(SUM(f.nilaiProyek), 0) FROM FakturPendapatan f WHERE " . implode(' AND ', $faktur_conds)
+    );
+    $stmt_faktur->execute($faktur_params);
     $faktur_unlinked_gabungan = (float)$stmt_faktur->fetchColumn();
 
     if ($faktur_unlinked_gabungan > 0) {
-        $pendapatan[] = [
-            'code'   => 'faktur_unlinked',
-            'name'   => 'Pendapatan dari E-Faktur (belum dijurnal)',
-            'saldo'  => $faktur_unlinked_gabungan,
-            'debit'  => 0.0,
-            'kredit' => $faktur_unlinked_gabungan,
-            'isAuto' => true,
-        ];
+        $found_rev = -1;
+        foreach ($pendapatan as $idx => $p) {
+            if ($p['code'] === '400' || preg_match('/pendapatan/i', $p['name'])) {
+                $found_rev = $idx;
+                break;
+            }
+        }
+        if ($found_rev !== -1) {
+            $pendapatan[$found_rev]['kredit'] += $faktur_unlinked_gabungan;
+            $pendapatan[$found_rev]['saldo']  += $faktur_unlinked_gabungan;
+        } else {
+            $pendapatan[] = [
+                'id'       => null,
+                'code'     => '400',
+                'name'     => 'Pendapatan Proyek (E-Faktur)',
+                'kategori' => 'PENDAPATAN',
+                'saldo'    => $faktur_unlinked_gabungan,
+                'debit'    => 0.0,
+                'kredit'   => $faktur_unlinked_gabungan,
+                'isAuto'   => true,
+            ];
+        }
     }
 
     $total_pendapatan = array_sum(array_column($pendapatan, 'saldo'));
@@ -177,7 +244,7 @@ if ($method === 'GET') {
     $laba_bersih      = $total_pendapatan - $total_beban;
 
     // ── Neraca Gabungan ───────────────────────────────────────────────────────
-    $params_neraca = array_merge($entity_ids, [$year], $entity_ids, [$date_from, $date_to]);
+    $params_neraca = array_merge($entity_ids, [$year], $entity_ids, [$date_from, $date_to], $nobukti_params);
     $stmt_neraca   = $pdo->prepare(
         "SELECT c.id, c.code, c.name, c.kategori, c.reportType,
                 COALESCE(SUM(sa.nominal), 0) AS saldo_awal,
@@ -192,93 +259,191 @@ if ($method === 'GET') {
            ON  t.coaAccountId = c.id
            AND t.entityId IN ($placeholders)
            AND t.tanggal BETWEEN ? AND ?
-         WHERE c.reportType IN ('NERACA','ARUS_KAS')
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')
+           $nobukti_sql
+         WHERE c.kategori IN ('ASET','KEWAJIBAN','MODAL')
            AND $report_cat_filter
          GROUP BY c.id, c.code, c.name, c.kategori, c.reportType
          ORDER BY c.code ASC"
     );
     $stmt_neraca->execute($params_neraca);
-    $neraca_rows = $stmt_neraca->fetchAll();
+    $neraca_rows = $stmt_neraca->fetchAll(PDO::FETCH_ASSOC);
 
-    $aktiva_lancar = [];
-    $aktiva_tetap  = [];
-    $kewajiban     = [];
-    $modal         = [];
+    $aktiva_lancar      = [];
+    $aktiva_tetap       = [];
+    $kewajiban          = [];
+    $modal              = [];
+    $laba_ditahan_saldo = 0.0;
+    $laba_ditahan_item  = null;
 
-    $netting_pairs = [
-        '111' => '311', '112' => '312', '113' => '313', '114' => '314', '115' => '315',
-        '311' => '111', '312' => '112', '313' => '113', '314' => '114', '315' => '115',
-    ];
-
-    // Saldo map
-    $saldo_map = [];
     foreach ($neraca_rows as $row) {
-        $saldo = hitung_saldo_akhir(
-            $row['kategori'], $row['code'],
-            (float)$row['saldo_awal'],
-            (float)$row['total_debit'],
-            (float)$row['total_kredit']
-        );
-        $saldo_map[$row['code']] = $saldo;
-    }
+        $sa    = (float)$row['saldo_awal'];
+        $debit = (float)$row['total_debit'];
+        $kredit= (float)$row['total_kredit'];
+        $saldo = hitung_saldo_akhir($row['kategori'], $row['code'], $sa, $debit, $kredit);
 
-    $codes_netted = [];
-    foreach ($neraca_rows as $row) {
-        $code  = $row['code'];
-        $saldo = $saldo_map[$code] ?? 0.0;
+        $has_activity = ($sa != 0.0 || $debit != 0.0 || $kredit != 0.0);
+        $is_contra    = is_contra_aset($row['code']);
 
-        if (isset($netting_pairs[$code]) && !in_array($code, $codes_netted)) {
-            $pasangan = $netting_pairs[$code];
-            $saldo_p  = $saldo_map[$pasangan] ?? 0.0;
-            $codes_netted[] = $code;
-            $codes_netted[] = $pasangan;
-            $netto = $saldo - $saldo_p;
-            if (abs($netto) < 0.01) continue;
-            $entry = [
-                'code'    => "$code↔$pasangan",
-                'name'    => $row['name'] . ' (netto)',
-                'saldo'   => abs($netto),
-                'isNetting' => true,
-            ];
-            if ($netto >= 0) $aktiva_lancar[] = $entry;
-            else             $kewajiban[]     = $entry;
-            continue;
-        }
-        if (in_array($code, $codes_netted)) continue;
-
-        $entry = ['id' => $row['id'], 'code' => $code, 'name' => $row['name'], 'saldo' => $saldo];
-        if ($row['kategori'] === 'ASET') {
-            if (is_aktiva_tetap($code, $row['name'])) $aktiva_tetap[]  = $entry;
-            else                                       $aktiva_lancar[] = $entry;
-        } elseif ($row['kategori'] === 'KEWAJIBAN') {
-            $kewajiban[] = $entry;
-        } elseif ($row['kategori'] === 'MODAL') {
-            if (is_laba_ditahan($code, $row['name'])) {
-                $entry['saldo']        += $laba_bersih;
-                $entry['labaBerjalan']  = $laba_bersih;
-            }
-            $modal[] = $entry;
-        }
-    }
-
-    // Akumulasi penyusutan gabungan (sudah dihitung di atas via get_penyusutan_summary)
-    $akumulasi_penyusutan = $total_akumulasi_penyusutan_gabungan;
-    if ($akumulasi_penyusutan > 0) {
-        $aktiva_tetap[] = [
-            'code'   => 'akumulasi_penyusutan',
-            'name'   => 'Akumulasi Penyusutan (otomatis)',
-            'saldo'  => -$akumulasi_penyusutan,
-            'isAuto' => true,
+        $line = [
+            'id'       => $row['id'],
+            'code'     => $row['code'],
+            'name'     => $row['name'],
+            'kategori' => $row['kategori'],
+            'saldo'    => $saldo,
+            'isContra' => $is_contra,
         ];
+
+        if ($row['kategori'] === 'ASET') {
+            if (is_aktiva_tetap($row['code'], $row['name'])) {
+                if ($has_activity || $row['code'] === '100' || $row['code'] === '1001') {
+                    $aktiva_tetap[] = $line;
+                }
+            } else {
+                if ($has_activity) {
+                    $aktiva_lancar[] = $line;
+                }
+            }
+        } elseif ($row['kategori'] === 'KEWAJIBAN') {
+            if ($has_activity) {
+                $kewajiban[] = $line;
+            }
+        } elseif ($row['kategori'] === 'MODAL') {
+            if (is_laba_ditahan($row['code'], $row['name'])) {
+                $laba_ditahan_saldo = $saldo;
+                $laba_ditahan_item  = $line;
+            } else {
+                if ($has_activity || $row['code'] === '320') {
+                    $modal[] = $line;
+                }
+            }
+        }
     }
 
-    $total_aktiva_lancar   = array_sum(array_column($aktiva_lancar, 'saldo'));
-    $total_aktiva_tetap    = array_sum(array_column($aktiva_tetap,  'saldo'));
-    $total_kewajiban       = array_sum(array_column($kewajiban,     'saldo'));
-    $total_modal           = array_sum(array_column($modal,         'saldo'));
+    // Sinkronkan Aktiva Tetap & Akumulasi Penyusutan
+    if ($total_akumulasi_penyusutan_gabungan > 0 || $total_harga_perolehan_gabungan > 0) {
+        $akm_found = false;
+        foreach ($aktiva_tetap as &$at) {
+            if (!empty($at['isContra']) || $at['code'] === '1001' || preg_match('/penyusutan/i', $at['name'])) {
+                $at['saldo']    = $total_akumulasi_penyusutan_gabungan;
+                $at['isContra'] = true;
+                $akm_found      = true;
+                break;
+            }
+        }
+        unset($at);
 
-    // ── Arus Kas Gabungan ─────────────────────────────────────────────────────
-    $params_ak = array_merge($entity_ids, [$year]);
+        if (!$akm_found && $total_akumulasi_penyusutan_gabungan > 0) {
+            $aktiva_tetap[] = [
+                'id'       => null,
+                'code'     => '1001',
+                'name'     => 'Akumulasi Penyusutan Aset',
+                'kategori' => 'ASET',
+                'saldo'    => $total_akumulasi_penyusutan_gabungan,
+                'isContra' => true,
+            ];
+        }
+
+        $perolehan_found = false;
+        foreach ($aktiva_tetap as &$at) {
+            if (empty($at['isContra']) && ($at['code'] === '100' || preg_match('/aktiva tetap|aset tetap/i', $at['name']))) {
+                if ($at['saldo'] == 0 || $at['saldo'] < $total_harga_perolehan_gabungan) {
+                    $at['saldo'] = $total_harga_perolehan_gabungan;
+                }
+                $perolehan_found = true;
+                break;
+            }
+        }
+        unset($at);
+
+        if (!$perolehan_found && $total_harga_perolehan_gabungan > 0) {
+            array_unshift($aktiva_tetap, [
+                'id'       => null,
+                'code'     => '100',
+                'name'     => 'Aktiva Tetap (Perolehan)',
+                'kategori' => 'ASET',
+                'saldo'    => $total_harga_perolehan_gabungan,
+                'isContra' => false,
+            ]);
+        }
+    }
+
+    // Inter-entity netting
+    $inter_entity_pairs = [
+        ['111', '311'], ['112', '312'], ['113', '313'], ['114', '314'], ['115', '315'],
+        ['117', '317'],
+    ];
+    foreach ($inter_entity_pairs as [$p_code, $h_code]) {
+        $p_idx = -1;
+        foreach ($aktiva_lancar as $i => $item) {
+            if ($item['code'] === $p_code) { $p_idx = $i; break; }
+        }
+        $h_idx = -1;
+        foreach ($kewajiban as $i => $item) {
+            if ($item['code'] === $h_code) { $h_idx = $i; break; }
+        }
+        if ($p_idx !== -1 && $h_idx !== -1) {
+            $p_saldo = (float)$aktiva_lancar[$p_idx]['saldo'];
+            $h_saldo = (float)$kewajiban[$h_idx]['saldo'];
+            if ($p_saldo >= $h_saldo) {
+                $aktiva_lancar[$p_idx]['saldo'] = $p_saldo - $h_saldo;
+                array_splice($kewajiban, $h_idx, 1);
+                if (abs($aktiva_lancar[$p_idx]['saldo']) < 0.01) {
+                    array_splice($aktiva_lancar, $p_idx, 1);
+                }
+            } else {
+                $kewajiban[$h_idx]['saldo'] = $h_saldo - $p_saldo;
+                array_splice($aktiva_lancar, $p_idx, 1);
+                if (abs($kewajiban[$h_idx]['saldo']) < 0.01) {
+                    array_splice($kewajiban, $h_idx, 1);
+                }
+            }
+        }
+    }
+
+    // Laba Ditahan & Ekuitas
+    $total_laba_ditahan = $laba_ditahan_saldo + $laba_bersih;
+    if ($laba_ditahan_item) {
+        $laba_ditahan_item['saldo']        = $total_laba_ditahan;
+        $laba_ditahan_item['labaBerjalan']  = $laba_bersih;
+        array_unshift($modal, $laba_ditahan_item);
+    } else {
+        array_unshift($modal, [
+            'id'           => null,
+            'code'         => '310',
+            'name'         => 'Laba Ditahan',
+            'kategori'     => 'MODAL',
+            'saldo'        => $total_laba_ditahan,
+            'labaBerjalan' => $laba_bersih,
+        ]);
+    }
+
+    $total_aktiva_lancar = 0.0;
+    foreach ($aktiva_lancar as $item) {
+        $total_aktiva_lancar += !empty($item['isContra']) ? -$item['saldo'] : $item['saldo'];
+    }
+
+    $total_aktiva_tetap = 0.0;
+    foreach ($aktiva_tetap as $item) {
+        $total_aktiva_tetap += !empty($item['isContra']) ? -$item['saldo'] : $item['saldo'];
+    }
+
+    $total_aktiva = $total_aktiva_lancar + $total_aktiva_tetap;
+
+    $total_kewajiban = 0.0;
+    foreach ($kewajiban as $item) {
+        $total_kewajiban += (float)$item['saldo'];
+    }
+
+    $total_modal = 0.0;
+    foreach ($modal as $item) {
+        $total_modal += (float)$item['saldo'];
+    }
+
+    $total_passiva = $total_kewajiban + $total_modal;
+
+    // ── Arus Kas Gabungan (Monthly) ──────────────────────────────────────────
+    $params_ak = array_merge($entity_ids, [$date_from, $date_to], $nobukti_params);
     $stmt_ak   = $pdo->prepare(
         "SELECT MONTH(t.tanggal) AS bulan,
                 COALESCE(SUM(t.debit),  0) AS total_masuk,
@@ -286,13 +451,15 @@ if ($method === 'GET') {
          FROM `Transaction` t
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId IN ($placeholders)
-           AND YEAR(t.tanggal)  = ?
-           AND c.reportType     = 'ARUS_KAS'
+           AND t.tanggal BETWEEN ? AND ?
+           AND c.reportType = 'ARUS_KAS'
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')
+           $nobukti_sql
          GROUP BY MONTH(t.tanggal)
          ORDER BY bulan ASC"
     );
     $stmt_ak->execute($params_ak);
-    $ak_rows = $stmt_ak->fetchAll();
+    $ak_rows = $stmt_ak->fetchAll(PDO::FETCH_ASSOC);
 
     $nama_bulan = [
         1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',
@@ -337,12 +504,15 @@ if ($method === 'GET') {
             'modal'                 => $modal,
             'totalAktivaLancar'     => $total_aktiva_lancar,
             'totalAktivaTetap'      => $total_aktiva_tetap,
-            'totalAktiva'           => $total_aktiva_lancar + $total_aktiva_tetap,
+            'totalAktiva'           => $total_aktiva,
             'totalKewajiban'        => $total_kewajiban,
             'totalModal'            => $total_modal,
-            'totalKewajibanModal'   => $total_kewajiban + $total_modal,
-            'akumulasiPenyusutan'   => $akumulasi_penyusutan,
+            'totalKewajibanModal'   => $total_passiva,
+            'totalPassiva'          => $total_passiva,
+            'akumulasiPenyusutan'   => $total_akumulasi_penyusutan_gabungan,
             'rekapPerKategoriAset'  => $rekap_aset_gabungan,
+            'selisih'               => round($total_aktiva - $total_passiva, 2),
+            'balanced'              => abs($total_aktiva - $total_passiva) < 1,
         ],
         'arusKas' => [
             'monthly'     => $arus_kas_monthly,

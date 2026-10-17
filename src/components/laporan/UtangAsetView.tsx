@@ -42,28 +42,34 @@ function AkunTable({ rows, emptyMsg }: { rows: Row[]; emptyMsg: string }) {
 }
 
 export function UtangAsetView({ data }: { data: Data }) {
+  const aset = data?.aset ?? { rows: [], total: 0, totalFmt: "Rp 0" };
+  const utang = data?.utang ?? { rows: [], total: 0, totalFmt: "Rp 0" };
+  const networthPositif = data?.networthPositif ?? true;
+  const networthFmt = data?.networthFmt ?? "Rp 0";
+  const year = data?.year ?? new Date().getFullYear();
+
   return (
     <div className="flex flex-col gap-5">
       {/* KPI ringkasan */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-surface-card border border-border-soft rounded-[16px] p-5 shadow-xs">
           <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Total Aset Bersih</div>
-          <div className="text-[20px] font-black text-status-green tabular-nums">{data.aset.totalFmt}</div>
-          <div className="text-[12px] text-muted mt-0.5 font-medium">{data.aset.rows.length} akun aset</div>
+          <div className="text-[20px] font-black text-status-green tabular-nums">{aset.totalFmt}</div>
+          <div className="text-[12px] text-muted mt-0.5 font-medium">{aset.rows.length} akun aset</div>
         </div>
         <div className="bg-surface-card border border-border-soft rounded-[16px] p-5 shadow-xs">
           <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Total Kewajiban Utang</div>
-          <div className={`text-[20px] font-black tabular-nums ${data.utang.total > 0 ? "text-status-red" : "text-status-green"}`}>
-            {data.utang.totalFmt}
+          <div className={`text-[20px] font-black tabular-nums ${utang.total > 0 ? "text-status-red" : "text-status-green"}`}>
+            {utang.totalFmt}
           </div>
-          <div className="text-[12px] text-muted mt-0.5 font-medium">{data.utang.rows.length} akun kewajiban lengkap</div>
+          <div className="text-[12px] text-muted mt-0.5 font-medium">{utang.rows.length} akun kewajiban lengkap</div>
         </div>
         <div className="bg-surface-card border border-border-soft rounded-[16px] p-5 shadow-xs">
           <div className="text-[11px] font-bold text-muted-faint uppercase mb-1.5">Aset Bersih – Utang (Ekuitas)</div>
-          <div className={`text-[22px] font-black tabular-nums ${data.networthPositif ? "text-status-green" : "text-status-red"}`}>
-            {data.networthPositif ? "+" : "-"}{data.networthFmt}
+          <div className={`text-[22px] font-black tabular-nums ${networthPositif ? "text-status-green" : "text-status-red"}`}>
+            {networthPositif ? "+" : "-"}{networthFmt}
           </div>
-          <div className="text-[12px] text-muted mt-0.5 font-medium">Posisi ekuitas bersih tahun {data.year}</div>
+          <div className="text-[12px] text-muted mt-0.5 font-medium">Posisi ekuitas bersih tahun {year}</div>
         </div>
       </div>
 
@@ -75,11 +81,11 @@ export function UtangAsetView({ data }: { data: Data }) {
             Dari transaksi ke akun COA berkategori Aset — Debit = tambah aset, Kredit = kurang aset
           </p>
         </div>
-        <AkunTable rows={data.aset.rows} emptyMsg="Tidak ada transaksi ke akun Aset di tahun ini." />
-        {data.aset.rows.length > 0 && (
+        <AkunTable rows={aset.rows} emptyMsg="Tidak ada transaksi ke akun Aset di tahun ini." />
+        {aset.rows.length > 0 && (
           <div className="px-5 py-3.5 border-t border-surface-subtle flex justify-between items-center">
             <span className="text-[13px] font-bold text-navy-text">Total Aset Bersih</span>
-            <span className="text-[14px] font-extrabold text-status-green tabular-nums">{data.aset.totalFmt}</span>
+            <span className="text-[14px] font-extrabold text-status-green tabular-nums">{aset.totalFmt}</span>
           </div>
         )}
       </div>
@@ -92,12 +98,12 @@ export function UtangAsetView({ data }: { data: Data }) {
             Dari transaksi ke akun COA berkategori Kewajiban — Kredit = tambah utang, Debit = bayar utang
           </p>
         </div>
-        <AkunTable rows={data.utang.rows} emptyMsg="Tidak ada transaksi ke akun Kewajiban di tahun ini." />
-        {data.utang.rows.length > 0 && (
+        <AkunTable rows={utang.rows} emptyMsg="Tidak ada transaksi ke akun Kewajiban di tahun ini." />
+        {utang.rows.length > 0 && (
           <div className="px-5 py-3.5 border-t border-surface-subtle flex justify-between items-center">
             <span className="text-[13px] font-bold text-navy-text">Total Utang</span>
-            <span className={`text-[14px] font-extrabold tabular-nums ${data.utang.total > 0 ? "text-status-red" : "text-status-green"}`}>
-              {data.utang.totalFmt}
+            <span className={`text-[14px] font-extrabold tabular-nums ${utang.total > 0 ? "text-status-red" : "text-status-green"}`}>
+              {utang.totalFmt}
             </span>
           </div>
         )}

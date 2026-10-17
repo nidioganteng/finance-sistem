@@ -2,6 +2,8 @@
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 function is_debet_normal(string $kategori, string $code): bool {
+    // Akun kontra-aset (210 CKPN & 1001 Akumulasi Penyusutan): Kredit-Normal
+    if (in_array($code, ['210', '1001'])) return false;
     // ASET dan BEBAN adalah debet-normal
     if (in_array($kategori, ['ASET', 'BEBAN'])) return true;
     return false;
@@ -11,13 +13,41 @@ function hitung_saldo_akhir(string $kategori, string $code, float $saldo_awal, f
     if (is_debet_normal($kategori, $code)) {
         return $saldo_awal + $total_debit - $total_kredit;
     } else {
-        // KEWAJIBAN, MODAL, PENDAPATAN: kredit-normal
+        // KEWAJIBAN, MODAL, PENDAPATAN, serta kontra-aset (210, 1001): kredit-normal
         return $saldo_awal + $total_kredit - $total_debit;
     }
 }
 
 function is_contra_aset(string $code): bool {
-    return in_array($code, ['1001', '502']) || preg_match('/^akumulasi/i', $code) > 0;
+    return in_array($code, ['210', '1001']) || preg_match('/^akumulasi/i', $code) > 0;
+}
+
+/**
+ * Mengembalikan daftar noBukti yang menyentuh akun terlarang untuk versi laporan tertentu.
+ * Jika versi = UMUM, transaksi yang menyentuh akun INTERNAL dikecualikan.
+ * Jika versi = INTERNAL, transaksi yang menyentuh akun UMUM dikecualikan.
+ */
+function get_excluded_no_bukti_for_version(PDO $pdo, array|string $entity_ids, int $year, string $version): array {
+    $ids = is_array($entity_ids) ? $entity_ids : [$entity_ids];
+    $ids = array_values(array_filter(array_map('trim', $ids)));
+    if (empty($ids)) return [];
+    $target_cat = strtoupper($version) === 'UMUM' ? 'INTERNAL' : 'UMUM';
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $date_start = "$year-01-01 00:00:00";
+    $date_end   = "$year-12-31 23:59:59";
+
+    $stmt = $pdo->prepare(
+        "SELECT DISTINCT t.noBukti
+         FROM `Transaction` t
+         JOIN CoaAccount c ON t.coaAccountId = c.id
+         WHERE t.entityId IN ($placeholders)
+           AND t.tanggal BETWEEN ? AND ?
+           AND c.report_category = ?
+           AND c.code != '628'
+           AND t.noBukti IS NOT NULL AND t.noBukti != ''"
+    );
+    $stmt->execute(array_merge($ids, [$date_start, $date_end, $target_cat]));
+    return array_values(array_filter($stmt->fetchAll(PDO::FETCH_COLUMN)));
 }
 
 function is_aktiva_tetap(string $code, string $name): bool {

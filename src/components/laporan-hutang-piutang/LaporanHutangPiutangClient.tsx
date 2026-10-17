@@ -1673,16 +1673,16 @@ export function LaporanHutangPiutangClient({
                       Total Pemegang Saham
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400">
-                      {grupData.pemegangSahamSummary.totalPiutangFmt}
+                      {grupData.pemegangSahamSummary?.totalPiutangFmt ?? "Rp -"}
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-rose-600 dark:text-rose-400">
-                      {grupData.pemegangSahamSummary.totalHutangFmt}
+                      {grupData.pemegangSahamSummary?.totalHutangFmt ?? "Rp -"}
                     </td>
                     <td className="py-3.5 px-5 text-right font-mono text-[13.5px]">
-                      {grupData.pemegangSahamSummary.netGlobalFmt}
+                      {grupData.pemegangSahamSummary?.netGlobalFmt ?? "Rp -"}
                     </td>
                     <td className="py-3.5 px-6 text-center text-[11px] text-muted font-normal">
-                      {grupData.pemegangSahamSummary.netGlobal > 0 ? "Hak Tagih Bersih" : grupData.pemegangSahamSummary.netGlobal < 0 ? "Kewajiban Bersih" : "Nihil"}
+                      {(grupData.pemegangSahamSummary?.netGlobal ?? 0) > 0 ? "Hak Tagih Bersih" : (grupData.pemegangSahamSummary?.netGlobal ?? 0) < 0 ? "Kewajiban Bersih" : "Nihil"}
                     </td>
                   </tr>
                 </tbody>
@@ -1709,7 +1709,7 @@ export function LaporanHutangPiutangClient({
                   Total Piutang Lainnya
                 </span>
                 <span className="text-[15px] font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
-                  {grupData.piutangLainnyaSummary.totalFmt}
+                  {grupData.piutangLainnyaSummary?.totalFmt ?? "Rp -"}
                 </span>
               </div>
             </div>
@@ -1724,7 +1724,7 @@ export function LaporanHutangPiutangClient({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-subtle text-[12.5px]">
-                  {grupData.piutangLainnyaSummary.items.map((it) => (
+                  {(grupData.piutangLainnyaSummary?.items ?? []).map((it) => (
                     <tr key={it.entityKey} className="hover:bg-surface-hover/20">
                       <td className="py-3.5 px-6 font-bold text-navy-text whitespace-nowrap">
                         {it.entityName} ({it.shortName})
@@ -1742,7 +1742,7 @@ export function LaporanHutangPiutangClient({
                       Total Seluruh Entitas
                     </td>
                     <td className="py-3.5 px-5 text-right font-mono text-[13.5px] text-emerald-600 dark:text-emerald-400">
-                      {grupData.piutangLainnyaSummary.totalFmt}
+                      {grupData.piutangLainnyaSummary?.totalFmt ?? "Rp -"}
                     </td>
                   </tr>
                 </tbody>

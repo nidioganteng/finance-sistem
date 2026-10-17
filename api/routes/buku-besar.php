@@ -32,8 +32,9 @@ if ($method === 'GET') {
                AND t.entityId     = ?
                AND t.tanggal BETWEEN ? AND ?
                AND (
-                   JSON_VALUE(t.extraFieldsJson, \'$.autoPostedFromJurnal\') IS NULL
-                   OR JSON_VALUE(t.extraFieldsJson, \'$.isKasEntry\') = \'true\'
+                   t.extraFieldsJson IS NULL
+                   OR JSON_VALUE(t.extraFieldsJson, \'$.autoPostedFromJurnal\') IS NULL
+                   OR JSON_VALUE(t.extraFieldsJson, \'$.autoPostedFromJurnal\') != \'true\'
                )
              LEFT JOIN SaldoAwal sa
                ON  sa.coaAccountId = c.id
@@ -98,8 +99,9 @@ if ($method === 'GET') {
                AND t.coaAccountId = ?
                AND t.tanggal BETWEEN ? AND ?
                AND (
-                   JSON_VALUE(t.extraFieldsJson, \'$.autoPostedFromJurnal\') IS NULL
-                   OR JSON_VALUE(t.extraFieldsJson, \'$.isKasEntry\') = \'true\'
+                   t.extraFieldsJson IS NULL
+                   OR JSON_VALUE(t.extraFieldsJson, \'$.autoPostedFromJurnal\') IS NULL
+                   OR JSON_VALUE(t.extraFieldsJson, \'$.autoPostedFromJurnal\') != \'true\'
                )
              ORDER BY t.tanggal ASC, t.createdAt ASC'
         );

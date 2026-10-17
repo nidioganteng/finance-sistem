@@ -189,9 +189,9 @@ export async function getLaporanKeuanganData(
   );
 
   // ── Extract nested sections ──────────────────────────────────────────────────
-  const lr = raw.labaRugi;
-  const neraca = raw.neraca;
-  const ak = raw.arusKas;
+  const lr = raw?.labaRugi ?? { pendapatan: [], beban: [], totalPendapatan: 0, totalBeban: 0, labaBersih: 0, bebanPenyusutan: 0 };
+  const neraca = raw?.neraca ?? { aktivaLancar: [], aktivaTetap: [], kewajiban: [], modal: [], totalAktivaLancar: 0, totalAktivaTetap: 0, totalAktiva: 0, totalKewajiban: 0, totalModal: 0, totalKewajibanModal: 0, akumulasiPenyusutan: 0 };
+  const ak = raw?.arusKas ?? { monthly: [], totalMasuk: 0, totalKeluar: 0, totalNeto: 0 };
 
   // ── Laba Rugi ────────────────────────────────────────────────────────────────
   const pendapatan = (lr.pendapatan ?? []).map(toCoaLine);

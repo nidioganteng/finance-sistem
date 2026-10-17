@@ -2,6 +2,7 @@
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 $user       = require_auth();
+require_once __DIR__ . '/../helpers/faktur-realisasi.php';
 $sub_action = $segments[1] ?? null; // null | 'faktur' | 'rekonsiliasi'
 $record_id  = $segments[2] ?? null; // faktur/:id
 
@@ -34,8 +35,19 @@ if ($method === 'GET' && $sub_action === null) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $faktur = $stmt->fetchAll();
+    $realisasi = get_faktur_realisasi_map($pdo, $entity_id, $faktur);
 
     foreach ($faktur as &$f) {
+        $actual = $realisasi[$f['id']] ?? null;
+        if ($actual) {
+            $f['ppnRealisasi']         = $actual['isRealized'] ? $actual['ppn'] : null;
+            $f['pphRealisasi']         = $actual['isRealized'] ? $actual['pph'] : null;
+            $f['nominalDiterima']      = $actual['isRealized'] ? (float)$actual['nominalDiterima'] : 0.0;
+            $f['tanggalTerima']        = $actual['isRealized'] ? ($actual['tanggalTerima'] ?? $f['tanggalTerima']) : null;
+            $f['bank']                 = $actual['isRealized'] ? ($actual['bank'] ?? $f['bank']) : null;
+            $f['isRealized']           = (bool)$actual['isRealized'];
+            $f['matchedJurnalNoBukti'] = $actual['isRealized'] ? $actual['matchedJurnalNoBukti'] : null;
+        }
         $f['dpp']                  = (float)$f['dpp'];
         $f['dppNilaiLain']         = (float)$f['dppNilaiLain'];
         $f['ppn']                  = (float)$f['ppn'];
@@ -87,13 +99,13 @@ if ($method === 'GET' && $sub_action === 'projects') {
 
     $pdo = get_pdo();
 
+    // Prioritize the requested entity, but include all ACTIVE projects from all entities
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.code, p.name, p.contractValue,
-                p.sidamon_client_name, p.sidamon_job_name,
-                p.sidamon_start_date, p.sidamon_end_date, p.deadline
+        'SELECT p.*, e.name as entity_name, e.`key` as entity_key
            FROM Project p
-          WHERE p.entityId = ?
-          ORDER BY p.createdAt DESC'
+           JOIN Entity e ON p.entityId = e.id
+          WHERE p.status = \'ACTIVE\'
+          ORDER BY CASE WHEN p.entityId = ? THEN 0 ELSE 1 END, e.name ASC, p.code ASC'
     );
     $stmt->execute([$entity_id]);
     $projects = $stmt->fetchAll();
@@ -129,6 +141,9 @@ if ($method === 'GET' && $sub_action === 'projects') {
                 'id'              => $p['id'],
                 'code'            => $p['code'],
                 'name'            => $p['name'],
+                'entityId'        => $p['entityId'],
+                'entityKey'       => $p['entity_key'] ?? null,
+                'entityName'      => $p['entity_name'] ?? null,
                 'contractValue'   => (float)$p['contractValue'],
                 'clientName'      => $p['sidamon_client_name'] ?? null,
                 'jobName'         => $p['sidamon_job_name']    ?? null,
@@ -266,11 +281,11 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
         (int)($body['kodeJenisProyek'] ?? 1),
         (float)($body['pekerjaanPerusahaan'] ?? 0),
         (float)($body['pekerjaanYangDipinjam'] ?? 0),
-        !empty($body['tanggalTerima']) ? $body['tanggalTerima'] : null,
-        !empty($body['bank']) ? $body['bank'] : null,
-        isset($body['nominalDiterima']) && $body['nominalDiterima'] !== '' ? (float)$body['nominalDiterima'] : 0,
+        null,
+        null,
+        0,
         $body['projectId'] ?? null,
-        $body['bankTransactionId'] ?? null,
+        null,
         $user['id'],
         $now,
         $now,
@@ -308,7 +323,7 @@ if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
         'npwp','noFaktur','masaPajak','tahunPajak','namaRekanan','namaJkp',
         'dpp','dppNilaiLain','tarifPpnPersen','tarifPphPersen',
         'kodeJenisProyek','pekerjaanPerusahaan','pekerjaanYangDipinjam',
-        'tanggalTerima','bank','nominalDiterima','projectId','bankTransactionId',
+        'projectId',
     ];
 
     $set_parts  = [];

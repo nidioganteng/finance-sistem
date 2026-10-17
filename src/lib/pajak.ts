@@ -146,6 +146,11 @@ function classifyBeban(item: PhpLRItem): "langsung" | "operasional" | "pph" | "l
   const code = item.code.trim();
   const nameLower = item.name.toLowerCase();
 
+  // Kas Titipan (150) adalah pengganti By Marketing (628) di versi UMUM → masuk Biaya Langsung
+  if (code === "150" || nameLower.includes("kas titipan") || nameLower.includes("titipan")) {
+    return "langsung";
+  }
+
   // PPh final recognition (by name keyword — no dedicated code range in seed)
   if (
     nameLower.includes("pph") ||
@@ -201,7 +206,8 @@ export async function getLaporanPajakData(
   const bebanMap = new Map<string, PhpLRItem>();
 
   for (const resp of responses) {
-    for (const item of resp.pendapatan) {
+    if (!resp) continue;
+    for (const item of (resp.pendapatan ?? [])) {
       const existing = pendapatanMap.get(item.code);
       if (existing) {
         existing.saldo  += item.saldo;
@@ -211,7 +217,7 @@ export async function getLaporanPajakData(
         pendapatanMap.set(item.code, { ...item });
       }
     }
-    for (const item of resp.beban) {
+    for (const item of (resp.beban ?? [])) {
       const existing = bebanMap.get(item.code);
       if (existing) {
         existing.saldo  += item.saldo;

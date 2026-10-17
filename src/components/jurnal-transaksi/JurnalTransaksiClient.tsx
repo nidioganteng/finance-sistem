@@ -107,6 +107,12 @@ export function JurnalTransaksiClient({
   const isOtherEntity = selectedProject?.entityKey && selectedProject.entityKey !== entityKey;
   const currentEntityProjects = (projectOptions ?? []).filter((p) => !p.entityKey || p.entityKey === entityKey);
   const otherEntityProjects = (projectOptions ?? []).filter((p) => p.entityKey && p.entityKey !== entityKey);
+  const otherByEntity = otherEntityProjects.reduce((acc, p) => {
+    const key = p.entityName || p.entityKey || "Entitas Lain";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(p);
+    return acc;
+  }, {} as Record<string, typeof otherEntityProjects>);
 
   // Filter faktur berdasarkan proyek jika proyek dipilih
   const currentProjectFakturs = projectId
@@ -594,15 +600,15 @@ export function JurnalTransaksiClient({
                         ))}
                       </optgroup>
                     )}
-                    {otherEntityProjects.length > 0 && (
-                      <optgroup label="Proyek Entitas Lain (Lintas Entitas)">
-                        {otherEntityProjects.map((p) => (
+                    {Object.entries(otherByEntity).map(([entName, projs]) => (
+                      <optgroup key={entName} label={`Proyek ${entName} (Lintas Entitas)`}>
+                        {projs.map((p) => (
                           <option key={p.id} value={p.id}>
-                            [{p.code}] {p.name} ({p.entityName ?? p.entityKey}) · Kontrak: {p.contractValueFmt ?? "-"}
+                            [{p.code}] {p.name} · Kontrak: {p.contractValueFmt ?? "-"} · Progres: {p.maxPercentage ?? 0}%
                           </option>
                         ))}
                       </optgroup>
-                    )}
+                    ))}
                   </select>
                   <p className="text-[10.5px] text-muted-faint">
                     Sinkronisasi termin otomatis ke Kontrol Piutang & Laporan Pendapatan.

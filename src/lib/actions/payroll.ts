@@ -161,6 +161,47 @@ export async function deletePegawaiAction(id: string) {
   }
 }
 
+export async function updateBatchTransportAction(
+  entityId: string,
+  tarifTransportHarian: number
+) {
+  const token = await getPhpToken();
+  try {
+    const result = await phpFetch<{
+      success: boolean;
+      affected: number;
+      message: string;
+    }>("/api/payroll/pegawai/batch-transport", token, {
+      method: "POST",
+      body: JSON.stringify({ entityId, tarifTransportHarian }),
+    });
+    return result;
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw new Error("Gagal memperbarui tarif transport masal.");
+  }
+}
+
+export async function updatePegawaiTransportAction(
+  pegawaiId: string,
+  tarifTransportHarian: number
+) {
+  const token = await getPhpToken();
+  try {
+    const result = await phpFetch<{
+      success: boolean;
+      message: string;
+    }>("/api/payroll/pegawai/single-transport", token, {
+      method: "POST",
+      body: JSON.stringify({ pegawaiId, tarifTransportHarian }),
+    });
+    return result;
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw new Error("Gagal memperbarui tarif transport pegawai.");
+  }
+}
+
 // ----------------------------------------------------
 // GAJI BULANAN PEGAWAI TETAP
 // ----------------------------------------------------

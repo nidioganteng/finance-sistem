@@ -38,8 +38,9 @@ function clean_identity_number(string $val): string {
 if ($method === 'GET' && $sub === 'search') {
     require_auth();
     $pdo  = get_pdo();
-    $q    = trim($_GET['q'] ?? '');
-    $tipe = trim($_GET['tipe'] ?? '');
+    $q         = trim($_GET['q'] ?? '');
+    $tipe      = trim($_GET['tipe'] ?? '');
+    $entity_id = trim($_GET['entityId'] ?? '');
 
     $where_parts = ['1=1'];
     $params      = [];
@@ -47,6 +48,15 @@ if ($method === 'GET' && $sub === 'search') {
     if ($tipe && $tipe !== 'ALL') {
         $where_parts[] = 'r.tipe = ?';
         $params[]      = $tipe;
+    }
+
+    if ($entity_id) {
+        $stmt_e = $pdo->prepare('SELECT id FROM Entity WHERE id = ? OR `key` = ? LIMIT 1');
+        $stmt_e->execute([$entity_id, $entity_id]);
+        $resolved_id = $stmt_e->fetchColumn() ?: $entity_id;
+
+        $where_parts[] = '(r.entityId IS NULL OR r.entityId = ?)';
+        $params[]      = $resolved_id;
     }
 
     if ($q === '') {
@@ -57,7 +67,7 @@ if ($method === 'GET' && $sub === 'search') {
              FROM Rekanan r
              LEFT JOIN Entity e ON r.entityId = e.id
              WHERE $where_sql
-             ORDER BY r.nama ASC
+             ORDER BY CASE WHEN r.tipe = 'KLIEN' THEN 1 WHEN r.tipe = 'VENDOR' THEN 2 ELSE 3 END, r.nama ASC
              LIMIT 15"
         );
         $stmt->execute($params);
@@ -110,8 +120,12 @@ elseif ($method === 'GET' && $sub === '') {
         $params[]      = $tipe;
     }
     if ($entity_id) {
-        $where_parts[] = 'r.entityId = ?';
-        $params[]      = $entity_id;
+        $stmt_e = $pdo->prepare('SELECT id FROM Entity WHERE id = ? OR `key` = ? LIMIT 1');
+        $stmt_e->execute([$entity_id, $entity_id]);
+        $resolved_id = $stmt_e->fetchColumn() ?: $entity_id;
+
+        $where_parts[] = '(r.entityId IS NULL OR r.entityId = ?)';
+        $params[]      = $resolved_id;
     }
     if ($search !== '') {
         $like = '%' . $search . '%';
@@ -125,7 +139,7 @@ elseif ($method === 'GET' && $sub === '') {
          FROM Rekanan r
          LEFT JOIN Entity e ON r.entityId = e.id
          WHERE $where_sql
-         ORDER BY r.tipe ASC, r.nama ASC"
+         ORDER BY CASE WHEN r.tipe = 'KLIEN' THEN 1 WHEN r.tipe = 'VENDOR' THEN 2 ELSE 3 END, r.nama ASC"
     );
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

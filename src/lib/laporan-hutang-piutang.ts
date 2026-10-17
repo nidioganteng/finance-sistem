@@ -241,176 +241,7 @@ export interface LaporanHutangPiutangGrupData {
   };
 }
 
-// PHP GET /api/piutang?entityKey=... response shape (subset needed here)
-type PhpBasePiutangResponse = {
-  entity: { id: string; key: string; name: string };
-  saldoAntarEntitas: Record<string, number>; // coaCode -> saldo (debit - kredit)
-};
 
-const ENTITY_SHORT_NAME: Record<string, string> = {
-  kencana: "KAK", gaharu: "GS", tataring: "TB", ciptaAsri: "CAD", umum: "KP",
-};
-
-function fmtRp(n: number): string {
-  if (n === 0) return "Rp -";
-  const abs = Math.round(Math.abs(n)).toLocaleString("id-ID");
-  return n < 0 ? `Rp (${abs})` : `Rp ${abs}`;
-}
-
-/**
- * Build LaporanHutangPiutangEntityData from the base PHP piutang response.
- * PHP returns saldoAntarEntitas: { coaCode: saldo } where saldo = debit - kredit.
- * Codes 111-115 = piutang (asset), codes 311-315 = hutang (liability).
- */
-function buildEntityData(
-  raw: PhpBasePiutangResponse,
-  year: number
-): LaporanHutangPiutangEntityData {
-  const saldoMap = raw.saldoAntarEntitas ?? {};
-  const entity = raw.entity;
-
-  const COA_TO_CP: Record<string, string> = {
-    "111": "kencana", "112": "gaharu", "113": "tataring", "114": "ciptaAsri", "115": "umum",
-    "311": "kencana", "312": "gaharu", "313": "tataring", "314": "ciptaAsri", "315": "umum",
-  };
-
-  // Separate piutang (111-115) and hutang (311-315) saldos
-  const piutangByCp: Record<string, { code: string; saldo: number }> = {};
-  const hutangByCp: Record<string, { code: string; saldo: number }> = {};
-
-  for (const [code, saldo] of Object.entries(saldoMap)) {
-    const cp = COA_TO_CP[code];
-    if (!cp) continue;
-    const num = parseInt(code);
-    if (num >= 100 && num < 200) {
-      // piutang codes 111-115
-      piutangByCp[cp] = { code, saldo };
-    } else if (num >= 300 && num < 400) {
-      // hutang codes 311-315
-      hutangByCp[cp] = { code, saldo };
-    }
-  }
-
-  // Build rekapPiutang rows
-  const rekapPiutangRows: RekapPiutangRow[] = COUNTERPARTIES.map((cp) => {
-    const entry = piutangByCp[cp.key];
-    const piutang = entry?.saldo ?? 0;
-    return {
-      counterpartyKey: cp.key,
-      shortName: cp.shortName,
-      fullName: cp.fullName,
-      code: entry?.code ?? cp.piutangCode,
-      accountName: `Piutang ke ${cp.fullName}`,
-      piutangLalu: 0,
-      piutangLaluFmt: fmtRp(0),
-      piutangBerjalan: piutang,
-      piutangBerjalanFmt: fmtRp(piutang),
-      perubahan: piutang,
-      perubahanFmt: fmtRp(piutang),
-      piutang,
-      piutangFmt: fmtRp(piutang),
-    };
-  });
-
-  const totalPiutang = rekapPiutangRows.reduce((s, r) => s + r.piutang, 0);
-  const rekapPiutang = {
-    rows: rekapPiutangRows,
-    totalPiutangLalu: 0,
-    totalPiutangLaluFmt: fmtRp(0),
-    totalPerubahan: totalPiutang,
-    totalPerubahanFmt: fmtRp(totalPiutang),
-    totalPiutang,
-    totalPiutangFmt: fmtRp(totalPiutang),
-  };
-
-  // Build rekapHutang rows
-  const rekapHutangRows: RekapHutangRow[] = COUNTERPARTIES.map((cp) => {
-    const entry = hutangByCp[cp.key];
-    // hutang saldo = debit - kredit; credit balance (negative debit-kredit) means we owe them
-    const rawSaldo = entry?.saldo ?? 0;
-    const hutang = rawSaldo < 0 ? Math.abs(rawSaldo) : 0;
-    return {
-      counterpartyKey: cp.key,
-      shortName: cp.shortName,
-      fullName: cp.fullName,
-      code: entry?.code ?? cp.hutangCode,
-      accountName: `Hutang ke ${cp.fullName}`,
-      hutangLalu: 0,
-      hutangLaluFmt: fmtRp(0),
-      hutangTahunIni: hutang,
-      hutangTahunIniFmt: fmtRp(hutang),
-      totalHutang: hutang,
-      totalHutangFmt: fmtRp(hutang),
-    };
-  });
-
-  const totalHutang = rekapHutangRows.reduce((s, r) => s + r.totalHutang, 0);
-  const rekapHutang = {
-    rows: rekapHutangRows,
-    totalHutangLalu: 0,
-    totalHutangLaluFmt: fmtRp(0),
-    totalHutangTahunIni: totalHutang,
-    totalHutangTahunIniFmt: fmtRp(totalHutang),
-    totalHutang,
-    totalHutangFmt: fmtRp(totalHutang),
-  };
-
-  // Build netting rows
-  const nettingRows: NettingRow[] = COUNTERPARTIES.map((cp) => {
-    const piutang = piutangByCp[cp.key]?.saldo ?? 0;
-    const rawHutangSaldo = hutangByCp[cp.key]?.saldo ?? 0;
-    const hutang = rawHutangSaldo < 0 ? Math.abs(rawHutangSaldo) : 0;
-    const net = piutang - hutang;
-    const isUtang = net < 0;
-    const absNet = Math.abs(net);
-    const status: "UTANG" | "PIUTANG" | "NIHIL" = net > 0 ? "PIUTANG" : net < 0 ? "UTANG" : "NIHIL";
-    return {
-      counterpartyKey: cp.key,
-      shortName: cp.shortName,
-      fullName: cp.fullName,
-      status,
-      saldoAwalNet: 0,
-      saldoAwalNetFmt: fmtRp(0),
-      penambahanPiutang: piutang,
-      penambahanPiutangFmt: fmtRp(piutang),
-      penambahanHutang: hutang,
-      penambahanHutangFmt: fmtRp(hutang),
-      piutang,
-      piutangFmt: fmtRp(piutang),
-      hutang,
-      hutangFmt: fmtRp(hutang),
-      net,
-      netFmt: fmtRp(net),
-      absNet,
-      absNetFmt: fmtRp(absNet),
-      isUtang,
-      neracaPosition: isUtang ? "Kewajiban" : "Aset",
-      neracaAccountCode: isUtang ? (hutangByCp[cp.key]?.code ?? cp.hutangCode) : (piutangByCp[cp.key]?.code ?? cp.piutangCode),
-    };
-  });
-
-  const posisiBersihGlobal = totalPiutang - totalHutang;
-  const statusGlobal: "PIUTANG" | "UTANG" | "NIHIL" =
-    posisiBersihGlobal > 0 ? "PIUTANG" : posisiBersihGlobal < 0 ? "UTANG" : "NIHIL";
-
-  const netting = {
-    rows: nettingRows,
-    totalNetPiutang: Math.max(0, posisiBersihGlobal),
-    totalNetUtang: Math.max(0, -posisiBersihGlobal),
-    posisiBersihGlobal,
-    posisiBersihGlobalFmt: fmtRp(posisiBersihGlobal),
-    statusGlobal,
-  };
-
-  return {
-    entity,
-    year,
-    rekapHutang,
-    rekapPiutang,
-    netting,
-    transactions: [], // PHP doesn't return transaction history in this endpoint
-  };
-}
 
 export async function getLaporanHutangPiutangEntityData(
   entityId: string,
@@ -418,113 +249,127 @@ export async function getLaporanHutangPiutangEntityData(
 ): Promise<LaporanHutangPiutangEntityData | null> {
   const token = await getPhpToken();
   try {
-    // PHP only supports base piutang by entityKey — use that and compute locally
-    const raw = await phpFetch<PhpBasePiutangResponse>(
-      `/api/piutang?entityKey=${encodeURIComponent(entityId)}`,
+    const isUuid = entityId.length > 20 || entityId.includes("-");
+    const param = isUuid ? `entityId=${encodeURIComponent(entityId)}` : `entityKey=${encodeURIComponent(entityId)}`;
+    const data = await phpFetch<LaporanHutangPiutangEntityData>(
+      `/api/piutang/laporan-afiliasi?${param}&year=${year}`,
       token
     );
-    return buildEntityData(raw, year);
+    return data;
   } catch {
     return null;
   }
 }
 
 export async function getLaporanHutangPiutangGrupData(year: number): Promise<LaporanHutangPiutangGrupData> {
-  const token = await getPhpToken();
-
-  // Fetch each entity separately and aggregate — PHP requires singular entityKey
-  const results = await Promise.all(
-    COUNTERPARTIES.map(async (cp) => {
-      try {
-        const raw = await phpFetch<PhpBasePiutangResponse>(
-          `/api/piutang?entityKey=${encodeURIComponent(cp.key)}`,
-          token
-        );
-        return { cp, saldoMap: raw.saldoAntarEntitas ?? {}, entity: raw.entity };
-      } catch {
-        return { cp, saldoMap: {}, entity: { id: "", key: cp.key, name: cp.fullName } };
-      }
-    })
-  );
-
-  const COA_TO_CP: Record<string, string> = {
-    "111": "kencana", "112": "gaharu", "113": "tataring", "114": "ciptaAsri", "115": "umum",
-    "311": "kencana", "312": "gaharu", "313": "tataring", "314": "ciptaAsri", "315": "umum",
-  };
-
-  // Build matrix: matrix[entityKey][counterpartyKey] = { piutang, hutang, net }
-  const matrix: Record<string, Record<string, InterEntityMatrixCell>> = {};
-  const totalsByEntity: Record<string, { totalPiutang: number; totalHutang: number; net: number; status: "PIUTANG" | "UTANG" | "NIHIL" }> = {};
-
-  const entities = results.map((r) => ({
-    id: r.entity.id,
-    key: r.cp.key,
-    name: r.cp.fullName,
-    shortName: ENTITY_SHORT_NAME[r.cp.key] ?? r.cp.shortName,
+  const entities = COUNTERPARTIES.map((cp) => ({
+    id: cp.key,
+    key: cp.key,
+    name: cp.fullName,
+    shortName: cp.shortName,
   }));
 
-  for (const { cp, saldoMap } of results) {
-    matrix[cp.key] = {};
-    let totalPiutang = 0;
-    let totalHutang = 0;
+  const matrix: Record<string, Record<string, InterEntityMatrixCell>> = {};
+  const totalsByEntity: Record<
+    string,
+    { totalPiutang: number; totalHutang: number; net: number; status: "PIUTANG" | "UTANG" | "NIHIL" }
+  > = {};
 
-    for (const [code, saldo] of Object.entries(saldoMap)) {
-      const counterpartyKey = COA_TO_CP[code];
-      if (!counterpartyKey) continue;
-      const num = parseInt(code);
-      if (!matrix[cp.key][counterpartyKey]) {
-        matrix[cp.key][counterpartyKey] = { piutang: 0, hutang: 0, net: 0 };
+  let grandTotalPiutang = 0;
+  let grandTotalHutang = 0;
+
+  const psItems: PemegangSahamGrupItem[] = [];
+  const piutangLainnyaItems: PiutangLainnyaGrupItem[] = [];
+  let totalPsPiutang = 0;
+  let totalPsHutang = 0;
+  let totalPiutangLainnya = 0;
+
+  for (const ent of entities) {
+    const data = await getLaporanHutangPiutangEntityData(ent.key, year);
+    matrix[ent.key] = {};
+
+    let entPiutang = 0;
+    let entHutang = 0;
+
+    if (data) {
+      for (const row of data.netting.rows) {
+        const isOperatingEntity = COUNTERPARTIES.some((c) => c.key === row.counterpartyKey);
+        if (isOperatingEntity) {
+          matrix[ent.key][row.counterpartyKey] = {
+            piutang: row.piutang,
+            hutang: row.hutang,
+            net: row.net,
+          };
+          entPiutang += row.piutang;
+          entHutang += row.hutang;
+        } else if (row.counterpartyKey === "pemegangSaham") {
+          psItems.push({
+            entityKey: ent.key,
+            entityName: ent.name,
+            shortName: ent.shortName,
+            piutang: row.piutang,
+            piutangFmt: row.piutangFmt,
+            hutang: row.hutang,
+            hutangFmt: row.hutangFmt,
+            net: row.net,
+            netFmt: row.netFmt,
+            status: row.status,
+          });
+          totalPsPiutang += row.piutang;
+          totalPsHutang += row.hutang;
+        } else if (row.counterpartyKey === "piutangLainnya") {
+          piutangLainnyaItems.push({
+            entityKey: ent.key,
+            entityName: ent.name,
+            shortName: ent.shortName,
+            nominal: row.piutang,
+            nominalFmt: row.piutangFmt,
+          });
+          totalPiutangLainnya += row.piutang;
+        }
       }
-      if (num >= 100 && num < 200) {
-        matrix[cp.key][counterpartyKey].piutang += saldo;
-        totalPiutang += saldo;
-      } else if (num >= 300 && num < 400) {
-        const hutang = saldo < 0 ? Math.abs(saldo) : 0;
-        matrix[cp.key][counterpartyKey].hutang += hutang;
-        totalHutang += hutang;
-      }
-      matrix[cp.key][counterpartyKey].net =
-        matrix[cp.key][counterpartyKey].piutang - matrix[cp.key][counterpartyKey].hutang;
     }
 
-    const net = totalPiutang - totalHutang;
-    totalsByEntity[cp.key] = {
-      totalPiutang,
-      totalHutang,
+    grandTotalPiutang += entPiutang;
+    grandTotalHutang += entHutang;
+
+    const net = entPiutang - entHutang;
+    totalsByEntity[ent.key] = {
+      totalPiutang: entPiutang,
+      totalHutang: entHutang,
       net,
       status: net > 0 ? "PIUTANG" : net < 0 ? "UTANG" : "NIHIL",
     };
   }
 
-  const grandTotalPiutang = Object.values(totalsByEntity).reduce((s, v) => s + v.totalPiutang, 0);
-  const grandTotalHutang = Object.values(totalsByEntity).reduce((s, v) => s + v.totalHutang, 0);
-
-  // Build reconciliation pairs (A vs B)
+  // Cross entity reconciliations
   const reconciliations: ReconciliationPair[] = [];
   for (let i = 0; i < COUNTERPARTIES.length; i++) {
     for (let j = i + 1; j < COUNTERPARTIES.length; j++) {
       const a = COUNTERPARTIES[i];
       const b = COUNTERPARTIES[j];
-      const piutangAB = matrix[a.key]?.[b.key]?.piutang ?? 0;
-      const hutangBA = matrix[b.key]?.[a.key]?.hutang ?? 0;
-      const diffAB = Math.abs(piutangAB - hutangBA);
-      const hutangAB = matrix[a.key]?.[b.key]?.hutang ?? 0;
-      const piutangBA = matrix[b.key]?.[a.key]?.piutang ?? 0;
-      const diffBA = Math.abs(hutangAB - piutangBA);
+      const cellAB = matrix[a.key]?.[b.key] ?? { piutang: 0, hutang: 0, net: 0 };
+      const cellBA = matrix[b.key]?.[a.key] ?? { piutang: 0, hutang: 0, net: 0 };
+
+      const diffAB = cellAB.piutang - cellBA.hutang;
+      const diffBA = cellAB.hutang - cellBA.piutang;
+
       reconciliations.push({
         entityA: { key: a.key, name: a.fullName, shortName: a.shortName },
         entityB: { key: b.key, name: b.fullName, shortName: b.shortName },
-        piutangAB,
-        hutangBA,
+        piutangAB: cellAB.piutang,
+        hutangBA: cellBA.hutang,
         diffAB,
-        isMatchAB: diffAB < 1,
-        hutangAB,
-        piutangBA,
+        isMatchAB: Math.abs(diffAB) < 1,
+        hutangAB: cellAB.hutang,
+        piutangBA: cellBA.piutang,
         diffBA,
-        isMatchBA: diffBA < 1,
+        isMatchBA: Math.abs(diffBA) < 1,
       });
     }
   }
+
+  const netGlobalPs = totalPsPiutang - totalPsHutang;
 
   return {
     year,
@@ -535,18 +380,18 @@ export async function getLaporanHutangPiutangGrupData(year: number): Promise<Lap
     grandTotalHutang,
     reconciliations,
     pemegangSahamSummary: {
-      items: [],
-      totalPiutang: 0,
-      totalPiutangFmt: fmtRp(0),
-      totalHutang: 0,
-      totalHutangFmt: fmtRp(0),
-      netGlobal: 0,
-      netGlobalFmt: fmtRp(0),
+      items: psItems,
+      totalPiutang: totalPsPiutang,
+      totalPiutangFmt: formatAccountingRupiah(totalPsPiutang),
+      totalHutang: totalPsHutang,
+      totalHutangFmt: formatAccountingRupiah(totalPsHutang),
+      netGlobal: netGlobalPs,
+      netGlobalFmt: formatAccountingRupiah(netGlobalPs),
     },
     piutangLainnyaSummary: {
-      items: [],
-      total: 0,
-      totalFmt: fmtRp(0),
+      items: piutangLainnyaItems,
+      total: totalPiutangLainnya,
+      totalFmt: formatAccountingRupiah(totalPiutangLainnya),
     },
   };
 }

@@ -219,7 +219,7 @@ export function EntityCard({
             {/* Logo on white bg */}
             <div className="w-12 h-12 rounded-xl bg-white dark:bg-white flex items-center justify-center flex-none shadow-md overflow-hidden border border-border-soft">
               {ENTITY_LOGO[entityKey]
-                ? <img src={ENTITY_LOGO[entityKey]} alt={name} className="w-full h-full object-contain p-0.5" />
+                ? <Image src={ENTITY_LOGO[entityKey]} alt={name} width={48} height={48} className="w-full h-full object-contain p-0.5" />
                 : <span className="text-[18px] font-extrabold" style={{ color: colorHex }}>{name[0]}</span>
               }
             </div>

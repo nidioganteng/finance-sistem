@@ -24,6 +24,8 @@ export type PegawaiItem = {
   gajiPokokFmt: string;
   tunjanganJabatan: number;
   tunjanganJabatanFmt: string;
+  tarifTransportHarian?: number;
+  tarifTransportHarianFmt?: string;
   tunjanganBpjsKes?: number;
   tunjanganBpjsKesFmt?: string;
   tunjanganBpjsTk?: number;

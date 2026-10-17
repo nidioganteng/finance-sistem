@@ -30,8 +30,12 @@ if ($method === 'GET' && $sub === '') {
         return json_response(['groups' => [], 'totalPages' => 1, 'page' => $page]);
     }
 
-    // Tanggal filter
-    $where_parts = ['entityId = ?', 'jenisInputId = ?'];
+    // Tanggal filter & filter non-crossing (khusus Entry Jurnal manual saja, gabungan semua ada di Jurnal Umum)
+    $where_parts = [
+        'entityId = ?',
+        'jenisInputId = ?',
+        "(extraFieldsJson IS NULL OR JSON_VALID(extraFieldsJson) = 0 OR JSON_EXTRACT(extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(extraFieldsJson, '$.isCrossingEntry') = false)",
+    ];
     $params      = [$entity_id, $jenis_input_id];
     if ($dari) {
         $where_parts[] = 'tanggal >= ?';
@@ -67,13 +71,15 @@ if ($method === 'GET' && $sub === '') {
     // Ambil semua rows untuk noBukti yang di-page
     $nb_ph = implode(',', array_fill(0, count($paged_nbs), '?'));
     $stmt  = $pdo->prepare(
-        "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit, t.projectId,
+        "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit, t.projectId, t.fakturId,
                 c.id as coa_id, c.code as coa_code, c.name as coa_name,
                 p.id as project_id_val, p.code as project_code, p.name as project_name
          FROM `Transaction` t
          LEFT JOIN CoaAccount c ON t.coaAccountId = c.id
          LEFT JOIN Project p ON t.projectId = p.id
-         WHERE t.entityId = ? AND t.jenisInputId = ? AND t.noBukti IN ($nb_ph)
+         WHERE t.entityId = ? AND t.jenisInputId = ?
+           AND (t.extraFieldsJson IS NULL OR JSON_VALID(t.extraFieldsJson) = 0 OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') = false)
+           AND t.noBukti IN ($nb_ph)
          ORDER BY t.tanggal DESC, t.noBukti DESC, t.createdAt ASC"
     );
     $stmt->execute(array_merge([$entity_id, $jenis_input_id], $paged_nbs));
@@ -88,6 +94,7 @@ if ($method === 'GET' && $sub === '') {
             'tanggalRaw'  => '',
             'keterangan'  => '',
             'projectId'   => null,
+            'fakturId'    => null,
             'project'     => null,
             'rows'        => [],
             'totalDebit'  => 0.0,
@@ -99,6 +106,7 @@ if ($method === 'GET' && $sub === '') {
     foreach ($rows as $r) {
         $g = &$grouped[$r['noBukti']];
         if (!$g) continue;
+        if ($r['fakturId']) $g['fakturId'] = $r['fakturId'];
 
         if (!$g['tanggalRaw']) {
             $g['tanggalRaw']  = $r['tanggal'];
@@ -174,6 +182,17 @@ elseif ($method === 'POST' && $sub === '') {
     $stmt->execute([$entity_key]);
     $entity = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$entity) return error_response('Entity tidak ditemukan.', 404);
+
+    if ($faktur_id) {
+        $stmt = $pdo->prepare('SELECT projectId FROM FakturPendapatan WHERE id = ? AND entityId = ?');
+        $stmt->execute([$faktur_id, $entity['id']]);
+        $faktur = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$faktur) return error_response('Faktur tidak ditemukan pada entitas ini.', 422);
+        if ($project_id && $faktur['projectId'] && $project_id !== $faktur['projectId']) {
+            return error_response('Proyek jurnal harus sesuai dengan proyek faktur.', 422);
+        }
+        $project_id = $faktur['projectId'] ?: $project_id;
+    }
 
     // Pastikan jenis input jurnalTransaksi ada
     $jenis_input_id = get_or_create_jurnal_transaksi_jenis($pdo);
@@ -471,7 +490,8 @@ elseif ($method === 'POST' && $sub === '') {
                 }
             } else {
                 $stmt_ef = $pdo->prepare(
-                    "SELECT id FROM FakturPendapatan WHERE noFaktur = ? AND entityId = ? LIMIT 1"
+                    "SELECT id FROM FakturPendapatan WHERE noFaktur = ? AND entityId = ?
+                     ORDER BY (tanggalTerima IS NULL OR nominalDiterima = 0) DESC, createdAt ASC LIMIT 1"
                 );
                 $stmt_ef->execute([$no_bukti, $target_entity_for_faktur]);
                 $existing_faktur_id = $stmt_ef->fetchColumn();
@@ -601,33 +621,65 @@ elseif ($method === 'DELETE' && $sub === '') {
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi yang dihapus.', 400);
 
-    // Ambil noBukti dan projectIds sebelum dihapus
+    // Ambil noBukti, fakturId, dan projectIds sebelum dihapus
     $ph_pre = implode(',', array_fill(0, count($tx_ids), '?'));
-    $stmt = $pdo->prepare("SELECT noBukti FROM `Transaction` WHERE id = ? LIMIT 1");
-    $stmt->execute([$tx_ids[0]]);
-    $first_no_bukti = $stmt->fetchColumn();
+    $stmt_nb = $pdo->prepare("SELECT DISTINCT noBukti FROM `Transaction` WHERE id IN ($ph_pre) AND noBukti IS NOT NULL AND noBukti != ''");
+    $stmt_nb->execute(array_values($tx_ids));
+    $all_no_buktis = $stmt_nb->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt_fids = $pdo->prepare("SELECT DISTINCT fakturId FROM `Transaction` WHERE id IN ($ph_pre) AND fakturId IS NOT NULL");
+    $stmt_fids->execute(array_values($tx_ids));
+    $faktur_ids_to_clear = $stmt_fids->fetchAll(PDO::FETCH_COLUMN);
 
     $stmt_pids = $pdo->prepare("SELECT DISTINCT projectId FROM `Transaction` WHERE id IN ($ph_pre) AND projectId IS NOT NULL");
     $stmt_pids->execute(array_values($tx_ids));
     $project_ids_to_sync = $stmt_pids->fetchAll(PDO::FETCH_COLUMN);
 
+    // Cari crossingGroupIds sebelum dihapus
+    $stmt_cg = $pdo->prepare("SELECT extraFieldsJson FROM `Transaction` WHERE id IN ($ph_pre)");
+    $stmt_cg->execute(array_values($tx_ids));
+    $crossing_group_ids = [];
+    foreach ($stmt_cg->fetchAll(PDO::FETCH_COLUMN) as $json) {
+        $extra = $json ? json_decode($json, true) : [];
+        if (!empty($extra['crossingGroupId'])) {
+            $crossing_group_ids[] = $extra['crossingGroupId'];
+        }
+    }
+    $crossing_group_ids = array_unique($crossing_group_ids);
+
     // Hapus source rows
     $ph = $ph_pre;
     $pdo->prepare("DELETE FROM `Transaction` WHERE id IN ($ph)")->execute(array_values($tx_ids));
 
-    if ($first_no_bukti) {
+    // Hapus crossing entries terkait di entitas lain
+    foreach ($crossing_group_ids as $gid) {
+        $pdo->prepare(
+            "DELETE FROM `Transaction` WHERE JSON_VALUE(extraFieldsJson, '$.crossingGroupId') = ?"
+        )->execute([$gid]);
+    }
+
+    if (!empty($faktur_ids_to_clear)) {
+        foreach ($faktur_ids_to_clear as $fid) {
+            $pdo->prepare("UPDATE FakturPendapatan SET tanggalTerima = NULL, bank = NULL, nominalDiterima = 0, updatedAt = ? WHERE id = ?")
+                ->execute([date('Y-m-d H:i:s'), $fid]);
+        }
+    }
+
+    foreach ($all_no_buktis as $nb) {
         // Hapus auto-posted entries
         $pdo->prepare(
             "DELETE FROM `Transaction` WHERE noBukti = ?
              AND JSON_VALUE(extraFieldsJson, '$.autoPostedFromJurnal') = 'true'"
-        )->execute([$first_no_bukti]);
+        )->execute([$nb]);
 
-        // Hapus faktur pendapatan
-        $pdo->prepare("DELETE FROM FakturPendapatan WHERE noFaktur = ?")->execute([$first_no_bukti]);
+        // Hapus faktur pendapatan jika auto-generated dari jurnal atau reset jika faktur master
+        $pdo->prepare("DELETE FROM FakturPendapatan WHERE noFaktur = ? AND (npwp = '-' OR npwp IS NULL)")->execute([$nb]);
+        $pdo->prepare("UPDATE FakturPendapatan SET tanggalTerima = NULL, bank = NULL, nominalDiterima = 0, updatedAt = ? WHERE noFaktur = ?")
+            ->execute([date('Y-m-d H:i:s'), $nb]);
 
         // Hapus termin terkait + revert project status jika perlu
         $stmt_t = $pdo->prepare("SELECT id, projectId FROM Termin WHERE name LIKE ?");
-        $stmt_t->execute(["%[$first_no_bukti]%"]);
+        $stmt_t->execute(["%[$nb]%"]);
         $termins = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
         if (!empty($termins)) {
             $termin_ids = array_column($termins, 'id');

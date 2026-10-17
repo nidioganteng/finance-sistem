@@ -197,35 +197,23 @@ if ($method === 'GET' && $sub === '') {
     $stmt->execute();
     $rekanan_tenaga_ahli = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 5. Pegawai for entity with all gaji for year
+    // 5. Master Pegawai untuk entitas (query mandiri tanpa tertimpa kolom gaji bulanan)
     $stmt = $pdo->prepare(
-        "SELECT p.*, p.tarifTransportHarian AS pegawai_tarif_transport,
-                g.id as gaji_id, g.bulan, g.tahun,
-                g.gajiPokok as gaji_gp, g.tunjanganJabatan, g.tunjanganTransport,
-                g.insentif, g.bpjsKesehatan, g.bpjsKetenagakerjaan, g.potonganLain,
-                g.pph21 as gaji_pph21, g.totalGajiKotor, g.totalGajiBersih, g.catatan as gaji_catatan,
-                g.hariKerja, g.tarifTransportHarian, g.thr, g.tunjanganBpjs, g.tunjanganBpjsKes,
-                g.tunjanganBpjsTk, g.tunjanganPph, g.tunjanganLainnya, g.potonganBpjs, g.totalGajiTerlaporPajak
-         FROM Pegawai p
-         LEFT JOIN GajiPegawaiBulanan g ON g.pegawaiId = p.id AND g.tahun = ?
-         WHERE p.entityId = ?
-         ORDER BY p.isActive DESC, p.nama ASC"
+        "SELECT * FROM Pegawai WHERE entityId = ? ORDER BY isActive DESC, nama ASC"
     );
-    $stmt->execute([$year, $entity_id]);
-    $pegawai_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute([$entity_id]);
+    $pegawai_map = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Group pegawai rows (one per pegawai, collect all gaji months)
-    $pegawai_map = [];
+    // 6. Seluruh data gaji bulanan pegawai tahun terpilih
+    $stmt = $pdo->prepare(
+        "SELECT * FROM GajiPegawaiBulanan WHERE entityId = ? AND tahun = ?"
+    );
+    $stmt->execute([$entity_id, $year]);
+    $gaji_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     $pegawai_gaji_map = []; // pegawaiId => [bulan => gaji_row]
-    foreach ($pegawai_rows as $row) {
-        $pid = $row['id'];
-        if (!isset($pegawai_map[$pid])) {
-            $pegawai_map[$pid] = $row;
-            $pegawai_gaji_map[$pid] = [];
-        }
-        if ($row['gaji_id']) {
-            $pegawai_gaji_map[$pid][$row['bulan']] = $row;
-        }
+    foreach ($gaji_rows as $grow) {
+        $pegawai_gaji_map[$grow['pegawaiId']][(int)$grow['bulan']] = $grow;
     }
 
     $pegawai_list       = [];
@@ -251,8 +239,9 @@ if ($method === 'GET' && $sub === '') {
         'totalGajiBersih'           => 0.0,
     ];
 
-    foreach ($pegawai_map as $pid => $p) {
-        $gaji_months    = $pegawai_gaji_map[$pid];
+    foreach ($pegawai_map as $p) {
+        $pid            = $p['id'];
+        $gaji_months    = $pegawai_gaji_map[$pid] ?? [];
         $ptkp_num       = (float)$p['ptkp'];
         $gaji_pokok_num = (float)$p['gajiPokok'];
         $status_val     = !empty($p['status']) ? strtoupper(trim($p['status'])) : (!empty($p['isActive']) ? 'AKTIF' : 'RESIGN');
@@ -265,16 +254,16 @@ if ($method === 'GET' && $sub === '') {
         $current_gaji = null;
         if (isset($gaji_months[$month])) {
             $g = $gaji_months[$month];
-            $gp    = (float)$g['gaji_gp'];
-            $tj    = (float)$g['tunjanganJabatan'];
-            $tt    = (float)$g['tunjanganTransport'];
-            $ins   = (float)$g['insentif'];
-            $bkes  = (float)$g['bpjsKesehatan'];
-            $btk   = (float)$g['bpjsKetenagakerjaan'];
-            $pot   = (float)$g['potonganLain'];
-            $pph   = (float)$g['gaji_pph21'];
-            $kotor = (float)$g['totalGajiKotor'];
-            $brsih = (float)$g['totalGajiBersih'];
+            $gp    = (float)($g['gajiPokok'] ?? 0);
+            $tj    = (float)($g['tunjanganJabatan'] ?? 0);
+            $tt    = (float)($g['tunjanganTransport'] ?? 0);
+            $ins   = (float)($g['insentif'] ?? 0);
+            $bkes  = (float)($g['bpjsKesehatan'] ?? 0);
+            $btk   = (float)($g['bpjsKetenagakerjaan'] ?? 0);
+            $pot   = (float)($g['potonganLain'] ?? 0);
+            $pph   = (float)($g['pph21'] ?? 0);
+            $kotor = (float)($g['totalGajiKotor'] ?? 0);
+            $brsih = (float)($g['totalGajiBersih'] ?? 0);
             $hk    = (int)($g['hariKerja'] ?? 0);
             $tarif = (float)($g['tarifTransportHarian'] ?? 15000);
             $thr   = (float)($g['thr'] ?? 0);
@@ -287,7 +276,7 @@ if ($method === 'GET' && $sub === '') {
             $gtp   = (float)($g['totalGajiTerlaporPajak'] ?? $kotor);
 
             $current_gaji = [
-                'id'                       => $g['gaji_id'],
+                'id'                       => $g['id'],
                 'pegawaiId'                => $pid,
                 'pegawaiNama'              => $p['nama'],
                 'pegawaiNik'               => $p['nik'],
@@ -335,7 +324,7 @@ if ($method === 'GET' && $sub === '') {
                 'totalGajiTerlaporPajakFmt'=> fmt_rp_payroll($gtp),
                 'totalGajiBersih'          => $brsih,
                 'totalGajiBersihFmt'       => fmt_rp_payroll($brsih),
-                'catatan'                  => $g['gaji_catatan'],
+                'catatan'                  => $g['catatan'] ?? '',
             ];
 
             $gaji_bulan_ini[] = $current_gaji;
@@ -364,20 +353,20 @@ if ($method === 'GET' && $sub === '') {
         $total_pph21_thn       = 0.0;
         $riwayat_gaji_bulan    = [];
         foreach ($gaji_months as $gm) {
-            $total_gaji_kotor_thn  += (float)$gm['totalGajiKotor'];
-            $total_gaji_bersih_thn += (float)$gm['totalGajiBersih'];
-            $total_pph21_thn       += (float)$gm['gaji_pph21'];
+            $total_gaji_kotor_thn  += (float)($gm['totalGajiKotor'] ?? 0);
+            $total_gaji_bersih_thn += (float)($gm['totalGajiBersih'] ?? 0);
+            $total_pph21_thn       += (float)($gm['pph21'] ?? 0);
 
-            $gp_m    = (float)$gm['gaji_gp'];
-            $tj_m    = (float)$gm['tunjanganJabatan'];
-            $tt_m    = (float)$gm['tunjanganTransport'];
-            $ins_m   = (float)$gm['insentif'];
-            $bkes_m  = (float)$gm['bpjsKesehatan'];
-            $btk_m   = (float)$gm['bpjsKetenagakerjaan'];
-            $pot_m   = (float)$gm['potonganLain'];
-            $pph_m   = (float)$gm['gaji_pph21'];
-            $kotor_m = (float)$gm['totalGajiKotor'];
-            $brsih_m = (float)$gm['totalGajiBersih'];
+            $gp_m    = (float)($gm['gajiPokok'] ?? 0);
+            $tj_m    = (float)($gm['tunjanganJabatan'] ?? 0);
+            $tt_m    = (float)($gm['tunjanganTransport'] ?? 0);
+            $ins_m   = (float)($gm['insentif'] ?? 0);
+            $bkes_m  = (float)($gm['bpjsKesehatan'] ?? 0);
+            $btk_m   = (float)($gm['bpjsKetenagakerjaan'] ?? 0);
+            $pot_m   = (float)($gm['potonganLain'] ?? 0);
+            $pph_m   = (float)($gm['pph21'] ?? 0);
+            $kotor_m = (float)($gm['totalGajiKotor'] ?? 0);
+            $brsih_m = (float)($gm['totalGajiBersih'] ?? 0);
             $hk_m    = (int)($gm['hariKerja'] ?? 0);
             $tarif_m = (float)($gm['tarifTransportHarian'] ?? 15000);
             $thr_m   = (float)($gm['thr'] ?? 0);
@@ -390,7 +379,7 @@ if ($method === 'GET' && $sub === '') {
             $gtp_m   = (float)($gm['totalGajiTerlaporPajak'] ?? $kotor_m);
 
             $riwayat_gaji_bulan[(int)$gm['bulan']] = [
-                'id'                       => $gm['gaji_id'],
+                'id'                       => $gm['id'],
                 'pegawaiId'                => $pid,
                 'pegawaiNama'              => $p['nama'],
                 'pegawaiNik'               => $p['nik'],
@@ -438,11 +427,11 @@ if ($method === 'GET' && $sub === '') {
                 'totalGajiTerlaporPajakFmt'=> fmt_rp_payroll($gtp_m),
                 'totalGajiBersih'          => $brsih_m,
                 'totalGajiBersihFmt'       => fmt_rp_payroll($brsih_m),
-                'catatan'                  => $gm['gaji_catatan'],
+                'catatan'                  => $gm['catatan'] ?? '',
             ];
         }
 
-        $tj_master    = (float)$p['tunjanganJabatan'];
+        $tj_master    = (float)($p['tunjanganJabatan'] ?? 0);
         $tbkes_master = (float)($p['tunjanganBpjsKes'] ?? 0);
         $tbtk_master  = (float)($p['tunjanganBpjsTk'] ?? 0);
         $tb_master    = $tbkes_master + $tbtk_master;
@@ -453,7 +442,7 @@ if ($method === 'GET' && $sub === '') {
             $pb_master = $bkes_master + $btk_master;
         }
         $tot_tetap    = $gaji_pokok_num + $tj_master;
-        $tarif_master = isset($p['pegawai_tarif_transport']) ? (float)$p['pegawai_tarif_transport'] : (isset($p['tarifTransportHarian']) ? (float)$p['tarifTransportHarian'] : 15000.0);
+        $tarif_master = (float)($p['tarifTransportHarian'] ?? 15000.0);
         if ($tarif_master <= 0) {
             $tarif_master = 15000.0;
         }

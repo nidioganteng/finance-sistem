@@ -50,10 +50,12 @@ function hitung_masa_kerja_id(?string $tgl_masuk): ?string {
 
 function parse_rupiah_num($val, float $fallback = 0.0): float {
     if ($val === null || $val === '') return $fallback;
-    if (is_numeric($val)) return (float)$val;
-    $str = preg_replace('/[^0-9,-]/', '', (string)$val);
-    $str = str_replace(',', '.', $str);
-    return is_numeric($str) ? (float)$str : $fallback;
+    if (is_int($val) || is_float($val)) return (float)$val;
+    $str = trim((string)$val);
+    if ($str === '') return $fallback;
+    $clean = preg_replace('/[^0-9,-]/', '', $str);
+    $clean = str_replace(',', '.', $clean);
+    return is_numeric($clean) ? (float)$clean : $fallback;
 }
 
 

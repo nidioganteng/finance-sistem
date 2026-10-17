@@ -22,13 +22,19 @@ interface LabaRugiViewProps {
 }
 
 export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
+  const pendapatan = data?.pendapatan ?? [];
+  const beban = data?.beban ?? [];
+  const totalPendapatan = data?.totalPendapatan ?? 0;
+  const totalBeban = data?.totalBeban ?? 0;
+  const labaBersih = data?.labaBersih ?? 0;
+
   const marginPct =
-    data.totalPendapatan > 0
-      ? (data.labaBersih / data.totalPendapatan) * 100
+    totalPendapatan > 0
+      ? (labaBersih / totalPendapatan) * 100
       : 0;
   const costRatio =
-    data.totalPendapatan > 0
-      ? (data.totalBeban / data.totalPendapatan) * 100
+    totalPendapatan > 0
+      ? (totalBeban / totalPendapatan) * 100
       : 0;
 
   return (
@@ -131,15 +137,15 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
                   I. Pendapatan Usaha
                 </span>
               </div>
-              <span className="text-[11px] font-bold text-muted-faint">{data.pendapatan.length} Akun</span>
+              <span className="text-[11px] font-bold text-muted-faint">{pendapatan.length} Akun</span>
             </div>
 
             <div className="divide-y divide-surface-subtle">
-              {data.pendapatan.length === 0 ? (
+              {pendapatan.length === 0 ? (
                 <p className="py-8 px-6 text-center text-[13px] text-muted italic">Tidak ada transaksi akun pendapatan.</p>
               ) : (
-                data.pendapatan.map((item) => {
-                  const sharePct = data.totalPendapatan > 0 ? (item.saldo / data.totalPendapatan) * 100 : 0;
+                pendapatan.map((item) => {
+                  const sharePct = totalPendapatan > 0 ? (item.saldo / totalPendapatan) * 100 : 0;
                   return (
                     <div key={item.code} className="px-6 py-3.5 hover:bg-surface-hover/30 transition-colors">
                       <div className="flex items-baseline justify-between gap-3">
@@ -189,15 +195,15 @@ export function LabaRugiView({ data, year, entityName }: LabaRugiViewProps) {
                   II. Beban Operasional & Usaha
                 </span>
               </div>
-              <span className="text-[11px] font-bold text-muted-faint">{data.beban.length} Akun</span>
+              <span className="text-[11px] font-bold text-muted-faint">{beban.length} Akun</span>
             </div>
 
             <div className="divide-y divide-surface-subtle max-h-[500px] overflow-y-auto">
-              {data.beban.length === 0 ? (
+              {beban.length === 0 ? (
                 <p className="py-8 px-6 text-center text-[13px] text-muted italic">Tidak ada transaksi akun beban.</p>
               ) : (
-                data.beban.map((item) => {
-                  const sharePct = data.totalBeban > 0 ? (item.saldo / data.totalBeban) * 100 : 0;
+                beban.map((item) => {
+                  const sharePct = totalBeban > 0 ? (item.saldo / totalBeban) * 100 : 0;
                   return (
                     <div key={item.code} className="px-6 py-3.5 hover:bg-surface-hover/30 transition-colors">
                       <div className="flex items-baseline justify-between gap-3">

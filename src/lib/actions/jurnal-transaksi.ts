@@ -10,6 +10,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
     noBukti: formData.get("noBukti"),
     editNoBukti: formData.get("editNoBukti") || null,
     projectId: formData.get("projectId") || null,
+    fakturId: formData.get("fakturId") || null,
     rows: JSON.parse((formData.get("rows") as string) ?? "[]"),
   };
 

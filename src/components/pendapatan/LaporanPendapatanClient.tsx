@@ -274,7 +274,9 @@ export function LaporanPendapatanClient({
         dppNilaiLain: match.dppNilaiLain,
         tarifPpnPersen: match.tarifPpnPersen,
         tarifPphPersen: match.tarifPphPersen,
-        bank: match.bank || prev.bank,
+        bank: "",
+        tanggalTerima: "",
+        nominalDiterima: 0,
       }));
 
       const cleanNpwp = (match.npwp || "").replace(/[\s.\-_/]/g, "").toLowerCase();
@@ -305,8 +307,6 @@ export function LaporanPendapatanClient({
       const nominal = term.nominal;
       const dpp = hitungDppDariKwitansi(nominal);
       const dppNilaiLain = dpp;
-      const pphNominal = Math.round((dpp * formFaktur.tarifPphPersen) / 100);
-      const netReceived = dpp - pphNominal;
       setFormFaktur((prev) => ({
         ...prev,
         nilaiKuitansi: nominal,
@@ -315,7 +315,7 @@ export function LaporanPendapatanClient({
         pekerjaanPerusahaan: dpp,
         pekerjaanYangDipinjam: 0,
         namaJkp: proj ? `Jasa Konsultansi ${proj.name} - ${term.name}` : prev.namaJkp,
-        nominalDiterima: netReceived,
+        nominalDiterima: 0,
       }));
     }
   }
@@ -1110,13 +1110,13 @@ export function LaporanPendapatanClient({
                         {f.dppNilaiLainFmt}
                       </td>
                       <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
-                        {f.ppnFmt}
+                        {f.ppnRealisasiFmt}
                         {f.isRealized && f.tarifPpnPersen !== 12 && (
                           <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPpnPersen}%)</span>
                         )}
                       </td>
                       <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
-                        {f.pphFmt}
+                        {f.pphRealisasiFmt}
                         {f.isRealized && f.tarifPphPersen !== 3.5 && (
                           <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPphPersen}%)</span>
                         )}
@@ -1263,10 +1263,10 @@ export function LaporanPendapatanClient({
                     {data.totalPeriod.dppNilaiLainFmt}
                   </td>
                   <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                    {data.totalPeriod.ppnFmt}
+                    {data.totalPeriod.ppnRealisasiFmt}
                   </td>
                   <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                    {data.totalPeriod.pphFmt}
+                    {data.totalPeriod.pphRealisasiFmt}
                   </td>
                   <td className="p-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/15">
                     {data.totalPeriod.nilaiProyekFmt}
@@ -1786,11 +1786,39 @@ export function LaporanPendapatanClient({
                   className="w-full px-3 py-2 text-xs border border-blue-300 dark:border-blue-500/40 rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
                 >
                   <option value="">-- Pilih Kode Proyek yang Sesuai --</option>
-                  {data.projectOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
-                    </option>
-                  ))}
+                  {(() => {
+                    const curProjs = data.projectOptions.filter((p) => !p.entityId || p.entityId === data.entity.id);
+                    const otherProjs = data.projectOptions.filter((p) => p.entityId && p.entityId !== data.entity.id);
+                    const otherByEntity = otherProjs.reduce((acc, p) => {
+                      const key = p.entityName || p.entityKey || "Entitas Lain";
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(p);
+                      return acc;
+                    }, {} as Record<string, typeof otherProjs>);
+
+                    return (
+                      <>
+                        {curProjs.length > 0 && (
+                          <optgroup label={`Proyek ${data.entity.name} (Entitas Ini)`}>
+                            {curProjs.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {Object.entries(otherByEntity).map(([entName, projs]) => (
+                          <optgroup key={entName} label={`Proyek ${entName} (Lintas Entitas)`}>
+                            {projs.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </select>
                 {formFaktur.projectId ? (
                   (() => {
@@ -2034,13 +2062,28 @@ export function LaporanPendapatanClient({
                     >
                       <option value="">-- Pilih dari Master Rekanan --</option>
                       {data.rekananOptions && data.rekananOptions.length > 0 && (
-                        <optgroup label="Database Master Rekanan">
-                          {data.rekananOptions.map((r) => (
-                            <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
-                              {r.nama} {r.npwp ? `(${r.npwp})` : "(Tanpa NPWP)"}
-                            </option>
-                          ))}
-                        </optgroup>
+                        <>
+                          <optgroup label="🏢 Klien / Pemberi Kerja">
+                            {data.rekananOptions
+                              .filter((r) => !r.tipe || r.tipe === "KLIEN")
+                              .map((r) => (
+                                <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
+                                  {r.nama} {r.npwp ? `(${r.npwp})` : "(Tanpa NPWP)"}
+                                </option>
+                              ))}
+                          </optgroup>
+                          {data.rekananOptions.some((r) => r.tipe && r.tipe !== "KLIEN") && (
+                            <optgroup label="📦 Vendor & Tenaga Ahli">
+                              {data.rekananOptions
+                                .filter((r) => r.tipe && r.tipe !== "KLIEN")
+                                .map((r) => (
+                                  <option key={r.id} value={r.id} className="bg-surface-card text-navy-text">
+                                    {r.nama} {r.npwp ? `(${r.npwp})` : "(Tanpa NPWP)"} [{r.tipe}]
+                                  </option>
+                                ))}
+                            </optgroup>
+                          )}
+                        </>
                       )}
                       <optgroup label="Input Manual">
                         <option value="__MANUAL__" className="bg-surface-card font-semibold text-blue-600 dark:text-blue-400">
@@ -2404,93 +2447,9 @@ export function LaporanPendapatanClient({
                 </select>
               </div>
 
-              {/* Form Grid 5: Realisasi Pencairan Kas Bank */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Tanggal Terima Dana di Bank <span className="text-[10px] text-navy-soft font-normal">(Opsional jika belum cair)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formFaktur.tanggalTerima}
-                    onChange={(e) =>
-                      setFormFaktur({
-                        ...formFaktur,
-                        tanggalTerima: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-navy-text mb-1">
-                    Rekening Bank Tujuan <span className="text-[10px] text-navy-soft font-normal">(Opsional)</span>
-                  </label>
-                  <select
-                    value={formFaktur.bank}
-                    onChange={(e) =>
-                      setFormFaktur({ ...formFaktur, bank: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-xs border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
-                  >
-                    <option value="" className="bg-surface-card text-navy-text">-- Belum Cair / Kosong --</option>
-                    {data.bankOptions.map((b) => (
-                      <option key={b.id} value={b.nama} className="bg-surface-card text-navy-text">
-                        {b.nama}
-                      </option>
-                    ))}
-                    <option value="KAS BESAR" className="bg-surface-card text-navy-text">KAS BESAR</option>
-                    <option value="KAS KECIL" className="bg-surface-card text-navy-text">KAS KECIL</option>
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-navy-text">
-                      Nominal Benar-Benar Cair <span className="text-[10px] text-navy-soft font-normal">(Rp 0 jika belum)</span>
-                    </label>
-                    {liveCalc.labaSetelahPajak > 0 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormFaktur((prev) => ({
-                            ...prev,
-                            nominalDiterima: liveCalc.labaSetelahPajak,
-                          }))
-                        }
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
-                        title="Klik untuk mengisi nominal cair dengan nilai setelah pemotongan PPh"
-                      >
-                        <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Isi Net Pajak</span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-navy-soft">
-                      Rp
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={formatRupiahInput(formFaktur.nominalDiterima)}
-                      onChange={(e) =>
-                        setFormFaktur({
-                          ...formFaktur,
-                          nominalDiterima: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
-                        })
-                      }
-                      className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold border border-border-soft rounded-xl bg-surface-input text-navy-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  {formFaktur.nominalDiterima > 0 && (
-                    <span className="text-[10px] text-navy-soft font-mono font-semibold mt-1 block">
-                      {formatRupiah(formFaktur.nominalDiterima)}
-                    </span>
-                  )}
-                </div>
+              <div className="p-3.5 bg-surface-subtle rounded-xl border border-border-soft text-xs text-navy-soft">
+                Dana cair, PPN Realisasi, dan PPh Realisasi terisi otomatis setelah
+                penerimaan bank dicatat di Entry Jurnal dengan faktur dan proyek ini.
               </div>
 
               {/* Form Grid 6: Kontrol Administratif Dokumen Fisik Pajak */}

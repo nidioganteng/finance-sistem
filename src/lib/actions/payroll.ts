@@ -311,6 +311,34 @@ export async function copyGajiBulanSebelumnyaAction(
 }
 
 /**
+ * Generate Otomatis Gaji Semua Pegawai Bulan Berjalan dari Master Data
+ */
+export async function bulkGenerateGajiBulananAction(params: {
+  entityId: string;
+  bulan: number;
+  tahun: number;
+  defaultHariKerja: number;
+  overwrite?: boolean;
+}) {
+  const token = await getPhpToken();
+  try {
+    const result = await phpFetch<{
+      success: boolean;
+      processedCount: number;
+      skippedCount: number;
+      message: string;
+    }>("/api/payroll/gaji/bulk-generate", token, {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+    return result;
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw new Error("Terjadi kesalahan.");
+  }
+}
+
+/**
  * Tambah / Edit Tenaga Ahli ke Master Database
  */
 export async function saveTenagaAhliMasterAction(formData: FormData) {

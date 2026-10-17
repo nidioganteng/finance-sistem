@@ -1172,6 +1172,68 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     json_response(['success' => true, 'data' => $pegawai]);
 }
 
+// ─── POST /api/payroll/pegawai/batch-transport ──────────────────────────────
+elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === 'batch-transport') {
+    $user = require_auth();
+    $pdo  = get_pdo();
+
+    $entity_id       = trim($body['entityId'] ?? '');
+    $tarif_transport = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    if ($tarif_transport < 0) $tarif_transport = 15000.0;
+
+    if (!$entity_id) {
+        return error_response('Entitas wajib dipilih.', 400);
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $stmt = $pdo->prepare("UPDATE Pegawai SET tarifTransportHarian = ?, updatedAt = ? WHERE entityId = ?");
+    $stmt->execute([$tarif_transport, $now, $entity_id]);
+    $affected = $stmt->rowCount();
+
+    log_activity(
+        $user['id'],
+        "Update Tarif Transport Standar Master Pegawai: " . fmt_rp_payroll($tarif_transport) . "/hari untuk $affected pegawai",
+        'FINANCIAL_CHANGE',
+        ['entityId' => $entity_id, 'tarifTransport' => $tarif_transport, 'count' => $affected]
+    );
+
+    json_response([
+        'success'  => true,
+        'affected' => $affected,
+        'message'  => "Berhasil memperbarui tarif transport menjadi " . fmt_rp_payroll($tarif_transport) . " per hari untuk {$affected} pegawai.",
+    ]);
+}
+
+// ─── POST /api/payroll/pegawai/single-transport ─────────────────────────────
+elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === 'single-transport') {
+    $user = require_auth();
+    $pdo  = get_pdo();
+
+    $pegawai_id      = trim($body['pegawaiId'] ?? '');
+    $tarif_transport = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    if ($tarif_transport < 0) $tarif_transport = 15000.0;
+
+    if (!$pegawai_id) {
+        return error_response('ID Pegawai wajib diisi.', 400);
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $stmt = $pdo->prepare("UPDATE Pegawai SET tarifTransportHarian = ?, updatedAt = ? WHERE id = ?");
+    $stmt->execute([$tarif_transport, $now, $pegawai_id]);
+
+    log_activity(
+        $user['id'],
+        "Update Tarif Transport Pegawai ($pegawai_id): " . fmt_rp_payroll($tarif_transport) . "/hari",
+        'FINANCIAL_CHANGE',
+        ['pegawaiId' => $pegawai_id, 'tarifTransport' => $tarif_transport]
+    );
+
+    json_response([
+        'success' => true,
+        'message' => "Berhasil memperbarui tarif transport menjadi " . fmt_rp_payroll($tarif_transport) . " per hari.",
+    ]);
+}
+
 // ─── PUT /api/payroll/pegawai/{id} ────────────────────────────────────────────
 elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
     $user = require_auth();

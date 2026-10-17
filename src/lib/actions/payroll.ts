@@ -319,6 +319,7 @@ export async function bulkGenerateGajiBulananAction(params: {
   tahun: number;
   defaultHariKerja: number;
   overwrite?: boolean;
+  autoCalculatePph?: boolean;
 }) {
   const token = await getPhpToken();
   try {

@@ -25,6 +25,145 @@ function fmt_tanggal_id(string $iso): string {
     return "$d {$months[$m]} $y";
 }
 
+function hitung_masa_kerja_id(?string $tgl_masuk): ?string {
+    if (!$tgl_masuk) return null;
+    $ts = strtotime($tgl_masuk);
+    if (!$ts) return null;
+    $now = time();
+    $y1 = (int)date('Y', $ts);
+    $m1 = (int)date('n', $ts);
+    $d1 = (int)date('j', $ts);
+    $y2 = (int)date('Y', $now);
+    $m2 = (int)date('n', $now);
+    $d2 = (int)date('j', $now);
+
+    $thn = $y2 - $y1;
+    $bln = $m2 - $m1;
+    if ($d2 < $d1) $bln--;
+    if ($bln < 0) { $thn--; $bln += 12; }
+    if ($thn < 0) return "0 bulan";
+    if ($thn === 0 && $bln === 0) return "< 1 bulan";
+    if ($thn === 0) return "{$bln} bulan";
+    if ($bln === 0) return "{$thn} tahun";
+    return "{$thn} tahun {$bln} bulan";
+}
+
+function parse_rupiah_num($val, float $fallback = 0.0): float {
+    if ($val === null || $val === '') return $fallback;
+    if (is_int($val) || is_float($val)) return (float)$val;
+    $str = trim((string)$val);
+    if ($str === '') return $fallback;
+    $clean = preg_replace('/[^0-9,-]/', '', $str);
+    $clean = str_replace(',', '.', $clean);
+    return is_numeric($clean) ? (float)$clean : $fallback;
+}
+
+
+/**
+ * Menentukan apakah pegawai berhak muncul di daftar penggajian bulan & tahun tertentu.
+ * Aturan:
+ * 1. Jika sudah ada data gaji di bulan ini (historis/arsip yang sudah diinput), SELALU TAMPILKAN
+ *    agar rekam jejak gaji dan pelaporan pajak masa lalu tidak hilang.
+ * 2. Karyawan yang berstatus RESIGN atau PENSIUN langsung dihilangkan dari daftar penggajian bulanan
+ *    jika belum ada data gaji di bulan tersebut.
+ * 3. Karyawan aktif otomatis muncul setiap bulan (sejak tanggal masuk).
+ */
+function is_pegawai_eligible_for_month(array $p, int $year, int $month, bool $has_gaji_this_month): bool {
+    // 1. Jika sudah ada data gaji di bulan ini (historis/arsip), SELALU TAMPILKAN
+    if ($has_gaji_this_month) return true;
+
+    $status = !empty($p['status']) ? strtoupper(trim($p['status'])) : (!empty($p['isActive']) ? 'AKTIF' : 'RESIGN');
+
+    // 2. Karyawan resign / pensiun / tidak aktif langsung tidak muncul di daftar gaji bulanan jika belum digaji
+    if ($status === 'RESIGN' || $status === 'PENSIUN' || empty($p['isActive'])) {
+        return false;
+    }
+
+    // 3. Cek tanggal masuk (sebelum mulai kerja belum berhak muncul tanpa data gaji)
+    if (!empty($p['tanggalMasuk'])) {
+        $masuk_ts = strtotime($p['tanggalMasuk']);
+        if ($masuk_ts) {
+            $masuk_y = (int)date('Y', $masuk_ts);
+            $masuk_m = (int)date('n', $masuk_ts);
+            if ($year < $masuk_y || ($year === $masuk_y && $month < $masuk_m)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Kalkulasi PPh 21 bulanan berdasarkan Tarif Efektif Rata-rata (TER) PP 58/2023 & PMK 168/2023.
+ */
+function hitung_pph21_ter(float $bruto, string $status_keluarga = 'TK/0'): array {
+    $norm = strtoupper(trim($status_keluarga));
+    $kategori = 'A';
+    if (in_array($norm, ['TK/0', 'TK/1', 'K/0'], true)) {
+        $kategori = 'A';
+    } elseif (in_array($norm, ['TK/2', 'TK/3', 'K/1', 'K/2'], true)) {
+        $kategori = 'B';
+    } elseif ($norm === 'K/3') {
+        $kategori = 'C';
+    }
+
+    $safe_bruto = max(0.0, round($bruto));
+    $tarif = 0.0;
+
+    if ($kategori === 'A') {
+        $brackets = [
+            [5400000, 0], [5650000, 0.25], [5950000, 0.5], [6300000, 0.75], [6750000, 1.0],
+            [7500000, 1.25], [8550000, 1.5], [9650000, 1.75], [10050000, 2.0], [10350000, 2.25],
+            [10700000, 2.5], [11050000, 3.0], [11600000, 3.5], [12500000, 4.0], [13750000, 5.0],
+            [15100000, 6.0], [16950000, 7.0], [19750000, 8.0], [24150000, 9.0], [26450000, 10.0],
+            [28000000, 11.0], [30050000, 12.0], [32400000, 13.0], [35400000, 14.0], [39100000, 15.0],
+            [43850000, 16.0], [47800000, 17.0], [51400000, 18.0], [56300000, 19.0], [62200000, 20.0],
+            [68600000, 21.0], [77500000, 22.0], [89000000, 23.0], [103000000, 24.0], [125000000, 25.0],
+            [157000000, 26.0], [206000000, 27.0], [337000000, 28.0], [454000000, 29.0], [550000000, 30.0],
+            [695000000, 31.0], [910000000, 32.0], [1400000000, 33.0], [INF, 34.0],
+        ];
+    } elseif ($kategori === 'B') {
+        $brackets = [
+            [6200000, 0], [6500000, 0.25], [6850000, 0.5], [7300000, 0.75], [9200000, 1.0],
+            [10750000, 1.5], [11250000, 2.0], [11600000, 2.5], [12600000, 3.0], [13600000, 4.0],
+            [14950000, 5.0], [16400000, 6.0], [18450000, 7.0], [21850000, 8.0], [26000000, 9.0],
+            [27700000, 10.0], [29350000, 11.0], [31450000, 12.0], [33950000, 13.0], [37100000, 14.0],
+            [41100000, 15.0], [45800000, 16.0], [49500000, 17.0], [53800000, 18.0], [58500000, 19.0],
+            [64000000, 20.0], [71000000, 21.0], [80000000, 22.0], [93000000, 23.0], [109000000, 24.0],
+            [129000000, 25.0], [163000000, 26.0], [211000000, 27.0], [374000000, 28.0], [459000000, 29.0],
+            [555000000, 30.0], [704000000, 31.0], [957000000, 32.0], [1405000000, 33.0], [INF, 34.0],
+        ];
+    } else {
+        $brackets = [
+            [6600000, 0], [6950000, 0.25], [7350000, 0.5], [7800000, 0.75], [8850000, 1.0],
+            [9800000, 1.25], [10950000, 1.5], [11200000, 1.75], [12050000, 2.0], [12950000, 3.0],
+            [14150000, 4.0], [15550000, 5.0], [17050000, 6.0], [19500000, 7.0], [22700000, 8.0],
+            [26600000, 9.0], [28100000, 10.0], [30100000, 11.0], [32600000, 12.0], [35400000, 13.0],
+            [38900000, 14.0], [43000000, 15.0], [47400000, 16.0], [51200000, 17.0], [55800000, 18.0],
+            [60800000, 19.0], [66700000, 20.0], [74500000, 21.0], [83200000, 22.0], [95600000, 23.0],
+            [110000000, 24.0], [134000000, 25.0], [169500000, 26.0], [221000000, 27.0], [390000000, 28.0],
+            [463000000, 29.0], [561000000, 30.0], [709000000, 31.0], [965000000, 32.0], [1419000000, 33.0],
+            [INF, 34.0],
+        ];
+    }
+
+    foreach ($brackets as [$limit, $rate]) {
+        if ($safe_bruto <= $limit) {
+            $tarif = (float)$rate;
+            break;
+        }
+    }
+
+    $nominal = round(($safe_bruto * $tarif) / 100);
+
+    return [
+        'kategori'    => $kategori,
+        'tarifPersen' => $tarif,
+        'nominal'     => $nominal,
+    ];
+}
+
 // ─── GET /api/payroll?entityId=...&year=...&month=... ─────────────────────────
 // Logika: 1:1 dengan getPayrollData() di src/lib/payroll.ts
 if ($method === 'GET' && $sub === '') {
@@ -58,39 +197,29 @@ if ($method === 'GET' && $sub === '') {
     $stmt->execute();
     $rekanan_tenaga_ahli = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 5. Pegawai for entity with all gaji for year
+    // 5. Master Pegawai untuk entitas (query mandiri tanpa tertimpa kolom gaji bulanan)
     $stmt = $pdo->prepare(
-        "SELECT p.*,
-                g.id as gaji_id, g.bulan, g.tahun,
-                g.gajiPokok as gaji_gp, g.tunjanganJabatan, g.tunjanganTransport,
-                g.insentif, g.bpjsKesehatan, g.bpjsKetenagakerjaan, g.potonganLain,
-                g.pph21 as gaji_pph21, g.totalGajiKotor, g.totalGajiBersih, g.catatan as gaji_catatan
-         FROM Pegawai p
-         LEFT JOIN GajiPegawaiBulanan g ON g.pegawaiId = p.id AND g.tahun = ?
-         WHERE p.entityId = ?
-         ORDER BY p.isActive DESC, p.nama ASC"
+        "SELECT * FROM Pegawai WHERE entityId = ? ORDER BY isActive DESC, nama ASC"
     );
-    $stmt->execute([$year, $entity_id]);
-    $pegawai_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute([$entity_id]);
+    $pegawai_map = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Group pegawai rows (one per pegawai, collect all gaji months)
-    $pegawai_map = [];
+    // 6. Seluruh data gaji bulanan pegawai tahun terpilih
+    $stmt = $pdo->prepare(
+        "SELECT * FROM GajiPegawaiBulanan WHERE entityId = ? AND tahun = ?"
+    );
+    $stmt->execute([$entity_id, $year]);
+    $gaji_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     $pegawai_gaji_map = []; // pegawaiId => [bulan => gaji_row]
-    foreach ($pegawai_rows as $row) {
-        $pid = $row['id'];
-        if (!isset($pegawai_map[$pid])) {
-            $pegawai_map[$pid] = $row;
-            $pegawai_gaji_map[$pid] = [];
-        }
-        if ($row['gaji_id']) {
-            $pegawai_gaji_map[$pid][$row['bulan']] = $row;
-        }
+    foreach ($gaji_rows as $grow) {
+        $pegawai_gaji_map[$grow['pegawaiId']][(int)$grow['bulan']] = $grow;
     }
 
-    // Build pegawaiList
-    $pegawai_list = [];
-    $gaji_bulan_ini = [];
-    $summary_bulan_ini = [
+    $pegawai_list       = [];
+    $all_pegawai_master = [];
+    $gaji_bulan_ini     = [];
+    $summary_bulan_ini  = [
         'totalPegawaiAktif'         => 0,
         'totalPegawaiInput'         => 0,
         'totalGajiPokok'            => 0.0,
@@ -110,56 +239,92 @@ if ($method === 'GET' && $sub === '') {
         'totalGajiBersih'           => 0.0,
     ];
 
-    foreach ($pegawai_map as $pid => $p) {
-        $gaji_months = $pegawai_gaji_map[$pid];
-        $ptkp_num    = (float)$p['ptkp'];
+    foreach ($pegawai_map as $p) {
+        $pid            = $p['id'];
+        $gaji_months    = $pegawai_gaji_map[$pid] ?? [];
+        $ptkp_num       = (float)$p['ptkp'];
         $gaji_pokok_num = (float)$p['gajiPokok'];
-        $is_active   = (bool)$p['isActive'];
+        $status_val     = !empty($p['status']) ? strtoupper(trim($p['status'])) : (!empty($p['isActive']) ? 'AKTIF' : 'RESIGN');
+        $is_active      = ($status_val === 'AKTIF');
+        $tgl_resign     = !empty($p['tanggalResign']) ? substr($p['tanggalResign'], 0, 10) : null;
+        $tgl_masuk      = !empty($p['tanggalMasuk']) ? substr($p['tanggalMasuk'], 0, 10) : null;
+        $masa_kerja     = hitung_masa_kerja_id($tgl_masuk);
 
         // Current month gaji
         $current_gaji = null;
         if (isset($gaji_months[$month])) {
             $g = $gaji_months[$month];
-            $gp    = (float)$g['gaji_gp'];
-            $tj    = (float)$g['tunjanganJabatan'];
-            $tt    = (float)$g['tunjanganTransport'];
-            $ins   = (float)$g['insentif'];
-            $bkes  = (float)$g['bpjsKesehatan'];
-            $btk   = (float)$g['bpjsKetenagakerjaan'];
-            $pot   = (float)$g['potonganLain'];
-            $pph   = (float)$g['gaji_pph21'];
-            $kotor = (float)$g['totalGajiKotor'];
-            $brsih = (float)$g['totalGajiBersih'];
+            $gp    = (float)($g['gajiPokok'] ?? 0);
+            $tj    = (float)($g['tunjanganJabatan'] ?? 0);
+            $tt    = (float)($g['tunjanganTransport'] ?? 0);
+            $ins   = (float)($g['insentif'] ?? 0);
+            $bkes  = (float)($g['bpjsKesehatan'] ?? 0);
+            $btk   = (float)($g['bpjsKetenagakerjaan'] ?? 0);
+            $pot   = (float)($g['potonganLain'] ?? 0);
+            $pph   = (float)($g['pph21'] ?? 0);
+            $kotor = (float)($g['totalGajiKotor'] ?? 0);
+            $brsih = (float)($g['totalGajiBersih'] ?? 0);
+            $hk    = (int)($g['hariKerja'] ?? 0);
+            $tarif = (float)($g['tarifTransportHarian'] ?? 15000);
+            $thr   = (float)($g['thr'] ?? 0);
+            $tbkes = (float)($g['tunjanganBpjsKes'] ?? 0);
+            $tbtk  = (float)($g['tunjanganBpjsTk'] ?? 0);
+            $tb    = (float)($g['tunjanganBpjs'] ?? ($tbkes + $tbtk));
+            $tpph  = (float)($g['tunjanganPph'] ?? 0);
+            $tlain = (float)($g['tunjanganLainnya'] ?? $ins);
+            $pb    = (float)($g['potonganBpjs'] ?? ($bkes + $btk));
+            $gtp   = (float)($g['totalGajiTerlaporPajak'] ?? $kotor);
 
             $current_gaji = [
-                'id'                       => $g['gaji_id'],
+                'id'                       => $g['id'],
                 'pegawaiId'                => $pid,
                 'pegawaiNama'              => $p['nama'],
                 'pegawaiNik'               => $p['nik'],
                 'pegawaiJabatan'           => $p['jabatan'],
+                'pegawaiTanggalMasuk'      => $tgl_masuk,
+                'pegawaiMasaKerja'         => $masa_kerja,
                 'bulan'                    => (int)$g['bulan'],
                 'tahun'                    => (int)$g['tahun'],
                 'gajiPokok'                => $gp,
                 'gajiPokokFmt'             => fmt_rp_payroll($gp),
                 'tunjanganJabatan'         => $tj,
                 'tunjanganJabatanFmt'      => fmt_rp_payroll($tj),
+                'hariKerja'                => $hk,
+                'tarifTransportHarian'     => $tarif,
+                'tarifTransportHarianFmt'  => fmt_rp_payroll($tarif),
                 'tunjanganTransport'       => $tt,
                 'tunjanganTransportFmt'    => fmt_rp_payroll($tt),
                 'insentif'                 => $ins,
                 'insentifFmt'              => fmt_rp_payroll($ins),
+                'tunjanganLainnya'         => $tlain,
+                'tunjanganLainnyaFmt'      => fmt_rp_payroll($tlain),
+                'thr'                      => $thr,
+                'thrFmt'                   => fmt_rp_payroll($thr),
+                'tunjanganBpjs'            => $tb,
+                'tunjanganBpjsFmt'         => fmt_rp_payroll($tb),
+                'tunjanganBpjsKes'         => $tbkes,
+                'tunjanganBpjsKesFmt'      => fmt_rp_payroll($tbkes),
+                'tunjanganBpjsTk'          => $tbtk,
+                'tunjanganBpjsTkFmt'       => fmt_rp_payroll($tbtk),
+                'tunjanganPph'             => $tpph,
+                'tunjanganPphFmt'          => fmt_rp_payroll($tpph),
                 'bpjsKesehatan'            => $bkes,
                 'bpjsKesehatanFmt'         => fmt_rp_payroll($bkes),
                 'bpjsKetenagakerjaan'      => $btk,
                 'bpjsKetenagakerjaanFmt'   => fmt_rp_payroll($btk),
+                'potonganBpjs'             => $pb,
+                'potonganBpjsFmt'          => fmt_rp_payroll($pb),
                 'potonganLain'             => $pot,
                 'potonganLainFmt'          => fmt_rp_payroll($pot),
                 'pph21'                    => $pph,
                 'pph21Fmt'                 => fmt_rp_payroll($pph),
                 'totalGajiKotor'           => $kotor,
                 'totalGajiKotorFmt'        => fmt_rp_payroll($kotor),
+                'totalGajiTerlaporPajak'   => $gtp,
+                'totalGajiTerlaporPajakFmt'=> fmt_rp_payroll($gtp),
                 'totalGajiBersih'          => $brsih,
                 'totalGajiBersihFmt'       => fmt_rp_payroll($brsih),
-                'catatan'                  => $g['gaji_catatan'],
+                'catatan'                  => $g['catatan'] ?? '',
             ];
 
             $gaji_bulan_ini[] = $current_gaji;
@@ -168,52 +333,178 @@ if ($method === 'GET' && $sub === '') {
             $summary_bulan_ini['totalTunjanganJabatan']    += $tj;
             $summary_bulan_ini['totalTunjanganTransport']  += $tt;
             $summary_bulan_ini['totalInsentif']            += $ins;
+            $summary_bulan_ini['totalThr']                 += $thr;
+            $summary_bulan_ini['totalTunjanganBpjs']        += $tb;
+            $summary_bulan_ini['totalTunjanganPph']         += $tpph;
             $summary_bulan_ini['totalBpjsKesehatan']       += $bkes;
             $summary_bulan_ini['totalBpjsKetenagakerjaan'] += $btk;
-            $summary_bulan_ini['totalPotonganBpjs']        += ($bkes + $btk);
+            $summary_bulan_ini['totalPotonganBpjs']        += $pb;
             $summary_bulan_ini['totalPotonganLain']        += $pot;
             $summary_bulan_ini['totalPph21']               += $pph;
             $summary_bulan_ini['totalGajiKotor']           += $kotor;
-            $summary_bulan_ini['totalGajiTerlaporPajak']   += $kotor;
+            $summary_bulan_ini['totalGajiTerlaporPajak']   += $gtp;
             $summary_bulan_ini['totalGajiBersih']          += $brsih;
             $summary_bulan_ini['totalPegawaiInput']++;
         }
 
-        // Akumulasi tahunan
+        // Akumulasi tahunan dan rekam riwayat per bulan
         $total_gaji_kotor_thn  = 0.0;
         $total_gaji_bersih_thn = 0.0;
         $total_pph21_thn       = 0.0;
+        $riwayat_gaji_bulan    = [];
         foreach ($gaji_months as $gm) {
-            $total_gaji_kotor_thn  += (float)$gm['totalGajiKotor'];
-            $total_gaji_bersih_thn += (float)$gm['totalGajiBersih'];
-            $total_pph21_thn       += (float)$gm['gaji_pph21'];
+            $total_gaji_kotor_thn  += (float)($gm['totalGajiKotor'] ?? 0);
+            $total_gaji_bersih_thn += (float)($gm['totalGajiBersih'] ?? 0);
+            $total_pph21_thn       += (float)($gm['pph21'] ?? 0);
+
+            $gp_m    = (float)($gm['gajiPokok'] ?? 0);
+            $tj_m    = (float)($gm['tunjanganJabatan'] ?? 0);
+            $tt_m    = (float)($gm['tunjanganTransport'] ?? 0);
+            $ins_m   = (float)($gm['insentif'] ?? 0);
+            $bkes_m  = (float)($gm['bpjsKesehatan'] ?? 0);
+            $btk_m   = (float)($gm['bpjsKetenagakerjaan'] ?? 0);
+            $pot_m   = (float)($gm['potonganLain'] ?? 0);
+            $pph_m   = (float)($gm['pph21'] ?? 0);
+            $kotor_m = (float)($gm['totalGajiKotor'] ?? 0);
+            $brsih_m = (float)($gm['totalGajiBersih'] ?? 0);
+            $hk_m    = (int)($gm['hariKerja'] ?? 0);
+            $tarif_m = (float)($gm['tarifTransportHarian'] ?? 15000);
+            $thr_m   = (float)($gm['thr'] ?? 0);
+            $tbkes_m = (float)($gm['tunjanganBpjsKes'] ?? 0);
+            $tbtk_m  = (float)($gm['tunjanganBpjsTk'] ?? 0);
+            $tb_m    = (float)($gm['tunjanganBpjs'] ?? ($tbkes_m + $tbtk_m));
+            $tpph_m  = (float)($gm['tunjanganPph'] ?? 0);
+            $tlain_m = (float)($gm['tunjanganLainnya'] ?? $ins_m);
+            $pb_m    = (float)($gm['potonganBpjs'] ?? ($bkes_m + $btk_m));
+            $gtp_m   = (float)($gm['totalGajiTerlaporPajak'] ?? $kotor_m);
+
+            $riwayat_gaji_bulan[(int)$gm['bulan']] = [
+                'id'                       => $gm['id'],
+                'pegawaiId'                => $pid,
+                'pegawaiNama'              => $p['nama'],
+                'pegawaiNik'               => $p['nik'],
+                'pegawaiJabatan'           => $p['jabatan'],
+                'pegawaiTanggalMasuk'      => $tgl_masuk,
+                'pegawaiMasaKerja'         => $masa_kerja,
+                'bulan'                    => (int)$gm['bulan'],
+                'tahun'                    => (int)$gm['tahun'],
+                'gajiPokok'                => $gp_m,
+                'gajiPokokFmt'             => fmt_rp_payroll($gp_m),
+                'tunjanganJabatan'         => $tj_m,
+                'tunjanganJabatanFmt'      => fmt_rp_payroll($tj_m),
+                'hariKerja'                => $hk_m,
+                'tarifTransportHarian'     => $tarif_m,
+                'tarifTransportHarianFmt'  => fmt_rp_payroll($tarif_m),
+                'tunjanganTransport'       => $tt_m,
+                'tunjanganTransportFmt'    => fmt_rp_payroll($tt_m),
+                'insentif'                 => $ins_m,
+                'insentifFmt'              => fmt_rp_payroll($ins_m),
+                'tunjanganLainnya'         => $tlain_m,
+                'tunjanganLainnyaFmt'      => fmt_rp_payroll($tlain_m),
+                'thr'                      => $thr_m,
+                'thrFmt'                   => fmt_rp_payroll($thr_m),
+                'tunjanganBpjs'            => $tb_m,
+                'tunjanganBpjsFmt'         => fmt_rp_payroll($tb_m),
+                'tunjanganBpjsKes'         => $tbkes_m,
+                'tunjanganBpjsKesFmt'      => fmt_rp_payroll($tbkes_m),
+                'tunjanganBpjsTk'          => $tbtk_m,
+                'tunjanganBpjsTkFmt'       => fmt_rp_payroll($tbtk_m),
+                'tunjanganPph'             => $tpph_m,
+                'tunjanganPphFmt'          => fmt_rp_payroll($tpph_m),
+                'bpjsKesehatan'            => $bkes_m,
+                'bpjsKesehatanFmt'         => fmt_rp_payroll($bkes_m),
+                'bpjsKetenagakerjaan'      => $btk_m,
+                'bpjsKetenagakerjaanFmt'   => fmt_rp_payroll($btk_m),
+                'potonganBpjs'             => $pb_m,
+                'potonganBpjsFmt'          => fmt_rp_payroll($pb_m),
+                'potonganLain'             => $pot_m,
+                'potonganLainFmt'          => fmt_rp_payroll($pot_m),
+                'pph21'                    => $pph_m,
+                'pph21Fmt'                 => fmt_rp_payroll($pph_m),
+                'totalGajiKotor'           => $kotor_m,
+                'totalGajiKotorFmt'        => fmt_rp_payroll($kotor_m),
+                'totalGajiTerlaporPajak'   => $gtp_m,
+                'totalGajiTerlaporPajakFmt'=> fmt_rp_payroll($gtp_m),
+                'totalGajiBersih'          => $brsih_m,
+                'totalGajiBersihFmt'       => fmt_rp_payroll($brsih_m),
+                'catatan'                  => $gm['catatan'] ?? '',
+            ];
         }
 
-        if ($is_active) $summary_bulan_ini['totalPegawaiAktif']++;
+        $tj_master    = (float)($p['tunjanganJabatan'] ?? 0);
+        $tbkes_master = (float)($p['tunjanganBpjsKes'] ?? 0);
+        $tbtk_master  = (float)($p['tunjanganBpjsTk'] ?? 0);
+        $tb_master    = $tbkes_master + $tbtk_master;
+        $bkes_master  = (float)($p['bpjsKesehatan'] ?? 0);
+        $btk_master   = (float)($p['bpjsKetenagakerjaan'] ?? 0);
+        $pb_master    = (float)($p['potonganBpjs'] ?? ($bkes_master + $btk_master));
+        if ($pb_master <= 0 && ($bkes_master > 0 || $btk_master > 0)) {
+            $pb_master = $bkes_master + $btk_master;
+        }
+        $tot_tetap    = $gaji_pokok_num + $tj_master;
+        $tarif_master = (float)($p['tarifTransportHarian'] ?? 15000.0);
+        if ($tarif_master <= 0) {
+            $tarif_master = 15000.0;
+        }
 
-        $tj_master = (float)$p['tunjanganJabatan'];
-        $pegawai_list[] = [
-            'id'                    => $pid,
-            'entityId'              => $p['entityId'],
-            'nik'                   => $p['nik'],
-            'nama'                  => $p['nama'],
-            'jabatan'               => $p['jabatan'],
-            'statusKeluarga'        => $p['statusKeluarga'],
-            'ptkp'                  => $ptkp_num,
-            'ptkpFmt'               => fmt_rp_payroll($ptkp_num),
-            'gajiPokok'             => $gaji_pokok_num,
-            'gajiPokokFmt'          => fmt_rp_payroll($gaji_pokok_num),
-            'tunjanganJabatan'      => $tj_master,
-            'tunjanganJabatanFmt'   => fmt_rp_payroll($tj_master),
-            'isActive'              => (bool)$p['isActive'],
-            'currentGaji'    => $current_gaji,
-            'akumulasiTahun' => [
-                'totalGajiKotor'  => $total_gaji_kotor_thn,
-                'totalGajiBersih' => $total_gaji_bersih_thn,
-                'totalPph21'      => $total_pph21_thn,
-                'bulanTerbayar'   => count($gaji_months),
+        $p_item = [
+            'id'                     => $pid,
+            'entityId'               => $p['entityId'],
+            'nik'                    => $p['nik'],
+            'nama'                   => $p['nama'],
+            'jabatan'                => $p['jabatan'],
+            'statusKeluarga'         => $p['statusKeluarga'],
+            'ptkp'                   => $ptkp_num,
+            'ptkpFmt'                => fmt_rp_payroll($ptkp_num),
+            'gajiPokok'              => $gaji_pokok_num,
+            'gajiPokokFmt'           => fmt_rp_payroll($gaji_pokok_num),
+            'tunjanganJabatan'       => $tj_master,
+            'tunjanganJabatanFmt'    => fmt_rp_payroll($tj_master),
+            'tarifTransportHarian'   => $tarif_master,
+            'tarifTransportHarianFmt'=> fmt_rp_payroll($tarif_master),
+            'tunjanganBpjsKes'       => $tbkes_master,
+            'tunjanganBpjsKesFmt'    => fmt_rp_payroll($tbkes_master),
+            'tunjanganBpjsTk'        => $tbtk_master,
+            'tunjanganBpjsTkFmt'     => fmt_rp_payroll($tbtk_master),
+            'tunjanganBpjs'          => $tb_master,
+            'tunjanganBpjsFmt'       => fmt_rp_payroll($tb_master),
+            'bpjsKesehatan'          => $bkes_master,
+            'bpjsKesehatanFmt'       => fmt_rp_payroll($bkes_master),
+            'bpjsKetenagakerjaan'    => $btk_master,
+            'bpjsKetenagakerjaanFmt' => fmt_rp_payroll($btk_master),
+            'potonganBpjs'           => $pb_master,
+            'potonganBpjsFmt'        => fmt_rp_payroll($pb_master),
+            'totalGajiTetap'         => $tot_tetap,
+            'totalGajiTetapFmt'      => fmt_rp_payroll($tot_tetap),
+            'tanggalMasuk'          => $tgl_masuk,
+            'tanggalMasukFmt'       => $tgl_masuk ? fmt_tanggal_id($tgl_masuk) : null,
+            'masaKerja'             => $masa_kerja,
+            'status'                => $status_val,
+            'tanggalResign'         => $tgl_resign,
+            'tanggalResignFmt'      => $tgl_resign ? fmt_tanggal_id($tgl_resign) : null,
+            'isActive'              => $is_active,
+            'currentGaji'           => $current_gaji,
+            'riwayatGajiBulan'      => $riwayat_gaji_bulan,
+            'akumulasiTahun'        => [
+                'totalGajiKotor'         => $total_gaji_kotor_thn,
+                'totalGajiTerlaporPajak' => $total_gaji_kotor_thn,
+                'totalGajiBersih'        => $total_gaji_bersih_thn,
+                'totalPph21'             => $total_pph21_thn,
+                'bulanTerbayar'          => count($gaji_months),
             ],
         ];
+
+        // 1. Masukkan ke profil master seluruh pegawai
+        $all_pegawai_master[] = $p_item;
+
+        // 2. Cek apakah karyawan berhak muncul di daftar penggajian bulan $month/$year ini
+        $is_eligible = is_pegawai_eligible_for_month($p, $year, $month, ($current_gaji !== null));
+        if ($is_eligible) {
+            $pegawai_list[] = $p_item;
+            if ($is_active || ($current_gaji !== null)) {
+                $summary_bulan_ini['totalPegawaiAktif']++;
+            }
+        }
     }
 
     // 6. Honor list for entity+year+month
@@ -768,6 +1059,7 @@ if ($method === 'GET' && $sub === '') {
         'year'                  => $year,
         'month'                 => $month,
         'pegawaiList'           => $pegawai_list,
+        'allPegawaiMaster'      => $all_pegawai_master,
         'gajiBulanIni'          => $gaji_bulan_ini,
         'rekapBulananPegawai'   => $rekap_bulanan_pegawai,
         'summaryBulanIni'       => array_merge($summary_bulan_ini, [
@@ -813,11 +1105,15 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     $nama           = trim($body['nama'] ?? '');
     $jabatan        = trim($body['jabatan'] ?? '') ?: 'Karyawan';
     $status_kel     = trim($body['statusKeluarga'] ?? '') ?: 'TK/0';
-    $ptkp           = (float)($body['ptkp'] ?? 54000000);
-    $gaji_pokok     = (float)($body['gajiPokok'] ?? 0);
-    $is_active      = isset($body['isActive'])
-        ? ($body['isActive'] === true || $body['isActive'] === 'true' || $body['isActive'] === 'on')
-        : true;
+    $ptkp           = parse_rupiah_num($body['ptkp'] ?? null, 54000000.0);
+    $gaji_pokok     = parse_rupiah_num($body['gajiPokok'] ?? null, 0.0);
+    $status         = strtoupper(trim($body['status'] ?? 'AKTIF'));
+    if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) {
+        $status = 'AKTIF';
+    }
+    $is_active      = ($status === 'AKTIF');
+    $tanggal_masuk  = !empty($body['tanggalMasuk']) ? trim($body['tanggalMasuk']) : null;
+    $tanggal_resign = !empty($body['tanggalResign']) ? trim($body['tanggalResign']) : null;
 
     if (!$entity_id || !$nik || !$nama) {
         return error_response('Entitas, NIK/Kode, dan Nama Pegawai wajib diisi.', 400);
@@ -832,11 +1128,27 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
 
     $id  = uuid4();
     $now = date('Y-m-d H:i:s');
-    $tunjangan_jabatan = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : 0.0;
+    $tunjangan_jabatan  = parse_rupiah_num($body['tunjanganJabatan'] ?? null, 0.0);
+    $tarif_transport    = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    if ($tarif_transport <= 0) {
+        $tarif_transport = 15000.0;
+    }
+    $tunjangan_bpjs_kes = parse_rupiah_num($body['tunjanganBpjsKes'] ?? null, 0.0);
+    $tunjangan_bpjs_tk  = parse_rupiah_num($body['tunjanganBpjsTk'] ?? null, 0.0);
+    $bpjs_kes           = parse_rupiah_num($body['bpjsKesehatan'] ?? null, 0.0);
+    $bpjs_tk            = parse_rupiah_num($body['bpjsKetenagakerjaan'] ?? null, 0.0);
+    $potongan_bpjs      = isset($body['potonganBpjs']) && parse_rupiah_num($body['potonganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['potonganBpjs'])
+        : ($bpjs_kes + $bpjs_tk);
+
     $pdo->prepare(
-        "INSERT INTO Pegawai (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok, tunjanganJabatan, isActive, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    )->execute([$id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $now, $now]);
+        "INSERT INTO Pegawai (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok, tunjanganJabatan, tarifTransportHarian, tunjanganBpjsKes, tunjanganBpjsTk, bpjsKesehatan, bpjsKetenagakerjaan, potonganBpjs, isActive, status, tanggalResign, tanggalMasuk, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )->execute([
+        $id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok,
+        $tunjangan_jabatan, $tarif_transport, $tunjangan_bpjs_kes, $tunjangan_bpjs_tk, $bpjs_kes, $bpjs_tk, $potongan_bpjs,
+        $is_active ? 1 : 0, $status, $tanggal_resign, $tanggal_masuk, $now, $now
+    ]);
 
     log_activity($user['id'], "Tambah Pegawai Tetap: $nama ($nik) - $jabatan", 'FINANCIAL_CHANGE', [
         'pegawaiId' => $id, 'entityId' => $entity_id,
@@ -847,6 +1159,68 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     $pegawai = $stmt->fetch(PDO::FETCH_ASSOC);
 
     json_response(['success' => true, 'data' => $pegawai]);
+}
+
+// ─── POST /api/payroll/pegawai/batch-transport ──────────────────────────────
+elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === 'batch-transport') {
+    $user = require_auth();
+    $pdo  = get_pdo();
+
+    $entity_id       = trim($body['entityId'] ?? '');
+    $tarif_transport = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    if ($tarif_transport < 0) $tarif_transport = 15000.0;
+
+    if (!$entity_id) {
+        return error_response('Entitas wajib dipilih.', 400);
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $stmt = $pdo->prepare("UPDATE Pegawai SET tarifTransportHarian = ?, updatedAt = ? WHERE entityId = ?");
+    $stmt->execute([$tarif_transport, $now, $entity_id]);
+    $affected = $stmt->rowCount();
+
+    log_activity(
+        $user['id'],
+        "Update Tarif Transport Standar Master Pegawai: " . fmt_rp_payroll($tarif_transport) . "/hari untuk $affected pegawai",
+        'FINANCIAL_CHANGE',
+        ['entityId' => $entity_id, 'tarifTransport' => $tarif_transport, 'count' => $affected]
+    );
+
+    json_response([
+        'success'  => true,
+        'affected' => $affected,
+        'message'  => "Berhasil memperbarui tarif transport menjadi " . fmt_rp_payroll($tarif_transport) . " per hari untuk {$affected} pegawai.",
+    ]);
+}
+
+// ─── POST /api/payroll/pegawai/single-transport ─────────────────────────────
+elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === 'single-transport') {
+    $user = require_auth();
+    $pdo  = get_pdo();
+
+    $pegawai_id      = trim($body['pegawaiId'] ?? '');
+    $tarif_transport = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    if ($tarif_transport < 0) $tarif_transport = 15000.0;
+
+    if (!$pegawai_id) {
+        return error_response('ID Pegawai wajib diisi.', 400);
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $stmt = $pdo->prepare("UPDATE Pegawai SET tarifTransportHarian = ?, updatedAt = ? WHERE id = ?");
+    $stmt->execute([$tarif_transport, $now, $pegawai_id]);
+
+    log_activity(
+        $user['id'],
+        "Update Tarif Transport Pegawai ($pegawai_id): " . fmt_rp_payroll($tarif_transport) . "/hari",
+        'FINANCIAL_CHANGE',
+        ['pegawaiId' => $pegawai_id, 'tarifTransport' => $tarif_transport]
+    );
+
+    json_response([
+        'success' => true,
+        'message' => "Berhasil memperbarui tarif transport menjadi " . fmt_rp_payroll($tarif_transport) . " per hari.",
+    ]);
 }
 
 // ─── PUT /api/payroll/pegawai/{id} ────────────────────────────────────────────
@@ -860,16 +1234,41 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$existing) return error_response('Data pegawai tidak ditemukan.', 404);
 
-    $nik               = trim($body['nik'] ?? $existing['nik']);
-    $nama              = trim($body['nama'] ?? $existing['nama']);
-    $jabatan           = trim($body['jabatan'] ?? $existing['jabatan']) ?: 'Karyawan';
-    $status_kel        = trim($body['statusKeluarga'] ?? $existing['statusKeluarga']) ?: 'TK/0';
-    $ptkp              = isset($body['ptkp']) ? (float)$body['ptkp'] : (float)$existing['ptkp'];
-    $gaji_pokok        = isset($body['gajiPokok']) ? (float)$body['gajiPokok'] : (float)$existing['gajiPokok'];
-    $tunjangan_jabatan = isset($body['tunjanganJabatan']) ? (float)$body['tunjanganJabatan'] : (float)$existing['tunjanganJabatan'];
-    $is_active         = isset($body['isActive'])
-        ? ($body['isActive'] === true || $body['isActive'] === 'true' || $body['isActive'] === 'on')
-        : (bool)$existing['isActive'];
+    $nik                = trim($body['nik'] ?? $existing['nik']);
+    $nama               = trim($body['nama'] ?? $existing['nama']);
+    $jabatan            = trim($body['jabatan'] ?? $existing['jabatan']) ?: 'Karyawan';
+    $status_kel         = trim($body['statusKeluarga'] ?? $existing['statusKeluarga']) ?: 'TK/0';
+    $ptkp               = isset($body['ptkp']) ? parse_rupiah_num($body['ptkp'], (float)$existing['ptkp']) : (float)$existing['ptkp'];
+    $gaji_pokok         = isset($body['gajiPokok']) ? parse_rupiah_num($body['gajiPokok'], (float)$existing['gajiPokok']) : (float)$existing['gajiPokok'];
+    $tunjangan_jabatan  = isset($body['tunjanganJabatan']) ? parse_rupiah_num($body['tunjanganJabatan'], (float)$existing['tunjanganJabatan']) : (float)$existing['tunjanganJabatan'];
+    $tarif_transport    = isset($body['tarifTransportHarian']) ? parse_rupiah_num($body['tarifTransportHarian'], (float)($existing['tarifTransportHarian'] ?? 15000.0)) : (float)($existing['tarifTransportHarian'] ?? 15000.0);
+    if ($tarif_transport <= 0) {
+        $tarif_transport = 15000.0;
+    }
+    $tunjangan_bpjs_kes = array_key_exists('tunjanganBpjsKes', $body) ? parse_rupiah_num($body['tunjanganBpjsKes'], (float)($existing['tunjanganBpjsKes'] ?? 0)) : (float)($existing['tunjanganBpjsKes'] ?? 0);
+    $tunjangan_bpjs_tk  = array_key_exists('tunjanganBpjsTk', $body) ? parse_rupiah_num($body['tunjanganBpjsTk'], (float)($existing['tunjanganBpjsTk'] ?? 0)) : (float)($existing['tunjanganBpjsTk'] ?? 0);
+    $bpjs_kes           = array_key_exists('bpjsKesehatan', $body) ? parse_rupiah_num($body['bpjsKesehatan'], (float)($existing['bpjsKesehatan'] ?? 0)) : (float)($existing['bpjsKesehatan'] ?? 0);
+    $bpjs_tk            = array_key_exists('bpjsKetenagakerjaan', $body) ? parse_rupiah_num($body['bpjsKetenagakerjaan'], (float)($existing['bpjsKetenagakerjaan'] ?? 0)) : (float)($existing['bpjsKetenagakerjaan'] ?? 0);
+    $potongan_bpjs      = array_key_exists('potonganBpjs', $body) && parse_rupiah_num($body['potonganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['potonganBpjs'])
+        : (float)($existing['potonganBpjs'] ?? ($bpjs_kes + $bpjs_tk));
+    
+    $status            = isset($body['status']) ? strtoupper(trim($body['status'])) : ($existing['status'] ?? 'AKTIF');
+    if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) {
+        $status = 'AKTIF';
+    }
+    $is_active         = ($status === 'AKTIF');
+
+    $tanggal_resign    = array_key_exists('tanggalResign', $body)
+        ? (!empty($body['tanggalResign']) ? trim($body['tanggalResign']) : null)
+        : ($existing['tanggalResign'] ?? null);
+    if ($status === 'AKTIF' && empty($body['tanggalResign'])) {
+        $tanggal_resign = null;
+    }
+
+    $tanggal_masuk     = array_key_exists('tanggalMasuk', $body)
+        ? (!empty($body['tanggalMasuk']) ? trim($body['tanggalMasuk']) : null)
+        : ($existing['tanggalMasuk'] ?? null);
 
     if (!$nik || !$nama) return error_response('NIK/Kode dan Nama Pegawai wajib diisi.', 400);
 
@@ -884,8 +1283,12 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
 
     $now = date('Y-m-d H:i:s');
     $pdo->prepare(
-        "UPDATE Pegawai SET nik=?, nama=?, jabatan=?, statusKeluarga=?, ptkp=?, gajiPokok=?, tunjanganJabatan=?, isActive=?, updatedAt=? WHERE id=?"
-    )->execute([$nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $is_active ? 1 : 0, $now, $id]);
+        "UPDATE Pegawai SET nik=?, nama=?, jabatan=?, statusKeluarga=?, ptkp=?, gajiPokok=?, tunjanganJabatan=?, tarifTransportHarian=?, tunjanganBpjsKes=?, tunjanganBpjsTk=?, bpjsKesehatan=?, bpjsKetenagakerjaan=?, potonganBpjs=?, isActive=?, status=?, tanggalResign=?, tanggalMasuk=?, updatedAt=? WHERE id=?"
+    )->execute([
+        $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok, $tunjangan_jabatan, $tarif_transport,
+        $tunjangan_bpjs_kes, $tunjangan_bpjs_tk, $bpjs_kes, $bpjs_tk, $potongan_bpjs,
+        $is_active ? 1 : 0, $status, $tanggal_resign, $tanggal_masuk, $now, $id
+    ]);
 
     log_activity($user['id'], "Update Pegawai Tetap: $nama ($nik)", 'FINANCIAL_CHANGE', ['pegawaiId' => $id]);
 
@@ -906,6 +1309,17 @@ elseif ($method === 'DELETE' && $sub === 'pegawai' && $sub2 !== '') {
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$existing) return error_response('Data pegawai tidak ditemukan.', 404);
 
+    // Larangan Menghapus Data: Karyawan yang memiliki riwayat gaji tidak boleh dihapus dari sistem
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM GajiPegawaiBulanan WHERE pegawaiId = ?");
+    $stmt->execute([$id]);
+    $gaji_count = (int)$stmt->fetchColumn();
+    if ($gaji_count > 0) {
+        return error_response(
+            "Karyawan {$existing['nama']} tidak boleh dihapus karena memiliki {$gaji_count} riwayat penggajian yang harus diarsip untuk laporan keuangan & pajak tahunan. Silakan ubah status menjadi RESIGN atau PENSIUN.",
+            422
+        );
+    }
+
     $pdo->prepare("DELETE FROM Pegawai WHERE id = ?")->execute([$id]);
 
     log_activity($user['id'], "Hapus Pegawai Tetap: {$existing['nama']} ({$existing['nik']})", 'FINANCIAL_CHANGE', [
@@ -914,36 +1328,199 @@ elseif ($method === 'DELETE' && $sub === 'pegawai' && $sub2 !== '') {
     json_response(['success' => true]);
 }
 
+// ─── POST /api/payroll/gaji/bulk-generate ─────────────────────────────────────
+elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === 'bulk-generate') {
+    $user = require_auth();
+    $pdo  = get_pdo();
+
+    $entity_id          = trim($body['entityId'] ?? '');
+    $bulan              = (int)($body['bulan'] ?? 0);
+    $tahun              = (int)($body['tahun'] ?? 0);
+    $default_hari_kerja = (int)parse_rupiah_num($body['defaultHariKerja'] ?? null, 20.0);
+    if ($default_hari_kerja <= 0) $default_hari_kerja = 20;
+    $overwrite          = !empty($body['overwrite']);
+    $auto_calculate_pph = isset($body['autoCalculatePph']) ? !empty($body['autoCalculatePph']) : true;
+
+    if (!$entity_id || !$bulan || !$tahun) {
+        return error_response('Entitas, Bulan, dan Tahun wajib diisi.', 400);
+    }
+
+    // Ambil seluruh pegawai di entitas ini
+    $stmt = $pdo->prepare("SELECT * FROM Pegawai WHERE entityId = ? ORDER BY nama ASC");
+    $stmt->execute([$entity_id]);
+    $all_pegawai = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($all_pegawai)) {
+        return error_response('Belum ada pegawai terdaftar di master database entitas ini.', 404);
+    }
+
+    // Ambil data gaji yang sudah ada di bulan/tahun ini
+    $stmt = $pdo->prepare("SELECT id, pegawaiId FROM GajiPegawaiBulanan WHERE entityId = ? AND bulan = ? AND tahun = ?");
+    $stmt->execute([$entity_id, $bulan, $tahun]);
+    $existing_gaji_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $existing_gaji_map = []; // pegawaiId => gaji_id
+    foreach ($existing_gaji_rows as $eg) {
+        $existing_gaji_map[$eg['pegawaiId']] = $eg['id'];
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $count = 0;
+    $skipped = 0;
+
+    foreach ($all_pegawai as $p) {
+        $pid = $p['id'];
+        $has_existing = isset($existing_gaji_map[$pid]);
+
+        // Cek eligibility: karyawan aktif atau yang resign sesudah/pada bulan target
+        $eligible = is_pegawai_eligible_for_month($p, $tahun, $bulan, $has_existing);
+        if (!$eligible) {
+            $skipped++;
+            continue;
+        }
+
+        if ($has_existing && !$overwrite) {
+            $skipped++;
+            continue;
+        }
+
+        $gp                  = (float)$p['gajiPokok'];
+        $tj                  = (float)$p['tunjanganJabatan'];
+        $tarif               = (float)($p['tarifTransportHarian'] ?: 15000.0);
+        if ($tarif <= 0) $tarif = 15000.0;
+        $hk                  = $default_hari_kerja;
+        $tt                  = $hk * $tarif;
+        $tbkes               = (float)($p['tunjanganBpjsKes'] ?? 0);
+        $tbtk                = (float)($p['tunjanganBpjsTk'] ?? 0);
+        $tb                  = $tbkes + $tbtk;
+        $bkes                = (float)($p['bpjsKesehatan'] ?? 0);
+        $btk                 = (float)($p['bpjsKetenagakerjaan'] ?? 0);
+        $pb                  = (float)($p['potonganBpjs'] ?? ($bkes + $btk));
+        if ($pb <= 0 && ($bkes > 0 || $btk > 0)) {
+            $pb = $bkes + $btk;
+        }
+
+        $insentif            = 0.0;
+        $thr                 = 0.0;
+        $tunjangan_pph       = 0.0;
+        $potongan_lain       = 0.0;
+        $total_kotor         = $gp + $tj + $tt + $tb + $tunjangan_pph;
+        $total_pajak         = $total_kotor;
+
+        $pph21               = 0.0;
+        if ($auto_calculate_pph) {
+            $calc_pph = hitung_pph21_ter($total_kotor, $p['statusKeluarga'] ?? 'TK/0');
+            $pph21 = (float)$calc_pph['nominal'];
+        }
+
+        $total_bersih        = max(0, $gp + $tj + $tt - $pb - $potongan_lain);
+        $catatan             = "Generated otomatis dari Master Data ({$hk} hari kerja" . ($auto_calculate_pph ? ", TER PPh 21 aktif" : "") . ")";
+
+        if ($has_existing && $overwrite) {
+            $existing_id = $existing_gaji_map[$pid];
+            $pdo->prepare(
+                "UPDATE GajiPegawaiBulanan
+                 SET gajiPokok=?, tunjanganJabatan=?, hariKerja=?, tarifTransportHarian=?, tunjanganTransport=?,
+                     insentif=?, tunjanganLainnya=?, thr=?, tunjanganBpjs=?, tunjanganBpjsKes=?,
+                     tunjanganBpjsTk=?, tunjanganPph=?, bpjsKesehatan=?, bpjsKetenagakerjaan=?,
+                     potonganBpjs=?, potonganLain=?, pph21=?, totalGajiKotor=?, totalGajiTerlaporPajak=?,
+                     totalGajiBersih=?, catatan=?, updatedAt=?
+                 WHERE id=?"
+            )->execute([
+                $gp, $tj, $hk, $tarif, $tt,
+                $insentif, 0.0, $thr, $tb, $tbkes,
+                $tbtk, $tunjangan_pph, $bkes, $btk,
+                $pb, $potongan_lain, $pph21, $total_kotor, $total_pajak,
+                $total_bersih, $catatan, $now, $existing_id
+            ]);
+        } else {
+            $gaji_id = uuid4();
+            $pdo->prepare(
+                "INSERT INTO GajiPegawaiBulanan
+                 (id, pegawaiId, entityId, bulan, tahun, gajiPokok, tunjanganJabatan, hariKerja,
+                  tarifTransportHarian, tunjanganTransport, insentif, tunjanganLainnya, thr,
+                  tunjanganBpjs, tunjanganBpjsKes, tunjanganBpjsTk, tunjanganPph, bpjsKesehatan,
+                  bpjsKetenagakerjaan, potonganBpjs, potonganLain, pph21, totalGajiKotor,
+                  totalGajiTerlaporPajak, totalGajiBersih, catatan, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )->execute([
+                $gaji_id, $pid, $entity_id, $bulan, $tahun, $gp, $tj, $hk,
+                $tarif, $tt, $insentif, 0.0, $thr,
+                $tb, $tbkes, $tbtk, $tunjangan_pph, $bkes,
+                $btk, $pb, $potongan_lain, $pph21, $total_kotor,
+                $total_pajak, $total_bersih, $catatan, $now, $now
+            ]);
+        }
+        $count++;
+    }
+
+    log_activity(
+        $user['id'],
+        "Generate Otomatis Gaji {$count} Pegawai Periode Bulan {$bulan}/{$tahun} (Standar {$default_hari_kerja} Hari Kerja)",
+        'FINANCIAL_CHANGE',
+        ['entityId' => $entity_id, 'bulan' => $bulan, 'tahun' => $tahun, 'count' => $count]
+    );
+
+    json_response([
+        'success'        => true,
+        'processedCount' => $count,
+        'skippedCount'   => $skipped,
+        'message'        => "Berhasil memproses gaji untuk {$count} pegawai periode bulan {$bulan}/{$tahun}.",
+    ]);
+}
+
 // ─── POST /api/payroll/gaji ───────────────────────────────────────────────────
 elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === '') {
     $user = require_auth();
     $pdo  = get_pdo();
 
-    $pegawai_id       = trim($body['pegawaiId'] ?? '');
-    $entity_id        = trim($body['entityId'] ?? '');
-    $bulan            = (int)($body['bulan'] ?? 0);
-    $tahun            = (int)($body['tahun'] ?? 0);
-    $gaji_pokok       = (float)($body['gajiPokok'] ?? 0);
-    $tunjangan_jabatan= (float)($body['tunjanganJabatan'] ?? 0);
-    $tunjangan_transport = (float)($body['tunjanganTransport'] ?? 0);
-    $insentif         = (float)($body['insentif'] ?? 0);
-    $bpjs_kes         = (float)($body['bpjsKesehatan'] ?? 0);
-    $bpjs_tk          = (float)($body['bpjsKetenagakerjaan'] ?? 0);
-    $potongan_lain    = (float)($body['potonganLain'] ?? 0);
-    $pph21            = (float)($body['pph21'] ?? 0);
-    $catatan          = trim($body['catatan'] ?? '') ?: null;
+    $pegawai_id          = trim($body['pegawaiId'] ?? '');
+    $entity_id           = trim($body['entityId'] ?? '');
+    $bulan               = (int)($body['bulan'] ?? 0);
+    $tahun               = (int)($body['tahun'] ?? 0);
+    $gaji_pokok          = parse_rupiah_num($body['gajiPokok'] ?? null, 0.0);
+    $tunjangan_jabatan   = parse_rupiah_num($body['tunjanganJabatan'] ?? null, 0.0);
+    $hari_kerja          = (int)parse_rupiah_num($body['hariKerja'] ?? null, 0.0);
+    $tarif_transport     = parse_rupiah_num($body['tarifTransportHarian'] ?? null, 15000.0);
+    $tunjangan_transport = parse_rupiah_num($body['tunjanganTransport'] ?? null, 0.0);
+    $insentif            = parse_rupiah_num($body['insentif'] ?? null, 0.0);
+    $tunjangan_lainnya   = parse_rupiah_num($body['tunjanganLainnya'] ?? null, $insentif);
+    $thr                 = parse_rupiah_num($body['thr'] ?? null, 0.0);
+    $tunjangan_bpjs_kes  = parse_rupiah_num($body['tunjanganBpjsKes'] ?? null, 0.0);
+    $tunjangan_bpjs_tk   = parse_rupiah_num($body['tunjanganBpjsTk'] ?? null, 0.0);
+    $tunjangan_bpjs      = isset($body['tunjanganBpjs']) && parse_rupiah_num($body['tunjanganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['tunjanganBpjs'])
+        : ($tunjangan_bpjs_kes + $tunjangan_bpjs_tk);
+    $tunjangan_pph       = parse_rupiah_num($body['tunjanganPph'] ?? null, 0.0);
+    $bpjs_kes            = parse_rupiah_num($body['bpjsKesehatan'] ?? null, 0.0);
+    $bpjs_tk             = parse_rupiah_num($body['bpjsKetenagakerjaan'] ?? null, 0.0);
+    $potongan_bpjs       = isset($body['potonganBpjs']) && parse_rupiah_num($body['potonganBpjs'], 0.0) > 0
+        ? parse_rupiah_num($body['potonganBpjs'])
+        : ($bpjs_kes + $bpjs_tk);
+    $potongan_lain       = parse_rupiah_num($body['potonganLain'] ?? null, 0.0);
+    $pph21               = parse_rupiah_num($body['pph21'] ?? null, 0.0);
+    $catatan             = trim($body['catatan'] ?? '') ?: null;
 
     if (!$pegawai_id || !$entity_id || !$bulan || !$tahun) {
         return error_response('Pegawai, Entitas, Bulan, dan Tahun wajib diisi.', 400);
     }
 
-    $stmt = $pdo->prepare("SELECT id, nama, nik FROM Pegawai WHERE id = ? LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, nama, nik, tarifTransportHarian FROM Pegawai WHERE id = ? LIMIT 1");
     $stmt->execute([$pegawai_id]);
     $pegawai = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$pegawai) return error_response('Pegawai tidak ditemukan.', 404);
 
-    $total_kotor  = $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $insentif;
-    $total_bersih = max(0, $total_kotor - $bpjs_kes - $bpjs_tk - $potongan_lain - $pph21);
+    if ($tarif_transport <= 0) {
+        $tarif_transport = (float)($pegawai['tarifTransportHarian'] ?? 15000.0);
+        if ($tarif_transport <= 0) $tarif_transport = 15000.0;
+    }
+    if ($tunjangan_transport <= 0 && $hari_kerja > 0) {
+        $tunjangan_transport = $hari_kerja * $tarif_transport;
+    }
+
+    $total_kotor  = $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $insentif + $thr + $tunjangan_bpjs + $tunjangan_pph;
+    $total_pajak  = $total_kotor;
+    // Potongan dari karyawan: BPJS Karyawan + Potongan Lain (PPh 21 ditanggung perusahaan)
+    $total_bersih = max(0, $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $insentif + $thr - $potongan_bpjs - $potongan_lain);
     $now          = date('Y-m-d H:i:s');
 
     // Check existing (upsert)
@@ -954,26 +1531,37 @@ elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === '') {
     if ($existing_id) {
         $pdo->prepare(
             "UPDATE GajiPegawaiBulanan
-             SET gajiPokok=?, tunjanganJabatan=?, tunjanganTransport=?, insentif=?,
-                 bpjsKesehatan=?, bpjsKetenagakerjaan=?, potonganLain=?, pph21=?,
-                 totalGajiKotor=?, totalGajiBersih=?, catatan=?
+             SET gajiPokok=?, tunjanganJabatan=?, hariKerja=?, tarifTransportHarian=?, tunjanganTransport=?,
+                 insentif=?, tunjanganLainnya=?, thr=?, tunjanganBpjs=?, tunjanganBpjsKes=?,
+                 tunjanganBpjsTk=?, tunjanganPph=?, bpjsKesehatan=?, bpjsKetenagakerjaan=?,
+                 potonganBpjs=?, potonganLain=?, pph21=?, totalGajiKotor=?, totalGajiTerlaporPajak=?,
+                 totalGajiBersih=?, catatan=?, updatedAt=?
              WHERE id=?"
-        )->execute([$gaji_pokok, $tunjangan_jabatan, $tunjangan_transport, $insentif,
-                    $bpjs_kes, $bpjs_tk, $potongan_lain, $pph21,
-                    $total_kotor, $total_bersih, $catatan, $existing_id]);
+        )->execute([
+            $gaji_pokok, $tunjangan_jabatan, $hari_kerja, $tarif_transport, $tunjangan_transport,
+            $insentif, $tunjangan_lainnya, $thr, $tunjangan_bpjs, $tunjangan_bpjs_kes,
+            $tunjangan_bpjs_tk, $tunjangan_pph, $bpjs_kes, $bpjs_tk,
+            $potongan_bpjs, $potongan_lain, $pph21, $total_kotor, $total_pajak,
+            $total_bersih, $catatan, $now, $existing_id
+        ]);
         $gaji_id = $existing_id;
     } else {
         $gaji_id = uuid4();
         $pdo->prepare(
             "INSERT INTO GajiPegawaiBulanan
-             (id, pegawaiId, entityId, bulan, tahun, gajiPokok, tunjanganJabatan, tunjanganTransport,
-              insentif, bpjsKesehatan, bpjsKetenagakerjaan, potonganLain, pph21,
-              totalGajiKotor, totalGajiBersih, catatan, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        )->execute([$gaji_id, $pegawai_id, $entity_id, $bulan, $tahun,
-                    $gaji_pokok, $tunjangan_jabatan, $tunjangan_transport, $insentif,
-                    $bpjs_kes, $bpjs_tk, $potongan_lain, $pph21,
-                    $total_kotor, $total_bersih, $catatan, $now]);
+             (id, pegawaiId, entityId, bulan, tahun, gajiPokok, tunjanganJabatan, hariKerja,
+              tarifTransportHarian, tunjanganTransport, insentif, tunjanganLainnya, thr,
+              tunjanganBpjs, tunjanganBpjsKes, tunjanganBpjsTk, tunjanganPph, bpjsKesehatan,
+              bpjsKetenagakerjaan, potonganBpjs, potonganLain, pph21, totalGajiKotor,
+              totalGajiTerlaporPajak, totalGajiBersih, catatan, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )->execute([
+            $gaji_id, $pegawai_id, $entity_id, $bulan, $tahun, $gaji_pokok, $tunjangan_jabatan, $hari_kerja,
+            $tarif_transport, $tunjangan_transport, $insentif, $tunjangan_lainnya, $thr,
+            $tunjangan_bpjs, $tunjangan_bpjs_kes, $tunjangan_bpjs_tk, $tunjangan_pph, $bpjs_kes,
+            $bpjs_tk, $potongan_bpjs, $potongan_lain, $pph21, $total_kotor,
+            $total_pajak, $total_bersih, $catatan, $now, $now
+        ]);
     }
 
     log_activity($user['id'],
@@ -1026,9 +1614,9 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
     $npwp            = trim($body['npwp'] ?? '') ?: null;
     $uraian          = trim($body['uraian'] ?? '');
     $tanggal_str     = trim($body['tanggal'] ?? '');
-    $nominal_honor   = (float)($body['nominalHonor'] ?? 0);
-    $tarif_pph       = (float)($body['tarifPph21Persen'] ?? 0);
-    $pph21           = (float)($body['pph21'] ?? 0);
+    $nominal_honor   = parse_rupiah_num($body['nominalHonor'] ?? null, 0.0);
+    $tarif_pph       = parse_rupiah_num($body['tarifPph21Persen'] ?? null, 0.0);
+    $pph21           = parse_rupiah_num($body['pph21'] ?? null, 0.0);
     $project_id      = trim($body['projectId'] ?? '') ?: null;
     $nama_proyek     = trim($body['namaProyek'] ?? '') ?: null;
     $no_bukti        = trim($body['noBukti'] ?? '') ?: null;
@@ -1166,9 +1754,9 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
     $count = 0;
 
     if (empty($prev_gaji_list)) {
-        // Buat dari master pegawai aktif
+        // Buat dari master pegawai aktif & eligible
         $stmt = $pdo->prepare(
-            "SELECT * FROM Pegawai WHERE entityId = ? AND isActive = 1"
+            "SELECT * FROM Pegawai WHERE entityId = ? AND (status = 'AKTIF' OR (isActive = 1 AND (status IS NULL OR status = '')))"
         );
         $stmt->execute([$entity_id]);
         $active_pegawai = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1178,6 +1766,11 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
         }
 
         foreach ($active_pegawai as $p) {
+            // Cek eligibility untuk bulan & tahun target
+            if (!is_pegawai_eligible_for_month($p, $target_year, $target_month, false)) {
+                continue;
+            }
+
             // Cek existing
             $stmt = $pdo->prepare(
                 "SELECT id FROM GajiPegawaiBulanan WHERE pegawaiId = ? AND bulan = ? AND tahun = ? LIMIT 1"
@@ -1186,12 +1779,29 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
             if ($stmt->fetchColumn()) continue;
 
             $gp = (float)$p['gajiPokok'];
+            $tj = (float)$p['tunjanganJabatan'];
+            $tarif = (float)($p['tarifTransportHarian'] ?: 15000.0);
+            $hk = 20;
+            $tt = $hk * $tarif;
+            $tbk = (float)($p['tunjanganBpjsKes'] ?? 0);
+            $tbtk = (float)($p['tunjanganBpjsTk'] ?? 0);
+            $tb = $tbk + $tbtk;
+            $bkes = (float)($p['bpjsKesehatan'] ?? 0);
+            $btk = (float)($p['bpjsKetenagakerjaan'] ?? 0);
+            $pb = (float)($p['potonganBpjs'] ?? ($bkes + $btk));
+            if ($pb <= 0 && ($bkes > 0 || $btk > 0)) $pb = $bkes + $btk;
+            $kotor = $gp + $tj + $tt + $tb;
+            $bersih = max(0, $gp + $tj + $tt - $pb);
             $pdo->prepare(
                 "INSERT INTO GajiPegawaiBulanan
-                 (id, entityId, pegawaiId, bulan, tahun, gajiPokok, totalGajiKotor, totalGajiBersih, catatan, createdAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                 (id, entityId, pegawaiId, bulan, tahun, gajiPokok, tunjanganJabatan, hariKerja,
+                  tarifTransportHarian, tunjanganTransport, tunjanganBpjs, tunjanganBpjsKes, tunjanganBpjsTk,
+                  bpjsKesehatan, bpjsKetenagakerjaan, potonganBpjs, totalGajiKotor, totalGajiTerlaporPajak,
+                  totalGajiBersih, catatan, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )->execute([uuid4(), $entity_id, $p['id'], $target_month, $target_year,
-                        $gp, $gp, $gp, 'Dibuat otomatis dari Gaji Pokok Master', $now]);
+                        $gp, $tj, $hk, $tarif, $tt, $tb, $tbk, $tbtk, $bkes, $btk, $pb,
+                        $kotor, $kotor, $bersih, 'Dibuat otomatis dari Master Data Karyawan (Standar 20 hari kerja)', $now, $now]);
             $count++;
         }
 
@@ -1207,6 +1817,14 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
     }
 
     foreach ($prev_gaji_list as $prev) {
+        // Cek apakah pegawai masih aktif/eligible di bulan target (tidak resign sebelum bulan target)
+        $stmt = $pdo->prepare("SELECT * FROM Pegawai WHERE id = ? LIMIT 1");
+        $stmt->execute([$prev['pegawaiId']]);
+        $peg = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($peg && !is_pegawai_eligible_for_month($peg, $target_year, $target_month, false)) {
+            continue; // Otomatis lewati karyawan yang sudah resign untuk bulan target
+        }
+
         $stmt = $pdo->prepare(
             "SELECT id FROM GajiPegawaiBulanan WHERE pegawaiId = ? AND bulan = ? AND tahun = ? LIMIT 1"
         );
@@ -1215,17 +1833,24 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
 
         $pdo->prepare(
             "INSERT INTO GajiPegawaiBulanan
-             (id, entityId, pegawaiId, bulan, tahun, gajiPokok, tunjanganJabatan, tunjanganTransport,
-              insentif, bpjsKesehatan, bpjsKetenagakerjaan, potonganLain, pph21,
-              totalGajiKotor, totalGajiBersih, catatan, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             (id, entityId, pegawaiId, bulan, tahun, gajiPokok, tunjanganJabatan, hariKerja,
+              tarifTransportHarian, tunjanganTransport, insentif, tunjanganLainnya, thr,
+              tunjanganBpjs, tunjanganBpjsKes, tunjanganBpjsTk, tunjanganPph, bpjsKesehatan,
+              bpjsKetenagakerjaan, potonganBpjs, potonganLain, pph21, totalGajiKotor,
+              totalGajiTerlaporPajak, totalGajiBersih, catatan, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             uuid4(), $entity_id, $prev['pegawaiId'], $target_month, $target_year,
-            $prev['gajiPokok'], $prev['tunjanganJabatan'], $prev['tunjanganTransport'],
-            $prev['insentif'], $prev['bpjsKesehatan'], $prev['bpjsKetenagakerjaan'],
-            $prev['potonganLain'], $prev['pph21'],
-            $prev['totalGajiKotor'], $prev['totalGajiBersih'],
-            "Disalin dari bulan $source_month/$source_year", $now,
+            $prev['gajiPokok'], $prev['tunjanganJabatan'], (int)($prev['hariKerja'] ?? 0),
+            (float)($prev['tarifTransportHarian'] ?? 15000), (float)($prev['tunjanganTransport'] ?? 0),
+            (float)($prev['insentif'] ?? 0), (float)($prev['tunjanganLainnya'] ?? 0), (float)($prev['thr'] ?? 0),
+            (float)($prev['tunjanganBpjs'] ?? 0), (float)($prev['tunjanganBpjsKes'] ?? 0), (float)($prev['tunjanganBpjsTk'] ?? 0),
+            (float)($prev['tunjanganPph'] ?? 0), (float)($prev['bpjsKesehatan'] ?? 0),
+            (float)($prev['bpjsKetenagakerjaan'] ?? 0), (float)($prev['potonganBpjs'] ?? 0),
+            (float)($prev['potonganLain'] ?? 0), (float)($prev['pph21'] ?? 0),
+            (float)($prev['totalGajiKotor'] ?? 0), (float)($prev['totalGajiTerlaporPajak'] ?? ($prev['totalGajiKotor'] ?? 0)),
+            (float)($prev['totalGajiBersih'] ?? 0),
+            "Disalin dari bulan $source_month/$source_year", $now, $now
         ]);
         $count++;
     }

@@ -51,16 +51,24 @@ function hitung_masa_kerja_id(?string $tgl_masuk): ?string {
 /**
  * Menentukan apakah pegawai berhak muncul di daftar penggajian bulan & tahun tertentu.
  * Aturan:
- * 1. Jika sudah ada data gaji di bulan ini (historis), SELALU TAMPILKAN agar arsip & pajak tidak hilang.
- * 2. Karyawan aktif otomatis muncul setiap bulan (sejak tanggal masuk).
- * 3. Karyawan resign/pensiun otomatis tidak muncul lagi di bulan-bulan setelah tanggal resign.
+ * 1. Jika sudah ada data gaji di bulan ini (historis/arsip yang sudah diinput), SELALU TAMPILKAN
+ *    agar rekam jejak gaji dan pelaporan pajak masa lalu tidak hilang.
+ * 2. Karyawan yang berstatus RESIGN atau PENSIUN langsung dihilangkan dari daftar penggajian bulanan
+ *    jika belum ada data gaji di bulan tersebut.
+ * 3. Karyawan aktif otomatis muncul setiap bulan (sejak tanggal masuk).
  */
 function is_pegawai_eligible_for_month(array $p, int $year, int $month, bool $has_gaji_this_month): bool {
+    // 1. Jika sudah ada data gaji di bulan ini (historis/arsip), SELALU TAMPILKAN
     if ($has_gaji_this_month) return true;
 
     $status = !empty($p['status']) ? strtoupper(trim($p['status'])) : (!empty($p['isActive']) ? 'AKTIF' : 'RESIGN');
 
-    // Cek tanggal masuk (sebelum mulai kerja belum berhak muncul tanpa data gaji)
+    // 2. Karyawan resign / pensiun / tidak aktif langsung tidak muncul di daftar gaji bulanan jika belum digaji
+    if ($status === 'RESIGN' || $status === 'PENSIUN' || empty($p['isActive'])) {
+        return false;
+    }
+
+    // 3. Cek tanggal masuk (sebelum mulai kerja belum berhak muncul tanpa data gaji)
     if (!empty($p['tanggalMasuk'])) {
         $masuk_ts = strtotime($p['tanggalMasuk']);
         if ($masuk_ts) {
@@ -70,24 +78,6 @@ function is_pegawai_eligible_for_month(array $p, int $year, int $month, bool $ha
                 return false;
             }
         }
-    }
-
-    // Cek status resign / pensiun
-    if ($status === 'RESIGN' || $status === 'PENSIUN' || empty($p['isActive'])) {
-        if (!empty($p['tanggalResign'])) {
-            $resign_ts = strtotime($p['tanggalResign']);
-            if ($resign_ts) {
-                $resign_y = (int)date('Y', $resign_ts);
-                $resign_m = (int)date('n', $resign_ts);
-                // Bulan setelah tanggal resign: OTOMATIS TIDAK MUNCUL LAGI
-                if ($year > $resign_y || ($year === $resign_y && $month > $resign_m)) {
-                    return false;
-                }
-                // Bulan pada saat atau sebelum resign: tetap muncul
-                return true;
-            }
-        }
-        return false;
     }
 
     return true;
@@ -253,14 +243,59 @@ if ($method === 'GET' && $sub === '') {
             $summary_bulan_ini['totalPegawaiInput']++;
         }
 
-        // Akumulasi tahunan
+        // Akumulasi tahunan dan rekam riwayat per bulan
         $total_gaji_kotor_thn  = 0.0;
         $total_gaji_bersih_thn = 0.0;
         $total_pph21_thn       = 0.0;
+        $riwayat_gaji_bulan    = [];
         foreach ($gaji_months as $gm) {
             $total_gaji_kotor_thn  += (float)$gm['totalGajiKotor'];
             $total_gaji_bersih_thn += (float)$gm['totalGajiBersih'];
             $total_pph21_thn       += (float)$gm['gaji_pph21'];
+
+            $gp_m    = (float)$gm['gaji_gp'];
+            $tj_m    = (float)$gm['tunjanganJabatan'];
+            $tt_m    = (float)$gm['tunjanganTransport'];
+            $ins_m   = (float)$gm['insentif'];
+            $bkes_m  = (float)$gm['bpjsKesehatan'];
+            $btk_m   = (float)$gm['bpjsKetenagakerjaan'];
+            $pot_m   = (float)$gm['potonganLain'];
+            $pph_m   = (float)$gm['gaji_pph21'];
+            $kotor_m = (float)$gm['totalGajiKotor'];
+            $brsih_m = (float)$gm['totalGajiBersih'];
+
+            $riwayat_gaji_bulan[(int)$gm['bulan']] = [
+                'id'                       => $gm['gaji_id'],
+                'pegawaiId'                => $pid,
+                'pegawaiNama'              => $p['nama'],
+                'pegawaiNik'               => $p['nik'],
+                'pegawaiJabatan'           => $p['jabatan'],
+                'pegawaiTanggalMasuk'      => $tgl_masuk,
+                'pegawaiMasaKerja'         => $masa_kerja,
+                'bulan'                    => (int)$gm['bulan'],
+                'tahun'                    => (int)$gm['tahun'],
+                'gajiPokok'                => $gp_m,
+                'gajiPokokFmt'             => fmt_rp_payroll($gp_m),
+                'tunjanganJabatan'         => $tj_m,
+                'tunjanganJabatanFmt'      => fmt_rp_payroll($tj_m),
+                'tunjanganTransport'       => $tt_m,
+                'tunjanganTransportFmt'    => fmt_rp_payroll($tt_m),
+                'insentif'                 => $ins_m,
+                'insentifFmt'              => fmt_rp_payroll($ins_m),
+                'bpjsKesehatan'            => $bkes_m,
+                'bpjsKesehatanFmt'         => fmt_rp_payroll($bkes_m),
+                'bpjsKetenagakerjaan'      => $btk_m,
+                'bpjsKetenagakerjaanFmt'   => fmt_rp_payroll($btk_m),
+                'potonganLain'             => $pot_m,
+                'potonganLainFmt'          => fmt_rp_payroll($pot_m),
+                'pph21'                    => $pph_m,
+                'pph21Fmt'                 => fmt_rp_payroll($pph_m),
+                'totalGajiKotor'           => $kotor_m,
+                'totalGajiKotorFmt'        => fmt_rp_payroll($kotor_m),
+                'totalGajiBersih'          => $brsih_m,
+                'totalGajiBersihFmt'       => fmt_rp_payroll($brsih_m),
+                'catatan'                  => $gm['gaji_catatan'],
+            ];
         }
 
         $tj_master = (float)$p['tunjanganJabatan'];
@@ -285,6 +320,7 @@ if ($method === 'GET' && $sub === '') {
             'tanggalResignFmt'      => $tgl_resign ? fmt_tanggal_id($tgl_resign) : null,
             'isActive'              => $is_active,
             'currentGaji'           => $current_gaji,
+            'riwayatGajiBulan'      => $riwayat_gaji_bulan,
             'akumulasiTahun'        => [
                 'totalGajiKotor'         => $total_gaji_kotor_thn,
                 'totalGajiTerlaporPajak' => $total_gaji_kotor_thn,

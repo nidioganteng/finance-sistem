@@ -251,6 +251,153 @@ function resolve_crossing_debit_coa(PDO $pdo, ?string $primary_row_coa_id): ?arr
 }
 
 /**
+ * Buat crossing entries di entitas tujuan saat terjadi pengeluaran lintas entitas (Kas Keluar).
+ * Mendukung multi-entitas (misal: pinjaman ke GS, TB, CAD, KP sekaligus).
+ *
+ * Logika pencocokan baris ke entitas:
+ * 1. Setiap baris di $valid_rows dicek apakah COA-nya adalah akun PIUTANG spesifik milik salah satu entitas tujuan
+ *    (PIUTANG_COA_CODE: 111 KAK, 112 GS, 113 TB, 114 CAD, 115 KP).
+ * 2. Baris yang cocok dialokasikan khusus ke entitas tersebut dengan nominal masing-masing.
+ * 3. Jika suatu entitas tujuan tidak memiliki baris piutang spesifik (misal pengeluaran beban langsung):
+ *    - Bila hanya ada 1 entitas tujuan di $crossing_keys, semua baris $valid_rows dialokasikan ke entitas tersebut.
+ *    - Bila ada beberapa entitas tujuan, baris yang bukan akun piutang entitas lain akan dialokasikan.
+ * 4. Untuk setiap entitas:
+ *    - Baris debit dibuat per baris yang cocok (nominal per baris, COA debit sesuai role BEBAN / PIUTANG).
+ *    - Baris kredit (HUTANG ke entitas asal, misal 311 Hutang KAK) dibuat sebesar subtotal baris yang dialokasikan.
+ */
+function create_crossing_entries(
+    PDO $pdo,
+    string $crossing_group_id,
+    array $crossing_keys,
+    string $entity_key,
+    string $jenis_input_key,
+    ?string $rekening_id,
+    ?string $rekening_nama,
+    ?string $proj_id,
+    string $no_bukti,
+    string $keterangan,
+    string $tanggal_dt,
+    array $valid_rows,
+    string $staff_id,
+    string $now
+): void {
+    if (!$crossing_group_id || empty($crossing_keys)) return;
+
+    $jurnal_jenis_id = get_or_create_jurnal_transaksi_jenis($pdo);
+    $hutang_code     = HUTANG_COA_CODE[$entity_key] ?? null;
+    $hutang_coa_id   = null;
+    if ($hutang_code) {
+        $stmt2 = $pdo->prepare('SELECT id FROM CoaAccount WHERE code = ?');
+        $stmt2->execute([$hutang_code]);
+        $hutang_coa_id = $stmt2->fetchColumn() ?: null;
+    }
+
+    // Preload COA details untuk semua valid_rows
+    $coa_ids_in_rows = array_unique(array_filter(array_column($valid_rows, 'coaAccountId')));
+    $coa_details = [];
+    if (!empty($coa_ids_in_rows)) {
+        $ph_coa = implode(',', array_fill(0, count($coa_ids_in_rows), '?'));
+        $stmt_c = $pdo->prepare("SELECT id, code, name, kategori FROM CoaAccount WHERE id IN ($ph_coa)");
+        $stmt_c->execute(array_values($coa_ids_in_rows));
+        foreach ($stmt_c->fetchAll(PDO::FETCH_ASSOC) as $cd) {
+            $coa_details[$cd['id']] = $cd;
+        }
+    }
+
+    foreach ($crossing_keys as $cross_key) {
+        $stmt3 = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
+        $stmt3->execute([$cross_key]);
+        $cross_entity_id = $stmt3->fetchColumn();
+        if (!$cross_entity_id) continue;
+
+        $cross_common_extra_base = [
+            'isCrossingEntry'           => true,
+            'crossingGroupId'           => $crossing_group_id,
+            'crossingFromEntityKey'     => $entity_key,
+            'crossingFromJenisInputKey' => $jenis_input_key,
+            'crossingFromRekeningId'    => $rekening_id,
+            'crossingFromRekeningNama'  => $rekening_nama,
+        ];
+        if ($proj_id) $cross_common_extra_base['projectId'] = $proj_id;
+
+        // Cocokkan baris yang ditujukan ke entitas ini
+        $target_piutang_code = PIUTANG_COA_CODE[$cross_key] ?? null;
+        $matched_rows = [];
+        foreach ($valid_rows as $vr) {
+            $code = $coa_details[$vr['coaAccountId']]['code'] ?? null;
+            if ($target_piutang_code && $code === $target_piutang_code) {
+                $matched_rows[] = $vr;
+            }
+        }
+
+        // Jika tidak ada baris spesifik kode piutang entitas ini:
+        if (empty($matched_rows)) {
+            if (count($crossing_keys) === 1) {
+                $matched_rows = $valid_rows;
+            } else {
+                foreach ($valid_rows as $vr) {
+                    $code = $coa_details[$vr['coaAccountId']]['code'] ?? null;
+                    $is_other_piutang = false;
+                    foreach (PIUTANG_COA_CODE as $k => $pcode) {
+                        if ($pcode === $code && in_array($k, $crossing_keys) && $k !== $cross_key) {
+                            $is_other_piutang = true;
+                            break;
+                        }
+                    }
+                    if (!$is_other_piutang) {
+                        $matched_rows[] = $vr;
+                    }
+                }
+            }
+        }
+
+        if (empty($matched_rows)) continue;
+
+        $cross_subtotal = 0.0;
+        foreach ($matched_rows as $mr) {
+            $nom = (float)$mr['nominal'];
+            if ($nom <= 0) continue;
+            $cross_subtotal += $nom;
+
+            $debit_target = resolve_crossing_debit_coa($pdo, $mr['coaAccountId']);
+            if ($debit_target) {
+                $row_ket = !empty($mr['keterangan']) ? trim($mr['keterangan']) : $keterangan;
+                $ex = array_merge($cross_common_extra_base, ['crossingRole' => $debit_target['role']]);
+                $stmt4 = $pdo->prepare(
+                    "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
+                     debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $stmt4->execute([
+                    uuid4(), $cross_entity_id, $jurnal_jenis_id, $tanggal_dt,
+                    $no_bukti, $row_ket, $debit_target['coaAccountId'],
+                    $nom, 0, 0, json_encode($ex), $staff_id, $proj_id, $now,
+                ]);
+            }
+        }
+
+        // Baris kredit (HUTANG entitas asal)
+        if ($hutang_coa_id && $cross_subtotal > 0) {
+            $ex = array_merge($cross_common_extra_base, [
+                'crossingRole'          => 'HUTANG',
+                'originalHutangCoaCode' => $hutang_code,
+            ]);
+            $stmt5 = $pdo->prepare(
+                "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
+                 debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt5->execute([
+                uuid4(), $cross_entity_id, $jurnal_jenis_id, $tanggal_dt,
+                $no_bukti, $keterangan, $hutang_coa_id,
+                0, $cross_subtotal, 0, json_encode($ex), $staff_id, $proj_id, $now,
+            ]);
+        }
+    }
+}
+
+
+/**
  * Pastikan jenis input jurnalTransaksi ada — buat jika belum.
  * Logika: inline di createKasTransaction & saveJurnalTransaksi
  */
@@ -295,9 +442,11 @@ function build_bank_coa_map(): array {
 function compute_new_termin_percentage(float $contract_value, array $existing_pcts, float $nominal, float $existing_cumulative = 0.0): int {
     if ($contract_value <= 0) return 0;
     $max_pct_so_far = empty($existing_pcts) ? 0 : max($existing_pcts);
-    $new_cumulative = $existing_cumulative + $nominal;
-    $new_pct = (int)min(100, round(($new_cumulative / $contract_value) * 100));
-    return max($max_pct_so_far, $new_pct);
+    $cumulative_before = $existing_cumulative > 0
+        ? $existing_cumulative
+        : ($max_pct_so_far / 100) * $contract_value;
+    $cumulative_after = $cumulative_before + $nominal;
+    return (int)min(100, round(($cumulative_after / $contract_value) * 100));
 }
 
 /**

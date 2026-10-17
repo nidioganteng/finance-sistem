@@ -1713,13 +1713,14 @@ export function PayrollClient({
                                       });
                                     }
                                   }}
-                                  className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-full border cursor-pointer appearance-none text-center outline-none transition-all shadow-2xs ${
+                                  className={`no-custom-chevron text-[11px] font-bold pl-3 pr-6 py-1 rounded-full border cursor-pointer appearance-none text-left outline-none transition-all shadow-2xs ${
                                     (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "AKTIF"
                                       ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100"
                                       : (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "RESIGN"
                                       ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 hover:bg-amber-100"
                                       : "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60 hover:bg-purple-100"
                                   }`}
+                                  style={{ backgroundImage: "none" }}
                                   title="Klik untuk mengubah status (Aktif, Resign, atau Pensiun)"
                                 >
                                   <option value="AKTIF" className="bg-surface-card text-foreground font-semibold">Aktif</option>
@@ -1728,7 +1729,7 @@ export function PayrollClient({
                                 </select>
                                 <ChevronDown
                                   size={11}
-                                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-70"
+                                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-current opacity-70"
                                 />
                               </div>
                             ) : (

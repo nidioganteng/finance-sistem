@@ -32,7 +32,6 @@ import {
   Info,
   Lock,
   History,
-  Sparkles,
   RotateCcw,
   Car,
 } from "lucide-react";
@@ -866,7 +865,6 @@ export function PayrollClient({
                         className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
                         title="Proses dan generate seluruh gaji karyawan bulan ini dari Master Data"
                       >
-                        <Sparkles size={13} className="text-amber-300" />
                         <span>Proses Gaji Semua Karyawan</span>
                         {countBelumInput > 0 && (
                           <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-900 font-bold text-[10px]">
@@ -1041,7 +1039,6 @@ export function PayrollClient({
                       }}
                       className="h-7 px-3 rounded-lg bg-navy hover:bg-navy-light text-white text-[11px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                     >
-                      <Sparkles size={12} className="text-amber-300" />
                       <span>Generate Otomatis {countBelumInput} Karyawan Belum Diisi</span>
                     </button>
                   )}
@@ -6089,9 +6086,8 @@ export function PayrollClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
-              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Sparkles size={16} className="text-amber-500" />
-                <span>Proses Gaji Semua Karyawan</span>
+              <h3 className="text-sm font-bold text-navy-text">
+                Proses Gaji Semua Karyawan
               </h3>
               <button
                 onClick={() => setIsBulkGenerateModalOpen(false)}
@@ -6224,7 +6220,6 @@ export function PayrollClient({
                   disabled={isPending || bulkDefaultHariKerja <= 0}
                   className="px-4 py-1.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy-light transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <Sparkles size={13} className="text-amber-300" />
                   <span>{isPending ? "Memproses Gaji..." : "Proses Gaji Sekarang"}</span>
                 </button>
               </div>

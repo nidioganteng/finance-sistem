@@ -4470,31 +4470,25 @@ export function PayrollClient({
                 {/* ========================================================= */}
                 {/* 1. BAGIAN KOMPONEN GAJI TETAP (AUTO-FILL DARI MASTER DATA) */}
                 {/* ========================================================= */}
-                <div className="p-3.5 rounded-2xl bg-surface-subtle/70 border border-border space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 font-bold text-navy-text text-xs">
-                        <Sparkles size={14} className="text-amber-500" />
-                        <span>1. Komponen Gaji Tetap (Auto-Fill Master Data)</span>
-                      </div>
-                      <p className="text-[10px] text-muted-faint mt-0.5">
-                        Otomatis terisi dari master data karyawan. Tim Finance tidak perlu mengetik ulang setiap bulan, namun tetap bisa disesuaikan jika ada kenaikan/perubahan.
-                      </p>
-                    </div>
+                <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border space-y-3">
+                  <div className="flex items-center justify-between pb-1 border-b border-border/60">
+                    <span className="font-bold text-navy-text text-xs uppercase tracking-wider">
+                      1. Komponen Gaji Tetap (Auto-Fill Master)
+                    </span>
                     <button
                       type="button"
                       onClick={handleResetFixedComponentsToMaster}
-                      className="px-2.5 py-1 rounded-lg border border-border bg-surface-card hover:bg-surface-subtle text-[10px] font-semibold text-navy-text inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                      className="px-2 py-0.5 rounded-lg border border-border bg-surface-card hover:bg-surface-subtle text-[10px] font-semibold text-navy-text inline-flex items-center gap-1 transition-colors cursor-pointer"
                       title="Kembalikan nilai ke standar Master Pegawai"
                     >
-                      <RotateCcw size={11} />
+                      <RotateCcw size={10} />
                       <span>Reset ke Master</span>
                     </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="font-semibold text-navy-text block mb-1">Gaji Pokok (Bulan ini) *</label>
+                      <label className="font-semibold text-navy-text block mb-1">Gaji Pokok (Rp) *</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -4505,13 +4499,10 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        ⚡ Standar master: {editingGaji.pegawai.gajiPokokFmt}
-                      </span>
                     </div>
                     <div>
                       <label className="font-semibold text-navy-text block mb-1">
-                        Tunjangan Jabatan (Rutin)
+                        Tunjangan Jabatan (Rp)
                       </label>
                       <input
                         type="text"
@@ -4522,21 +4513,15 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        ⚡ Standar master: {editingGaji.pegawai.tunjanganJabatanFmt || formatRupiah(editingGaji.pegawai.tunjanganJabatan)}
-                      </span>
                     </div>
                   </div>
 
                   {/* BPJS Tetap (Tunjangan Kantor & Potongan Pegawai) */}
                   <div className="pt-2 border-t border-border/60 space-y-2">
-                    <span className="text-[10px] font-bold text-navy-text uppercase tracking-wider block">
-                      Paket Iuran BPJS Tetap (Auto-Fill)
-                    </span>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-semibold text-navy-text block mb-1">
-                          Tunjangan BPJS Kesehatan (Kantor)
+                        <label className="text-[10px] font-semibold text-muted-stronger block mb-1">
+                          Tunjangan BPJS Kes (Kantor)
                         </label>
                         <input
                           type="text"
@@ -4549,7 +4534,7 @@ export function PayrollClient({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-navy-text block mb-1">
+                        <label className="text-[10px] font-semibold text-muted-stronger block mb-1">
                           Tunjangan BPJS TK (Kantor)
                         </label>
                         <input
@@ -4567,7 +4552,7 @@ export function PayrollClient({
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 block mb-1">
-                          Potongan BPJS Kesehatan (Pegawai)
+                          Potongan BPJS Kes (Pegawai)
                         </label>
                         <input
                           type="text"
@@ -4598,31 +4583,19 @@ export function PayrollClient({
                 </div>
 
                 {/* ========================================================= */}
-                {/* 2. BAGIAN INPUT VARIABEL BULANAN (FOKUS INPUT TIM FINANCE) */}
+                {/* 2. BAGIAN INPUT VARIABEL BULANAN */}
                 {/* ========================================================= */}
-                <div className="p-3.5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border-2 border-emerald-300 dark:border-emerald-700 space-y-3">
-                  <div>
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-900 dark:text-emerald-300 text-xs">
-                      <Pencil size={14} className="text-emerald-600" />
-                      <span>2. Input Variabel Bulanan (Fokus Utama Tim Finance)</span>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-bold uppercase tracking-wider">
-                        Rutin Tiap Bulan
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-emerald-800/80 dark:text-emerald-300/70 mt-0.5">
-                      Tim Finance hanya perlu menginput komponen yang bersifat tidak tetap/variabel setiap bulannya: <strong>Tunjangan Transport, Insentif Bulanan, THR, dan Potongan Lain</strong>.
-                    </p>
+                <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border space-y-3">
+                  <div className="pb-1 border-b border-border/60">
+                    <span className="font-bold text-navy-text text-xs uppercase tracking-wider">
+                      2. Input Variabel Bulanan
+                    </span>
                   </div>
 
-                  {/* Tunjangan Transport (Hari Kerja x Tarif Harian Dinamis/Editable) */}
-                  <div className="p-3 rounded-xl bg-surface-card border border-emerald-200 dark:border-emerald-800/60 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="font-semibold text-navy-text block text-xs">
-                        Tunjangan Transport (Hari Kerja × Tarif Harian)
-                      </label>
-                      <span className="text-[10px] text-muted-faint font-mono">
-                        Kalkulator Otomatis
-                      </span>
+                  {/* Tunjangan Transport */}
+                  <div className="p-3 rounded-xl bg-surface-card border border-border space-y-2">
+                    <div className="font-semibold text-navy-text text-xs">
+                      Tunjangan Transport
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
@@ -4659,7 +4632,7 @@ export function PayrollClient({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-emerald-800 dark:text-emerald-300 font-semibold block mb-0.5">
+                        <label className="text-[10px] text-muted-stronger font-semibold block mb-0.5">
                           Total Transport (Rp)
                         </label>
                         <input
@@ -4669,7 +4642,7 @@ export function PayrollClient({
                           value={formatRupiahInput(modalTunjanganTransport)}
                           onChange={(e) => setModalTunjanganTransport(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                           placeholder="0"
-                          className="w-full h-8 px-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-surface-card text-emerald-800 dark:text-emerald-300 font-bold font-mono text-xs"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-subtle text-navy-text font-bold font-mono text-xs"
                         />
                       </div>
                     </div>
@@ -4677,9 +4650,9 @@ export function PayrollClient({
 
                   {/* Insentif Bulanan & THR */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-2.5 rounded-xl bg-surface-card border border-emerald-200 dark:border-emerald-800/60">
+                    <div className="p-2.5 rounded-xl bg-surface-card border border-border">
                       <label className="font-semibold text-navy-text block mb-1">
-                        Insentif Bulanan (Bonus / Lembur)
+                        Insentif / Lembur (Rp)
                       </label>
                       <input
                         type="text"
@@ -4694,14 +4667,11 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Insentif kinerja, project, atau lembur
-                      </span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-surface-card border border-emerald-200 dark:border-emerald-800/60">
+                    <div className="p-2.5 rounded-xl bg-surface-card border border-border">
                       <label className="font-semibold text-navy-text block mb-1">
-                        THR (Tunjangan Hari Raya)
+                        THR (Rp)
                       </label>
                       <input
                         type="text"
@@ -4712,9 +4682,6 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Diisi pada bulan pembagian THR
-                      </span>
                     </div>
                   </div>
 
@@ -4722,7 +4689,7 @@ export function PayrollClient({
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-2.5 rounded-xl bg-surface-card border border-border">
                       <label className="font-semibold text-rose-700 dark:text-rose-400 block mb-1">
-                        Potongan Lainnya (Kasbon / Pinjaman)
+                        Kasbon / Potongan Lain (Rp)
                       </label>
                       <input
                         type="text"
@@ -4733,14 +4700,11 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Kasbon / pinjaman karyawan bulan ini
-                      </span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-surface-card border border-border">
                       <label className="font-semibold text-navy-text block mb-1">
-                        Tunjangan Subsidi PPh (Kantor)
+                        Tunjangan Subsidi PPh (Rp)
                       </label>
                       <input
                         type="text"
@@ -4751,76 +4715,53 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
-                      <span className="text-[10px] text-muted-faint block mt-0.5">
-                        Subsidi pajak bila ditanggung kantor
-                      </span>
                     </div>
                   </div>
                 </div>
 
-                  {/* PPh 21 Ditanggung Perusahaan Card */}
-                  <div className="p-2.5 rounded-xl bg-surface-subtle border border-border flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-navy-text text-xs">
-                        Pelaporan PPh 21 (SPT Pajak)
-                      </div>
-                      <div className="text-[10px] text-muted-faint">
-                        PPh 21 ditanggung perusahaan sehingga <strong className="text-emerald-700 dark:text-emerald-400">tidak memotong Take Home Pay</strong> karyawan.
-                      </div>
+                {/* Pelaporan PPh 21 */}
+                <div className="p-3 rounded-xl bg-surface-subtle/50 border border-border flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-navy-text text-xs">
+                      Pelaporan PPh 21 (Beban Kantor)
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        name="pph21"
-                        value={formatRupiahInput(modalPph21)}
-                        onChange={(e) => setModalPph21(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                        placeholder="0"
-                        className="w-32 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right"
-                      />
-                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded border border-amber-200 dark:border-amber-800 whitespace-nowrap">
-                        Beban Kantor
+                    <div className="text-[10px] text-muted-faint">
+                      Ditanggung perusahaan, tidak memotong gaji pegawai
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="pph21"
+                    value={formatRupiahInput(modalPph21)}
+                    onChange={(e) => setModalPph21(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                    placeholder="0"
+                    className="w-32 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right font-semibold"
+                  />
+                </div>
+
+                {/* Ringkasan Total Live Preview */}
+                <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/40 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-stronger block">
+                    Ringkasan Total
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl border border-border bg-surface-card">
+                      <span className="text-[10px] font-semibold text-muted-faint block">
+                        Bruto Terlapor Pajak
+                      </span>
+                      <span className="text-base font-bold font-mono text-navy-text block mt-0.5">
+                        {formatRupiah(liveTotalGajiTerlaporPajak)}
                       </span>
                     </div>
-                  </div>
 
-                {/* 5. Dual Total Live Preview Card */}
-                <div className="p-3.5 rounded-2xl border border-border bg-surface-subtle/50 space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-stronger flex items-center justify-between">
-                    <span>Perbandingan Dual Total (Live Preview)</span>
-                    <span className="text-[10px] text-muted-faint font-normal font-sans">Otomatis dihitung</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {/* Dual Total 1: Terlapor Pajak */}
-                    <div className="p-2.5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/30">
-                      <div className="text-[10px] font-semibold text-blue-800 dark:text-blue-300 flex items-center justify-between">
-                        <span>Bruto Terlapor Pajak</span>
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-mono font-bold">
-                          SPT PPh 21
-                        </span>
-                      </div>
-                      <div className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-1">
-                        {formatRupiah(liveTotalGajiTerlaporPajak)}
-                      </div>
-                      <div className="text-[9px] text-blue-700/80 dark:text-blue-300/70 mt-0.5">
-                        Dasar pelaporan SPT Masa Pajak
-                      </div>
-                    </div>
-
-                    {/* Dual Total 2: Take Home Pay */}
-                    <div className="p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/30">
-                      <div className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                        <span>Gaji Bersih (THP)</span>
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 font-mono font-bold">
-                          Kas / GL 511
-                        </span>
-                      </div>
-                      <div className="text-base font-bold font-mono text-emerald-800 dark:text-emerald-200 mt-1">
+                    <div className="p-3 rounded-xl border border-border bg-surface-card">
+                      <span className="text-[10px] font-semibold text-muted-faint block">
+                        Gaji Bersih (Take Home Pay)
+                      </span>
+                      <span className="text-base font-bold font-mono text-navy-text block mt-0.5">
                         {formatRupiah(liveTotalGajiBersih)}
-                      </div>
-                      <div className="text-[9px] text-emerald-700/80 dark:text-emerald-300/70 mt-0.5">
-                        Dana riil keluar dari rekening
-                      </div>
+                      </span>
                     </div>
                   </div>
                 </div>

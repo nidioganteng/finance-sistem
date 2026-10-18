@@ -6,7 +6,7 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus, Receipt } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus, Receipt, Calendar, Check } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 import { DatePicker } from "@/components/shared/DatePicker";
@@ -109,18 +109,45 @@ export function KasScreenClient({
     return `${year}-${month}-${day}`;
   }
 
-  const [activePreset, setActivePreset] = useState<string>(() => {
-    if (!dari && !sampai) return "bulan-ini";
-    const t = new Date();
-    const fmt = (d: Date) => toDateStr(d);
-    const presetRanges: Record<string, [string, string]> = {
-      "bulan-ini":  [fmt(new Date(t.getFullYear(), t.getMonth(), 1)),     fmt(new Date(t.getFullYear(), t.getMonth() + 1, 0))],
-      "bulan-lalu": [fmt(new Date(t.getFullYear(), t.getMonth() - 1, 1)), fmt(new Date(t.getFullYear(), t.getMonth(), 0))],
-      "3-bulan":    [fmt(new Date(t.getFullYear(), t.getMonth() - 3, t.getDate())), fmt(t)],
-      "6-bulan":    [fmt(new Date(t.getFullYear(), t.getMonth() - 6, t.getDate())), fmt(t)],
+  const today = new Date();
+  const nowYear = today.getFullYear();
+
+  const MONTH_NAMES = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+
+  // Daftar 12 bulan terakhir untuk dropdown filter
+  const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const monthKey = `month-${y}-${String(m + 1).padStart(2, "0")}`;
+    const startStr = toDateStr(new Date(y, m, 1));
+    const endStr = toDateStr(new Date(y, m + 1, 0));
+    const isCurrent = i === 0;
+    return {
+      key: monthKey,
+      label: `${MONTH_NAMES[m]} ${y}${isCurrent ? " (Bulan Ini)" : ""}`,
+      shortLabel: `${MONTH_NAMES[m]} ${y}`,
+      start: startStr,
+      end: endStr,
     };
-    const matched = Object.entries(presetRanges).find(([, [d, s]]) => d === dari && s === sampai);
-    return matched ? matched[0] : "custom";
+  });
+
+  const defaultMonthKey = MONTH_OPTIONS[0]?.key ?? "bulan-ini";
+
+  const [activePreset, setActivePreset] = useState<string>(() => {
+    if (searchParams.get("periode") === "semua" || (!dari && !sampai && searchParams.has("periode"))) {
+      return "semua";
+    }
+    if (!dari && !sampai) return defaultMonthKey;
+    const matchedMonth = MONTH_OPTIONS.find((m) => m.start === dari && m.end === sampai);
+    if (matchedMonth) return matchedMonth.key;
+    if (dari === `${nowYear}-01-01` && sampai === `${nowYear}-12-31`) {
+      return "tahun-ini";
+    }
+    return "custom";
   });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -155,79 +182,127 @@ export function KasScreenClient({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sync activePreset kalau query params di URL berubah
+  useEffect(() => {
+    if (searchParams.get("periode") === "semua") {
+      setActivePreset("semua");
+      setFilterDari("");
+      setFilterSampai("");
+      return;
+    }
+    if (!dari && !sampai) {
+      return;
+    }
+    const matchedMonth = MONTH_OPTIONS.find((m) => m.start === dari && m.end === sampai);
+    if (matchedMonth) {
+      setActivePreset(matchedMonth.key);
+      setFilterDari(dari);
+      setFilterSampai(sampai);
+    } else if (dari === `${nowYear}-01-01` && sampai === `${nowYear}-12-31`) {
+      setActivePreset("tahun-ini");
+      setFilterDari(dari);
+      setFilterSampai(sampai);
+    } else {
+      setActivePreset("custom");
+      setFilterDari(dari);
+      setFilterSampai(sampai);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dari, sampai, searchParams]);
+
   // Auto-apply bulan ini kalau halaman dibuka tanpa filter
   useEffect(() => {
-    if (!dari && !sampai) {
+    if (!dari && !sampai && searchParams.get("periode") !== "semua") {
       const t = new Date();
       const d = toDateStr(new Date(t.getFullYear(), t.getMonth(), 1));
       const s = toDateStr(new Date(t.getFullYear(), t.getMonth() + 1, 0));
       const params = new URLSearchParams(searchParams.toString());
       params.set("dari", d);
       params.set("sampai", s);
+      params.delete("periode");
       router.replace(`${pathname}?${params.toString()}`);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const today = new Date();
-  const PRESET_OPTIONS = [
-    { key: "bulan-ini", label: "Bulan Ini" },
-    { key: "bulan-lalu", label: "1 Bulan Lalu" },
-    { key: "3-bulan", label: "3 Bulan Lalu" },
-    { key: "6-bulan", label: "6 Bulan Lalu" },
-    { key: "custom", label: "Custom..." },
-  ];
-
   function applyPreset(preset: string) {
-    let d = "";
-    let s = "";
-
-    if (preset === "bulan-ini") {
-      d = toDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
-      s = toDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
-    } else if (preset === "bulan-lalu") {
-      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
-      s = toDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
-    } else if (preset === "2-bulan") {
-      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 2, 1));
-      s = toDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 0));
-    } else if (preset === "3-bulan") {
-      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 3, today.getDate()));
-      s = toDateStr(today);
-    } else if (preset === "6-bulan") {
-      d = toDateStr(new Date(today.getFullYear(), today.getMonth() - 6, today.getDate()));
-      s = toDateStr(today);
-    } else if (preset === "tahun-ini") {
-      d = toDateStr(new Date(today.getFullYear(), 0, 1));
-      s = toDateStr(new Date(today.getFullYear(), 11, 31));
-    }
-
     setActivePreset(preset);
     setDropdownOpen(false);
 
     if (preset === "custom") return;
 
-    setFilterDari(d);
-    setFilterSampai(s);
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+
+    if (preset === "semua") {
+      params.delete("dari");
+      params.delete("sampai");
+      params.set("periode", "semua");
+      setFilterDari("");
+      setFilterSampai("");
+      router.push(`${pathname}?${params.toString()}`);
+      return;
+    }
+
+    let d = "";
+    let s = "";
+
+    if (preset === "tahun-ini") {
+      d = `${nowYear}-01-01`;
+      s = `${nowYear}-12-31`;
+    } else {
+      const matched = MONTH_OPTIONS.find((m) => m.key === preset);
+      if (matched) {
+        d = matched.start;
+        s = matched.end;
+      }
+    }
+
+    params.delete("periode");
     if (d) params.set("dari", d); else params.delete("dari");
     if (s) params.set("sampai", s); else params.delete("sampai");
+
+    setFilterDari(d);
+    setFilterSampai(s);
     router.push(`${pathname}?${params.toString()}`);
   }
 
   function applyDateFilter() {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    params.delete("periode");
     if (filterDari) params.set("dari", filterDari); else params.delete("dari");
     if (filterSampai) params.set("sampai", filterSampai); else params.delete("sampai");
     router.push(`${pathname}?${params.toString()}`);
   }
 
   function resetToDefault() {
-    applyPreset("bulan-ini");
+    applyPreset(defaultMonthKey);
   }
 
-  const isNonDefault = activePreset !== "bulan-ini";
-  const activeLabel = PRESET_OPTIONS.find((o) => o.key === activePreset)?.label ?? "Bulan Ini";
+  const isNonDefault = activePreset !== defaultMonthKey;
+
+  let activeLabel = "Pilih Periode";
+  if (activePreset === "semua") {
+    activeLabel = "Semua Tanggal";
+  } else if (activePreset === "tahun-ini") {
+    activeLabel = `Tahun Ini (${nowYear})`;
+  } else {
+    const matchedMonth = MONTH_OPTIONS.find((m) => m.key === activePreset);
+    if (matchedMonth) {
+      activeLabel = matchedMonth.shortLabel;
+    } else if (activePreset === "custom") {
+      if (filterDari && filterSampai) {
+        activeLabel = `${fmtDateShort(filterDari)} – ${fmtDateShort(filterSampai)}`;
+      } else if (filterDari) {
+        activeLabel = `Dari ${fmtDateShort(filterDari)}`;
+      } else if (filterSampai) {
+        activeLabel = `Sampai ${fmtDateShort(filterSampai)}`;
+      } else {
+        activeLabel = "Rentang Khusus";
+      }
+    }
+  }
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -355,49 +430,114 @@ export function KasScreenClient({
           {/* Dropdown filter periode */}
           <div className="relative" ref={dropdownRef}>
             <button
+              type="button"
               onClick={() => setDropdownOpen((v) => !v)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] border border-border-soft bg-surface-input text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors min-w-[140px] justify-between"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-[11px] border border-border-soft bg-surface-input text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover hover:border-border transition-colors min-w-[160px] justify-between shadow-xs"
+              title="Pilih tanggal atau bulan untuk melihat transaksi"
             >
-              <span>{activeLabel}</span>
-              <ChevronDown size={13} className={`text-muted-faint transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+              <div className="flex items-center gap-2 truncate">
+                <Calendar size={14} className="text-brand shrink-0" />
+                <span className="truncate">{activeLabel}</span>
+              </div>
+              <ChevronDown size={13} className={`text-muted-faint shrink-0 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
             {dropdownOpen && (
-              <div className="absolute top-[calc(100%+6px)] left-0 z-30 bg-surface-card border border-border-soft rounded-[12px] shadow-lg py-1.5 min-w-[160px]">
-                {PRESET_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.key}
-                    onClick={() => applyPreset(opt.key)}
-                    className={`w-full text-left px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
-                      activePreset === opt.key
-                        ? "text-brand bg-blue-50 dark:bg-blue-500/10"
-                        : "text-muted-stronger hover:bg-surface-hover"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="absolute top-[calc(100%+6px)] left-0 z-30 bg-surface-card border border-border-soft rounded-[13px] shadow-xl py-1.5 w-[240px] max-h-[380px] overflow-y-auto">
+                <div className="px-3.5 py-1 text-[10px] font-bold tracking-wider text-muted-faint uppercase">
+                  Tampilan Keseluruhan
+                </div>
+                <button
+                  type="button"
+                  onClick={() => applyPreset("semua")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[12px] transition-colors ${
+                    activePreset === "semua"
+                      ? "text-brand bg-blue-50/70 dark:bg-blue-500/10 font-bold"
+                      : "text-muted-stronger hover:bg-surface-hover font-medium"
+                  }`}
+                >
+                  <span>Semua Tanggal (Lihat Semua)</span>
+                  {activePreset === "semua" && <Check size={14} className="text-brand shrink-0" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset("tahun-ini")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[12px] transition-colors ${
+                    activePreset === "tahun-ini"
+                      ? "text-brand bg-blue-50/70 dark:bg-blue-500/10 font-bold"
+                      : "text-muted-stronger hover:bg-surface-hover font-medium"
+                  }`}
+                >
+                  <span>Sepanjang Tahun {nowYear}</span>
+                  {activePreset === "tahun-ini" && <Check size={14} className="text-brand shrink-0" />}
+                </button>
+
+                <div className="my-1 border-t border-border-soft" />
+
+                <div className="px-3.5 py-1 text-[10px] font-bold tracking-wider text-muted-faint uppercase">
+                  Pilih Bulan
+                </div>
+                {MONTH_OPTIONS.map((opt) => {
+                  const isSelected = activePreset === opt.key;
+                  return (
+                    <button
+                      type="button"
+                      key={opt.key}
+                      onClick={() => applyPreset(opt.key)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2 text-[12px] transition-colors ${
+                        isSelected
+                          ? "text-brand bg-blue-50/70 dark:bg-blue-500/10 font-bold"
+                          : "text-muted-stronger hover:bg-surface-hover font-medium"
+                      }`}
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      {isSelected && <Check size={14} className="text-brand shrink-0" />}
+                    </button>
+                  );
+                })}
+
+                <div className="my-1 border-t border-border-soft" />
+
+                <div className="px-3.5 py-1 text-[10px] font-bold tracking-wider text-muted-faint uppercase">
+                  Kustom
+                </div>
+                <button
+                  type="button"
+                  onClick={() => applyPreset("custom")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[12px] transition-colors ${
+                    activePreset === "custom"
+                      ? "text-brand bg-blue-50/70 dark:bg-blue-500/10 font-bold"
+                      : "text-muted-stronger hover:bg-surface-hover font-medium"
+                  }`}
+                >
+                  <span>Pilih Tanggal Khusus...</span>
+                  {activePreset === "custom" && <Check size={14} className="text-brand shrink-0" />}
+                </button>
               </div>
             )}
           </div>
 
           {activePreset === "custom" && (
-            <>
+            <div className="flex items-center gap-1.5 flex-wrap">
               <DatePicker value={filterDari} onChange={setFilterDari} placeholder="Dari" className="w-[140px]" />
+              <span className="text-muted-faint text-[12px]">s/d</span>
               <DatePicker value={filterSampai} onChange={setFilterSampai} placeholder="Sampai" className="w-[140px]" />
               <button
+                type="button"
                 onClick={applyDateFilter}
-                className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold"
+                className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold hover:bg-navy/90 transition-colors shadow-xs"
               >
                 Terapkan
               </button>
-            </>
+            </div>
           )}
 
-          {isNonDefault && activePreset !== "custom" && (
+          {isNonDefault && (
             <button
+              type="button"
               onClick={resetToDefault}
-              className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
+              className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
+              title="Reset kembali ke Bulan Ini"
             >
               <X size={11} /> Reset
             </button>

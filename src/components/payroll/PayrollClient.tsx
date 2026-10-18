@@ -1136,7 +1136,10 @@ export function PayrollClient({
                       <th className="py-3 px-3.5 text-right whitespace-nowrap min-w-[95px] border-b border-r border-border">
                         THR
                       </th>
-                      <th className="py-3 px-3.5 text-right whitespace-nowrap min-w-[130px] bg-blue-50/70 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border-b border-r border-blue-200 dark:border-blue-900/60">
+                      <th
+                        className="py-3 px-3.5 text-right whitespace-nowrap min-w-[130px] bg-blue-50/70 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border-b border-r border-blue-200 dark:border-blue-900/60"
+                        title="Akumulasi seluruh penghasilan kotor (Gaji Pokok + Seluruh Tunjangan) yang menjadi dasar pelaporan PPh 21"
+                      >
                         Terlapor Pajak (Bruto)
                       </th>
                       <th className="py-3 px-3.5 text-right whitespace-nowrap min-w-[95px] border-b border-r border-border">
@@ -1145,7 +1148,10 @@ export function PayrollClient({
                       <th className="py-3 px-3.5 text-right whitespace-nowrap min-w-[90px] border-b border-r border-border">
                         PPh 21
                       </th>
-                      <th className="py-3 px-3.5 text-right whitespace-nowrap min-w-[130px] bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-b border-r border-emerald-200 dark:border-emerald-900/60">
+                      <th
+                        className="py-3 px-3.5 text-right whitespace-nowrap min-w-[130px] bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-b border-r border-emerald-200 dark:border-emerald-900/60"
+                        title="Nominal riil ditransfer: Gaji Pokok + Tunjangan Jabatan + Transport + Insentif − Potongan BPJS (Tunjangan BPJS & PPh disetor langsung ke lembaga terkait)"
+                      >
                         Gaji Bersih (THP)
                       </th>
                       <th className="py-3 px-3.5 text-center whitespace-nowrap min-w-[120px] border-b border-border">
@@ -5042,11 +5048,22 @@ export function PayrollClient({
         const liveTotalTunjanganBpjs =
           Number(modalTunjanganBpjsKes || 0) + Number(modalTunjanganBpjsTk || 0);
 
+        const liveTunjanganLain = Math.max(
+          Number(modalTunjanganLainnya || 0),
+          Number(modalInsentif || 0)
+        );
+
+        // Akumulasi PPh 21 Jan-Nov untuk kalkulasi Tunjangan PPh Desember (Penyelesaian Akhir Tahun)
+        const pphJanNov = Array.from({ length: 11 }, (_, i) => i + 1).reduce((acc, m) => {
+          const row = editingGaji?.pegawai.riwayatGajiBulan?.[m];
+          return acc + (row?.pph21 || 0);
+        }, 0);
+
         const liveTotalGajiKotor =
           Number(modalGajiPokok || 0) +
           Number(modalTunjanganJabatan || 0) +
           Number(modalTunjanganTransport || 0) +
-          Number(modalTunjanganLainnya || 0) +
+          liveTunjanganLain +
           Number(modalThr || 0) +
           liveTotalTunjanganBpjs +
           Number(modalTunjanganPph || 0);
@@ -5057,17 +5074,21 @@ export function PayrollClient({
           editingGaji.pegawai.statusKeluarga
         );
 
+        const akumulasiPphSetahun = pphJanNov + Number(modalPph21 || liveTerCalc.nominal || 0);
+
         // Potongan yang riil dipotong dari karyawan: BPJS (Kes + TK) dan Potongan Lain
         // PPh 21 TIDAK dipotong dari karyawan karena 100% ditanggung perusahaan
         const liveTotalPotonganKaryawan =
           liveTotalBpjs + Number(modalPotonganLain || 0);
 
+        // Formulasi THP: Gaji Pokok + Tunjangan Jabatan + Transport + Tunjangan Lainnya/Insentif - Potongan BPJS
+        // (Tunjangan BPJS dan Tunjangan PPh tidak ikut dikirim ke rekening karyawan karena dibayarkan langsung ke lembaga terkait)
         const liveTotalGajiBersih = Math.max(
           0,
           Number(modalGajiPokok || 0) +
             Number(modalTunjanganJabatan || 0) +
             Number(modalTunjanganTransport || 0) +
-            Number(modalTunjanganLainnya || 0) +
+            liveTunjanganLain +
             Number(modalThr || 0) -
             liveTotalPotonganKaryawan
         );
@@ -5527,9 +5548,16 @@ export function PayrollClient({
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-surface-card border border-border">
-                      <label className="font-semibold text-navy-text block mb-1">
-                        Tunjangan Subsidi PPh (Rp)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-semibold text-navy-text block">
+                          Tunjangan Subsidi PPh (Rp)
+                        </label>
+                        {modalGajiBulan === 12 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                            Desember
+                          </span>
+                        )}
+                      </div>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -5539,9 +5567,34 @@ export function PayrollClient({
                         placeholder="0"
                         className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                       />
+                      {modalGajiBulan === 12 && (
+                        <div className="mt-1.5 flex items-center justify-between gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setModalTunjanganPph(akumulasiPphSetahun)}
+                            className="text-[10px] font-bold text-navy hover:underline cursor-pointer"
+                            title="Set otomatis dengan akumulasi PPh 21 Jan-Des"
+                          >
+                            Set Akumulasi Jan–Des ({formatRupiah(akumulasiPphSetahun)})
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {/* Info Desember: Tunjangan PPh Penyelesaian Akhir Tahun */}
+                {modalGajiBulan === 12 && (
+                  <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 text-xs space-y-1">
+                    <div className="font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
+                      <Award size={14} className="text-blue-600 dark:text-blue-400" />
+                      <span>Penyelesaian Tunjangan PPh Bulan Desember</span>
+                    </div>
+                    <p className="text-[11px] text-blue-900/80 dark:text-blue-300/80">
+                      Pada pembukuan bulan Desember, Tunjangan PPh dikalkulasikan dan diselesaikan sebagai akumulasi fasilitas PPh 21 yang ditanggung perusahaan selama setahun untuk keperluan pelaporan formulir 1721-A1. Nominal ini menambah Bruto Terlapor Pajak, namun <strong>tidak ditransfer ke rekening karyawan</strong>.
+                    </p>
+                  </div>
+                )}
 
                 {/* Pelaporan PPh 21 */}
                 <div className="p-3 rounded-xl bg-surface-subtle/50 border border-border space-y-2">
@@ -5579,29 +5632,58 @@ export function PayrollClient({
                   </div>
                 </div>
 
-                {/* Ringkasan Total Live Preview */}
-                <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/40 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-stronger block">
-                    Ringkasan Total
-                  </span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl border border-border bg-surface-card">
-                      <span className="text-[10px] font-semibold text-muted-faint block">
-                        Bruto Terlapor Pajak
-                      </span>
-                      <span className="text-base font-bold font-mono text-navy-text block mt-0.5">
+                {/* Ringkasan Total Live Preview: Formulasi THP vs Terlapor Pajak */}
+                <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-stronger block">
+                      Formulasi Penghitungan Gaji (THP vs Terlapor Pajak)
+                    </span>
+                    <span className="text-[10px] text-muted-faint font-mono">
+                      Rumus Standar SAK & Pajak
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-semibold text-blue-900 dark:text-blue-300">
+                          Gaji Terlapor Pajak (Bruto)
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-bold font-mono">
+                          SPT PPh 21
+                        </span>
+                      </div>
+                      <span className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 block mt-0.5">
                         {formatRupiah(liveTotalGajiTerlaporPajak)}
+                      </span>
+                      <span className="text-[9.5px] text-blue-800/80 dark:text-blue-300/70 block mt-0.5">
+                        Gaji Pokok + Seluruh Tunjangan (Jabatan, Transport, Insentif, BPJS & PPh)
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-xl border border-border bg-surface-card">
-                      <span className="text-[10px] font-semibold text-muted-faint block">
-                        Gaji Bersih (Take Home Pay)
-                      </span>
-                      <span className="text-base font-bold font-mono text-navy-text block mt-0.5">
+                    <div className="p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-semibold text-emerald-900 dark:text-emerald-300">
+                          Gaji Bersih (Take Home Pay)
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold font-mono">
+                          Ditransfer
+                        </span>
+                      </div>
+                      <span className="text-base font-bold font-mono text-emerald-800 dark:text-emerald-200 block mt-0.5">
                         {formatRupiah(liveTotalGajiBersih)}
                       </span>
+                      <span className="text-[9.5px] text-emerald-800/80 dark:text-emerald-300/70 block mt-0.5">
+                        Gaji Pokok + Jabatan + Transport + Insentif − BPJS Karyawan {modalPotonganLain > 0 ? "− Kasbon" : ""}
+                      </span>
                     </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-surface-card border border-border text-[10.5px] text-muted-faint flex items-start gap-1.5">
+                    <Info size={13} className="text-navy shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Catatan Regulasi:</strong> Tunjangan BPJS ({formatRupiah(liveTotalTunjanganBpjs)}) dan Tunjangan PPh ({formatRupiah(modalTunjanganPph)}) tidak ikut dikirim ke rekening karyawan karena dibayarkan langsung ke lembaga terkait (BPJS & Kas Negara/DJP).
+                    </span>
                   </div>
                 </div>
 
@@ -6655,6 +6737,19 @@ export function PayrollClient({
                     Ditransfer riil ke pegawai
                   </span>
                 </div>
+              </div>
+
+              {/* Catatan Formulasi THP & Terlapor Pajak di Slip Gaji */}
+              <div className="p-3 rounded-xl bg-surface-subtle/60 border border-border text-[10px] space-y-1">
+                <div className="font-semibold text-navy-text flex items-center justify-between flex-wrap gap-1">
+                  <span>Formulasi THP: Gaji Pokok + Tunjangan Jabatan + Transport + Insentif − Potongan BPJS {slipModalItem.potonganLain > 0 ? "− Kasbon" : ""}</span>
+                  <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                    = {slipModalItem.totalGajiBersihFmt}
+                  </span>
+                </div>
+                <p className="text-muted-faint text-[9.5px]">
+                  * Tunjangan BPJS dan Tunjangan PPh merupakan fasilitas yang disetorkan langsung ke BPJS dan Kas Negara (DJP), sehingga tidak ikut dikirim ke rekening karyawan namun tetap diakumulasikan ke dalam Gaji Terlapor Pajak (Bruto).
+                </p>
               </div>
 
               {slipModalItem.catatan && (

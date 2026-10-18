@@ -13,6 +13,7 @@ export async function saveJurnalTransaksi(formData: FormData) {
     fakturId: formData.get("fakturId") || null,
     periodeBulanGaji: formData.get("periodeBulanGaji") ? parseInt(formData.get("periodeBulanGaji") as string, 10) : null,
     periodeTahunGaji: formData.get("periodeTahunGaji") ? parseInt(formData.get("periodeTahunGaji") as string, 10) : null,
+    tanggalNota: formData.get("tanggalNota") ? (formData.get("tanggalNota") as string) : null,
     rows: JSON.parse((formData.get("rows") as string) ?? "[]"),
   };
 

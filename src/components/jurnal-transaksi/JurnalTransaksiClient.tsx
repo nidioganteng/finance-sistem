@@ -99,6 +99,8 @@ export function JurnalTransaksiClient({
   const [fakturId, setFakturId] = useState("");
   const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(null);
   const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(null);
+  const [tanggalNota, setTanggalNota] = useState("");
+  const [showTanggalNota, setShowTanggalNota] = useState(false);
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -351,6 +353,7 @@ export function JurnalTransaksiClient({
   function resetForm() {
     setNoBukti(""); setTanggal(todayStr()); setProjectId(""); setFakturId("");
     setPeriodeBulanGaji(null); setPeriodeTahunGaji(null);
+    setTanggalNota(""); setShowTanggalNota(false);
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -364,6 +367,8 @@ export function JurnalTransaksiClient({
     setFakturId(group.fakturId ?? "");
     setPeriodeBulanGaji(group.periodeBulanGaji ?? null);
     setPeriodeTahunGaji(group.periodeTahunGaji ?? null);
+    setTanggalNota(group.tanggalNota ?? "");
+    setShowTanggalNota(!!group.tanggalNota);
     setCoaRows(group.rows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
@@ -407,6 +412,7 @@ export function JurnalTransaksiClient({
       fd.set("periodeBulanGaji", String(periodeBulanGaji));
       fd.set("periodeTahunGaji", String(periodeTahunGaji || new Date(tanggal).getFullYear()));
     }
+    if (tanggalNota) fd.set("tanggalNota", tanggalNota);
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
@@ -537,6 +543,45 @@ export function JurnalTransaksiClient({
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">Tanggal</label>
                 <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
                   className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
+                {!showTanggalNota ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTanggalNota(true);
+                      if (!tanggalNota) setTanggalNota(tanggal);
+                    }}
+                    className="text-left text-[10.5px] font-medium text-brand hover:underline inline-flex items-center gap-1"
+                  >
+                    + Tanggal Nota / Kuitansi (jika beda tanggal / susulan)
+                  </button>
+                ) : (
+                  <div className="mt-1 p-2 rounded-lg bg-surface-subtle border border-border-subtle flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-muted-stronger uppercase tracking-wide">
+                        Tanggal Nota Fisik / Riil
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTanggalNota(false);
+                          setTanggalNota("");
+                        }}
+                        className="text-[10px] text-muted-faint hover:text-red-500 font-medium"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                    <input
+                      type="date"
+                      value={tanggalNota}
+                      onChange={(e) => setTanggalNota(e.target.value)}
+                      className="h-8 px-2.5 rounded-[7px] border border-border-soft bg-surface-input text-xs text-navy-text focus:outline-none focus:border-brand"
+                    />
+                    <span className="text-[9.5px] text-muted-faint">
+                      Tanggal kuitansi/transaksi asli jika baru dicatat sekarang.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1042,6 +1087,17 @@ export function JurnalTransaksiClient({
                               <CalendarDays size={8} className="text-amber-500 flex-none" />
                               Akrual: {BULAN_NAMES[group.periodeBulanGaji - 1].slice(0, 3)} {group.periodeTahunGaji ?? ""}
                             </span>
+                          )}
+                          {group.tanggalNota && group.tanggalNota !== group.tanggalRaw?.slice(0, 10) && (
+                            <div className="mt-0.5">
+                              <span
+                                className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1.5 py-0.5 rounded font-sans"
+                                title={`Tanggal nota/kuitansi fisik: ${group.tanggalNota}`}
+                              >
+                                <Receipt size={8} className="text-blue-500 flex-none" />
+                                Nota: {group.tanggalNota}
+                              </span>
+                            </div>
                           )}
                         </td>
                         <td className="py-2.5 px-1.5 whitespace-nowrap">

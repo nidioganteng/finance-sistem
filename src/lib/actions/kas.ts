@@ -18,6 +18,7 @@ export type CreateKasTransactionInput = {
   syncBukuBankRekeningId?: string;
   periodeBulanGaji?: number | null;
   periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
 };
 
 export async function generateNoBukti(entityKey: string, tanggal: string): Promise<string> {

@@ -56,6 +56,11 @@ let _counter = 0;
 function uid() { return `r${++_counter}`; }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", keterangan: "", arah: "debit", nominalRaw: "" }; }
+const BULAN_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
 function parseNum(s: string) { return parseInt(s.replace(/\./g, "").replace(/[^0-9]/g, ""), 10) || 0; }
 function fmtNum(raw: string) {
   const n = parseInt(raw.replace(/\./g, "").replace(/[^0-9]/g, ""), 10);
@@ -92,6 +97,8 @@ export function JurnalTransaksiClient({
   const [tanggal, setTanggal] = useState(todayStr());
   const [projectId, setProjectId] = useState("");
   const [fakturId, setFakturId] = useState("");
+  const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(null);
+  const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(null);
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -113,6 +120,13 @@ export function JurnalTransaksiClient({
     acc[key].push(p);
     return acc;
   }, {} as Record<string, typeof otherEntityProjects>);
+
+  // Deteksi akun beban gaji / honor tenaga ahli di baris jurnal
+  const hasSalaryAccount = coaRows.some((r) => {
+    const c = coa.find((acc) => acc.id === r.coaAccountId);
+    if (!c) return false;
+    return c.code === "511" || c.code === "612" || /gaji|honor|tenaga ahli/i.test(c.name);
+  });
 
   // Filter faktur berdasarkan proyek jika proyek dipilih
   const currentProjectFakturs = projectId
@@ -336,6 +350,7 @@ export function JurnalTransaksiClient({
 
   function resetForm() {
     setNoBukti(""); setTanggal(todayStr()); setProjectId(""); setFakturId("");
+    setPeriodeBulanGaji(null); setPeriodeTahunGaji(null);
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -347,6 +362,8 @@ export function JurnalTransaksiClient({
     setTanggal(group.tanggalRaw.slice(0, 10));
     setProjectId(group.projectId ?? "");
     setFakturId(group.fakturId ?? "");
+    setPeriodeBulanGaji(group.periodeBulanGaji ?? null);
+    setPeriodeTahunGaji(group.periodeTahunGaji ?? null);
     setCoaRows(group.rows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
@@ -386,6 +403,10 @@ export function JurnalTransaksiClient({
     fd.set("tanggal", tanggal);
     if (projectId) fd.set("projectId", projectId);
     if (fakturId) fd.set("fakturId", fakturId);
+    if (periodeBulanGaji) {
+      fd.set("periodeBulanGaji", String(periodeBulanGaji));
+      fd.set("periodeTahunGaji", String(periodeTahunGaji || new Date(tanggal).getFullYear()));
+    }
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
@@ -788,6 +809,84 @@ export function JurnalTransaksiClient({
               )}
             </div>
 
+            {/* Periode Akrual Beban Gaji (Pengoperasian Akrual Jurnal Umum) */}
+            <div className={`mb-5 rounded-[12px] border p-3.5 flex flex-col gap-2.5 transition-colors ${
+              hasSalaryAccount || periodeBulanGaji
+                ? "border-amber-200/90 dark:border-amber-800/50 bg-amber-50/40 dark:bg-amber-950/20"
+                : "border-border-soft bg-surface-subtle/30"
+            }`}>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarDays size={14} className={hasSalaryAccount || periodeBulanGaji ? "text-amber-600 dark:text-amber-400" : "text-muted-faint"} />
+                  <span className="text-[11.5px] font-bold text-navy-text">
+                    Periode Akrual Beban Gaji
+                  </span>
+                  {hasSalaryAccount && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                      Akun Gaji Terdeteksi
+                    </span>
+                  )}
+                  {periodeBulanGaji && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                      Diakui Beban: {BULAN_NAMES[periodeBulanGaji - 1]} {periodeTahunGaji || new Date(tanggal).getFullYear()}
+                    </span>
+                  )}
+                </div>
+                {periodeBulanGaji && (
+                  <button
+                    type="button"
+                    onClick={() => { setPeriodeBulanGaji(null); setPeriodeTahunGaji(null); }}
+                    className="text-[10.5px] text-muted-faint hover:text-red-500 font-medium transition-colors"
+                  >
+                    Reset (Sesuai Tanggal)
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10.5px] font-bold text-muted-faint block mb-1">
+                    Bulan Beban Gaji (Akrual)
+                  </label>
+                  <select
+                    value={periodeBulanGaji ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                      setPeriodeBulanGaji(val);
+                      if (val && !periodeTahunGaji) {
+                        setPeriodeTahunGaji(new Date(tanggal).getFullYear());
+                      }
+                    }}
+                    className="w-full h-8 px-2.5 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand"
+                  >
+                    <option value="">Sesuai Tanggal Transaksi (Otomatis)</option>
+                    {BULAN_NAMES.map((name, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        Bulan {name} ({i + 1})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10.5px] font-bold text-muted-faint block mb-1">
+                    Tahun Beban Gaji
+                  </label>
+                  <input
+                    type="number"
+                    value={periodeTahunGaji ?? (periodeBulanGaji ? new Date(tanggal).getFullYear() : "")}
+                    onChange={(e) => setPeriodeTahunGaji(e.target.value ? parseInt(e.target.value, 10) : null)}
+                    placeholder={String(new Date(tanggal).getFullYear())}
+                    className="w-full h-8 px-2.5 rounded-[8px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text font-mono focus:outline-none focus:border-brand"
+                  />
+                </div>
+              </div>
+
+              <p className="text-[10.5px] text-muted-faint leading-relaxed">
+                💡 Pembayaran gaji yang dibayarkan di bulan berjalan (misal gaji September yang baru dibayar tanggal 1–10 Oktober) tetap diakui sebagai biaya operasional bulan September secara akrual pada Rekonsiliasi Payroll & Pajak.
+              </p>
+            </div>
+
             {/* Tabel baris COA */}
             <div className="rounded-[12px] border border-border-soft overflow-hidden mb-4">
               <table className="w-full text-[13px]">
@@ -947,7 +1046,18 @@ export function JurnalTransaksiClient({
                     {rowIdx === 0 ? (
                       <>
                         <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
-                        <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{group.noBukti}</td>
+                        <td className="py-2.5 px-1.5 text-xs text-muted font-mono">
+                          <div>{group.noBukti}</div>
+                          {group.periodeBulanGaji && (
+                            <span
+                              className="mt-0.5 inline-flex items-center gap-1 text-[9.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 px-1.5 py-0.5 rounded font-sans"
+                              title={`Diakui Beban: Bulan ${BULAN_NAMES[group.periodeBulanGaji - 1]} ${group.periodeTahunGaji ?? ""}`}
+                            >
+                              <CalendarDays size={8} className="text-amber-500 flex-none" />
+                              Akrual: {BULAN_NAMES[group.periodeBulanGaji - 1].slice(0, 3)} {group.periodeTahunGaji ?? ""}
+                            </span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-1.5 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">
                             {group.project ? (

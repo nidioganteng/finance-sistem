@@ -5597,24 +5597,32 @@ export function PayrollClient({
                 )}
 
                 {/* Pelaporan PPh 21 */}
-                <div className="p-3 rounded-xl bg-surface-subtle/50 border border-border space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div>
-                      <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5 flex-wrap">
-                        <span>Pelaporan PPh 21 (Beban Kantor)</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold font-mono">
-                          TER {liveTerCalc.kategori} ({liveTerCalc.tarifPersen}%)
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-muted-faint mt-0.5">
-                        Ditanggung perusahaan · PTKP: {editingGaji.pegawai.statusKeluarga || "TK/0"} · Bruto: {formatRupiah(liveTotalGajiTerlaporPajak)}
-                      </div>
+                <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5 flex-wrap">
+                      <span>Pelaporan PPh 21 (Beban Kantor)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold font-mono">
+                        TER {liveTerCalc.kategori} ({liveTerCalc.tarifPersen}%)
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <span className="text-[10px] text-muted-faint font-medium">
+                      Ditanggung Perusahaan
+                    </span>
+                  </div>
+
+                  <div className="text-[10.5px] text-muted-faint">
+                    Dasar Pengenaan Pajak: PTKP <span className="font-semibold text-foreground font-mono">{editingGaji.pegawai.statusKeluarga || "TK/0"}</span> · Bruto Terlapor <span className="font-semibold text-foreground font-mono">{formatRupiah(liveTotalGajiTerlaporPajak)}</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-navy-text">
+                      Nominal PPh 21 (Rp)
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => setModalPph21(liveTerCalc.nominal)}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-navy/20 bg-navy/5 text-navy hover:bg-navy/15 dark:bg-navy/30 dark:text-blue-200 transition-colors cursor-pointer shrink-0"
+                        className="flex-1 sm:flex-none px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-navy/20 bg-navy/5 text-navy hover:bg-navy/15 dark:bg-navy/30 dark:text-blue-200 transition-colors cursor-pointer text-center"
                         title="Klik untuk mengisi otomatis sesuai tarif TER PP 58/2023"
                       >
                         Terapkan TER ({formatRupiah(liveTerCalc.nominal)})
@@ -5626,7 +5634,7 @@ export function PayrollClient({
                         value={formatRupiahInput(modalPph21)}
                         onChange={(e) => setModalPph21(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                         placeholder="0"
-                        className="w-28 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right font-semibold"
+                        className="w-28 sm:w-32 h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono text-xs text-right font-semibold shrink-0"
                       />
                     </div>
                   </div>

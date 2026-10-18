@@ -59,12 +59,11 @@ if ($method === 'GET' && $sub === '') {
     // 1. Agregasi Transaksi Jurnal Umum (filter akun 511, 612, 533 + name match)
     //    Lewati auto-posted mirror (dari Jurnal Transaksi) agar tidak dobel.
     $tx_sql =
-        "SELECT t.id, t.tanggal, t.debit, t.kredit,
+        "SELECT t.id, t.tanggal, t.debit, t.kredit, t.extraFieldsJson,
                 c.code AS coa_code, c.name AS coa_name
          FROM `Transaction` t
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId IN ($placeholders)
-           AND t.tanggal BETWEEN ? AND ?
            AND (c.code = '511' OR c.code = '612' OR c.code = '533'
                 OR c.name LIKE '%Gaji%'
                 OR c.name LIKE '%Honor%'
@@ -72,9 +71,13 @@ if ($method === 'GET' && $sub === '') {
                 OR c.name LIKE '%PPH 21%'
                 OR c.name LIKE '%PPh 21%')
            AND (JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') IS NULL
-                OR JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') != 'true')";
+                OR JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') != 'true')
+           AND (
+             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') IS NULL))
+             OR JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') = ?
+           )";
     $stmt = $pdo->prepare($tx_sql);
-    $stmt->execute(array_merge($ids, [$date_from, $date_to]));
+    $stmt->execute(array_merge($ids, [$date_from, $date_to, (string)$year]));
     $tx_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Payroll pegawai bulanan
@@ -133,7 +136,9 @@ if ($method === 'GET' && $sub === '') {
 
     // Agregasi Transaksi
     foreach ($tx_rows as $t) {
-        $m = (int)date('n', strtotime($t['tanggal']));
+        $extra = (!empty($t['extraFieldsJson']) && is_string($t['extraFieldsJson'])) ? json_decode($t['extraFieldsJson'], true) : [];
+        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : null;
+        $m = $akrual_bulan ?: (int)date('n', strtotime($t['tanggal']));
         if ($m < 1 || $m > 12) continue;
         $code  = $t['coa_code'] ?? '';
         $name  = strtolower($t['coa_name'] ?? '');

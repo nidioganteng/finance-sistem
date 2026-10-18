@@ -32,6 +32,7 @@ type InitialValues = {
   projectId?: string;
   periodeBulanGaji?: number | null;
   periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
   rows: { coaAccountId: string; nominal: string; keterangan?: string }[];
   existingTxIds: string[];
 };
@@ -226,6 +227,8 @@ export function KasTransactionForm({
   const [syncRekeningId, setSyncRekeningId] = useState(bukuBankRekeningOptions[0]?.id ?? "");
   const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
   const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
+  const [tanggalNota, setTanggalNota] = useState<string>(initialValues?.tanggalNota ?? "");
+  const [showTanggalNota, setShowTanggalNota] = useState<boolean>(!!initialValues?.tanggalNota);
 
   const hasSalaryAccount = rows.some((r) => {
     const c = coaOptions.find((opt) => opt.id === r.coaAccountId);
@@ -290,6 +293,7 @@ export function KasTransactionForm({
       ...(projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
       ...(periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
+      ...(tanggalNota ? { tanggalNota } : {}),
       ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
@@ -349,6 +353,40 @@ export function KasTransactionForm({
           <div>
             <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">Tanggal</label>
             <DatePicker value={tanggal} onChange={setTanggal} required />
+            {!showTanggalNota ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTanggalNota(true);
+                  if (!tanggalNota) setTanggalNota(tanggal);
+                }}
+                className="mt-1.5 text-[10.5px] font-medium text-brand hover:underline inline-flex items-center gap-1"
+              >
+                + Tanggal Nota / Kuitansi (jika beda tanggal / susulan)
+              </button>
+            ) : (
+              <div className="mt-2 p-2 rounded-lg bg-surface-subtle border border-border-subtle flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-muted-stronger uppercase tracking-wide">
+                    Tanggal Nota Fisik / Riil
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTanggalNota(false);
+                      setTanggalNota("");
+                    }}
+                    className="text-[10px] text-muted-faint hover:text-red-500 font-medium"
+                  >
+                    Batal
+                  </button>
+                </div>
+                <DatePicker value={tanggalNota} onChange={setTanggalNota} />
+                <span className="text-[9.5px] text-muted-faint">
+                  Tanggal asli kuitansi/pengeluaran jika baru sempat dicatat sekarang.
+                </span>
+              </div>
+            )}
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">

@@ -906,12 +906,13 @@ if ($method === 'GET' && $sub === '') {
                 OR c.name LIKE '%Gaji%' OR c.name LIKE '%Honor%' OR c.name LIKE '%Tenaga Ahli%')
            AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')
            AND (
-             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.periodeTahunGaji') IS NULL))
+             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR (JSON_VALUE(t.extraFieldsJson, '$.periodeTahunGaji') IS NULL AND JSON_VALUE(t.extraFieldsJson, '$.tanggalNota') IS NULL)))
              OR JSON_VALUE(t.extraFieldsJson, '$.periodeTahunGaji') = ?
+             OR JSON_VALUE(t.extraFieldsJson, '$.tanggalNota') LIKE ?
            )
          ORDER BY t.tanggal DESC, t.noBukti DESC"
     );
-    $stmt->execute([$entity_id, $year_start, $year_end, (string)$year]);
+    $stmt->execute([$entity_id, $year_start, $year_end, (string)$year, (string)$year . '%']);
     $tx_gaji_tahun = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $tx_pegawai_tahun = [];
@@ -931,12 +932,13 @@ if ($method === 'GET' && $sub === '') {
         $tgl  = substr($t['tanggal'], 0, 10);
 
         $extra = (!empty($t['extraFieldsJson']) && is_string($t['extraFieldsJson'])) ? json_decode($t['extraFieldsJson'], true) : [];
-        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : null;
-        $akrual_tahun = !empty($extra['periodeTahunGaji']) ? (int)$extra['periodeTahunGaji'] : null;
+        $tgl_nota     = !empty($extra['tanggalNota']) ? substr((string)$extra['tanggalNota'], 0, 10) : null;
+        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : ($tgl_nota ? (int)date('n', strtotime($tgl_nota)) : null);
+        $akrual_tahun = !empty($extra['periodeTahunGaji']) ? (int)$extra['periodeTahunGaji'] : ($tgl_nota ? (int)date('Y', strtotime($tgl_nota)) : null);
 
         $bulan_tx  = $akrual_bulan ?: (int)date('n', strtotime($tgl));
         $tahun_tx  = $akrual_tahun ?: (int)date('Y', strtotime($tgl));
-        $is_akrual = !empty($akrual_bulan);
+        $is_akrual = !empty($akrual_bulan) || (!empty($tgl_nota) && $tgl_nota !== $tgl);
 
         $jenis_nama_str = $jenis_map[$t['jenis_key'] ?? ''] ?? ($t['jenis_nama'] ?? 'Jurnal Umum');
 
@@ -950,6 +952,7 @@ if ($method === 'GET' && $sub === '') {
             'isAkrual'         => $is_akrual,
             'periodeBulanGaji' => $akrual_bulan,
             'periodeTahunGaji' => $akrual_tahun,
+            'tanggalNota'      => $tgl_nota,
             'noBukti'          => $t['noBukti'],
             'keterangan'       => $t['keterangan'],
             'coaAccountId'     => $t['coaAccountId'],

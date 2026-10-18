@@ -288,6 +288,7 @@ if ($method === 'GET' && $sub === '') {
             'arahLaporan'     => is_array($extra['arahLaporan'] ?? null) ? $extra['arahLaporan'] : [],
             'periodeBulanGaji' => !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : null,
             'periodeTahunGaji' => !empty($extra['periodeTahunGaji']) ? (int)$extra['periodeTahunGaji'] : (!empty($extra['periodeBulanGaji']) ? (int)date('Y', strtotime($r['tanggal'])) : null),
+            'tanggalNota'     => !empty($extra['tanggalNota']) ? (string)$extra['tanggalNota'] : null,
         ];
     }
 

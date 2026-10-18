@@ -484,6 +484,7 @@ export type JurnalTransaksiGajiItem = {
   isAkrual?: boolean;
   periodeBulanGaji?: number | null;
   periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
 };
 
 export type PenyesuaianAkunGajiDetail = {

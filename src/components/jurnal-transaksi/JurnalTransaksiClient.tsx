@@ -54,7 +54,13 @@ type CoaRow = {
 
 let _counter = 0;
 function uid() { return `r${++_counter}`; }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", keterangan: "", arah: "debit", nominalRaw: "" }; }
 const BULAN_NAMES = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",

@@ -890,6 +890,7 @@ if ($method === 'GET' && $sub === '') {
     $stmt = $pdo->prepare(
         "SELECT t.id, t.entityId, t.tanggal, t.noBukti, t.keterangan,
                 t.coaAccountId, t.projectId, t.debit, t.kredit,
+                t.extraFieldsJson,
                 c.code AS coa_code, c.name AS coa_name,
                 ji.`key` AS jenis_key, ji.nama AS jenis_nama,
                 p.code AS proj_code, p.name AS proj_name,
@@ -900,13 +901,17 @@ if ($method === 'GET' && $sub === '') {
          LEFT JOIN Project p ON t.projectId = p.id
          LEFT JOIN User u ON t.staffId = u.id
          WHERE t.entityId = ?
-           AND t.tanggal BETWEEN ? AND ?
            AND c.kategori = 'BEBAN'
            AND (c.code = '511' OR c.code = '612'
                 OR c.name LIKE '%Gaji%' OR c.name LIKE '%Honor%' OR c.name LIKE '%Tenaga Ahli%')
+           AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.autoPostedFromJurnal') != 'true')
+           AND (
+             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '$.periodeTahunGaji') IS NULL))
+             OR JSON_VALUE(t.extraFieldsJson, '$.periodeTahunGaji') = ?
+           )
          ORDER BY t.tanggal DESC, t.noBukti DESC"
     );
-    $stmt->execute([$entity_id, $year_start, $year_end]);
+    $stmt->execute([$entity_id, $year_start, $year_end, (string)$year]);
     $tx_gaji_tahun = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $tx_pegawai_tahun = [];
@@ -924,32 +929,43 @@ if ($method === 'GET' && $sub === '') {
         $d    = (float)$t['debit'];
         $k    = (float)$t['kredit'];
         $tgl  = substr($t['tanggal'], 0, 10);
-        $bulan_tx = (int)date('n', strtotime($tgl));
+
+        $extra = (!empty($t['extraFieldsJson']) && is_string($t['extraFieldsJson'])) ? json_decode($t['extraFieldsJson'], true) : [];
+        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : null;
+        $akrual_tahun = !empty($extra['periodeTahunGaji']) ? (int)$extra['periodeTahunGaji'] : null;
+
+        $bulan_tx  = $akrual_bulan ?: (int)date('n', strtotime($tgl));
+        $tahun_tx  = $akrual_tahun ?: (int)date('Y', strtotime($tgl));
+        $is_akrual = !empty($akrual_bulan);
+
         $jenis_nama_str = $jenis_map[$t['jenis_key'] ?? ''] ?? ($t['jenis_nama'] ?? 'Jurnal Umum');
 
         $item = [
-            'id'            => $t['id'],
-            'entityId'      => $t['entityId'],
-            'tanggal'       => $tgl,
-            'tanggalFmt'    => fmt_tanggal_id($tgl),
-            'bulan'         => $bulan_tx,
-            'tahun'         => (int)date('Y', strtotime($tgl)),
-            'noBukti'       => $t['noBukti'],
-            'keterangan'    => $t['keterangan'],
-            'coaAccountId'  => $t['coaAccountId'],
-            'coaCode'       => $code ?: '-',
-            'coaName'       => $t['coa_name'] ?: 'Beban Gaji',
-            'jenisInputKey' => $t['jenis_key'] ?? 'jurnalTransaksi',
-            'jenisInputNama'=> $jenis_nama_str,
-            'projectId'     => $t['projectId'] ?? null,
-            'projectCode'   => $t['proj_code'] ?? null,
-            'projectName'   => $t['proj_name'] ?? null,
-            'namaProyek'    => $t['proj_code'] ? "{$t['proj_code']} - {$t['proj_name']}" : null,
-            'debit'         => $d,
-            'debitFmt'      => fmt_rp_payroll($d),
-            'kredit'        => $k,
-            'kreditFmt'     => fmt_rp_payroll($k),
-            'staffName'     => $t['staff_name'] ?? null,
+            'id'               => $t['id'],
+            'entityId'         => $t['entityId'],
+            'tanggal'          => $tgl,
+            'tanggalFmt'       => fmt_tanggal_id($tgl),
+            'bulan'            => $bulan_tx,
+            'tahun'            => $tahun_tx,
+            'isAkrual'         => $is_akrual,
+            'periodeBulanGaji' => $akrual_bulan,
+            'periodeTahunGaji' => $akrual_tahun,
+            'noBukti'          => $t['noBukti'],
+            'keterangan'       => $t['keterangan'],
+            'coaAccountId'     => $t['coaAccountId'],
+            'coaCode'          => $code ?: '-',
+            'coaName'          => $t['coa_name'] ?: 'Beban Gaji',
+            'jenisInputKey'    => $t['jenis_key'] ?? 'jurnalTransaksi',
+            'jenisInputNama'   => $jenis_nama_str,
+            'projectId'        => $t['projectId'] ?? null,
+            'projectCode'      => $t['proj_code'] ?? null,
+            'projectName'      => $t['proj_name'] ?? null,
+            'namaProyek'       => $t['proj_code'] ? "{$t['proj_code']} - {$t['proj_name']}" : null,
+            'debit'            => $d,
+            'debitFmt'         => fmt_rp_payroll($d),
+            'kredit'           => $k,
+            'kreditFmt'        => fmt_rp_payroll($k),
+            'staffName'        => $t['staff_name'] ?? null,
         ];
 
         if ($code === '612' || preg_match('/tenaga ahli|honor/i', $name)) {

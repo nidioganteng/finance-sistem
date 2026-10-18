@@ -73,11 +73,12 @@ if ($method === 'GET' && $sub === '') {
            AND (JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') IS NULL
                 OR JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') != 'true')
            AND (
-             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') IS NULL))
+             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR (JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') IS NULL AND JSON_VALUE(t.extraFieldsJson, '\$.tanggalNota') IS NULL)))
              OR JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') = ?
+             OR JSON_VALUE(t.extraFieldsJson, '\$.tanggalNota') LIKE ?
            )";
     $stmt = $pdo->prepare($tx_sql);
-    $stmt->execute(array_merge($ids, [$date_from, $date_to, (string)$year]));
+    $stmt->execute(array_merge($ids, [$date_from, $date_to, (string)$year, (string)$year . '%']));
     $tx_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Payroll pegawai bulanan
@@ -137,7 +138,8 @@ if ($method === 'GET' && $sub === '') {
     // Agregasi Transaksi
     foreach ($tx_rows as $t) {
         $extra = (!empty($t['extraFieldsJson']) && is_string($t['extraFieldsJson'])) ? json_decode($t['extraFieldsJson'], true) : [];
-        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : null;
+        $tgl_nota     = !empty($extra['tanggalNota']) ? substr((string)$extra['tanggalNota'], 0, 10) : null;
+        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : ($tgl_nota ? (int)date('n', strtotime($tgl_nota)) : null);
         $m = $akrual_bulan ?: (int)date('n', strtotime($t['tanggal']));
         if ($m < 1 || $m > 12) continue;
         $code  = $t['coa_code'] ?? '';

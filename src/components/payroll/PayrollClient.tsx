@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Role } from "@/types/app-enums";
 import {
   Users,
+  User,
+  Filter,
   Award,
   Scale,
   ShieldCheck,
@@ -440,6 +442,105 @@ export function PayrollClient({
   const [slipModalItem, setSlipModalItem] = useState<GajiBulananItem | null>(null);
   const [riwayatPegawaiTarget, setRiwayatPegawaiTarget] = useState<PegawaiItem | null>(null);
 
+  // State Rekapitulasi Akumulasi Gaji Setahun Per Nama (Filter Periode Bebas)
+  const [akumulasiMode, setAkumulasiMode] = useState<"per-nama" | "semua">("per-nama");
+  const [selectedAkumulasiPegawaiId, setSelectedAkumulasiPegawaiId] = useState<string>("");
+  const [akumulasiStartMonth, setAkumulasiStartMonth] = useState<number>(1);
+  const [akumulasiEndMonth, setAkumulasiEndMonth] = useState<number>(() => (selectedMonth > 0 ? selectedMonth : 12));
+
+  // Filter rentang bulan di Modal Riwayat Gaji Pegawai
+  const [modalStartMonth, setModalStartMonth] = useState<number>(1);
+  const [modalEndMonth, setModalEndMonth] = useState<number>(12);
+
+  // Helper kalkulasi akumulasi penghasilan, tunjangan, potongan & PPh 21 rentang bulan bebas
+  function getAkumulasiData(p: PegawaiItem, startM: number, endM: number) {
+    const from = Math.min(startM, endM);
+    const to = Math.max(startM, endM);
+    let bulanTerbayar = 0;
+    let totalGajiPokok = 0;
+    let totalTunjanganJabatan = 0;
+    let totalTunjanganTransport = 0;
+    let totalInsentifThr = 0;
+    let totalTunjanganBpjs = 0;
+    let totalTunjanganLainnya = 0;
+    let totalGajiKotor = 0;
+    let totalGajiTerlaporPajak = 0;
+    let totalPotonganBpjs = 0;
+    let totalPotonganLain = 0;
+    let totalPph21 = 0;
+    let totalGajiBersih = 0;
+
+    const monthlyBreakdown: {
+      bulan: number;
+      gajiRow: GajiBulananItem | null;
+      isPaid: boolean;
+    }[] = [];
+
+    for (let m = from; m <= to; m++) {
+      const gajiRow =
+        p.riwayatGajiBulan?.[m] ||
+        (p.currentGaji?.bulan === m ? p.currentGaji : null);
+      const isPaid = !!gajiRow;
+
+      if (gajiRow) {
+        bulanTerbayar++;
+        totalGajiPokok += gajiRow.gajiPokok || 0;
+        totalTunjanganJabatan += gajiRow.tunjanganJabatan || 0;
+        totalTunjanganTransport += gajiRow.tunjanganTransport || 0;
+        totalInsentifThr += (gajiRow.insentif || 0) + (gajiRow.thr || 0);
+        totalTunjanganLainnya += gajiRow.tunjanganLainnya || 0;
+        totalTunjanganBpjs +=
+          (gajiRow.tunjanganBpjsKes || 0) + (gajiRow.tunjanganBpjsTk || 0) ||
+          (gajiRow.tunjanganBpjs || 0);
+
+        totalGajiKotor += gajiRow.totalGajiKotor || 0;
+        totalGajiTerlaporPajak +=
+          gajiRow.totalGajiTerlaporPajak || gajiRow.totalGajiKotor || 0;
+
+        const potBpjs =
+          gajiRow.potonganBpjs ||
+          ((gajiRow.bpjsKesehatan || 0) + (gajiRow.bpjsKetenagakerjaan || 0));
+        totalPotonganBpjs += potBpjs;
+        totalPotonganLain += gajiRow.potonganLain || 0;
+        totalPph21 += gajiRow.pph21 || 0;
+        totalGajiBersih += gajiRow.totalGajiBersih || 0;
+      }
+
+      monthlyBreakdown.push({ bulan: m, gajiRow, isPaid });
+    }
+
+    const totalTunjangan =
+      totalTunjanganJabatan +
+      totalTunjanganTransport +
+      totalInsentifThr +
+      totalTunjanganLainnya +
+      totalTunjanganBpjs;
+
+    const totalPotongan = totalPotonganBpjs + totalPotonganLain;
+
+    return {
+      from,
+      to,
+      totalBulanRentang: to - from + 1,
+      bulanTerbayar,
+      totalGajiPokok,
+      totalTunjanganJabatan,
+      totalTunjanganTransport,
+      totalInsentifThr,
+      totalTunjanganBpjs,
+      totalTunjanganLainnya,
+      totalTunjangan,
+      totalGajiKotor,
+      totalGajiTerlaporPajak,
+      totalPotonganBpjs,
+      totalPotonganLain,
+      totalPotongan,
+      totalPph21,
+      totalGajiBersih,
+      monthlyBreakdown,
+    };
+  }
+
   // Toast / Error state
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -491,6 +592,10 @@ export function PayrollClient({
 
   // Master Pegawai Tetap (seluruh profil karyawan)
   const allMasterPegawai = data.allPegawaiMaster ?? data.pegawaiList;
+  const currentAkumulasiPegawai =
+    allMasterPegawai.find((p) => p.id === selectedAkumulasiPegawaiId) ||
+    allMasterPegawai[0] ||
+    null;
   const filteredMasterList = allMasterPegawai.filter((p) => {
     const matchesSearch =
       p.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1977,66 +2082,588 @@ export function PayrollClient({
             </div>
           )}
 
-          {/* Sub-Tab Content 3: Rekapitulasi Tahunan */}
+          {/* Sub-Tab Content 3: Rekapitulasi Akumulasi Gaji Setahun Per Nama (SPT Tahunan PPh 21) */}
           {pegawaiSubTab === "tahunan" && (
-            <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-text">
-                    Akumulasi Penghasilan & Pajak Pegawai Tetap – Tahun {selectedYear}
-                  </h3>
-                  <p className="text-xs text-muted-faint">
-                    Ringkasan akumulasi seluruh pembayaran gaji 12 bulan per karyawan untuk persiapan SPT Tahunan 1721-A1
-                  </p>
+            <div className="space-y-4">
+              {/* Header Box & Control Panel */}
+              <div className="rounded-2xl border border-border bg-surface-card p-5 space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 rounded-xl bg-navy/10 text-navy dark:bg-navy/30 dark:text-blue-300">
+                        <Briefcase size={18} />
+                      </span>
+                      <div>
+                        <h3 className="text-base font-bold text-navy-text">
+                          Rekapitulasi Akumulasi Gaji Per Nama – Tahun {selectedYear}
+                        </h3>
+                        <p className="text-xs text-muted-faint mt-0.5">
+                          Filter periode bebas untuk melihat akumulasi rincian gaji pokok, tunjangan, potongan, dan PPh 21 untuk keperluan pelaporan SPT Pajak
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mode Selector & Action Buttons */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center p-1 rounded-xl bg-surface-subtle border border-border">
+                      <button
+                        type="button"
+                        onClick={() => setAkumulasiMode("per-nama")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all inline-flex items-center gap-1.5 ${
+                          akumulasiMode === "per-nama"
+                            ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                            : "text-muted-faint hover:text-navy-text"
+                        }`}
+                      >
+                        <User size={13} />
+                        <span>Khusus Satu Orang (Per Nama)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAkumulasiMode("semua")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all inline-flex items-center gap-1.5 ${
+                          akumulasiMode === "semua"
+                            ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                            : "text-muted-faint hover:text-navy-text"
+                        }`}
+                      >
+                        <Users size={13} />
+                        <span>Semua Karyawan</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs print:hidden"
+                      title="Cetak Rekap Akumulasi SPT"
+                    >
+                      <Printer size={13} className="text-navy" />
+                      <span>Cetak Rekap SPT</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Controls Row */}
+                <div className="pt-3 border-t border-border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 flex-wrap">
+                  {/* Selector Pegawai (Jika di Mode Per-Nama) */}
+                  {akumulasiMode === "per-nama" && (
+                    <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+                      <span className="text-xs font-semibold text-muted-stronger whitespace-nowrap">
+                        Pilih Karyawan:
+                      </span>
+                      <select
+                        value={currentAkumulasiPegawai?.id ?? ""}
+                        onChange={(e) => setSelectedAkumulasiPegawaiId(e.target.value)}
+                        className="h-8 flex-1 text-xs rounded-xl border border-border bg-surface-card text-navy-text font-semibold px-3"
+                      >
+                        {allMasterPegawai.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nama} — {p.nik} ({p.jabatan})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Filter Periode Bebas (Rentang Bulan) */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-muted-stronger flex items-center gap-1">
+                      <Filter size={12} className="text-navy" />
+                      <span>Rentang Periode Bebas:</span>
+                    </span>
+
+                    <div className="inline-flex items-center gap-1.5">
+                      <select
+                        value={akumulasiStartMonth}
+                        onChange={(e) => setAkumulasiStartMonth(Number(e.target.value))}
+                        className="h-8 text-xs rounded-xl border border-border bg-surface-card text-navy-text font-semibold px-2.5"
+                      >
+                        {BULAN_NAMES.map((name, idx) => (
+                          <option key={idx + 1} value={idx + 1}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-xs text-muted-faint font-semibold">s/d</span>
+                      <select
+                        value={akumulasiEndMonth}
+                        onChange={(e) => setAkumulasiEndMonth(Number(e.target.value))}
+                        className="h-8 text-xs rounded-xl border border-border bg-surface-card text-navy-text font-semibold px-2.5"
+                      >
+                        {BULAN_NAMES.map((name, idx) => (
+                          <option key={idx + 1} value={idx + 1}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAkumulasiStartMonth(1);
+                          setAkumulasiEndMonth(9);
+                        }}
+                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
+                          akumulasiStartMonth === 1 && akumulasiEndMonth === 9
+                            ? "bg-navy text-white border-navy"
+                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
+                        }`}
+                        title="Rentang Januari s/d September"
+                      >
+                        Jan – Sep
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAkumulasiStartMonth(1);
+                          setAkumulasiEndMonth(12);
+                        }}
+                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
+                          akumulasiStartMonth === 1 && akumulasiEndMonth === 12
+                            ? "bg-navy text-white border-navy"
+                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
+                        }`}
+                        title="Setahun Penuh (12 Bulan)"
+                      >
+                        Full 12 Bulan (Jan – Des)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAkumulasiStartMonth(1);
+                          setAkumulasiEndMonth(6);
+                        }}
+                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
+                          akumulasiStartMonth === 1 && akumulasiEndMonth === 6
+                            ? "bg-navy text-white border-navy"
+                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
+                        }`}
+                      >
+                        Semester 1 (Jan – Jun)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAkumulasiStartMonth(7);
+                          setAkumulasiEndMonth(12);
+                        }}
+                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
+                          akumulasiStartMonth === 7 && akumulasiEndMonth === 12
+                            ? "bg-navy text-white border-navy"
+                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
+                        }`}
+                      >
+                        Semester 2 (Jul – Des)
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[880px] text-left text-xs border-separate border-spacing-0">
-                  <thead className="bg-surface-subtle text-muted-stronger font-bold">
-                    <tr>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[180px] border-b border-r border-border">Pegawai</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[100px] border-b border-r border-border">Status PTKP</th>
-                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[130px] border-b border-r border-border">Bulan Dibayar</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px] border-b border-r border-border">Akumulasi Gaji Bruto</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px] border-b border-r border-border">Akumulasi PPh 21</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px] border-b border-border">Akumulasi Net (THP)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTahunanList.map((p) => {
-                      const ak = p.akumulasiTahun;
-                      return (
-                        <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                            <div className="font-bold text-navy-text">{p.nama}</div>
-                            <div className="text-[11px] text-muted-faint font-mono mt-0.5">
-                              {p.nik} · {p.jabatan}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                            <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-mono text-[11px] font-semibold">
-                              {p.statusKeluarga}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3.5 text-center font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                            {ak?.bulanTerbayar ?? 0} / 12 Bulan
-                          </td>
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                            {formatRupiah(ak?.totalGajiKotor ?? 0)}
-                          </td>
-                          <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap border-b border-r border-border">
-                            {formatRupiah(ak?.totalPph21 ?? 0)}
-                          </td>
-                          <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap border-b border-border">
-                            {formatRupiah(ak?.totalGajiBersih ?? 0)}
-                          </td>
+              {/* JIKA MODE PER-NAMA */}
+              {akumulasiMode === "per-nama" && currentAkumulasiPegawai && (() => {
+                const ak = getAkumulasiData(currentAkumulasiPegawai, akumulasiStartMonth, akumulasiEndMonth);
+                return (
+                  <div className="space-y-4">
+                    {/* Profil Karyawan & Periode Terpilih */}
+                    <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-wrap items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-navy-text text-base">{currentAkumulasiPegawai.nama}</span>
+                          <span className="font-mono text-xs text-muted-stronger px-2 py-0.5 rounded-md bg-surface-subtle border border-border">
+                            NIK: {currentAkumulasiPegawai.nik}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            {currentAkumulasiPegawai.jabatan}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                              (currentAkumulasiPegawai.status ?? (currentAkumulasiPegawai.isActive ? "AKTIF" : "RESIGN")) === "AKTIF"
+                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                            }`}
+                          >
+                            {currentAkumulasiPegawai.status ?? "AKTIF"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-faint flex items-center gap-3 flex-wrap">
+                          <span>Status PTKP: <strong className="font-mono text-navy-text">{currentAkumulasiPegawai.statusKeluarga}</strong> ({currentAkumulasiPegawai.ptkpFmt || formatRupiah(currentAkumulasiPegawai.ptkp ?? 54000000)}/thn)</span>
+                          <span>·</span>
+                          <span>Masa Kerja: <strong className="text-navy-text">{currentAkumulasiPegawai.masaKerja || "-"}</strong></span>
+                          <span>·</span>
+                          <span>Mulai Bekerja: <strong className="text-navy-text">{currentAkumulasiPegawai.tanggalMasukFmt || "-"}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-navy/10 text-navy font-bold text-xs border border-navy/20">
+                          <Calendar size={13} />
+                          <span>
+                            Periode: {BULAN_NAMES[ak.from - 1]} – {BULAN_NAMES[ak.to - 1]} {selectedYear} ({ak.totalBulanRentang} Bulan)
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-faint mt-1">
+                          Gaji Pokok Master: <strong className="font-mono text-navy-text">{currentAkumulasiPegawai.gajiPokokFmt}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary Cards (Detail Pelaporan SPT Pajak PPh 21) */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card shadow-2xs">
+                        <div className="text-[11px] text-muted-faint font-medium">Bulan Terbayar</div>
+                        <div className="text-lg font-bold font-mono text-navy-text mt-1">
+                          {ak.bulanTerbayar} / {ak.totalBulanRentang} Bln
+                        </div>
+                        <div className="text-[10px] text-muted-faint mt-0.5">
+                          {ak.bulanTerbayar === ak.totalBulanRentang ? "Lengkap terbayar" : `${ak.totalBulanRentang - ak.bulanTerbayar} bln belum terinput`}
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card shadow-2xs">
+                        <div className="text-[11px] text-muted-faint font-medium">Total Gaji Pokok</div>
+                        <div className="text-lg font-bold font-mono text-navy-text mt-1">
+                          {formatRupiah(ak.totalGajiPokok)}
+                        </div>
+                        <div className="text-[10px] text-muted-faint mt-0.5">
+                          Akumulasi gaji pokok
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card shadow-2xs">
+                        <div className="text-[11px] text-muted-faint font-medium">Total Tunjangan</div>
+                        <div className="text-lg font-bold font-mono text-navy-text mt-1">
+                          {formatRupiah(ak.totalTunjangan)}
+                        </div>
+                        <div className="text-[10px] text-muted-faint mt-0.5" title={`Jabatan: ${formatRupiah(ak.totalTunjanganJabatan)}, Transport: ${formatRupiah(ak.totalTunjanganTransport)}, THR/Insentif: ${formatRupiah(ak.totalInsentifThr)}`}>
+                          Jabatan, transport, THR & BPJS
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 shadow-2xs">
+                        <div className="text-[11px] text-blue-900 dark:text-blue-200 font-semibold flex items-center justify-between">
+                          <span>Total Bruto (SPT PPh 21)</span>
+                        </div>
+                        <div className="text-lg font-bold font-mono text-blue-900 dark:text-blue-300 mt-1">
+                          {formatRupiah(ak.totalGajiTerlaporPajak)}
+                        </div>
+                        <div className="text-[10px] text-blue-700/80 dark:text-blue-400 mt-0.5">
+                          Objek pemotongan pajak
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 shadow-2xs">
+                        <div className="text-[11px] text-amber-900 dark:text-amber-200 font-semibold flex items-center justify-between">
+                          <span>Total PPh 21 Terhitung</span>
+                        </div>
+                        <div className="text-lg font-bold font-mono text-amber-800 dark:text-amber-300 mt-1">
+                          {formatRupiah(ak.totalPph21)}
+                        </div>
+                        <div className="text-[10px] text-amber-700/80 dark:text-amber-400 mt-0.5">
+                          Pajak PPh 21 disetor
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-2xs">
+                        <div className="text-[11px] text-emerald-900 dark:text-emerald-200 font-semibold flex items-center justify-between">
+                          <span>Total Gaji Bersih (THP)</span>
+                        </div>
+                        <div className="text-lg font-bold font-mono text-emerald-800 dark:text-emerald-300 mt-1">
+                          {formatRupiah(ak.totalGajiBersih)}
+                        </div>
+                        <div className="text-[10px] text-emerald-700/80 dark:text-emerald-400 mt-0.5">
+                          Diterima karyawan
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabel Rincian Detail Bulanan Dalam Rentang Periode Bebas */}
+                    <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
+                      <div className="p-4 border-b border-border bg-surface-subtle/30 flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <h4 className="text-sm font-bold text-navy-text">
+                            Rincian Gaji Bulanan: {currentAkumulasiPegawai.nama} ({BULAN_NAMES[ak.from - 1]} – {BULAN_NAMES[ak.to - 1]} {selectedYear})
+                          </h4>
+                          <p className="text-xs text-muted-faint mt-0.5">
+                            Rincian setiap komponen penghasilan, tunjangan, potongan BPJS, kasbon, dan pajak PPh 21 per bulan selama periode dipilih
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[1240px] text-left text-xs border-separate border-spacing-0">
+                          <thead className="bg-surface-subtle text-muted-stronger font-bold">
+                            <tr>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[120px] border-b border-r border-border">Bulan</th>
+                              <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[95px] border-b border-r border-border">Status</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Gaji Pokok</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[105px] border-b border-r border-border">Tunj. Jabatan</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Tunj. Transport</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] border-b border-r border-border">THR & Insentif</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] border-b border-r border-border">Tunj. BPJS</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px] bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 border-b border-r border-blue-200 dark:border-blue-900/60">
+                                Total Bruto (SPT)
+                              </th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] border-b border-r border-border">Potongan BPJS</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] border-b border-r border-border">Potongan Lain</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] bg-amber-50/40 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 border-b border-r border-amber-200 dark:border-amber-900/60">
+                                PPh 21
+                              </th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 border-b border-r border-emerald-200 dark:border-emerald-900/60">
+                                Gaji Bersih (THP)
+                              </th>
+                              <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[90px] border-b border-border">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ak.monthlyBreakdown.map(({ bulan: m, gajiRow, isPaid }) => {
+                              const tunjBpjs =
+                                gajiRow
+                                  ? (gajiRow.tunjanganBpjsKes || 0) + (gajiRow.tunjanganBpjsTk || 0) || (gajiRow.tunjanganBpjs || 0)
+                                  : 0;
+                              const potBpjs =
+                                gajiRow
+                                  ? gajiRow.potonganBpjs || ((gajiRow.bpjsKesehatan || 0) + (gajiRow.bpjsKetenagakerjaan || 0))
+                                  : 0;
+                              return (
+                                <tr
+                                  key={m}
+                                  className={`hover:bg-surface-hover/30 transition-colors ${
+                                    isPaid ? "" : "opacity-60 bg-surface-subtle/20"
+                                  }`}
+                                >
+                                  <td className="py-2.5 px-3.5 font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
+                                    {BULAN_NAMES[m - 1]} {selectedYear}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-r border-border">
+                                    {isPaid ? (
+                                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
+                                        Terbayar
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-muted-faint text-[10px] font-medium">
+                                        Belum Ada
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-navy-text whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow ? gajiRow.gajiPokokFmt : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow ? gajiRow.tunjanganJabatanFmt || formatRupiah(gajiRow.tunjanganJabatan) : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow ? gajiRow.tunjanganTransportFmt || formatRupiah(gajiRow.tunjanganTransport) : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow ? formatRupiah((gajiRow.insentif || 0) + (gajiRow.thr || 0)) : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow && tunjBpjs > 0 ? formatRupiah(tunjBpjs) : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/30 dark:bg-blue-950/15 whitespace-nowrap border-b border-r border-blue-200/80 dark:border-blue-900/50">
+                                    {gajiRow ? gajiRow.totalGajiTerlaporPajakFmt || gajiRow.totalGajiKotorFmt : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow && potBpjs > 0 ? formatRupiah(potBpjs) : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
+                                    {gajiRow && (gajiRow.potonganLain || 0) > 0 ? formatRupiah(gajiRow.potonganLain) : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50/20 dark:bg-amber-950/10 whitespace-nowrap border-b border-r border-amber-200/80 dark:border-amber-900/50">
+                                    {gajiRow ? gajiRow.pph21Fmt : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50/30 dark:bg-emerald-950/15 whitespace-nowrap border-b border-r border-emerald-200/80 dark:border-emerald-900/50">
+                                    {gajiRow ? gajiRow.totalGajiBersihFmt : "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-border">
+                                    {gajiRow ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setSlipModalItem(gajiRow)}
+                                        className="h-6 px-2 rounded-md border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                        title="Lihat Slip Gaji"
+                                      >
+                                        <FileText size={11} className="text-navy" />
+                                        <span>Slip</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-muted-faint text-[11px]">-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot className="bg-surface-subtle font-bold text-xs">
+                            <tr>
+                              <td className="py-3 px-3.5 text-navy-text whitespace-nowrap border-t-2 border-b border-r border-border">
+                                TOTAL AKUMULASI:
+                              </td>
+                              <td className="py-3 px-3.5 text-center font-mono whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {ak.bulanTerbayar} Bln
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalGajiPokok)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalTunjanganJabatan)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalTunjanganTransport)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalInsentifThr)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalTunjanganBpjs)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono text-blue-900 dark:text-blue-200 bg-blue-50/50 dark:bg-blue-950/30 whitespace-nowrap border-t-2 border-b border-r border-blue-200 dark:border-blue-900/60">
+                                {formatRupiah(ak.totalGajiTerlaporPajak)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalPotonganBpjs)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono whitespace-nowrap border-t-2 border-b border-r border-border">
+                                {formatRupiah(ak.totalPotonganLain)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono text-amber-800 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-950/30 whitespace-nowrap border-t-2 border-b border-r border-amber-200 dark:border-amber-900/60">
+                                {formatRupiah(ak.totalPph21)}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/30 whitespace-nowrap border-t-2 border-b border-r border-emerald-200 dark:border-emerald-900/60">
+                                {formatRupiah(ak.totalGajiBersih)}
+                              </td>
+                              <td className="py-3 px-3.5 text-center border-t-2 border-b border-border">
+                                -
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Banner Info Kesiapan Pelaporan SPT Pajak */}
+                    <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 flex items-start gap-3">
+                      <Info size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <div className="text-xs text-blue-950 dark:text-blue-200 space-y-1">
+                        <div className="font-bold">Keperluan Pelaporan SPT Tahunan PPh 21 (Form 1721-A1)</div>
+                        <p className="text-blue-900/80 dark:text-blue-300/80">
+                          Data di atas mengakumulasi seluruh objek pajak bruto (Gaji Pokok + Seluruh Tunjangan) sebesar{" "}
+                          <strong className="font-mono text-blue-900 dark:text-blue-200">{formatRupiah(ak.totalGajiTerlaporPajak)}</strong>{" "}
+                          dan PPh 21 yang telah dipotong sebesar{" "}
+                          <strong className="font-mono text-amber-700 dark:text-amber-300">{formatRupiah(ak.totalPph21)}</strong>{" "}
+                          selama rentang {BULAN_NAMES[ak.from - 1]} s/d {BULAN_NAMES[ak.to - 1]} {selectedYear}. Siap digunakan sebagai dasar bukti potong pajak karyawan.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* JIKA MODE SEMUA KARYAWAN */}
+              {akumulasiMode === "semua" && (
+                <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
+                  <div className="p-4 border-b border-border bg-surface-subtle/30 flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-navy-text">
+                        Ringkasan Akumulasi Seluruh Karyawan ({BULAN_NAMES[Math.min(akumulasiStartMonth, akumulasiEndMonth) - 1]} – {BULAN_NAMES[Math.max(akumulasiStartMonth, akumulasiEndMonth) - 1]} {selectedYear})
+                      </h4>
+                      <p className="text-xs text-muted-faint mt-0.5">
+                        Tabel komparasi total pembayaran gaji bruto, tunjangan, dan PPh 21 seluruh karyawan untuk rentang periode yang dipilih
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[1100px] text-left text-xs border-separate border-spacing-0">
+                      <thead className="bg-surface-subtle text-muted-stronger font-bold">
+                        <tr>
+                          <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[190px] border-b border-r border-border">Pegawai</th>
+                          <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[95px] border-b border-r border-border">Status PTKP</th>
+                          <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[110px] border-b border-r border-border">Bulan Dibayar</th>
+                          <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] border-b border-r border-border">Akumulasi Pokok</th>
+                          <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[125px] border-b border-r border-border">Akumulasi Tunjangan</th>
+                          <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px] bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 border-b border-r border-blue-200 dark:border-blue-900/60">
+                            Bruto Objek Pajak
+                          </th>
+                          <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] bg-amber-50/40 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 border-b border-r border-amber-200 dark:border-amber-900/60">
+                            PPh 21 Disetor
+                          </th>
+                          <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[135px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 border-b border-r border-emerald-200 dark:border-emerald-900/60">
+                            Net (THP)
+                          </th>
+                          <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[120px] border-b border-border">Aksi</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {filteredTahunanList.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="py-8 text-center text-muted-faint border-b border-border">
+                              Tidak ada data karyawan ditemukan.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredTahunanList.map((p) => {
+                            const ak = getAkumulasiData(p, akumulasiStartMonth, akumulasiEndMonth);
+                            return (
+                              <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
+                                <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
+                                  <div className="font-bold text-navy-text">{p.nama}</div>
+                                  <div className="text-[11px] text-muted-faint font-mono mt-0.5">
+                                    {p.nik} · {p.jabatan}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
+                                  <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-mono text-[11px] font-semibold">
+                                    {p.statusKeluarga}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3.5 text-center font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
+                                  {ak.bulanTerbayar} / {ak.totalBulanRentang} Bln
+                                </td>
+                                <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap border-b border-r border-border">
+                                  {formatRupiah(ak.totalGajiPokok)}
+                                </td>
+                                <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
+                                  {formatRupiah(ak.totalTunjangan)}
+                                </td>
+                                <td className="py-3 px-3.5 text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50/20 dark:bg-blue-950/10 whitespace-nowrap border-b border-r border-blue-200/80 dark:border-blue-900/50">
+                                  {formatRupiah(ak.totalGajiTerlaporPajak)}
+                                </td>
+                                <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 bg-amber-50/20 dark:bg-amber-950/10 whitespace-nowrap border-b border-r border-amber-200/80 dark:border-amber-900/50">
+                                  {formatRupiah(ak.totalPph21)}
+                                </td>
+                                <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50/20 dark:bg-emerald-950/10 whitespace-nowrap border-b border-r border-emerald-200/80 dark:border-emerald-900/50">
+                                  {formatRupiah(ak.totalGajiBersih)}
+                                </td>
+                                <td className="py-3 px-3.5 text-center whitespace-nowrap border-b border-border">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAkumulasiPegawaiId(p.id);
+                                      setAkumulasiMode("per-nama");
+                                    }}
+                                    className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    title="Lihat Detail Akumulasi Khusus Karyawan Ini"
+                                  >
+                                    <User size={11} className="text-navy" />
+                                    <span>Detail SPT</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -5553,135 +6180,275 @@ export function PayrollClient({
                 </div>
               </div>
 
-              {/* 4 Cards Summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-xl border border-border bg-surface-card">
-                  <div className="text-[11px] text-muted-faint font-medium">Bulan Terbayar</div>
-                  <div className="text-lg font-bold font-mono text-navy-text mt-0.5">
-                    {riwayatPegawaiTarget.akumulasiTahun?.bulanTerbayar ?? 0} / 12 Bln
-                  </div>
-                </div>
-                <div className="p-3.5 rounded-xl border border-border bg-surface-card">
-                  <div className="text-[11px] text-muted-faint font-medium">Total Bruto Terlapor</div>
-                  <div className="text-lg font-bold font-mono text-blue-900 dark:text-blue-300 mt-0.5">
-                    {formatRupiah(riwayatPegawaiTarget.akumulasiTahun?.totalGajiKotor ?? 0)}
-                  </div>
-                </div>
-                <div className="p-3.5 rounded-xl border border-border bg-surface-card">
-                  <div className="text-[11px] text-muted-faint font-medium">Total PPh 21 Terhitung</div>
-                  <div className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300 mt-0.5">
-                    {formatRupiah(riwayatPegawaiTarget.akumulasiTahun?.totalPph21 ?? 0)}
-                  </div>
-                </div>
-                <div className="p-3.5 rounded-xl border border-border bg-surface-card">
-                  <div className="text-[11px] text-muted-faint font-medium">Total Bersih (THP)</div>
-                  <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">
-                    {formatRupiah(riwayatPegawaiTarget.akumulasiTahun?.totalGajiBersih ?? 0)}
-                  </div>
-                </div>
-              </div>
+              {/* Filter Periode Bebas & Rekap Akumulasi */}
+              {(() => {
+                const modalAk = getAkumulasiData(riwayatPegawaiTarget, modalStartMonth, modalEndMonth);
+                return (
+                  <div className="space-y-4">
+                    {/* Filter Rentang Periode di Modal */}
+                    <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-muted-stronger flex items-center gap-1">
+                          <Filter size={12} className="text-navy" />
+                          <span>Filter Periode:</span>
+                        </span>
+                        <div className="inline-flex items-center gap-1.5">
+                          <select
+                            value={modalStartMonth}
+                            onChange={(e) => setModalStartMonth(Number(e.target.value))}
+                            className="h-7 text-xs rounded-lg border border-border bg-surface-card text-navy-text font-semibold px-2"
+                          >
+                            {BULAN_NAMES.map((name, idx) => (
+                              <option key={idx + 1} value={idx + 1}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-xs text-muted-faint font-semibold">s/d</span>
+                          <select
+                            value={modalEndMonth}
+                            onChange={(e) => setModalEndMonth(Number(e.target.value))}
+                            className="h-7 text-xs rounded-lg border border-border bg-surface-card text-navy-text font-semibold px-2"
+                          >
+                            {BULAN_NAMES.map((name, idx) => (
+                              <option key={idx + 1} value={idx + 1}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-              {/* Tabel Riwayat Bulanan (Jan - Des) */}
-              <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[700px] text-left text-xs border-separate border-spacing-0">
-                    <thead className="bg-surface-subtle text-muted-stronger font-bold">
-                      <tr>
-                        <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[110px] border-b border-r border-border">Bulan</th>
-                        <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px] border-b border-r border-border">Status</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Gaji Pokok</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Tunjangan</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] border-b border-r border-border">Potongan BPJS</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px] border-b border-r border-border">PPh 21</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Gaji Bersih (THP)</th>
-                        <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px] border-b border-border">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
-                        const gajiRow =
-                          riwayatPegawaiTarget.riwayatGajiBulan?.[m] ||
-                          (riwayatPegawaiTarget.currentGaji?.bulan === m ? riwayatPegawaiTarget.currentGaji : null);
-                        const isPaid = !!gajiRow;
-
-                        return (
-                          <tr
-                            key={m}
-                            className={`hover:bg-surface-hover/30 transition-colors ${
-                              isPaid ? "" : "opacity-60 bg-surface-subtle/20"
+                        {/* Presets */}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalStartMonth(1);
+                              setModalEndMonth(9);
+                            }}
+                            className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                              modalStartMonth === 1 && modalEndMonth === 9
+                                ? "bg-navy text-white border-navy"
+                                : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
                             }`}
                           >
-                            <td className="py-2.5 px-3.5 font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                              {BULAN_NAMES[m - 1]} {selectedYear}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-r border-border">
-                              {isPaid ? (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
-                                  Terbayar
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-muted-faint text-[10px] font-medium">
-                                  Tidak Digaji
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-right font-mono whitespace-nowrap border-b border-r border-border">
-                              {gajiRow ? gajiRow.gajiPokokFmt : "-"}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-right font-mono whitespace-nowrap border-b border-r border-border">
-                              {gajiRow
-                                ? formatRupiah(
-                                    (gajiRow.tunjanganJabatan || 0) +
-                                      (gajiRow.tunjanganTransport || 0) +
-                                      (gajiRow.insentif || 0) +
-                                      (gajiRow.thr || 0)
-                                  )
-                                : "-"}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap border-b border-r border-border">
-                              {gajiRow
-                                ? (gajiRow.potonganBpjsFmt ||
-                                    formatRupiah(
-                                      (gajiRow.bpjsKesehatan || 0) +
-                                        (gajiRow.bpjsKetenagakerjaan || 0) +
-                                        (gajiRow.potonganLain || 0)
-                                    ))
-                                : "-"}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap border-b border-r border-border">
-                              {gajiRow ? gajiRow.pph21Fmt : "-"}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap border-b border-r border-border">
-                              {gajiRow ? gajiRow.totalGajiBersihFmt : "-"}
-                            </td>
-                            <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-border">
-                              {gajiRow ? (
-                                <button
-                                  onClick={() => setSlipModalItem(gajiRow)}
-                                  className="h-6 px-2 rounded-md border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                  title="Lihat & Cetak Slip Gaji Bulan Ini"
-                                >
-                                  <FileText size={11} className="text-navy" />
-                                  <span>Slip Gaji</span>
-                                </button>
-                              ) : (
-                                <span className="text-muted-faint text-[11px]">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                            Jan – Sep
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalStartMonth(1);
+                              setModalEndMonth(12);
+                            }}
+                            className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                              modalStartMonth === 1 && modalEndMonth === 12
+                                ? "bg-navy text-white border-navy"
+                                : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                            }`}
+                          >
+                            Full 12 Bln
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalStartMonth(1);
+                              setModalEndMonth(6);
+                            }}
+                            className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                              modalStartMonth === 1 && modalEndMonth === 6
+                                ? "bg-navy text-white border-navy"
+                                : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                            }`}
+                          >
+                            Sem 1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalStartMonth(7);
+                              setModalEndMonth(12);
+                            }}
+                            className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                              modalStartMonth === 7 && modalEndMonth === 12
+                                ? "bg-navy text-white border-navy"
+                                : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                            }`}
+                          >
+                            Sem 2
+                          </button>
+                        </div>
+                      </div>
+
+                      <span className="text-[11px] text-muted-faint font-mono">
+                        {BULAN_NAMES[modalAk.from - 1]} – {BULAN_NAMES[modalAk.to - 1]} ({modalAk.totalBulanRentang} Bulan)
+                      </span>
+                    </div>
+
+                    {/* 4 Cards Summary (Dihitung Dinamis Sesuai Periode) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Bulan Terbayar</div>
+                        <div className="text-lg font-bold font-mono text-navy-text mt-0.5">
+                          {modalAk.bulanTerbayar} / {modalAk.totalBulanRentang} Bln
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Total Bruto Terlapor</div>
+                        <div className="text-lg font-bold font-mono text-blue-900 dark:text-blue-300 mt-0.5">
+                          {formatRupiah(modalAk.totalGajiTerlaporPajak)}
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Total PPh 21 Terhitung</div>
+                        <div className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300 mt-0.5">
+                          {formatRupiah(modalAk.totalPph21)}
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Total Bersih (THP)</div>
+                        <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">
+                          {formatRupiah(modalAk.totalGajiBersih)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabel Riwayat Bulanan Dalam Periode */}
+                    <div className="rounded-xl border border-border overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[700px] text-left text-xs border-separate border-spacing-0">
+                          <thead className="bg-surface-subtle text-muted-stronger font-bold">
+                            <tr>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[110px] border-b border-r border-border">Bulan</th>
+                              <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px] border-b border-r border-border">Status</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Gaji Pokok</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Tunjangan</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[100px] border-b border-r border-border">Potongan BPJS</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px] border-b border-r border-border">PPh 21</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Gaji Bersih (THP)</th>
+                              <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px] border-b border-border">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {modalAk.monthlyBreakdown.map(({ bulan: m, gajiRow, isPaid }) => (
+                              <tr
+                                key={m}
+                                className={`hover:bg-surface-hover/30 transition-colors ${
+                                  isPaid ? "" : "opacity-60 bg-surface-subtle/20"
+                                }`}
+                              >
+                                <td className="py-2.5 px-3.5 font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
+                                  {BULAN_NAMES[m - 1]} {selectedYear}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-r border-border">
+                                  {isPaid ? (
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
+                                      Terbayar
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-muted-faint text-[10px] font-medium">
+                                      Tidak Digaji
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-mono whitespace-nowrap border-b border-r border-border">
+                                  {gajiRow ? gajiRow.gajiPokokFmt : "-"}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-mono whitespace-nowrap border-b border-r border-border">
+                                  {gajiRow
+                                    ? formatRupiah(
+                                        (gajiRow.tunjanganJabatan || 0) +
+                                          (gajiRow.tunjanganTransport || 0) +
+                                          (gajiRow.insentif || 0) +
+                                          (gajiRow.thr || 0)
+                                      )
+                                    : "-"}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 whitespace-nowrap border-b border-r border-border">
+                                  {gajiRow
+                                    ? (gajiRow.potonganBpjsFmt ||
+                                        formatRupiah(
+                                          (gajiRow.bpjsKesehatan || 0) +
+                                            (gajiRow.bpjsKetenagakerjaan || 0) +
+                                            (gajiRow.potonganLain || 0)
+                                        ))
+                                    : "-"}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap border-b border-r border-border">
+                                  {gajiRow ? gajiRow.pph21Fmt : "-"}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap border-b border-r border-border">
+                                  {gajiRow ? gajiRow.totalGajiBersihFmt : "-"}
+                                </td>
+                                <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-border">
+                                  {gajiRow ? (
+                                    <button
+                                      onClick={() => setSlipModalItem(gajiRow)}
+                                      className="h-6 px-2 rounded-md border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      title="Lihat & Cetak Slip Gaji Bulan Ini"
+                                    >
+                                      <FileText size={11} className="text-navy" />
+                                      <span>Slip Gaji</span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-muted-faint text-[11px]">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-surface-subtle font-bold text-xs">
+                            <tr>
+                              <td className="py-2.5 px-3.5 text-navy-text border-t-2 border-b border-r border-border">
+                                Total ({modalAk.bulanTerbayar} Bulan):
+                              </td>
+                              <td className="py-2.5 px-3.5 text-center font-mono border-t-2 border-b border-r border-border">
+                                {modalAk.bulanTerbayar} / {modalAk.totalBulanRentang}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono border-t-2 border-b border-r border-border">
+                                {formatRupiah(modalAk.totalGajiPokok)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono border-t-2 border-b border-r border-border">
+                                {formatRupiah(modalAk.totalTunjangan)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-rose-700 dark:text-rose-300 border-t-2 border-b border-r border-border">
+                                {formatRupiah(modalAk.totalPotonganBpjs + modalAk.totalPotonganLain)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 border-t-2 border-b border-r border-border">
+                                {formatRupiah(modalAk.totalPph21)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 border-t-2 border-b border-r border-border">
+                                {formatRupiah(modalAk.totalGajiBersih)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-center border-t-2 border-b border-border">
+                                -
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-border bg-surface-subtle/30 flex items-center justify-between shrink-0">
-              <span className="text-xs text-muted-faint">
-                Rekam penggajian karyawan diarsipkan secara aman untuk laporan pajak & keuangan.
-              </span>
+            <div className="p-4 border-t border-border bg-surface-subtle/30 flex items-center justify-between shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAkumulasiPegawaiId(riwayatPegawaiTarget.id);
+                  setAkumulasiMode("per-nama");
+                  setAkumulasiStartMonth(modalStartMonth);
+                  setAkumulasiEndMonth(modalEndMonth);
+                  setPegawaiSubTab("tahunan");
+                  setRiwayatPegawaiTarget(null);
+                }}
+                className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+              >
+                <Briefcase size={13} />
+                <span>Buka Rekapitulasi Lengkap di Tab Akumulasi</span>
+              </button>
               <button
                 onClick={() => setRiwayatPegawaiTarget(null)}
                 className="h-8 px-4 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold text-navy-text cursor-pointer transition-colors"

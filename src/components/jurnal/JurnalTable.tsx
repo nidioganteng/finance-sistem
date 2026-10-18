@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Check, X } from "lucide-react";
-import { updateKodeAkunJurnal, updateProyekJurnal } from "@/lib/actions/jurnal";
+import { Pencil, Check, X, CalendarDays } from "lucide-react";
+import { updateKodeAkunJurnal, updateProyekJurnal, updateAkrualJurnal } from "@/lib/actions/jurnal";
 import { CoaCombobox } from "@/components/kas/CoaCombobox";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
@@ -28,7 +28,14 @@ type JurnalRow = {
   staffName: string;
   staffInitial: string;
   arahLaporan: string[];
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
 };
+
+const BULAN_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 function fmtDateShort(s: string) {
   if (!s) return "—";
@@ -71,8 +78,31 @@ export function JurnalTable({
   const [editCode, setEditCode] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectId, setEditProjectId] = useState("");
+  const [editingAkrualId, setEditingAkrualId] = useState<string | null>(null);
+  const [editBulan, setEditBulan] = useState<number>(0);
+  const [editTahun, setEditTahun] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function startEditAkrual(r: JurnalRow) {
+    setError(null);
+    setEditBulan(r.periodeBulanGaji ?? (new Date(r.tanggal).getMonth() + 1));
+    setEditTahun(r.periodeTahunGaji ?? (new Date(r.tanggal).getFullYear()));
+    setEditingAkrualId(r.id);
+  }
+
+  function handleSaveAkrual(id: string) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateAkrualJurnal(id, entityId, editBulan || null, editTahun || null);
+        router.refresh();
+        setEditingAkrualId(null);
+      } catch (e: any) {
+        setError(e.message);
+      }
+    });
+  }
 
   function startEditProject(r: JurnalRow) {
     setError(null);
@@ -225,7 +255,7 @@ export function JurnalTable({
                     </div>
                   )}
                 </td>
-                <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px]">
+                <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[220px]">
                   {r.isKasEntry ? (
                     <span className="text-muted-faint italic text-[12px]">{r.keterangan}</span>
                   ) : (
@@ -241,6 +271,87 @@ export function JurnalTable({
                         </div>
                       )}
                     </>
+                  )}
+
+                  {/* Badge & Editor Periode Akrual Beban Gaji */}
+                  {r.periodeBulanGaji && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 text-amber-700 dark:text-amber-300"
+                        title={`Beban Gaji Bulan ${BULAN_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
+                      >
+                        <CalendarDays size={9} className="text-amber-500 flex-none" />
+                        Akrual: {BULAN_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
+                      </span>
+                      {canEditAkun && (
+                        <button
+                          onClick={() => startEditAkrual(r)}
+                          className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text"
+                          title="Ubah periode akrual gaji"
+                        >
+                          <Pencil size={10} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {!r.periodeBulanGaji && canEditAkun && (r.kodeAkun === "511" || r.kodeAkun === "612" || /gaji|honor/i.test(r.namaAkun)) && (
+                    <div className="mt-1">
+                      <button
+                        onClick={() => startEditAkrual(r)}
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-faint hover:text-navy-text border border-dashed border-border-soft hover:border-brand px-1.5 py-0.5 rounded transition-colors"
+                        title="Tentukan periode akrual gaji jika transaksi ini untuk bulan lain"
+                      >
+                        <CalendarDays size={9} />
+                        + Akrual Gaji
+                      </button>
+                    </div>
+                  )}
+
+                  {editingAkrualId === r.id && (
+                    <div className="mt-1.5 p-2 rounded-[10px] bg-surface-card border border-border-soft shadow-lg flex flex-col gap-1.5 z-20">
+                      <div className="text-[10px] font-bold text-navy-text flex items-center gap-1">
+                        <CalendarDays size={11} className="text-brand" /> Periode Akrual Beban Gaji
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={editBulan}
+                          onChange={(e) => setEditBulan(parseInt(e.target.value, 10) || 0)}
+                          className="h-6 px-1 text-[11px] rounded border border-border-soft bg-surface-input text-navy-text flex-1"
+                        >
+                          <option value={0}>— Sesuai Tanggal —</option>
+                          {BULAN_NAMES.map((name, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              Bulan {name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          value={editTahun || ""}
+                          onChange={(e) => setEditTahun(parseInt(e.target.value, 10) || 0)}
+                          placeholder="Tahun"
+                          className="h-6 w-16 px-1 text-[11px] rounded border border-border-soft bg-surface-input text-navy-text font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveAkrual(r.id)}
+                          disabled={isPending}
+                          className="p-1 rounded hover:bg-surface-hover text-status-green disabled:opacity-40"
+                          title="Simpan"
+                        >
+                          <Check size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAkrualId(null)}
+                          className="p-1 rounded hover:bg-surface-hover text-muted-stronger"
+                          title="Batal"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </td>
                 <td className={`py-2.5 px-1.5 text-[12px] font-mono text-muted ${r.isKredit ? "pl-6" : ""}`}>

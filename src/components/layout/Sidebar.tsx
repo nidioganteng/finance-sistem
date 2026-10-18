@@ -151,7 +151,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className={`flex-none bg-[#0f1729] dark:bg-[#0c0c14] flex flex-col p-4 pt-5 sticky top-0 h-screen transition-all duration-300 relative overflow-x-hidden ${collapsed ? "w-[68px]" : "w-[280px]"}`}>
+    <aside className={`flex-none bg-[#0f1729] dark:bg-[#0c0c14] flex flex-col p-4 pt-5 sticky top-0 h-screen transition-all duration-300 ${collapsed ? "w-[68px]" : "w-[280px]"}`}>
       {/* Toggle collapse button */}
       {onToggleCollapse && (
         <button
@@ -163,7 +163,7 @@ export function Sidebar({
       )}
 
       {/* Brand row */}
-      <div className={`flex items-center pb-6 ${collapsed ? "justify-center px-0" : "gap-3 px-2"}`}>
+      <div className={`flex items-center pb-6 overflow-hidden ${collapsed ? "justify-center px-0" : "gap-3 px-2"}`}>
         <div className="w-9 h-9 flex-none flex items-center justify-center overflow-hidden">
           <Image
             src="/logo-entitas/logo-simatra-dark.png"
@@ -191,7 +191,7 @@ export function Sidebar({
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
         {sections.map((section) => {
           const sectionKey = `section:${section.title}`;
           const isSectionOpen = section.collapsible

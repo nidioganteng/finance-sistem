@@ -1725,11 +1725,15 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1240px] text-left text-xs border-separate border-spacing-0">
+                <table className="w-full min-w-[1600px] text-left text-xs border-separate border-spacing-0">
                   <thead className="bg-surface-subtle text-muted-stronger font-bold">
                     <tr>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[110px] border-b border-r border-border">NIK / Kode</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[160px] border-b border-r border-border">Nama Pegawai</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap sticky left-0 z-20 bg-surface-subtle w-[150px] min-w-[150px] max-w-[150px] border-b border-r border-border">
+                        NIK / Kode
+                      </th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap sticky left-[150px] z-20 bg-surface-subtle w-[180px] min-w-[180px] max-w-[180px] border-b border-r-2 border-border shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-2px_rgba(0,0,0,0.4)]">
+                        Nama Pegawai
+                      </th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px] border-b border-r border-border">Jabatan</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[100px] border-b border-r border-border">Status PTKP</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px] border-b border-r border-border">PTKP Tahunan</th>
@@ -1751,11 +1755,11 @@ export function PayrollClient({
                       </tr>
                     ) : (
                       filteredMasterList.map((p) => (
-                        <tr key={p.id} className="hover:bg-surface-hover/30 transition-colors">
-                          <td className="py-3 px-3.5 font-mono font-semibold text-navy-text whitespace-nowrap border-b border-r border-border">
+                        <tr key={p.id} className="group hover:bg-surface-hover/30 transition-colors">
+                          <td className="py-3 px-3.5 font-mono font-semibold text-navy-text whitespace-nowrap sticky left-0 z-10 bg-surface-card group-hover:bg-surface-hover transition-colors w-[150px] min-w-[150px] max-w-[150px] border-b border-r border-border truncate">
                             {p.nik}
                           </td>
-                          <td className="py-3 px-3.5 font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
+                          <td className="py-3 px-3.5 font-bold text-navy-text whitespace-nowrap sticky left-[150px] z-10 bg-surface-card group-hover:bg-surface-hover transition-colors w-[180px] min-w-[180px] max-w-[180px] border-b border-r-2 border-border shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-2px_rgba(0,0,0,0.4)] truncate" title={p.nama}>
                             {p.nama}
                           </td>
                           <td className="py-3 px-3.5 text-muted-stronger whitespace-nowrap border-b border-r border-border">

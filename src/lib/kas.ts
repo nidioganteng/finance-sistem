@@ -76,12 +76,15 @@ export async function getSaldoSebelum(
 export type KasLedgerEntry = {
   tanggal: string;
   tanggalRaw: string;
+  tanggalNota?: string | null;
   noBukti: string;
   keterangan: string;
   akunTags: string[];
   rekening?: string;
   crossingEntityKeys?: string[];
   crossingFromEntityKey?: string;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
   masuk: number;
   keluar: number;
   saldo: number;

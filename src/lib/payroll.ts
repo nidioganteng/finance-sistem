@@ -481,6 +481,9 @@ export type JurnalTransaksiGajiItem = {
   kredit: number;
   kreditFmt: string;
   staffName?: string | null;
+  isAkrual?: boolean;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
 };
 
 export type PenyesuaianAkunGajiDetail = {

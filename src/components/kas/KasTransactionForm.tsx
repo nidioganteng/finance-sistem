@@ -30,9 +30,16 @@ type InitialValues = {
   rekeningId?: string;
   crossingEntityKeys?: string[];
   projectId?: string;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
   rows: { coaAccountId: string; nominal: string; keterangan?: string }[];
   existingTxIds: string[];
 };
+
+const BULAN_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
 
@@ -217,6 +224,14 @@ export function KasTransactionForm({
   const [error, setError] = useState<string | null>(null);
   const [syncBukuBank, setSyncBukuBank] = useState(false);
   const [syncRekeningId, setSyncRekeningId] = useState(bukuBankRekeningOptions[0]?.id ?? "");
+  const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
+  const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
+
+  const hasSalaryAccount = rows.some((r) => {
+    const c = coaOptions.find((opt) => opt.id === r.coaAccountId);
+    if (!c) return false;
+    return c.code === "511" || c.code === "612" || /gaji|honor|tenaga ahli/i.test(c.name);
+  });
 
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
@@ -274,6 +289,7 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
+      ...(periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
       ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
@@ -715,6 +731,85 @@ export function KasTransactionForm({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Periode Akrual Beban Gaji (Pengoperasian Akrual Jurnal Umum) */}
+        {(arah === "keluar" || hasSalaryAccount || periodeBulanGaji) && (
+          <div className={`rounded-[12px] border p-3.5 flex flex-col gap-2.5 transition-colors ${
+            hasSalaryAccount || periodeBulanGaji
+              ? "border-amber-200/90 dark:border-amber-800/50 bg-amber-50/40 dark:bg-amber-950/20"
+              : "border-border-soft bg-surface-subtle/30"
+          }`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-[12px] ${hasSalaryAccount || periodeBulanGaji ? "text-amber-600 dark:text-amber-400 font-bold" : "text-muted-faint"}`}>
+                  🗓️ Periode Akrual Beban Gaji
+                </span>
+                {hasSalaryAccount && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                    Akun Gaji Terdeteksi
+                  </span>
+                )}
+                {periodeBulanGaji && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    Diakui Beban: {BULAN_NAMES[periodeBulanGaji - 1]} {periodeTahunGaji || new Date(tanggal).getFullYear()}
+                  </span>
+                )}
+              </div>
+              {periodeBulanGaji && (
+                <button
+                  type="button"
+                  onClick={() => { setPeriodeBulanGaji(null); setPeriodeTahunGaji(null); }}
+                  className="text-[10.5px] text-muted-faint hover:text-red-500 font-medium transition-colors"
+                >
+                  Reset (Sesuai Tanggal)
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10.5px] font-bold text-muted-faint block mb-1">
+                  Bulan Beban Gaji (Akrual)
+                </label>
+                <select
+                  value={periodeBulanGaji ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setPeriodeBulanGaji(val);
+                    if (val && !periodeTahunGaji) {
+                      setPeriodeTahunGaji(new Date(tanggal).getFullYear());
+                    }
+                  }}
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand"
+                >
+                  <option value="">Sesuai Tanggal Transaksi (Otomatis)</option>
+                  {BULAN_NAMES.map((name, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Bulan {name} ({i + 1})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10.5px] font-bold text-muted-faint block mb-1">
+                  Tahun Beban Gaji
+                </label>
+                <input
+                  type="number"
+                  value={periodeTahunGaji ?? (periodeBulanGaji ? new Date(tanggal).getFullYear() : "")}
+                  onChange={(e) => setPeriodeTahunGaji(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  placeholder={String(new Date(tanggal).getFullYear())}
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text font-mono focus:outline-none focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10.5px] text-muted-faint leading-relaxed">
+              💡 Pembayaran gaji yang dibayarkan di bulan berjalan (misal gaji September yang baru dibayar tanggal 1–10 Oktober) tetap diakui sebagai biaya operasional bulan September secara akrual pada Rekonsiliasi Payroll & Pajak.
+            </p>
           </div>
         )}
 

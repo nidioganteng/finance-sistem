@@ -233,16 +233,6 @@ export function KasTransactionForm({
   const [error, setError] = useState<string | null>(null);
   const [syncBukuBank, setSyncBukuBank] = useState(false);
   const [syncRekeningId, setSyncRekeningId] = useState(bukuBankRekeningOptions[0]?.id ?? "");
-  const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
-  const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
-  const [tanggalNota, setTanggalNota] = useState<string>(initialValues?.tanggalNota ?? "");
-  const [showTanggalNota, setShowTanggalNota] = useState<boolean>(!!initialValues?.tanggalNota);
-
-  const hasSalaryAccount = rows.some((r) => {
-    const c = coaOptions.find((opt) => opt.id === r.coaAccountId);
-    if (!c) return false;
-    return c.code === "511" || c.code === "612" || c.code.startsWith("511") || c.code.startsWith("612") || /gaji|honor|tenaga ahli/i.test(c.name);
-  });
 
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
@@ -300,8 +290,6 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
-      ...(periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
-      ...(tanggalNota ? { tanggalNota } : {}),
       ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
@@ -361,40 +349,6 @@ export function KasTransactionForm({
           <div>
             <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">Tanggal</label>
             <DatePicker value={tanggal} onChange={setTanggal} required />
-            {!showTanggalNota ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowTanggalNota(true);
-                  if (!tanggalNota) setTanggalNota(tanggal);
-                }}
-                className="mt-1.5 text-[10.5px] font-medium text-brand hover:underline inline-flex items-center gap-1"
-              >
-                + Tanggal Nota / Kuitansi (jika beda tanggal / susulan)
-              </button>
-            ) : (
-              <div className="mt-2 p-2 rounded-lg bg-surface-subtle border border-border-subtle flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-muted-stronger uppercase tracking-wide">
-                    Tanggal Nota Fisik / Riil
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowTanggalNota(false);
-                      setTanggalNota("");
-                    }}
-                    className="text-[10px] text-muted-faint hover:text-red-500 font-medium"
-                  >
-                    Batal
-                  </button>
-                </div>
-                <DatePicker value={tanggalNota} onChange={setTanggalNota} />
-                <span className="text-[9.5px] text-muted-faint">
-                  Tanggal asli kuitansi/pengeluaran jika baru sempat dicatat sekarang.
-                </span>
-              </div>
-            )}
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -777,70 +731,6 @@ export function KasTransactionForm({
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* Pilihan Periode Gaji (Hanya tampil jika akun gaji dipilih) */}
-        {(hasSalaryAccount || !!periodeBulanGaji) && (
-          <div className="rounded-[12px] border border-amber-200/90 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 flex flex-col gap-2 transition-colors">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] text-amber-700 dark:text-amber-300 font-bold flex items-center gap-1.5">
-                  🗓️ Bulan Gaji
-                </span>
-                {periodeBulanGaji && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
-                    Beban: {BULAN_NAMES[periodeBulanGaji - 1]} {periodeTahunGaji || new Date(tanggal).getFullYear()}
-                  </span>
-                )}
-              </div>
-              {periodeBulanGaji && (
-                <button
-                  type="button"
-                  onClick={() => { setPeriodeBulanGaji(null); setPeriodeTahunGaji(null); }}
-                  className="text-[10.5px] text-muted-faint hover:text-red-500 font-medium transition-colors"
-                >
-                  Reset ke Tanggal
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <select
-                  value={periodeBulanGaji ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setPeriodeBulanGaji(val);
-                    if (val && !periodeTahunGaji) {
-                      setPeriodeTahunGaji(new Date(tanggal).getFullYear());
-                    }
-                  }}
-                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand"
-                >
-                  <option value="">Sesuai Tanggal Transaksi</option>
-                  {BULAN_NAMES.map((name, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      Gaji Bulan {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <input
-                  type="number"
-                  value={periodeTahunGaji ?? (periodeBulanGaji ? new Date(tanggal).getFullYear() : "")}
-                  onChange={(e) => setPeriodeTahunGaji(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  placeholder={String(new Date(tanggal).getFullYear())}
-                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text font-mono focus:outline-none focus:border-brand"
-                />
-              </div>
-            </div>
-
-            <p className="text-[10.5px] text-muted-faint">
-              💡 Cukup pilih bulan jika membayar gaji bulan sebelumnya (misal: bayar di Oktober untuk gaji September).
-            </p>
           </div>
         )}
 

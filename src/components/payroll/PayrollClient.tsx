@@ -35,6 +35,7 @@ import {
   Lock,
   History,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import {
   type PegawaiItem,
@@ -5531,70 +5532,76 @@ export function PayrollClient({
                   </div>
 
                   {/* Potongan Lainnya & Subsidi PPh */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-2.5 rounded-xl bg-surface-card border border-border">
-                      <label className="font-semibold text-rose-700 dark:text-rose-400 block mb-1">
-                        Kasbon / Potongan Lain (Rp)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        name="potonganLain"
-                        value={formatRupiahInput(modalPotonganLain)}
-                        onChange={(e) => setModalPotonganLain(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                      />
+                  <div className="grid grid-cols-2 gap-3 items-stretch">
+                    <div className="p-2.5 rounded-xl bg-surface-card border border-border flex flex-col justify-between">
+                      <div>
+                        <label className="font-semibold text-rose-700 dark:text-rose-400 block mb-1">
+                          Kasbon / Potongan Lain (Rp)
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          name="potonganLain"
+                          value={formatRupiahInput(modalPotonganLain)}
+                          onChange={(e) => setModalPotonganLain(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                      </div>
+                      {modalGajiBulan === 12 && (
+                        <p className="text-[10px] text-muted-faint pt-1.5 leading-tight">
+                          Dipotong dari rekening karyawan
+                        </p>
+                      )}
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-surface-card border border-border">
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="font-semibold text-navy-text block">
-                          Tunjangan Subsidi PPh (Rp)
-                        </label>
-                        {modalGajiBulan === 12 && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                            Desember
-                          </span>
-                        )}
-                      </div>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        name="tunjanganPph"
-                        value={formatRupiahInput(modalTunjanganPph)}
-                        onChange={(e) => setModalTunjanganPph(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
-                      />
-                      {modalGajiBulan === 12 && (
-                        <div className="mt-1.5 flex items-center justify-between gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setModalTunjanganPph(akumulasiPphSetahun)}
-                            className="text-[10px] font-bold text-navy hover:underline cursor-pointer"
-                            title="Set otomatis dengan akumulasi PPh 21 Jan-Des"
-                          >
-                            Set Akumulasi Jan–Des ({formatRupiah(akumulasiPphSetahun)})
-                          </button>
+                    <div className="p-2.5 rounded-xl bg-surface-card border border-border flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-semibold text-navy-text block">
+                            Tunjangan Subsidi PPh (Rp)
+                          </label>
+                          {modalGajiBulan === 12 && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                              Desember
+                            </span>
+                          )}
                         </div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          name="tunjanganPph"
+                          value={formatRupiahInput(modalTunjanganPph)}
+                          onChange={(e) => setModalTunjanganPph(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                          placeholder="0"
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
+                        />
+                      </div>
+                      {modalGajiBulan === 12 && (
+                        <button
+                          type="button"
+                          onClick={() => setModalTunjanganPph(akumulasiPphSetahun)}
+                          className={`mt-2 w-full py-1.5 px-2 text-[10.5px] font-medium rounded-lg transition-all flex items-center justify-between cursor-pointer border shadow-xs ${
+                            modalTunjanganPph === akumulasiPphSetahun && akumulasiPphSetahun > 0
+                              ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60 active:scale-[0.99]"
+                          }`}
+                          title="Klik untuk mengisi otomatis akumulasi PPh 21 Jan–Des"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            {modalTunjanganPph === akumulasiPphSetahun && akumulasiPphSetahun > 0 ? (
+                              <CheckCircle size={11} className="text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Sparkles size={11} className="text-blue-500" />
+                            )}
+                            <span className="font-semibold">Set Jan–Des</span>
+                          </span>
+                          <span className="font-mono font-bold text-[11px]">{formatRupiah(akumulasiPphSetahun)}</span>
+                        </button>
                       )}
                     </div>
                   </div>
                 </div>
-
-                {/* Info Desember: Tunjangan PPh Penyelesaian Akhir Tahun */}
-                {modalGajiBulan === 12 && (
-                  <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 text-xs space-y-1">
-                    <div className="font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
-                      <Award size={14} className="text-blue-600 dark:text-blue-400" />
-                      <span>Penyelesaian Tunjangan PPh Bulan Desember</span>
-                    </div>
-                    <p className="text-[11px] text-blue-900/80 dark:text-blue-300/80">
-                      Pada pembukuan bulan Desember, Tunjangan PPh dikalkulasikan dan diselesaikan sebagai akumulasi fasilitas PPh 21 yang ditanggung perusahaan selama setahun untuk keperluan pelaporan formulir 1721-A1. Nominal ini menambah Bruto Terlapor Pajak, namun <strong>tidak ditransfer ke rekening karyawan</strong>.
-                    </p>
-                  </div>
-                )}
 
                 {/* Pelaporan PPh 21 */}
                 <div className="p-3.5 rounded-xl bg-surface-subtle/50 border border-border space-y-2.5">

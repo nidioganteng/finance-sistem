@@ -103,10 +103,6 @@ export function JurnalTransaksiClient({
   const [tanggal, setTanggal] = useState(todayStr());
   const [projectId, setProjectId] = useState("");
   const [fakturId, setFakturId] = useState("");
-  const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(null);
-  const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(null);
-  const [tanggalNota, setTanggalNota] = useState("");
-  const [showTanggalNota, setShowTanggalNota] = useState(false);
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -128,13 +124,6 @@ export function JurnalTransaksiClient({
     acc[key].push(p);
     return acc;
   }, {} as Record<string, typeof otherEntityProjects>);
-
-  // Deteksi akun beban gaji / honor tenaga ahli di baris jurnal
-  const hasSalaryAccount = coaRows.some((r) => {
-    const c = coa.find((acc) => acc.id === r.coaAccountId);
-    if (!c) return false;
-    return c.code === "511" || c.code === "612" || c.code.startsWith("511") || c.code.startsWith("612") || /gaji|honor|tenaga ahli/i.test(c.name);
-  });
 
   // Filter faktur berdasarkan proyek jika proyek dipilih
   const currentProjectFakturs = projectId
@@ -358,8 +347,6 @@ export function JurnalTransaksiClient({
 
   function resetForm() {
     setNoBukti(""); setTanggal(todayStr()); setProjectId(""); setFakturId("");
-    setPeriodeBulanGaji(null); setPeriodeTahunGaji(null);
-    setTanggalNota(""); setShowTanggalNota(false);
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -371,10 +358,6 @@ export function JurnalTransaksiClient({
     setTanggal(group.tanggalRaw.slice(0, 10));
     setProjectId(group.projectId ?? "");
     setFakturId(group.fakturId ?? "");
-    setPeriodeBulanGaji(group.periodeBulanGaji ?? null);
-    setPeriodeTahunGaji(group.periodeTahunGaji ?? null);
-    setTanggalNota(group.tanggalNota ?? "");
-    setShowTanggalNota(!!group.tanggalNota);
     setCoaRows(group.rows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
@@ -414,11 +397,6 @@ export function JurnalTransaksiClient({
     fd.set("tanggal", tanggal);
     if (projectId) fd.set("projectId", projectId);
     if (fakturId) fd.set("fakturId", fakturId);
-    if (periodeBulanGaji) {
-      fd.set("periodeBulanGaji", String(periodeBulanGaji));
-      fd.set("periodeTahunGaji", String(periodeTahunGaji || new Date(tanggal).getFullYear()));
-    }
-    if (tanggalNota) fd.set("tanggalNota", tanggalNota);
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
     fd.set("rows", JSON.stringify(
       coaRows
@@ -549,45 +527,6 @@ export function JurnalTransaksiClient({
                 <label className="text-[10.5px] font-bold text-muted-faint uppercase tracking-widest">Tanggal</label>
                 <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
                   className="h-9 px-3 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-navy-text focus:outline-none focus:border-brand transition-colors" />
-                {!showTanggalNota ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowTanggalNota(true);
-                      if (!tanggalNota) setTanggalNota(tanggal);
-                    }}
-                    className="text-left text-[10.5px] font-medium text-brand hover:underline inline-flex items-center gap-1"
-                  >
-                    + Tanggal Nota / Kuitansi (jika beda tanggal / susulan)
-                  </button>
-                ) : (
-                  <div className="mt-1 p-2 rounded-lg bg-surface-subtle border border-border-subtle flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-muted-stronger uppercase tracking-wide">
-                        Tanggal Nota Fisik / Riil
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowTanggalNota(false);
-                          setTanggalNota("");
-                        }}
-                        className="text-[10px] text-muted-faint hover:text-red-500 font-medium"
-                      >
-                        Batal
-                      </button>
-                    </div>
-                    <input
-                      type="date"
-                      value={tanggalNota}
-                      onChange={(e) => setTanggalNota(e.target.value)}
-                      className="h-8 px-2.5 rounded-[7px] border border-border-soft bg-surface-input text-xs text-navy-text focus:outline-none focus:border-brand"
-                    />
-                    <span className="text-[9.5px] text-muted-faint">
-                      Tanggal kuitansi/transaksi asli jika baru dicatat sekarang.
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -859,70 +798,6 @@ export function JurnalTransaksiClient({
                 </div>
               )}
             </div>
-
-            {/* Pilihan Periode Gaji (Hanya tampil jika akun gaji dipilih) */}
-            {(hasSalaryAccount || !!periodeBulanGaji) && (
-              <div className="mb-4 rounded-[12px] border border-amber-200/90 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 flex flex-col gap-2 transition-colors">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] text-amber-700 dark:text-amber-300 font-bold flex items-center gap-1.5">
-                      🗓️ Bulan Gaji
-                    </span>
-                    {periodeBulanGaji && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
-                        Beban: {BULAN_NAMES[periodeBulanGaji - 1]} {periodeTahunGaji || new Date(tanggal).getFullYear()}
-                      </span>
-                    )}
-                  </div>
-                  {periodeBulanGaji && (
-                    <button
-                      type="button"
-                      onClick={() => { setPeriodeBulanGaji(null); setPeriodeTahunGaji(null); }}
-                      className="text-[10.5px] text-muted-faint hover:text-red-500 font-medium transition-colors"
-                    >
-                      Reset ke Tanggal
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <select
-                      value={periodeBulanGaji ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                        setPeriodeBulanGaji(val);
-                        if (val && !periodeTahunGaji) {
-                          setPeriodeTahunGaji(new Date(tanggal).getFullYear());
-                        }
-                      }}
-                      className="w-full h-8 px-2.5 rounded-[8px] border border-border-soft bg-surface-input text-xs text-navy-text focus:outline-none focus:border-brand"
-                    >
-                      <option value="">Sesuai Tanggal Transaksi</option>
-                      {BULAN_NAMES.map((name, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          Gaji Bulan {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <input
-                      type="number"
-                      value={periodeTahunGaji ?? (periodeBulanGaji ? new Date(tanggal).getFullYear() : "")}
-                      onChange={(e) => setPeriodeTahunGaji(e.target.value ? parseInt(e.target.value, 10) : null)}
-                      placeholder={String(new Date(tanggal).getFullYear())}
-                      className="w-full h-8 px-2.5 rounded-[8px] border border-border-soft bg-surface-input text-xs text-navy-text font-mono focus:outline-none focus:border-brand"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-[10.5px] text-muted-faint">
-                  💡 Cukup pilih bulan jika membayar gaji bulan sebelumnya (misal: bayar di Oktober untuk gaji September).
-                </p>
-              </div>
-            )}
 
             {/* Tabel baris COA */}
             <div className="rounded-[12px] border border-border-soft overflow-hidden mb-4">

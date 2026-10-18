@@ -6,7 +6,7 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus, Receipt } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 import { DatePicker } from "@/components/shared/DatePicker";
@@ -16,6 +16,7 @@ type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: numb
 type LedgerRow = {
   tanggal: string;
   tanggalRaw: string;
+  tanggalNota?: string | null;
   noBukti: string;
   keterangan: string;
   akunTags: string[];
@@ -279,6 +280,7 @@ export function KasScreenClient({
               bukuBankRekeningOptions={bukuBankRekeningOptions}
               initialValues={{
                 tanggal: editingRow.tanggalRaw,
+                tanggalNota: editingRow.tanggalNota ?? null,
                 noBukti: editingRow.noBukti,
                 keterangan: editingRow.keterangan,
                 arah: editingRow.masuk > 0 ? "masuk" : "keluar",
@@ -557,6 +559,17 @@ export function KasScreenClient({
                             {fmtDateFull(r.tanggalRaw || r.tanggal)}
                           </div>
                         </div>
+                        {r.tanggalNota && r.tanggalNota !== (r.tanggalRaw || r.tanggal).slice(0, 10) && (
+                          <div className="mt-0.5">
+                            <span
+                              className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1 py-0.2 rounded"
+                              title={`Tanggal Nota / Kuitansi Riil: ${r.tanggalNota}`}
+                            >
+                              <Receipt size={9} className="text-blue-500 flex-none" />
+                              Nota: {fmtDateShort(r.tanggalNota)}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                       <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">

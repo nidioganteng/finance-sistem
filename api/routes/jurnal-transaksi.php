@@ -72,6 +72,7 @@ if ($method === 'GET' && $sub === '') {
     $nb_ph = implode(',', array_fill(0, count($paged_nbs), '?'));
     $stmt  = $pdo->prepare(
         "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit, t.projectId, t.fakturId,
+                t.extraFieldsJson,
                 c.id as coa_id, c.code as coa_code, c.name as coa_name,
                 p.id as project_id_val, p.code as project_code, p.name as project_name
          FROM `Transaction` t
@@ -89,17 +90,19 @@ if ($method === 'GET' && $sub === '') {
     $grouped = [];
     foreach ($paged_nbs as $nb) {
         $grouped[$nb] = [
-            'noBukti'     => $nb,
-            'tanggal'     => '',
-            'tanggalRaw'  => '',
-            'keterangan'  => '',
-            'projectId'   => null,
-            'fakturId'    => null,
-            'project'     => null,
-            'rows'        => [],
-            'totalDebit'  => 0.0,
-            'totalKredit' => 0.0,
-            'allTxIds'    => [],
+            'noBukti'          => $nb,
+            'tanggal'          => '',
+            'tanggalRaw'       => '',
+            'keterangan'       => '',
+            'projectId'        => null,
+            'fakturId'         => null,
+            'project'          => null,
+            'periodeBulanGaji' => null,
+            'periodeTahunGaji' => null,
+            'rows'             => [],
+            'totalDebit'       => 0.0,
+            'totalKredit'      => 0.0,
+            'allTxIds'         => [],
         ];
     }
 
@@ -107,6 +110,12 @@ if ($method === 'GET' && $sub === '') {
         $g = &$grouped[$r['noBukti']];
         if (!$g) continue;
         if ($r['fakturId']) $g['fakturId'] = $r['fakturId'];
+
+        $ex = (!empty($r['extraFieldsJson']) && is_string($r['extraFieldsJson'])) ? json_decode($r['extraFieldsJson'], true) : [];
+        if (!empty($ex['periodeBulanGaji']) && empty($g['periodeBulanGaji'])) {
+            $g['periodeBulanGaji'] = (int)$ex['periodeBulanGaji'];
+            $g['periodeTahunGaji'] = !empty($ex['periodeTahunGaji']) ? (int)$ex['periodeTahunGaji'] : (int)date('Y', strtotime($r['tanggal']));
+        }
 
         if (!$g['tanggalRaw']) {
             $g['tanggalRaw']  = $r['tanggal'];
@@ -158,6 +167,8 @@ elseif ($method === 'POST' && $sub === '') {
     $edit_no_bukti = trim($body['editNoBukti'] ?? '');
     $project_id  = trim($body['projectId']   ?? '') ?: null;
     $faktur_id   = trim($body['fakturId']    ?? '') ?: null;
+    $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
+    $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
 
     if (!$tanggal)    return error_response('Tanggal wajib diisi.', 400);
     if (!$no_bukti)   return error_response('No. Bukti wajib diisi.', 400);
@@ -279,6 +290,15 @@ elseif ($method === 'POST' && $sub === '') {
                     $preserved_crossing,
                     ['crossingRole' => $role]
                 );
+            }
+            $row_bulan = !empty($row['periodeBulanGaji']) ? (int)$row['periodeBulanGaji'] : $periode_bulan_gaji;
+            $row_tahun = !empty($row['periodeTahunGaji']) ? (int)$row['periodeTahunGaji'] : ($row_bulan ? $periode_tahun_gaji : null);
+            if ($row_bulan) {
+                if (!$extra) $extra = [];
+                $extra['periodeBulanGaji'] = $row_bulan;
+                if ($row_tahun) {
+                    $extra['periodeTahunGaji'] = $row_tahun;
+                }
             }
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,

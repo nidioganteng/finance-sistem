@@ -16,6 +16,7 @@ export type JurnalTransaksiGroup = {
   allTxIds: string[];
   periodeBulanGaji?: number | null;
   periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
 };
 
 export type JurnalTransaksiResult = {

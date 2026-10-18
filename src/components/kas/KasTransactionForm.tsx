@@ -297,7 +297,32 @@ export function KasTransactionForm({
         ? await replaceKasTransaction({ ...payload, existingTxIds: initialValues!.existingTxIds })
         : await createKasTransaction(payload);
       if (result?.error) { setError(result.error); return; }
-      router.refresh();
+
+      if (typeof window !== "undefined") {
+        const currentParams = new URLSearchParams(window.location.search);
+        let changed = false;
+        const curDari = currentParams.get("dari");
+        const curSampai = currentParams.get("sampai");
+        if ((curDari && tanggal < curDari) || (curSampai && tanggal > curSampai)) {
+          const ym = tanggal.slice(0, 7);
+          const [y, m] = ym.split("-").map(Number);
+          const lastDay = new Date(y, m, 0).getDate();
+          currentParams.set("dari", `${ym}-01`);
+          currentParams.set("sampai", `${ym}-${String(lastDay).padStart(2, "0")}`);
+          changed = true;
+        }
+        if (isBankBuku && rekeningId && currentParams.get("rekening") !== rekeningId) {
+          currentParams.set("rekening", rekeningId);
+          changed = true;
+        }
+        if (changed) {
+          router.push(`${pagePath}?${currentParams.toString()}`);
+        } else {
+          router.refresh();
+        }
+      } else {
+        router.refresh();
+      }
       onClose();
     });
   }

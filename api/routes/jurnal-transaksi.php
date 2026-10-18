@@ -99,6 +99,7 @@ if ($method === 'GET' && $sub === '') {
             'project'          => null,
             'periodeBulanGaji' => null,
             'periodeTahunGaji' => null,
+            'tanggalNota'      => null,
             'rows'             => [],
             'totalDebit'       => 0.0,
             'totalKredit'      => 0.0,
@@ -115,6 +116,9 @@ if ($method === 'GET' && $sub === '') {
         if (!empty($ex['periodeBulanGaji']) && empty($g['periodeBulanGaji'])) {
             $g['periodeBulanGaji'] = (int)$ex['periodeBulanGaji'];
             $g['periodeTahunGaji'] = !empty($ex['periodeTahunGaji']) ? (int)$ex['periodeTahunGaji'] : (int)date('Y', strtotime($r['tanggal']));
+        }
+        if (!empty($ex['tanggalNota']) && empty($g['tanggalNota'])) {
+            $g['tanggalNota'] = (string)$ex['tanggalNota'];
         }
 
         if (!$g['tanggalRaw']) {
@@ -169,6 +173,7 @@ elseif ($method === 'POST' && $sub === '') {
     $faktur_id   = trim($body['fakturId']    ?? '') ?: null;
     $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
     $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
+    $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
 
     if (!$tanggal)    return error_response('Tanggal wajib diisi.', 400);
     if (!$no_bukti)   return error_response('No. Bukti wajib diisi.', 400);
@@ -300,6 +305,10 @@ elseif ($method === 'POST' && $sub === '') {
                     $extra['periodeTahunGaji'] = $row_tahun;
                 }
             }
+            if ($tanggal_nota) {
+                if (!$extra) $extra = [];
+                $extra['tanggalNota'] = $tanggal_nota;
+            }
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                  debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, fakturId, createdAt)
@@ -373,6 +382,7 @@ elseif ($method === 'POST' && $sub === '') {
             // Primary kas entry
             $kas_extra = ['isKasEntry' => true, 'autoPostedFromJurnal' => true];
             if ($rekening_nama_post) $kas_extra['rekeningNama'] = $rekening_nama_post;
+            if ($tanggal_nota)       $kas_extra['tanggalNota']  = $tanggal_nota;
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                  debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
@@ -400,6 +410,7 @@ elseif ($method === 'POST' && $sub === '') {
 
                 $cp_extra = ['autoPostedFromJurnal' => true];
                 if ($rekening_nama_post) $cp_extra['rekeningNama'] = $rekening_nama_post;
+                if ($tanggal_nota)       $cp_extra['tanggalNota']  = $tanggal_nota;
                 $pdo->prepare(
                     "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                      debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)

@@ -20,6 +20,7 @@ import {
   CheckCircle,
   AlertCircle,
   Calendar,
+  CalendarDays,
   Building2,
   DollarSign,
   Download,
@@ -1711,6 +1712,17 @@ export function PayrollClient({
                               <div className="font-mono text-[11px] text-muted-faint mt-0.5">
                                 Bukti: {tx.noBukti}
                               </div>
+                              {tx.isAkrual && (
+                                <div className="mt-1">
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[9.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 px-1.5 py-0.5 rounded"
+                                    title={`Diakui sebagai beban bulan ${BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1]} ${tx.periodeTahunGaji ?? ""}`}
+                                  >
+                                    <CalendarDays size={10} className="text-amber-500 flex-none" />
+                                    Akrual: {BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1].slice(0, 3)} {tx.periodeTahunGaji ?? ""}
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
                               <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
@@ -3641,6 +3653,17 @@ export function PayrollClient({
                               <div className="font-mono text-[11px] text-muted-faint mt-0.5">
                                 Bukti: {tx.noBukti}
                               </div>
+                              {tx.isAkrual && (
+                                <div className="mt-1">
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[9.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 px-1.5 py-0.5 rounded"
+                                    title={`Diakui sebagai beban bulan ${BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1]} ${tx.periodeTahunGaji ?? ""}`}
+                                  >
+                                    <CalendarDays size={10} className="text-amber-500 flex-none" />
+                                    Akrual: {BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1].slice(0, 3)} {tx.periodeTahunGaji ?? ""}
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
                               <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
@@ -4368,6 +4391,17 @@ export function PayrollClient({
                           <td className="py-2.5 px-3 font-medium whitespace-nowrap border-b border-r border-border">
                             <div className="text-navy-text">{tx.tanggalFmt}</div>
                             <div className="text-[10px] font-mono text-muted-faint">{tx.noBukti}</div>
+                            {tx.isAkrual && (
+                              <div className="mt-1">
+                                <span
+                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 px-1.5 py-0.5 rounded"
+                                  title={`Diakui sebagai beban bulan ${BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1]} ${tx.periodeTahunGaji ?? ""}`}
+                                >
+                                  <CalendarDays size={10} className="text-amber-500 flex-none" />
+                                  Akrual: {BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1].slice(0, 3)} {tx.periodeTahunGaji ?? ""}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap border-b border-r border-border">
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">

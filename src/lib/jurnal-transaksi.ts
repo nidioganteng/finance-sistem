@@ -14,6 +14,8 @@ export type JurnalTransaksiGroup = {
   totalDebit: number;
   totalKredit: number;
   allTxIds: string[];
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
 };
 
 export type JurnalTransaksiResult = {

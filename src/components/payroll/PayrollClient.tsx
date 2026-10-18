@@ -37,6 +37,7 @@ import {
   History,
   RotateCcw,
   Sparkles,
+  Receipt,
 } from "lucide-react";
 import {
   type PegawaiItem,
@@ -1720,6 +1721,17 @@ export function PayrollClient({
                                   >
                                     <CalendarDays size={10} className="text-amber-500 flex-none" />
                                     Akrual: {BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1].slice(0, 3)} {tx.periodeTahunGaji ?? ""}
+                                  </span>
+                                </div>
+                              )}
+                              {tx.tanggalNota && tx.tanggalNota !== tx.tanggal && (
+                                <div className="mt-1">
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1.5 py-0.5 rounded"
+                                    title={`Tanggal Nota / Kuitansi Riil: ${tx.tanggalNota}`}
+                                  >
+                                    <Receipt size={10} className="text-blue-500 flex-none" />
+                                    Nota: {tx.tanggalNota}
                                   </span>
                                 </div>
                               )}
@@ -3664,6 +3676,17 @@ export function PayrollClient({
                                   </span>
                                 </div>
                               )}
+                              {tx.tanggalNota && tx.tanggalNota !== tx.tanggal && (
+                                <div className="mt-1">
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1.5 py-0.5 rounded"
+                                    title={`Tanggal Nota / Kuitansi Riil: ${tx.tanggalNota}`}
+                                  >
+                                    <Receipt size={10} className="text-blue-500 flex-none" />
+                                    Nota: {tx.tanggalNota}
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
                               <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
@@ -4399,6 +4422,17 @@ export function PayrollClient({
                                 >
                                   <CalendarDays size={10} className="text-amber-500 flex-none" />
                                   Akrual: {BULAN_NAMES[(tx.periodeBulanGaji || 1) - 1].slice(0, 3)} {tx.periodeTahunGaji ?? ""}
+                                </span>
+                              </div>
+                            )}
+                            {tx.tanggalNota && tx.tanggalNota !== tx.tanggal && (
+                              <div className="mt-1">
+                                <span
+                                  className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1.5 py-0.5 rounded"
+                                  title={`Tanggal Nota / Kuitansi Riil: ${tx.tanggalNota}`}
+                                >
+                                  <Receipt size={10} className="text-blue-500 flex-none" />
+                                  Nota: {tx.tanggalNota}
                                 </span>
                               </div>
                             )}

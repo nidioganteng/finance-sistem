@@ -1403,6 +1403,21 @@ elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === 'bulk-generate') {
         $thr                 = 0.0;
         $tunjangan_pph       = 0.0;
         $potongan_lain       = 0.0;
+
+        // Pada bulan 12 (Desember): Tunjangan PPh dikalkulasikan dan diselesaikan sebagai akumulasi fasilitas PPh yang ditanggung perusahaan
+        if ($bulan === 12) {
+            $stmt_pph_prev = $pdo->prepare(
+                "SELECT COALESCE(SUM(pph21), 0) FROM GajiPegawaiBulanan
+                 WHERE pegawaiId = ? AND tahun = ? AND bulan BETWEEN 1 AND 11"
+            );
+            $stmt_pph_prev->execute([$pid, $tahun]);
+            $sum_pph_jan_nov = (float)$stmt_pph_prev->fetchColumn();
+            $calc_pph_des = hitung_pph21_ter($gp + $tj + $tt + $tb, $p['statusKeluarga'] ?? 'TK/0');
+            $pph21_des = (float)$calc_pph_des['nominal'];
+            $tunjangan_pph = $sum_pph_jan_nov + $pph21_des;
+        }
+
+        // Gaji Terlapor Pajak (Bruto): Akumulasi seluruh penghasilan kotor (Gaji + Seluruh Tunjangan) dasar PPh 21
         $total_kotor         = $gp + $tj + $tt + $tb + $tunjangan_pph;
         $total_pajak         = $total_kotor;
 
@@ -1412,7 +1427,10 @@ elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === 'bulk-generate') {
             $pph21 = (float)$calc_pph['nominal'];
         }
 
-        $total_bersih        = max(0, $gp + $tj + $tt - $pb - $potongan_lain);
+        // Gaji Bersih / Take Home Pay (THP / Ditransfer):
+        // THP = Gaji Pokok + Tunjangan Jabatan + Transport + Tunjangan Lainnya/Insentif - Potongan BPJS - Potongan Lain
+        // (Tunjangan BPJS dan Tunjangan PPh tidak ikut dikirim ke rekening karyawan karena dibayarkan langsung ke lembaga terkait)
+        $total_bersih        = max(0, $gp + $tj + $tt + $insentif + $thr - $pb - $potongan_lain);
         $catatan             = "Generated otomatis dari Master Data ({$hk} hari kerja" . ($auto_calculate_pph ? ", TER PPh 21 aktif" : "") . ")";
 
         if ($has_existing && $overwrite) {
@@ -1517,10 +1535,29 @@ elseif ($method === 'POST' && $sub === 'gaji' && $sub2 === '') {
         $tunjangan_transport = $hari_kerja * $tarif_transport;
     }
 
-    $total_kotor  = $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $insentif + $thr + $tunjangan_bpjs + $tunjangan_pph;
+    $tunj_lain = max($insentif, $tunjangan_lainnya);
+
+    // Pada bulan 12 (Desember): Tunjangan PPh dikalkulasikan dan diselesaikan sebagai akumulasi fasilitas PPh yang ditanggung perusahaan jika belum diisi manual
+    if ($bulan === 12 && $tunjangan_pph <= 0 && empty($body['isTunjanganPphManual'])) {
+        $stmt_pph_prev = $pdo->prepare(
+            "SELECT COALESCE(SUM(pph21), 0) FROM GajiPegawaiBulanan
+             WHERE pegawaiId = ? AND tahun = ? AND bulan BETWEEN 1 AND 11"
+        );
+        $stmt_pph_prev->execute([$pegawai_id, $tahun]);
+        $sum_pph_prev = (float)$stmt_pph_prev->fetchColumn();
+        if ($sum_pph_prev > 0 || $pph21 > 0) {
+            $tunjangan_pph = $sum_pph_prev + $pph21;
+        }
+    }
+
+    // Gaji Terlapor Pajak (Bruto): Akumulasi seluruh penghasilan kotor (Gaji + Seluruh Tunjangan) dasar PPh 21
+    $total_kotor  = $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $tunj_lain + $thr + $tunjangan_bpjs + $tunjangan_pph;
     $total_pajak  = $total_kotor;
-    // Potongan dari karyawan: BPJS Karyawan + Potongan Lain (PPh 21 ditanggung perusahaan)
-    $total_bersih = max(0, $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $insentif + $thr - $potongan_bpjs - $potongan_lain);
+
+    // Gaji Bersih / Take Home Pay (THP / Ditransfer): Nominal riil yang ditransfer ke rekening karyawan
+    // THP = Gaji Pokok + Tunjangan Jabatan + Transport + Tunjangan Lainnya/Insentif - Potongan BPJS - Potongan Lain
+    // (Tunjangan BPJS dan Tunjangan PPh tidak ikut dikirim ke rekening karyawan karena dibayarkan langsung ke lembaga terkait)
+    $total_bersih = max(0, $gaji_pokok + $tunjangan_jabatan + $tunjangan_transport + $tunj_lain + $thr - $potongan_bpjs - $potongan_lain);
     $now          = date('Y-m-d H:i:s');
 
     // Check existing (upsert)

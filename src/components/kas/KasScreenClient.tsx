@@ -102,10 +102,17 @@ export function KasScreenClient({
   const [filterDari, setFilterDari] = useState(dari);
   const [filterSampai, setFilterSampai] = useState(sampai);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  function toDateStr(d: Date) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
   const [activePreset, setActivePreset] = useState<string>(() => {
     if (!dari && !sampai) return "bulan-ini";
     const t = new Date();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const fmt = (d: Date) => toDateStr(d);
     const presetRanges: Record<string, [string, string]> = {
       "bulan-ini":  [fmt(new Date(t.getFullYear(), t.getMonth(), 1)),     fmt(new Date(t.getFullYear(), t.getMonth() + 1, 0))],
       "bulan-lalu": [fmt(new Date(t.getFullYear(), t.getMonth() - 1, 1)), fmt(new Date(t.getFullYear(), t.getMonth(), 0))],
@@ -117,17 +124,23 @@ export function KasScreenClient({
   });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  function toDateStr(d: Date) {
-    return d.toISOString().slice(0, 10);
+  function parseLocalDate(s: string): Date {
+    if (s.includes("T") || s.includes(" ")) return new Date(s);
+    const parts = s.split("-");
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+    return new Date(s);
   }
+
   function fmtDateShort(s: string) {
     if (!s) return "—";
-    const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+    const d = parseLocalDate(s);
     return isNaN(d.getTime()) ? s.slice(0, 10) : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
   }
   function fmtDateFull(s: string) {
     if (!s) return "";
-    const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+    const d = parseLocalDate(s);
     return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) +
       (d.getHours() || d.getMinutes() ? ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
   }

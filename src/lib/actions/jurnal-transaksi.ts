@@ -11,6 +11,8 @@ export async function saveJurnalTransaksi(formData: FormData) {
     editNoBukti: formData.get("editNoBukti") || null,
     projectId: formData.get("projectId") || null,
     fakturId: formData.get("fakturId") || null,
+    periodeBulanGaji: formData.get("periodeBulanGaji") ? parseInt(formData.get("periodeBulanGaji") as string, 10) : null,
+    periodeTahunGaji: formData.get("periodeTahunGaji") ? parseInt(formData.get("periodeTahunGaji") as string, 10) : null,
     rows: JSON.parse((formData.get("rows") as string) ?? "[]"),
   };
 

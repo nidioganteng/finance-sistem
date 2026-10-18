@@ -68,6 +68,14 @@ function formatRupiahInput(val: string) {
   return Number(num).toLocaleString("id-ID");
 }
 
+function getTodayLocalDate(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function KasTransactionForm({
   entityKey,
   jenisInputKey,
@@ -98,7 +106,7 @@ export function KasTransactionForm({
   const isEdit = !!initialValues;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? new Date().toISOString().slice(0, 10));
+  const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? getTodayLocalDate());
   const [noBukti, setNoBukti] = useState(initialValues?.noBukti ?? "");
   const [isNoBuktiManual, setIsNoBuktiManual] = useState(isEdit);
 

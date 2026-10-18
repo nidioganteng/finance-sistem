@@ -1068,7 +1068,7 @@ export function PayrollClient({
             <div className="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between">
               <div>
                 <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between gap-1.5">
-                  <span className="truncate">Total Gaji Bersih</span>
+                  <span className="truncate">Take Home Pay (THP)</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 font-mono font-bold whitespace-nowrap shrink-0">
                     Kas / GL 511
                   </span>
@@ -1236,11 +1236,7 @@ export function PayrollClient({
 
                             <td className="py-3 px-3.5 text-right font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
                               {gaji
-                                ? formatRupiah(
-                                    (gaji.insentif || 0) +
-                                      (gaji.tunjanganBpjs || 0) +
-                                      (gaji.tunjanganPph || 0)
-                                  )
+                                ? formatRupiah((gaji.insentif || 0) + (gaji.tunjanganLainnya || 0))
                                 : "Rp 0"}
                             </td>
 

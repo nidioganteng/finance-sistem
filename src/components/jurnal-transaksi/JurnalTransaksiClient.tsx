@@ -671,7 +671,7 @@ export function JurnalTransaksiClient({
                           const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === f.noFaktur.trim().toLowerCase());
                           const isDup = sameNumber.length > 1;
                           const partIdx = isDup ? sameNumber.findIndex((x) => x.id === f.id) + 1 : null;
-                          const partTag = isDup ? `[Tagihan #${partIdx}/${sameNumber.length}] ` : "";
+                          const partTag = isDup ? `[Termin #${partIdx}] ` : "";
                           const isCair = (f.nominalDiterima && f.nominalDiterima > 0) || !!f.tanggalTerima;
                           const statusTag = isCair ? " · [Lunas/Cair]" : " · [Belum Cair]";
                           const netto = f.labaSetelahPajak > 0 ? f.labaSetelahPajak : Math.max(0, f.dpp - f.pph);
@@ -689,7 +689,7 @@ export function JurnalTransaksiClient({
                           const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === f.noFaktur.trim().toLowerCase());
                           const isDup = sameNumber.length > 1;
                           const partIdx = isDup ? sameNumber.findIndex((x) => x.id === f.id) + 1 : null;
-                          const partTag = isDup ? `[Tagihan #${partIdx}/${sameNumber.length}] ` : "";
+                          const partTag = isDup ? `[Termin #${partIdx}] ` : "";
                           const isCair = (f.nominalDiterima && f.nominalDiterima > 0) || !!f.tanggalTerima;
                           const statusTag = isCair ? " · [Lunas/Cair]" : " · [Belum Cair]";
                           const netto = f.labaSetelahPajak > 0 ? f.labaSetelahPajak : Math.max(0, f.dpp - f.pph);
@@ -775,7 +775,7 @@ export function JurnalTransaksiClient({
                           <>
                             {isDup && (
                               <span className="font-bold text-[10.5px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
-                                Tagihan #{partIdx} dari {sameNumber.length}
+                                Termin #{partIdx}
                               </span>
                             )}
                             {isCair ? (

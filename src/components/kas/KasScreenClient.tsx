@@ -609,10 +609,10 @@ export function KasScreenClient({
                         {r.keterangan}
                         {r.periodeBulanGaji && (
                           <span
-                            className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"
+                            className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"
                             title={`Beban Gaji Bulan ${MONTH_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
                           >
-                            <Calendar size={10} className="text-amber-500 flex-none" />
+                            <Calendar size={10} className="text-blue-500 flex-none" />
                             Akrual: {MONTH_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
                           </span>
                         )}

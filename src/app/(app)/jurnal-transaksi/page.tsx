@@ -44,6 +44,7 @@ export default async function JurnalTransaksiPage({
       bank?: string | null; projectId?: string | null;
       projectCode?: string | null; projectName?: string | null;
       tahunPajak: number; masaPajak: number;
+      tanggalTerima?: string | null; createdAt?: string;
     }> }>(
       `/api/pendapatan/faktur?entityId=${encodeURIComponent(selectedEntity.id)}`,
       token

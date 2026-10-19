@@ -339,6 +339,8 @@ export type TenagaAhliProjectAssignment = {
   projectId: string;
   projectCode?: string | null;
   projectName?: string | null;
+  projectEntityId?: string | null;
+  projectEntityName?: string | null;
   tanggalMulaiTugas?: string | null;
   tanggalMulaiTugasFmt?: string | null;
   tanggalSelesaiTugas?: string | null;
@@ -471,6 +473,14 @@ export type RekapTenagaAhliPerNamaItem = {
   totalHonorBersihFmt: string;
   daftarEntitas: string[];
   daftarProyek: string[];
+  daftarProyekObj?: {
+    projectId?: string | null;
+    projectCode?: string | null;
+    projectName: string;
+    namaProyek: string;
+    entityId?: string;
+    entityName: string;
+  }[];
   daftarBulan: string[];
   rincian: {
     id: string;

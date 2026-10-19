@@ -327,6 +327,31 @@ export type HonorTenagaAhliItem = {
   projectName?: string | null;
   namaProyek?: string | null;
   noBukti?: string | null;
+  isPendingPayment?: boolean;
+  statusPembayaran?: "DIBAYAR" | "BELUM_DIBAYAR";
+  isTurunLapangan?: boolean;
+  tanggalMulaiTugas?: string | null;
+  tanggalSelesaiTugas?: string | null;
+};
+
+export type RekananTenagaAhliItem = {
+  id: string;
+  nama: string;
+  nik: string | null;
+  npwp: string | null;
+  kategori: string | null;
+  ptkp?: string | null;
+  entityId?: string | null;
+  projectId?: string | null;
+  projectCode?: string | null;
+  projectName?: string | null;
+  tanggalMulaiTugas?: string | null;
+  tanggalMulaiTugasFmt?: string | null;
+  tanggalSelesaiTugas?: string | null;
+  tanggalSelesaiTugasFmt?: string | null;
+  isTurunLapangan?: boolean;
+  nominalHonorBulanan?: number;
+  nominalHonorBulananFmt?: string;
 };
 
 export const BULAN_NAMES = [

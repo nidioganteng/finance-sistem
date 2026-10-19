@@ -95,6 +95,19 @@ export function LaporanPendapatanClient({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingFaktur, setDeletingFaktur] = useState<FakturPendapatanItem | null>(null);
 
+  const [isDetailSelisihModalOpen, setIsDetailSelisihModalOpen] = useState(false);
+  const [inspectingFaktur, setInspectingFaktur] = useState<FakturPendapatanItem | null>(null);
+
+  function openDetailSelisihModal(f: FakturPendapatanItem) {
+    setInspectingFaktur(f);
+    setIsDetailSelisihModalOpen(true);
+  }
+
+  function closeDetailSelisihModal() {
+    setIsDetailSelisihModalOpen(false);
+    setInspectingFaktur(null);
+  }
+
   // Form states for Faktur
   const [formFaktur, setFormFaktur] = useState({
     npwp: "",
@@ -1136,20 +1149,33 @@ export function LaporanPendapatanClient({
                       </td>
                       <td className="p-3 text-center">
                         {f.balanceStatus === "BALANCE" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/60">
-                            <CheckCircle2 size={10} /> Balance
-                          </span>
-                        ) : f.balanceStatus === "SELISIH" ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60"
-                            title={`Selisih dengan net tagihan: ${f.selisihBankFmt}`}
+                          <button
+                            type="button"
+                            onClick={() => openDetailSelisihModal(f)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 hover:bg-green-200 dark:bg-green-950/50 dark:hover:bg-green-900/60 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/60 transition-all cursor-pointer shadow-2xs hover:scale-102"
+                            title="Klik untuk melihat rincian rekonsiliasi tagihan"
                           >
-                            <AlertTriangle size={10} /> Selisih: {f.selisihBankFmt}
-                          </span>
+                            <CheckCircle2 size={10} /> Balance
+                          </button>
+                        ) : f.balanceStatus === "SELISIH" ? (
+                          <button
+                            type="button"
+                            onClick={() => openDetailSelisihModal(f)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition-all cursor-pointer shadow-2xs hover:scale-102"
+                            title="Klik untuk melihat rincian bagian mana yang selisih"
+                          >
+                            <AlertTriangle size={11} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                            <span>Selisih: {f.selisihBankFmt}</span>
+                          </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-subtle text-muted-faint border border-border">
+                          <button
+                            type="button"
+                            onClick={() => openDetailSelisihModal(f)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-subtle hover:bg-surface-hover text-muted-faint border border-border cursor-pointer transition-colors"
+                            title="Klik untuk melihat estimasi tagihan & status pencairan"
+                          >
                             Belum Cair
-                          </span>
+                          </button>
                         )}
                       </td>
                       <td className="p-3">
@@ -2423,6 +2449,35 @@ export function LaporanPendapatanClient({
                         DPP Dasar − PPh Final
                       </span>
                     </div>
+                    {editingFaktur && editingFaktur.isRealized && (
+                      <div className={`mt-2.5 p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
+                        editingFaktur.balanceStatus === "SELISIH"
+                          ? "bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200"
+                          : "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60 text-emerald-900 dark:text-emerald-200"
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          {editingFaktur.balanceStatus === "SELISIH" ? (
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          )}
+                          <div>
+                            <span className="font-semibold">Realisasi Masuk Bank: </span>
+                            <span className="font-mono font-bold">{editingFaktur.nominalDiterimaFmt}</span>
+                            <span className="text-[11px] opacity-80 ml-1">({editingFaktur.bank || "Bank"} · {editingFaktur.tanggalTerima || "-"})</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold font-mono">
+                            {editingFaktur.balanceStatus === "SELISIH" ? (
+                              <span className="text-rose-700 dark:text-rose-300">Selisih: {editingFaktur.selisihBankFmt}</span>
+                            ) : (
+                              <span className="text-emerald-700 dark:text-emerald-300">Balance (Rp 0)</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2830,6 +2885,463 @@ export function LaporanPendapatanClient({
               >
                 {isSubmitting ? "Menghapus..." : "Ya, Hapus Faktur"}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* MODAL: DETAIL SELISIH & REKONSILIASI PENERIMAAN BANK */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {mounted && isDetailSelisihModalOpen && inspectingFaktur && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-surface-card rounded-2xl border border-border-soft shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft bg-surface-subtle shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-2xs ${
+                  inspectingFaktur.balanceStatus === "SELISIH"
+                    ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 border-rose-200 dark:border-rose-800/60"
+                    : inspectingFaktur.balanceStatus === "BALANCE"
+                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200 dark:border-emerald-800/60"
+                    : "bg-surface-subtle text-navy-soft border-border"
+                }`}>
+                  <Scale className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-navy-text">
+                      Detail Selisih & Rekonsiliasi Tagihan
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-card border border-border-soft text-navy-soft">
+                      Masa {inspectingFaktur.namaBulan} {inspectingFaktur.tahunPajak}
+                    </span>
+                  </div>
+                  <p className="text-xs text-navy-soft mt-0.5">
+                    Faktur: <span className="font-mono font-semibold text-navy-text">{inspectingFaktur.noFaktur}</span> · Rekanan: <span className="font-medium text-navy-text">{inspectingFaktur.namaRekanan}</span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeDetailSelisihModal}
+                className="p-1.5 rounded-lg text-navy-soft hover:text-navy-text hover:bg-surface-hover transition-colors cursor-pointer"
+                aria-label="Tutup Modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 space-y-4 overflow-y-auto text-xs">
+              {/* Context Strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-surface-subtle rounded-xl border border-border-soft text-[11px]">
+                <div>
+                  <span className="text-navy-soft block">Proyek Terkait:</span>
+                  <span className="font-semibold text-navy-text">
+                    {inspectingFaktur.projectCode ? `[${inspectingFaktur.projectCode}] ` : ""}
+                    {inspectingFaktur.projectName || inspectingFaktur.namaJkp || "-"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-navy-soft block">Status Pencairan Bank:</span>
+                  <span className="font-semibold text-navy-text">
+                    {inspectingFaktur.isRealized ? (
+                      <span className="text-emerald-700 dark:text-emerald-400">
+                        Dicairkan ke {inspectingFaktur.bank || "Bank"} ({inspectingFaktur.tanggalTerima || "-"})
+                      </span>
+                    ) : (
+                      <span className="text-muted-faint italic">Belum ada catatan pencairan bank</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status Banner & Calculations */}
+              {(() => {
+                const f = inspectingFaktur;
+                const pphReal = f.pphRealisasi != null ? f.pphRealisasi : f.pph;
+                const selisihPph = f.pphRealisasi != null ? f.pphRealisasi - f.pph : 0;
+
+                const ppnReal = f.ppnRealisasi != null ? f.ppnRealisasi : f.ppn;
+                const selisihPpn = f.ppnRealisasi != null ? f.ppnRealisasi - f.ppn : 0;
+
+                const selisihBank = f.nominalDiterima - f.labaSetelahPajak;
+                const isUnderpaid = selisihBank < 0;
+                const totalRealisasi = (f.nominalDiterima || 0) + ppnReal + pphReal;
+                const selisihKuitansi = totalRealisasi - f.nilaiProyek;
+
+                return (
+                  <>
+                    <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      f.balanceStatus === "SELISIH"
+                        ? "bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60"
+                        : f.balanceStatus === "BALANCE"
+                        ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60"
+                        : "bg-surface-subtle border-border-soft"
+                    }`}>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            f.balanceStatus === "SELISIH"
+                              ? "bg-rose-600 text-white"
+                              : f.balanceStatus === "BALANCE"
+                              ? "bg-emerald-600 text-white"
+                              : "bg-surface-hover text-muted-faint"
+                          }`}>
+                            {f.balanceStatus === "SELISIH" ? "Selisih Terdeteksi" : f.balanceStatus === "BALANCE" ? "Sesuai / Balance" : "Menunggu Pencairan"}
+                          </span>
+                          <span className="text-xs font-semibold text-navy-text">
+                            Kontrol Balance Penerimaan
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-navy-soft mt-1">
+                          {f.balanceStatus === "SELISIH"
+                            ? isUnderpaid
+                              ? `Dana cair di bank kurang ${formatRupiah(Math.abs(selisihBank))} dibanding ekspektasi Netto Tagihan Kuitansi.`
+                              : `Dana cair di bank lebih ${formatRupiah(selisihBank)} dibanding ekspektasi Netto Tagihan Kuitansi.`
+                            : f.balanceStatus === "BALANCE"
+                            ? "Nominal yang masuk ke rekening bank tepat sama dengan Netto Tagihan setelah dipotong PPN & PPh."
+                            : "Belum ada pencairan dana di bank untuk faktur ini."}
+                        </p>
+                      </div>
+
+                      <div className="text-right sm:border-l sm:border-border-soft sm:pl-4 shrink-0">
+                        <span className="text-[10px] text-navy-soft uppercase tracking-wider block font-medium">
+                          Selisih Bersih (Bank)
+                        </span>
+                        <span className={`text-base font-extrabold font-mono ${
+                          f.balanceStatus === "SELISIH" ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
+                        }`}>
+                          {f.selisihBankFmt}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Comparison Table */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-navy-text text-xs flex items-center gap-1.5">
+                          <Calculator className="w-3.5 h-3.5 text-blue-600" />
+                          Perbandingan Input Kuitansi Awal vs Realisasi Aktual
+                        </span>
+                        <span className="text-[10.5px] text-navy-soft">Semua nilai dalam Rupiah</span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-border-soft">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-surface-subtle text-[11px] font-bold text-navy-soft border-b border-border-soft">
+                              <th className="p-2.5">Komponen Tagihan / Pajak</th>
+                              <th className="p-2.5 text-right bg-blue-50/40 dark:bg-blue-950/20 text-blue-900 dark:text-blue-300">
+                                1. Input Kuitansi Awal
+                              </th>
+                              <th className="p-2.5 text-right bg-purple-50/30 dark:bg-purple-950/20 text-purple-900 dark:text-purple-300">
+                                2. Realisasi Bank & Pajak
+                              </th>
+                              <th className="p-2.5 text-right">Selisih</th>
+                              <th className="p-2.5 text-center w-24">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-soft text-navy-text font-mono text-xs">
+                            {/* Kuitansi Bruto */}
+                            <tr className="hover:bg-surface-hover/50">
+                              <td className="p-2.5 font-sans font-medium text-navy-text">
+                                Nilai Kuitansi Bruto (111%)
+                              </td>
+                              <td className="p-2.5 text-right bg-blue-50/20 dark:bg-blue-950/10 font-bold text-blue-800 dark:text-blue-200">
+                                {f.nilaiProyekFmt}
+                              </td>
+                              <td className="p-2.5 text-right bg-purple-50/10 dark:bg-purple-950/10 font-semibold text-purple-800 dark:text-purple-300">
+                                {f.isRealized ? formatRupiah(totalRealisasi) : "-"}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                {f.isRealized && Math.abs(selisihKuitansi) > 0.01 ? (
+                                  <span className="text-rose-600 font-bold">
+                                    {formatRupiah(selisihKuitansi)}
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-600 font-bold">Rp 0</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-center font-sans">
+                                {f.isRealized && Math.abs(selisihKuitansi) > 0.01 ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                    Selisih
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                    Sesuai
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* DPP */}
+                            <tr className="hover:bg-surface-hover/50">
+                              <td className="p-2.5 font-sans font-medium text-navy-text">
+                                DPP Dasar Tagihan (100%)
+                              </td>
+                              <td className="p-2.5 text-right bg-blue-50/20 dark:bg-blue-950/10 text-navy-text">
+                                {f.dppFmt}
+                              </td>
+                              <td className="p-2.5 text-right bg-purple-50/10 dark:bg-purple-950/10 text-navy-text">
+                                {f.dppFmt}
+                              </td>
+                              <td className="p-2.5 text-right text-emerald-600 font-bold">
+                                Rp 0
+                              </td>
+                              <td className="p-2.5 text-center font-sans">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  Sesuai
+                                </span>
+                              </td>
+                            </tr>
+
+                            {/* PPN */}
+                            <tr className="hover:bg-surface-hover/50">
+                              <td className="p-2.5 font-sans font-medium text-navy-text">
+                                PPN Dipungut (11%)
+                              </td>
+                              <td className="p-2.5 text-right bg-blue-50/20 dark:bg-blue-950/10 text-purple-700 dark:text-purple-400">
+                                {f.ppnFmt}
+                              </td>
+                              <td className="p-2.5 text-right bg-purple-50/10 dark:bg-purple-950/10 text-purple-700 dark:text-purple-400">
+                                {f.ppnRealisasiFmt}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                {Math.abs(selisihPpn) > 0.01 ? (
+                                  <span className="text-rose-600 font-bold">{formatRupiah(selisihPpn)}</span>
+                                ) : (
+                                  <span className="text-emerald-600 font-bold">Rp 0</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-center font-sans">
+                                {Math.abs(selisihPpn) > 0.01 ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                    Selisih
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                    Sesuai
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* PPh */}
+                            <tr className="hover:bg-surface-hover/50">
+                              <td className="p-2.5 font-sans font-medium text-navy-text">
+                                Potongan PPh ({f.tarifPphPersen}%)
+                              </td>
+                              <td className="p-2.5 text-right bg-blue-50/20 dark:bg-blue-950/10 text-amber-700 dark:text-amber-400">
+                                {f.pphFmt}
+                              </td>
+                              <td className="p-2.5 text-right bg-purple-50/10 dark:bg-purple-950/10 text-amber-700 dark:text-amber-400">
+                                {f.pphRealisasiFmt}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                {Math.abs(selisihPph) > 0.01 ? (
+                                  <span className="text-rose-600 font-bold">{formatRupiah(selisihPph)}</span>
+                                ) : (
+                                  <span className="text-emerald-600 font-bold">Rp 0</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-center font-sans">
+                                {Math.abs(selisihPph) > 0.01 ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                    Selisih
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                    Sesuai
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Netto / Dana Masuk Bersih */}
+                            <tr className="bg-surface-subtle font-bold border-t-2 border-border-soft">
+                              <td className="p-2.5 font-sans font-bold text-navy-text">
+                                Netto Tagihan / Dana Cair Bank
+                              </td>
+                              <td className="p-2.5 text-right bg-blue-50/40 dark:bg-blue-950/30 font-extrabold text-emerald-800 dark:text-emerald-200">
+                                {f.labaSetelahPajakFmt}
+                              </td>
+                              <td className="p-2.5 text-right bg-purple-50/20 dark:bg-purple-950/20 font-extrabold text-emerald-800 dark:text-emerald-200">
+                                {f.isRealized ? f.nominalDiterimaFmt : <span className="text-muted-faint font-normal font-sans italic text-xs">Belum Cair</span>}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                {f.balanceStatus === "SELISIH" ? (
+                                  <span className="text-rose-600 font-bold">{f.selisihBankFmt}</span>
+                                ) : f.balanceStatus === "BALANCE" ? (
+                                  <span className="text-emerald-600 font-bold">Rp 0</span>
+                                ) : (
+                                  <span className="text-muted-faint font-normal font-sans text-xs">-</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-center font-sans">
+                                {f.balanceStatus === "SELISIH" ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                    Selisih
+                                  </span>
+                                ) : f.balanceStatus === "BALANCE" ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                    Balance
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-surface-subtle text-muted-faint">
+                                    Belum Cair
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Breakdown & Analisis Penyebab Selisih */}
+                    <div className="space-y-2">
+                      <span className="font-bold text-navy-text text-xs flex items-center gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-amber-600" />
+                        Rincian Detail Bagian yang Selisih:
+                      </span>
+
+                      {/* Item 1: Selisih Dana Cair Bank */}
+                      {f.balanceStatus === "SELISIH" && (
+                        <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-rose-900 dark:text-rose-200 text-xs flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                              Bagian Dana Masuk Rekening Bank: Selisih {f.selisihBankFmt}
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-rose-700 dark:text-rose-300">
+                              {f.nominalDiterimaFmt} vs {f.labaSetelahPajakFmt}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-rose-800/90 dark:text-rose-300 leading-relaxed">
+                            {isUnderpaid ? (
+                              <>
+                                Nominal yang masuk ke rekening bank lebih kecil <strong>{formatRupiah(Math.abs(selisihBank))}</strong> dibanding ekspektasi Netto Tagihan. Hal ini lazim terjadi jika ada:
+                                <ul className="list-disc list-inside mt-1 space-y-0.5 pl-1 text-[10.5px]">
+                                  <li><strong>Potongan Retensi Pemeliharaan:</strong> Rekanan menahan uang retensi (biasanya 5% pada termin akhir).</li>
+                                  <li><strong>Denda Keterlambatan:</strong> Terdapat pemotongan pinalti waktu dari SP2D dinas/rekanan.</li>
+                                  <li><strong>Biaya Administrasi Bank:</strong> Biaya transfer kliring SKN/RTGS/BI-Fast antar-bank.</li>
+                                  <li><strong>Pencairan Bertahap:</strong> Tagihan dicairkan dalam beberapa kali transfer.</li>
+                                </ul>
+                              </>
+                            ) : (
+                              <>
+                                Nominal yang masuk ke rekening bank lebih besar <strong>{formatRupiah(selisihBank)}</strong> dibanding ekspektasi Netto Tagihan. Periksa apakah terdapat kelebihan transfer atau koreksi nilai tagihan pada bukti transfer.
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Item 2: Selisih PPh */}
+                      {Math.abs(selisihPph) > 0.01 && (
+                        <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-amber-900 dark:text-amber-200 text-xs flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                              Bagian Potongan PPh: Selisih {formatRupiah(selisihPph)}
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300">
+                              Realisasi {f.pphRealisasiFmt} vs Estimasi {f.pphFmt}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-800/90 dark:text-amber-300 leading-relaxed">
+                            Nilai pemotongan PPh oleh bendahara/klien berbeda <strong>{formatRupiah(Math.abs(selisihPph))}</strong> dibanding estimasi sistem ({f.tarifPphPersen}% × DPP). Periksa lembar Bukti Potong (Bupot) PPh resmi untuk mencocokkan perhitungan kas daerah / pembulatan.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Item 3: Selisih PPN */}
+                      {Math.abs(selisihPpn) > 0.01 && (
+                        <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/40 dark:bg-purple-950/20 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-purple-900 dark:text-purple-200 text-xs flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-purple-600" />
+                              Bagian Pemungutan PPN: Selisih {formatRupiah(selisihPpn)}
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-purple-700 dark:text-purple-300">
+                              Realisasi {f.ppnRealisasiFmt} vs Estimasi {f.ppnFmt}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-purple-800/90 dark:text-purple-300 leading-relaxed">
+                            Nilai PPN yang tercatat berbeda <strong>{formatRupiah(Math.abs(selisihPpn))}</strong> dibanding perhitungan standar (11/111 atau DPP Nilai Lain).
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Jika Semua Sesuai */}
+                      {f.balanceStatus === "BALANCE" && Math.abs(selisihPph) <= 0.01 && Math.abs(selisihPpn) <= 0.01 && (
+                        <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="text-xs">
+                            Semua komponen tagihan dan pencairan bank telah cocok (balance) tanpa ada selisih.
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Status Dokumen Fisik */}
+                      <div className="pt-2 border-t border-border-soft flex flex-wrap items-center gap-2 text-[11px]">
+                        <span className="text-navy-soft font-medium">Dokumen Fisik Terverifikasi:</span>
+                        <span className={`px-2 py-0.5 rounded-md border font-semibold ${
+                          f.ceklisPpn ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-surface-subtle text-muted-faint border-border"
+                        }`}>
+                          Faktur Pajak PPN: {f.ceklisPpn ? "✓ Ada" : "○ Belum"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md border font-semibold ${
+                          f.ceklisPph ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-surface-subtle text-muted-faint border-border"
+                        }`}>
+                          Bukti Bayar PPh: {f.ceklisPph ? "✓ Ada" : "○ Belum"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md border font-semibold ${
+                          f.ceklisBuktiPotong ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-surface-subtle text-muted-faint border-border"
+                        }`}>
+                          Sertifikat Bupot: {f.ceklisBuktiPotong ? "✓ Ada" : "○ Belum"}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-3.5 border-t border-border-soft bg-surface-subtle shrink-0">
+              <span className="text-[11px] text-navy-soft">
+                ID Transaksi Bank: <strong className="font-mono text-navy-text">{inspectingFaktur.bankTransactionId || "-"}</strong>
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={closeDetailSelisihModal}
+                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-xl border border-border-soft transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const f = inspectingFaktur;
+                      closeDetailSelisihModal();
+                      openEditFakturModal(f);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Koreksi / Edit Faktur</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>,

@@ -17,6 +17,8 @@ type LedgerRow = {
   tanggal: string;
   tanggalRaw: string;
   tanggalNota?: string | null;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
   noBukti: string;
   keterangan: string;
   akunTags: string[];
@@ -383,6 +385,8 @@ export function KasScreenClient({
                 rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
                 crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
                 projectId: editingRow.project?.id,
+                periodeBulanGaji: editingRow.periodeBulanGaji ?? null,
+                periodeTahunGaji: editingRow.periodeTahunGaji ?? null,
                 rows: editingRow.coaRows.map((cr) => ({
                   coaAccountId: cr.coaAccountId,
                   nominal: String(cr.nominal),
@@ -736,6 +740,15 @@ export function KasScreenClient({
                       <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                       <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                         {r.keterangan}
+                        {r.periodeBulanGaji && (
+                          <span
+                            className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"
+                            title={`Beban Gaji Bulan ${MONTH_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
+                          >
+                            <Calendar size={10} className="text-amber-500 flex-none" />
+                            Akrual: {MONTH_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
+                          </span>
+                        )}
                         {r.project && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
                             {r.project.code}

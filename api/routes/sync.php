@@ -66,13 +66,17 @@ if ($method === 'POST' && $sub === 'assignment') {
             $existing['id'],
         ]);
 
-        $notif_text  = "Penugasan diperbarui dari Sidamon: [{$existing['code']}] $job_name" . ($client_name ? " — $client_name" : '');
-        $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
-        foreach ($notif_roles as $role) {
-            $pdo->prepare(
-                "INSERT INTO Notifikasi (id, type, targetRole, text, `read`, createdAt)
-                 VALUES (?, 'PENUGASAN_BARU', ?, ?, 0, NOW())"
-            )->execute([uuid4(), $role, $notif_text]);
+        try {
+            $notif_text  = "Penugasan diperbarui dari Sidamon: [{$existing['code']}] $job_name" . ($client_name ? " — $client_name" : '');
+            $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
+            foreach ($notif_roles as $role) {
+                $pdo->prepare(
+                    "INSERT INTO Notifikasi (id, type, targetRole, text, `read`, createdAt)
+                     VALUES (?, 'PENUGASAN_BARU', ?, ?, 0, NOW())"
+                )->execute([uuid4(), $role, $notif_text]);
+            }
+        } catch (Throwable $e) {
+            error_log('Sync notif gagal (update): ' . $e->getMessage());
         }
 
         json_response([
@@ -134,13 +138,17 @@ if ($method === 'POST' && $sub === 'assignment') {
     );
 
     // Kirim notifikasi ke Manajer Keuangan dan Staf Keuangan
-    $notif_text = "Penugasan baru dari Sidamon: [$code] $job_name" . ($client_name ? " — $client_name" : '');
-    $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
-    foreach ($notif_roles as $role) {
-        $pdo->prepare(
-            "INSERT INTO Notifikasi (id, type, targetRole, text, `read`, createdAt)
-             VALUES (?, 'PENUGASAN_BARU', ?, ?, 0, NOW())"
-        )->execute([uuid4(), $role, $notif_text]);
+    try {
+        $notif_text  = "Penugasan baru dari Sidamon: [$code] $job_name" . ($client_name ? " — $client_name" : '');
+        $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
+        foreach ($notif_roles as $role) {
+            $pdo->prepare(
+                "INSERT INTO Notifikasi (id, type, targetRole, text, `read`, createdAt)
+                 VALUES (?, 'PENUGASAN_BARU', ?, ?, 0, NOW())"
+            )->execute([uuid4(), $role, $notif_text]);
+        }
+    } catch (Throwable $e) {
+        error_log('Sync notif gagal (create): ' . $e->getMessage());
     }
 
     // Sync-back ke Sidamon: reset termin lama, set persenTerbayar = 0

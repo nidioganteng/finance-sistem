@@ -220,7 +220,7 @@ export function LaporanPendapatanClient({
   // Live calculation for Faktur Form
   const liveCalc = hitungPajakFaktur(
     formFaktur.dpp,
-    formFaktur.dppNilaiLain,
+    formFaktur.dppNilaiLain || hitungDppNilaiLain(formFaktur.dpp),
     formFaktur.tarifPpnPersen,
     formFaktur.tarifPphPersen,
     formFaktur.nilaiKuitansi > 0 ? formFaktur.nilaiKuitansi : undefined
@@ -284,7 +284,7 @@ export function LaporanPendapatanClient({
         namaJkp: match.namaJkp,
         nilaiKuitansi: prevKuitansi,
         dpp: match.dpp,
-        dppNilaiLain: match.dppNilaiLain,
+        dppNilaiLain: match.dppNilaiLain || hitungDppNilaiLain(match.dpp),
         tarifPpnPersen: match.tarifPpnPersen,
         tarifPphPersen: match.tarifPphPersen,
         bank: "",
@@ -319,13 +319,13 @@ export function LaporanPendapatanClient({
     if (term) {
       const nominal = term.nominal;
       const dpp = hitungDppDariKwitansi(nominal);
-      const dppNilaiLain = dpp;
+      const dppNilaiLain = hitungDppNilaiLain(dpp);
       setFormFaktur((prev) => ({
         ...prev,
         nilaiKuitansi: nominal,
         dpp,
         dppNilaiLain,
-        pekerjaanPerusahaan: dpp,
+        pekerjaanPerusahaan: dppNilaiLain,
         pekerjaanYangDipinjam: 0,
         namaJkp: proj ? `Jasa Konsultansi ${proj.name} - ${term.name}` : prev.namaJkp,
         nominalDiterima: 0,
@@ -523,7 +523,7 @@ export function LaporanPendapatanClient({
       namaJkp: f.namaJkp,
       nilaiKuitansi: initialKuitansi,
       dpp: f.dpp,
-      dppNilaiLain: f.dppNilaiLain,
+      dppNilaiLain: f.dppNilaiLain || hitungDppNilaiLain(f.dpp),
       tarifPpnPersen: f.tarifPpnPersen,
       tarifPphPersen: f.tarifPphPersen,
       kodeJenisProyek: f.kodeJenisProyek,
@@ -579,7 +579,7 @@ export function LaporanPendapatanClient({
           namaJkp: match.namaJkp,
           nilaiKuitansi: prevKuitansi,
           dpp: match.dpp,
-          dppNilaiLain: match.dppNilaiLain,
+          dppNilaiLain: match.dppNilaiLain || hitungDppNilaiLain(match.dpp),
           tarifPpnPersen: match.tarifPpnPersen,
           tarifPphPersen: match.tarifPphPersen,
           kodeJenisProyek: match.kodeJenisProyek,
@@ -646,7 +646,7 @@ export function LaporanPendapatanClient({
         namaJkp: formFaktur.namaJkp,
         nilaiKuitansi: kuitansiVal,
         dpp: dppVal,
-        dppNilaiLain: Number(formFaktur.dppNilaiLain) || dppVal,
+        dppNilaiLain: Number(formFaktur.dppNilaiLain) || hitungDppNilaiLain(dppVal),
         tarifPpnPersen: Number(formFaktur.tarifPpnPersen),
         tarifPphPersen: Number(formFaktur.tarifPphPersen),
         kodeJenisProyek: Number(formFaktur.kodeJenisProyek),
@@ -2228,7 +2228,7 @@ export function LaporanPendapatanClient({
                         Form E-Faktur Berbasis Nilai Kuitansi Bruto
                       </h4>
                       <p className="text-[11px] text-navy-soft">
-                        Input utama adalah Nilai Kuitansi Bruto. Nilai DPP (100/111) dan PPN (11/111) dikalkulasi secara otomatis.
+                        Input utama adalah Nilai Kuitansi Bruto. Nilai DPP Dasar (100/111) dan DPP Lainnya (11/12 × DPP Awal) dikalkulasi secara otomatis.
                       </p>
                     </div>
                   </div>
@@ -2248,7 +2248,7 @@ export function LaporanPendapatanClient({
                       Nilai Kuitansi Bruto (Input Utama) <span className="text-rose-500">*</span>
                     </label>
                     <span className="text-[10px] text-navy-soft font-mono">
-                      Rumus otomatis: DPP = 100/111 × Kuitansi • PPN = 11/111 × Kuitansi
+                      Rumus otomatis: DPP = 100/111 × Kuitansi • DPP Lainnya = 11/12 × DPP Awal
                     </span>
                   </div>
                   <div className="relative">
@@ -2266,12 +2266,13 @@ export function LaporanPendapatanClient({
                       onChange={(e) => {
                         const kuitansi = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                         const dpp = hitungDppDariKwitansi(kuitansi);
+                        const dppNilaiLain = hitungDppNilaiLain(dpp);
                         setFormFaktur((prev) => ({
                           ...prev,
                           nilaiKuitansi: kuitansi,
                           dpp,
-                          dppNilaiLain: dpp,
-                          pekerjaanPerusahaan: dpp,
+                          dppNilaiLain,
+                          pekerjaanPerusahaan: dppNilaiLain,
                           pekerjaanYangDipinjam: 0,
                         }));
                       }}
@@ -2280,7 +2281,7 @@ export function LaporanPendapatanClient({
                   </div>
                 </div>
 
-                {/* Hasil Kalkulasi Otomatis: DPP & PPN */}
+                {/* Hasil Kalkulasi Otomatis: DPP Dasar & DPP Lainnya */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* Card DPP Dasar */}
                   <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft shadow-xs space-y-1">
@@ -2300,21 +2301,21 @@ export function LaporanPendapatanClient({
                     </span>
                   </div>
 
-                  {/* Card PPN */}
+                  {/* Card DPP Lainnya (11/12 × DPP Awal) */}
                   <div className="p-3.5 rounded-xl bg-surface-card border border-border-soft shadow-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-navy-text uppercase tracking-wider">
-                        PPN (11/111 × Kuitansi)
+                        DPP Lainnya (11/12 × DPP Awal)
                       </span>
-                      <span className="text-[9.5px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15 px-1.5 py-0.5 rounded">
+                      <span className="text-[9.5px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/15 px-1.5 py-0.5 rounded">
                         Otomatis
                       </span>
                     </div>
-                    <div className="text-lg font-bold font-mono text-purple-700 dark:text-purple-300">
-                      {formatRupiah(liveCalc.ppn)}
+                    <div className="text-lg font-bold font-mono text-blue-700 dark:text-blue-300">
+                      {formatRupiah(formFaktur.dppNilaiLain || hitungDppNilaiLain(formFaktur.dpp))}
                     </div>
                     <span className="text-[10px] text-navy-soft block">
-                      PPN terutang / dipungut rekanan ({formFaktur.tarifPpnPersen}%)
+                      Dasar pengenaan PPN 12% ({formFaktur.tarifPpnPersen}%)
                     </span>
                   </div>
                 </div>

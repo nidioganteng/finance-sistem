@@ -389,6 +389,16 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
   const isTurunLapanganRaw = formData.get("isTurunLapangan");
   const isTurunLapangan = isTurunLapanganRaw === "1" || isTurunLapanganRaw === "true";
 
+  const proyekListRaw = formData.get("proyekList") as string | null;
+  let proyekList = null;
+  if (proyekListRaw) {
+    try {
+      proyekList = JSON.parse(proyekListRaw);
+    } catch {
+      proyekList = null;
+    }
+  }
+
   const body = {
     id: (formData.get("id") as string)?.trim() || null,
     nama: (formData.get("nama") as string)?.trim(),
@@ -402,6 +412,7 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
     tanggalSelesaiTugas: (formData.get("tanggalSelesaiTugas") as string)?.trim() || null,
     isTurunLapangan,
     nominalHonorBulanan: parseFloat(rawNominal) || 0,
+    proyekList,
   };
   try {
     const result = await phpFetch<{

@@ -96,6 +96,7 @@ if ($method === 'GET' && $sub === '') {
             'keterangan'       => '',
             'projectId'        => null,
             'fakturId'         => null,
+            'terminId'         => null,
             'project'          => null,
             'periodeBulanGaji' => null,
             'periodeTahunGaji' => null,
@@ -119,6 +120,9 @@ if ($method === 'GET' && $sub === '') {
         }
         if (!empty($ex['tanggalNota']) && empty($g['tanggalNota'])) {
             $g['tanggalNota'] = (string)$ex['tanggalNota'];
+        }
+        if (!empty($ex['terminId']) && empty($g['terminId'])) {
+            $g['terminId'] = (string)$ex['terminId'];
         }
 
         if (!$g['tanggalRaw']) {
@@ -194,6 +198,7 @@ elseif ($method === 'POST' && $sub === '') {
     $edit_no_bukti = trim($body['editNoBukti'] ?? '');
     $project_id  = trim($body['projectId']   ?? '') ?: null;
     $faktur_id   = trim($body['fakturId']    ?? '') ?: null;
+    $termin_id   = trim($body['terminId']    ?? '') ?: null;
     $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
     $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
     $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
@@ -290,8 +295,12 @@ elseif ($method === 'POST' && $sub === '') {
         } else {
             $pdo->prepare("DELETE FROM FakturPendapatan WHERE noFaktur = ?")->execute([$edit_no_bukti]);
         }
-        // Hapus termin terkait
-        $pdo->prepare("DELETE FROM Termin WHERE name LIKE ?")->execute(["%[$edit_no_bukti]%"]);
+        // Hapus termin terkait — jangan hapus termin yang dipilih pengguna untuk diupdate
+        if ($termin_id && $termin_id !== '__NEW__') {
+            $pdo->prepare("DELETE FROM Termin WHERE name LIKE ? AND id != ?")->execute(["%[$edit_no_bukti]%", $termin_id]);
+        } else {
+            $pdo->prepare("DELETE FROM Termin WHERE name LIKE ?")->execute(["%[$edit_no_bukti]%"]);
+        }
 
     } else {
         // Cek duplikat
@@ -328,6 +337,8 @@ elseif ($method === 'POST' && $sub === '') {
 
     $pdo->beginTransaction();
     try {
+        $assigned_termin_id = ($termin_id && $termin_id !== '__NEW__') ? $termin_id : uuid4();
+
         // ── 1. Insert baris jurnal utama ──────────────────────────────────────
         foreach ($valid_rows as $row) {
             $is_kredit = (float)($row['kredit'] ?? 0) > 0;
@@ -353,6 +364,10 @@ elseif ($method === 'POST' && $sub === '') {
             if ($tanggal_nota) {
                 if (!$extra) $extra = [];
                 $extra['tanggalNota'] = $tanggal_nota;
+            }
+            if ($project_id && $assigned_termin_id) {
+                if (!$extra) $extra = [];
+                $extra['terminId'] = $assigned_termin_id;
             }
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
@@ -652,39 +667,72 @@ elseif ($method === 'POST' && $sub === '') {
                 $stmt_tw->execute([$project_id]);
                 $all_termins = $stmt_tw->fetchAll(PDO::FETCH_ASSOC);
 
-                // Hapus termin terkait noBukti ini jika edit
-                $old_termin_id = null;
-                foreach ($all_termins as $t) {
-                    if (
-                        str_contains($t['name'], "[$no_bukti]")
-                        || ($edit_no_bukti && str_contains($t['name'], "[$edit_no_bukti]"))
-                    ) {
-                        $old_termin_id = $t['id'];
-                        break;
+                $contract_val   = (float)($project_obj['contractValue'] ?? 0);
+                $nominal_termin = $nilai_proyek > 0 ? $nilai_proyek : ($dpp > 0 ? $dpp : $nominal_diterima);
+
+                // Cek apakah user memilih termin yang sudah ada
+                $target_termin = null;
+                if ($termin_id && $termin_id !== '__NEW__') {
+                    foreach ($all_termins as $t) {
+                        if ($t['id'] === $termin_id) {
+                            $target_termin = $t;
+                            break;
+                        }
                     }
                 }
-                if ($old_termin_id) {
-                    $pdo->prepare("DELETE FROM Termin WHERE id = ?")->execute([$old_termin_id]);
-                }
 
-                $remaining = array_filter($all_termins, fn($t) => !$old_termin_id || $t['id'] !== $old_termin_id);
-                $remaining = array_values($remaining);
+                if ($target_termin) {
+                    // Update termin yang sudah ada (tambahkan nominal pembayaran/pencairan bertahap)
+                    $cur_nom = (float)($target_termin['nominal'] ?? 0);
+                    $already_has_nb = str_contains($target_termin['name'], "[$no_bukti]") || ($edit_no_bukti && str_contains($target_termin['name'], "[$edit_no_bukti]"));
 
-                $existing_pcts = array_map(fn($t) => (int)$t['percentage'], $remaining);
-                $max_pct_so_far = empty($existing_pcts) ? 0 : max($existing_pcts);
-                $contract_val   = (float)($project_obj['contractValue'] ?? 0);
+                    $new_nominal = $already_has_nb ? $nominal_termin : ($cur_nom + $nominal_termin);
+                    $new_pct = $contract_val > 0 ? min(100, (int)round(($new_nominal / $contract_val) * 100)) : (int)$target_termin['percentage'];
+                    $status_t = $new_pct >= 80 ? 'ON_TRACK' : 'AT_RISK';
 
-                $existing_cumulative = 0.0;
-                foreach ($remaining as $i => $t) {
-                    $prev_pct = $i === 0 ? 0 : $remaining[$i-1]['percentage'];
-                    $nom = ($t['nominal'] && (float)$t['nominal'] > 0)
-                        ? (float)$t['nominal']
-                        : (((int)$t['percentage'] - $prev_pct) / 100) * $contract_val;
-                    $existing_cumulative += $nom;
-                }
+                    $new_name = $target_termin['name'];
+                    if (!$already_has_nb && !str_contains($new_name, "[$no_bukti]")) {
+                        $new_name .= " [$no_bukti]";
+                    }
 
-                $nominal_termin = $nilai_proyek > 0 ? $nilai_proyek : ($dpp > 0 ? $dpp : $nominal_diterima);
-                if ($nominal_termin > 0) {
+                    $pdo->prepare(
+                        "UPDATE Termin SET name = ?, percentage = ?, nominal = ?, status = ? WHERE id = ?"
+                    )->execute([$new_name, $new_pct, $new_nominal, $status_t, $target_termin['id']]);
+
+                    if ($new_pct >= 100) {
+                        $pdo->prepare("UPDATE Project SET status = 'COMPLETED' WHERE id = ?")->execute([$project_id]);
+                    }
+                } else if ($nominal_termin > 0) {
+                    // Hapus termin terkait noBukti ini jika edit
+                    $old_termin_id = null;
+                    foreach ($all_termins as $t) {
+                        if (
+                            str_contains($t['name'], "[$no_bukti]")
+                            || ($edit_no_bukti && str_contains($t['name'], "[$edit_no_bukti]"))
+                        ) {
+                            $old_termin_id = $t['id'];
+                            break;
+                        }
+                    }
+                    if ($old_termin_id) {
+                        $pdo->prepare("DELETE FROM Termin WHERE id = ?")->execute([$old_termin_id]);
+                    }
+
+                    $remaining = array_filter($all_termins, fn($t) => !$old_termin_id || $t['id'] !== $old_termin_id);
+                    $remaining = array_values($remaining);
+
+                    $existing_pcts = array_map(fn($t) => (int)$t['percentage'], $remaining);
+                    $max_pct_so_far = empty($existing_pcts) ? 0 : max($existing_pcts);
+
+                    $existing_cumulative = 0.0;
+                    foreach ($remaining as $i => $t) {
+                        $prev_pct = $i === 0 ? 0 : $remaining[$i-1]['percentage'];
+                        $nom = ($t['nominal'] && (float)$t['nominal'] > 0)
+                            ? (float)$t['nominal']
+                            : (((int)$t['percentage'] - $prev_pct) / 100) * $contract_val;
+                        $existing_cumulative += $nom;
+                    }
+
                     $new_pct    = compute_new_termin_percentage($contract_val, $existing_pcts, $nominal_termin, $existing_cumulative);
                     $termin_ke  = count($remaining) + 1;
                     $delta_pct  = max(0, $new_pct - $max_pct_so_far);
@@ -694,7 +742,7 @@ elseif ($method === 'POST' && $sub === '') {
                         "INSERT INTO Termin (id, projectId, name, percentage, nominal, status, createdAt)
                          VALUES (?, ?, ?, ?, ?, ?, ?)"
                     )->execute([
-                        uuid4(), $project_id,
+                        $assigned_termin_id, $project_id,
                         "Termin $termin_ke ($delta_pct% Kontrak) [$no_bukti]",
                         $new_pct, $nominal_termin, $status_t, $now,
                     ]);
@@ -790,13 +838,21 @@ elseif ($method === 'DELETE' && $sub === '') {
             ->execute([date('Y-m-d H:i:s'), $nb]);
 
         // Hapus termin terkait + revert project status jika perlu
-        $stmt_t = $pdo->prepare("SELECT id, projectId FROM Termin WHERE name LIKE ?");
+        $stmt_t = $pdo->prepare("SELECT id, projectId, name FROM Termin WHERE name LIKE ?");
         $stmt_t->execute(["%[$nb]%"]);
         $termins = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
         if (!empty($termins)) {
-            $termin_ids = array_column($termins, 'id');
-            $t_ph = implode(',', array_fill(0, count($termin_ids), '?'));
-            $pdo->prepare("DELETE FROM Termin WHERE id IN ($t_ph)")->execute($termin_ids);
+            foreach ($termins as $t) {
+                // Jika termin ini punya tag noBukti lain selain $nb, jangan hapus terminnya, cukup hapus tag $nb
+                preg_match_all('/\[(.*?)\]/', $t['name'], $m);
+                $tagged_nbs = $m[1] ?? [];
+                if (count($tagged_nbs) > 1) {
+                    $cleaned_name = trim(str_replace("[$nb]", '', $t['name']));
+                    $pdo->prepare("UPDATE Termin SET name = ? WHERE id = ?")->execute([$cleaned_name, $t['id']]);
+                } else {
+                    $pdo->prepare("DELETE FROM Termin WHERE id = ?")->execute([$t['id']]);
+                }
+            }
 
             foreach ($termins as $t) {
                 $s = $pdo->prepare("SELECT percentage FROM Termin WHERE projectId = ?");

@@ -122,6 +122,21 @@ if ($method === 'GET' && $sub === 'ledger') {
             if (!empty($extra['crossingFromEntityKey'])) $g['crossingFromEntityKey'] = $extra['crossingFromEntityKey'];
             if (!empty($extra['crossingGroupId']))     $g['crossingGroupId']     = $extra['crossingGroupId'];
         } else {
+            // Jika row berasal dari auto-post jurnal, abaikan baris potongan pajak PPN & PPh
+            if (!empty($extra['autoPostedFromJurnal'])) {
+                $c_code = (string)($r['coa_code'] ?? '');
+                $c_name = (string)($r['coa_name'] ?? '');
+                if (
+                    in_array($c_code, ['533', '534', '535', '536', '116', '117', '213'], true)
+                    || preg_match('/\b(pph|ppn)\b/i', $c_name)
+                    || preg_match('/^53[3-6]/', $c_code)
+                    || stripos($c_name, 'pajak') !== false
+                ) {
+                    unset($g);
+                    continue;
+                }
+            }
+
             if ($r['coa_id']) {
                 $item_desc = isset($extra['itemDescription']) ? (string)$extra['itemDescription'] : null;
                 $g['akunTags'][] = $item_desc ?? $r['coa_name'];
@@ -137,6 +152,15 @@ if ($method === 'GET' && $sub === 'ledger') {
         }
         unset($g);
     }
+
+    // Sinkronisasi nominal coaRows jika auto-posted dari jurnal agar tepat sesuai mutasi bank
+    foreach ($groups as &$grp) {
+        $net_mutasi = ($grp['masuk'] > 0) ? $grp['masuk'] : $grp['keluar'];
+        if ($net_mutasi > 0 && count($grp['coaRows']) === 1 && $grp['coaRows'][0]['nominal'] != $net_mutasi) {
+            $grp['coaRows'][0]['nominal'] = $net_mutasi;
+        }
+    }
+    unset($grp);
 
     // Filter per rekening (bankBuku)
     if ($rekening_nama) {

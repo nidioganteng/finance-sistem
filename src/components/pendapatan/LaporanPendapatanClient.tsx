@@ -1165,7 +1165,15 @@ export function LaporanPendapatanClient({
                             title="Klik untuk melihat rincian bagian mana yang selisih"
                           >
                             <AlertTriangle size={11} className="text-rose-600 dark:text-rose-400 shrink-0" />
-                            <span>Selisih: {f.selisihBankFmt}</span>
+                            <span>
+                              {f.selisihBank !== 0
+                                ? `Selisih Bank: ${f.selisihBankFmt}`
+                                : Math.abs(f.selisihPpn) > 0.01
+                                ? `Selisih PPN: ${formatRupiah(f.selisihPpn)}`
+                                : Math.abs(f.selisihPph) > 0.01
+                                ? `Selisih PPh: ${formatRupiah(f.selisihPph)}`
+                                : `Selisih: ${f.selisihTotalFmt || formatRupiah(f.selisihTotal)}`}
+                            </span>
                           </button>
                         ) : (
                           <button
@@ -2453,7 +2461,15 @@ export function LaporanPendapatanClient({
                         <div className="flex items-center gap-2">
                           <span className="font-bold font-mono">
                             {editingFaktur.balanceStatus === "SELISIH" ? (
-                              <span className="text-rose-700 dark:text-rose-300">Selisih: {editingFaktur.selisihBankFmt}</span>
+                              <span className="text-rose-700 dark:text-rose-300">
+                                {editingFaktur.selisihBank !== 0
+                                  ? `Selisih Bank: ${editingFaktur.selisihBankFmt}`
+                                  : Math.abs(editingFaktur.selisihPpn) > 0.01
+                                  ? `Selisih PPN: ${formatRupiah(editingFaktur.selisihPpn)}`
+                                  : Math.abs(editingFaktur.selisihPph) > 0.01
+                                  ? `Selisih PPh: ${formatRupiah(editingFaktur.selisihPph)}`
+                                  : `Selisih: ${editingFaktur.selisihTotalFmt || formatRupiah(editingFaktur.selisihTotal)}`}
+                              </span>
                             ) : (
                               <span className="text-emerald-700 dark:text-emerald-300">Balance (Rp 0)</span>
                             )}
@@ -2984,21 +3000,27 @@ export function LaporanPendapatanClient({
                           {f.balanceStatus === "SELISIH"
                             ? isUnderpaid
                               ? `Dana cair di bank kurang ${formatRupiah(Math.abs(selisihBank))} dibanding ekspektasi Netto Tagihan Kuitansi.`
-                              : `Dana cair di bank lebih ${formatRupiah(selisihBank)} dibanding ekspektasi Netto Tagihan Kuitansi.`
+                              : selisihBank > 0
+                              ? `Dana cair di bank lebih ${formatRupiah(selisihBank)} dibanding ekspektasi Netto Tagihan Kuitansi.`
+                              : Math.abs(selisihPpn) > 0.01
+                              ? `Terdapat selisih pada pemungutan PPN sebesar ${formatRupiah(selisihPpn)} dibanding estimasi kuitansi.`
+                              : Math.abs(selisihPph) > 0.01
+                              ? `Terdapat selisih pada pemotongan PPh sebesar ${formatRupiah(selisihPph)} dibanding estimasi kuitansi.`
+                              : `Terdapat selisih total realisasi sebesar ${formatRupiah(selisihKuitansi)} dibanding nilai bruto kuitansi.`
                             : f.balanceStatus === "BALANCE"
-                            ? "Nominal yang masuk ke rekening bank tepat sama dengan Netto Tagihan setelah dipotong PPN & PPh."
+                            ? "Nominal yang masuk ke rekening bank, pemungutan PPN, dan potongan PPh tepat sama dengan estimasi faktur."
                             : "Belum ada pencairan dana di bank untuk faktur ini."}
                         </p>
                       </div>
 
                       <div className="text-right sm:border-l sm:border-border-soft sm:pl-4 shrink-0">
                         <span className="text-[10px] text-navy-soft uppercase tracking-wider block font-medium">
-                          Selisih Bersih (Bank)
+                          {selisihBank !== 0 ? "Selisih Bersih (Bank)" : "Selisih Total Realisasi"}
                         </span>
                         <span className={`text-base font-extrabold font-mono ${
                           f.balanceStatus === "SELISIH" ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
                         }`}>
-                          {f.selisihBankFmt}
+                          {selisihBank !== 0 ? f.selisihBankFmt : formatRupiah(selisihKuitansi)}
                         </span>
                       </div>
                     </div>
@@ -3157,23 +3179,27 @@ export function LaporanPendapatanClient({
                                 {f.isRealized ? f.nominalDiterimaFmt : <span className="text-muted-faint font-normal font-sans italic text-xs">Belum Cair</span>}
                               </td>
                               <td className="p-2.5 text-right">
-                                {f.balanceStatus === "SELISIH" ? (
-                                  <span className="text-rose-600 font-bold">{f.selisihBankFmt}</span>
-                                ) : f.balanceStatus === "BALANCE" ? (
-                                  <span className="text-emerald-600 font-bold">Rp 0</span>
+                                {f.isRealized ? (
+                                  Math.abs(selisihBank) > 0.01 ? (
+                                    <span className="text-rose-600 font-bold">{f.selisihBankFmt}</span>
+                                  ) : (
+                                    <span className="text-emerald-600 font-bold">Rp 0</span>
+                                  )
                                 ) : (
                                   <span className="text-muted-faint font-normal font-sans text-xs">-</span>
                                 )}
                               </td>
                               <td className="p-2.5 text-center font-sans">
-                                {f.balanceStatus === "SELISIH" ? (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-                                    Selisih
-                                  </span>
-                                ) : f.balanceStatus === "BALANCE" ? (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                    Balance
-                                  </span>
+                                {f.isRealized ? (
+                                  Math.abs(selisihBank) > 0.01 ? (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                                      Selisih
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                      Balance
+                                    </span>
+                                  )
                                 ) : (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-surface-subtle text-muted-faint">
                                     Belum Cair

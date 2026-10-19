@@ -202,7 +202,7 @@ if ($method === 'GET' && $sub === '') {
         'kasKecil'       => ['bg' => '#fef3c7', 'color' => '#92400e', 'label' => 'Kas Kecil'],
         'kasBesar'       => ['bg' => '#dbeafe', 'color' => '#1e40af', 'label' => 'Kas Besar'],
         'bankBuku'       => ['bg' => '#dcfce7', 'color' => '#166534', 'label' => 'Buku Bank'],
-        'jurnalTransaksi'=> ['bg' => '#ede9fe', 'color' => '#6d28d9', 'label' => 'Jurnal Transaksi'],
+        'jurnalTransaksi'=> ['bg' => '#ede9fe', 'color' => '#6d28d9', 'label' => 'Entry Jurnal'],
     ];
     $entity_label_map = [
         'kencana' => 'Kencana', 'gaharu' => 'Gaharu', 'tataring' => 'Tataring',

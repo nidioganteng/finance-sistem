@@ -59,13 +59,6 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
         { label: "Log Aktivitas", href: "/log", icon: "history" },
       ],
     },
-    {
-      title: "Pengaturan",
-      collapsible: true,
-      items: [
-        { label: "Rekanan", href: "/rekanan", icon: "users" },
-      ],
-    },
   ],
   MANAJER_KEUANGAN: [
     {

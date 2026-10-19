@@ -79,7 +79,7 @@ export function JurnalTable({
   const [editCode, setEditCode] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectId, setEditProjectId] = useState("");
-  const [editingAkrualId, setEditingAkrualId] = useState<string | null>(null);
+  const [editingAkrualRow, setEditingAkrualRow] = useState<JurnalRow | null>(null);
   const [editBulan, setEditBulan] = useState<number>(0);
   const [editTahun, setEditTahun] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -89,16 +89,17 @@ export function JurnalTable({
     setError(null);
     setEditBulan(r.periodeBulanGaji ?? (new Date(r.tanggal).getMonth() + 1));
     setEditTahun(r.periodeTahunGaji ?? (new Date(r.tanggal).getFullYear()));
-    setEditingAkrualId(r.id);
+    setEditingAkrualRow(r);
   }
 
-  function handleSaveAkrual(id: string) {
+  function handleSaveAkrual() {
+    if (!editingAkrualRow) return;
     setError(null);
     startTransition(async () => {
       try {
-        await updateAkrualJurnal(id, entityId, editBulan || null, editTahun || null);
+        await updateAkrualJurnal(editingAkrualRow.id, entityId, editBulan || null, editTahun || null);
         router.refresh();
-        setEditingAkrualId(null);
+        setEditingAkrualRow(null);
       } catch (e: any) {
         setError(e.message);
       }
@@ -318,52 +319,6 @@ export function JurnalTable({
                       </button>
                     </div>
                   )}
-
-                  {editingAkrualId === r.id && (
-                    <div className="mt-2 p-3 rounded-[11px] bg-surface-card border border-border-soft shadow-lg flex flex-col gap-2 z-20 min-w-[240px]">
-                      <div className="text-[11px] font-bold text-navy-text">
-                        Periode Beban Gaji (Akrual)
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <select
-                          value={editBulan}
-                          onChange={(e) => setEditBulan(parseInt(e.target.value, 10) || 0)}
-                          className="h-8 px-2 text-[11.5px] rounded-[7px] border border-border-soft bg-surface-input text-navy-text"
-                        >
-                          <option value={0}>Sesuai Tanggal</option>
-                          {BULAN_NAMES.map((name, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              Bulan {name}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          value={editTahun || ""}
-                          onChange={(e) => setEditTahun(parseInt(e.target.value, 10) || 0)}
-                          placeholder="Tahun"
-                          className="h-8 px-2 text-[11.5px] rounded-[7px] border border-border-soft bg-surface-input text-navy-text font-mono"
-                        />
-                      </div>
-                      <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-border-subtle">
-                        <button
-                          type="button"
-                          onClick={() => setEditingAkrualId(null)}
-                          className="px-2.5 py-1 text-[11px] font-semibold rounded-[6px] border border-border-soft hover:bg-surface-hover text-muted-stronger cursor-pointer transition-colors"
-                        >
-                          Batal
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSaveAkrual(r.id)}
-                          disabled={isPending}
-                          className="px-3 py-1 text-[11px] font-bold rounded-[6px] bg-navy text-white hover:bg-navy/90 disabled:opacity-40 cursor-pointer shadow-xs transition-colors"
-                        >
-                          Simpan
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </td>
                 <td className={`py-2.5 px-1.5 text-[12px] font-mono text-muted ${r.isKredit ? "pl-6" : ""}`}>
                   {editingId === r.id ? (
@@ -452,6 +407,85 @@ export function JurnalTable({
           </tfoot>
         )}
       </table>
+
+      {/* Modal Dialog Ubah Periode Akrual Gaji */}
+      {editingAkrualRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-[16px] bg-surface-card border border-border-soft shadow-2xl p-5 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-navy-text">
+                  Periode Beban Gaji (Akrual)
+                </h3>
+                <p className="text-[11.5px] text-muted-faint mt-0.5 font-mono">
+                  {editingAkrualRow.noBukti} · {editingAkrualRow.namaAkun}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAkrualRow(null)}
+                className="p-1 rounded-lg hover:bg-surface-hover text-muted-stronger cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                  Bulan Gaji
+                </label>
+                <select
+                  value={editBulan}
+                  onChange={(e) => setEditBulan(parseInt(e.target.value, 10) || 0)}
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand"
+                >
+                  <option value={0}>Sesuai Tanggal</option>
+                  {BULAN_NAMES.map((name, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Bulan {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                  Tahun Gaji
+                </label>
+                <input
+                  type="number"
+                  value={editTahun || ""}
+                  onChange={(e) => setEditTahun(parseInt(e.target.value, 10) || 0)}
+                  placeholder="Tahun"
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text font-mono focus:outline-none focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-faint leading-relaxed">
+              Beban gaji akan diakui pada laporan operasional & pajak bulan yang dipilih secara akrual.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setEditingAkrualRow(null)}
+                className="px-3.5 py-2 text-[12px] font-semibold rounded-[9px] border border-border-soft hover:bg-surface-hover text-muted-stronger cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAkrual}
+                disabled={isPending}
+                className="px-4 py-2 text-[12px] font-bold rounded-[9px] bg-navy text-white hover:bg-navy/90 disabled:opacity-40 cursor-pointer shadow-xs transition-colors"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

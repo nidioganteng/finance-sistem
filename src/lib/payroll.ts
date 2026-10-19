@@ -389,9 +389,12 @@ export type RekananTenagaAhliItem = {
   kategori: string | null;
   ptkp?: string | null;
   entityId?: string | null;
+  entityName?: string | null;
   projectId?: string | null;
   projectCode?: string | null;
   projectName?: string | null;
+  projectEntityId?: string | null;
+  projectEntityName?: string | null;
   tanggalMulaiTugas?: string | null;
   tanggalMulaiTugasFmt?: string | null;
   tanggalSelesaiTugas?: string | null;

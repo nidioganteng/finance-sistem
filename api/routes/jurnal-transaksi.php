@@ -480,9 +480,14 @@ elseif ($method === 'POST' && $sub === '') {
             foreach ($counterparts as $cp_row) {
                 $orig_nom = (float)($cp_row['debit'] > 0 ? $cp_row['debit'] : $cp_row['kredit']);
                 // Sesuaikan nominal agar tepat sesuai dengan nominal mutasi akun bank yang dipilih
-                $row_nom = ($sum_cp > 0 && abs($sum_cp - $nominal) > 1)
+                $has_mismatch = ($sum_cp > 0 && abs($sum_cp - $nominal) > 1);
+                $row_nom = $has_mismatch
                     ? round(($orig_nom / $sum_cp) * $nominal)
                     : $orig_nom;
+
+                // Jika nominal akun lawan berbeda dari nominal mutasi bank (misal Pendapatan bruto 300jt vs Bank netto 200.810.811),
+                // gunakan akun bank yang dipilih ($row['coaAccountId']) agar akun dan nominalnya cocok (BPD GS Rp 200.810.811)
+                $cp_coa_id = $has_mismatch ? $row['coaAccountId'] : $cp_row['coaAccountId'];
 
                 $cp_extra = ['autoPostedFromJurnal' => true];
                 if ($rekening_nama_post) $cp_extra['rekeningNama'] = $rekening_nama_post;
@@ -494,7 +499,7 @@ elseif ($method === 'POST' && $sub === '') {
                 )->execute([
                     uuid4(), $target_entity_id, $target_jenis_id, $tanggal_dt,
                     $no_bukti, trim($cp_row['keterangan'] ?? '') ?: $first_keterangan,
-                    $cp_row['coaAccountId'],
+                    $cp_coa_id,
                     $arah_masuk ? 0 : $row_nom,
                     $arah_masuk ? $row_nom : 0,
                     $new_saldo, json_encode($cp_extra),

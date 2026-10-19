@@ -461,7 +461,8 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
                 "UPDATE Rekanan SET
                     nama = ?, npwp = ?, kategori = ?, ptkp = ?,
                     projectId = COALESCE(?, projectId),
-                    tanggalMulaiTugas = ?, tanggalSelesaiTugas = ?,
+                    tanggalMulaiTugas = COALESCE(?, tanggalMulaiTugas),
+                    tanggalSelesaiTugas = COALESCE(?, tanggalSelesaiTugas),
                     isTurunLapangan = ?, nominalHonorBulanan = ?,
                     updatedAt = ?
                  WHERE id = ?"
@@ -473,6 +474,7 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
                 $now, $existing_id
             ]);
 
+            $target_rekanan_id = $existing_id;
             $results[] = [
                 'nik' => $nik,
                 'nama' => $nama,
@@ -493,12 +495,36 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
                 $is_turun, $nominal_honor, $now, $now
             ]);
 
+            $target_rekanan_id = $new_id;
             $results[] = [
                 'nik' => $nik,
                 'nama' => $nama,
                 'action' => 'created',
                 'rekananId' => $new_id,
             ];
+        }
+
+        // Upsert ke TenagaAhliProject jika penugasan memiliki projectId
+        if ($project_id && $target_rekanan_id) {
+            $stmt_tap = $pdo->prepare("SELECT id FROM TenagaAhliProject WHERE rekananId = ? AND projectId = ? LIMIT 1");
+            $stmt_tap->execute([$target_rekanan_id, $project_id]);
+            $existing_tap_id = $stmt_tap->fetchColumn();
+
+            if ($existing_tap_id) {
+                $pdo->prepare(
+                    "UPDATE TenagaAhliProject SET
+                        tanggalMulaiTugas = ?, tanggalSelesaiTugas = ?,
+                        isTurunLapangan = ?, nominalHonorBulanan = ?,
+                        updatedAt = ?
+                     WHERE id = ?"
+                )->execute([$start_date, $end_date, $is_turun, $nominal_honor, $now, $existing_tap_id]);
+            } else {
+                $pdo->prepare(
+                    "INSERT INTO TenagaAhliProject
+                        (id, rekananId, projectId, tanggalMulaiTugas, tanggalSelesaiTugas, isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute([uuid4(), $target_rekanan_id, $project_id, $start_date, $end_date, $is_turun, $nominal_honor, $now, $now]);
+            }
         }
     }
 

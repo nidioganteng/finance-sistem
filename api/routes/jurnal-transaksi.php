@@ -442,8 +442,10 @@ elseif ($method === 'POST' && $sub === '') {
                 $staff_id, $project_id, $now,
             ]);
 
-            // Salin baris akun lawan (pendapatan, pajak, beban, dll) ke ledger bank/kas
-            // Logika: 1:1 dengan counterpartRow loop di saveJurnalTransaksi
+            // Salin baris akun lawan (pendapatan, beban, dll) ke ledger bank/kas
+            // 1. Abaikan akun kas/bank lain
+            // 2. Abaikan baris potongan pajak PPN & PPh (tidak masuk ke mutasi kas/bank riil)
+            $counterparts = [];
             foreach ($valid_rows as $cp_row) {
                 if ($cp_row['coaAccountId'] === $row['coaAccountId']) continue;
                 $cp_coa = $coa_map[$cp_row['coaAccountId']] ?? null;
@@ -452,6 +454,35 @@ elseif ($method === 'POST' && $sub === '') {
                     || isset($kas_kecil_code_to_ek[$cp_coa['code']])
                     || isset($kas_besar_code_to_ek[$cp_coa['code']])
                 )) continue;
+
+                // Abaikan baris PPN dan PPh (potongan pajak tidak masuk ke ledger buku bank/kas)
+                if ($cp_coa) {
+                    $c_code = (string)($cp_coa['code'] ?? '');
+                    $c_name = (string)($cp_coa['name'] ?? '');
+                    if (
+                        in_array($c_code, ['533', '534', '535', '536', '116', '117', '213'], true)
+                        || preg_match('/\b(pph|ppn)\b/i', $c_name)
+                        || preg_match('/^53[3-6]/', $c_code)
+                        || stripos($c_name, 'pajak') !== false
+                    ) {
+                        continue;
+                    }
+                }
+
+                $counterparts[] = $cp_row;
+            }
+
+            $sum_cp = 0.0;
+            foreach ($counterparts as $cpr) {
+                $sum_cp += (float)($cpr['debit'] > 0 ? $cpr['debit'] : $cpr['kredit']);
+            }
+
+            foreach ($counterparts as $cp_row) {
+                $orig_nom = (float)($cp_row['debit'] > 0 ? $cp_row['debit'] : $cp_row['kredit']);
+                // Sesuaikan nominal agar tepat sesuai dengan nominal mutasi akun bank yang dipilih
+                $row_nom = ($sum_cp > 0 && abs($sum_cp - $nominal) > 1)
+                    ? round(($orig_nom / $sum_cp) * $nominal)
+                    : $orig_nom;
 
                 $cp_extra = ['autoPostedFromJurnal' => true];
                 if ($rekening_nama_post) $cp_extra['rekeningNama'] = $rekening_nama_post;
@@ -464,8 +495,8 @@ elseif ($method === 'POST' && $sub === '') {
                     uuid4(), $target_entity_id, $target_jenis_id, $tanggal_dt,
                     $no_bukti, trim($cp_row['keterangan'] ?? '') ?: $first_keterangan,
                     $cp_row['coaAccountId'],
-                    (float)($cp_row['debit']  ?? 0),
-                    (float)($cp_row['kredit'] ?? 0),
+                    $arah_masuk ? 0 : $row_nom,
+                    $arah_masuk ? $row_nom : 0,
                     $new_saldo, json_encode($cp_extra),
                     $staff_id, $project_id, $now,
                 ]);

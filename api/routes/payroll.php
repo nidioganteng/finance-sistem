@@ -276,9 +276,13 @@ if ($method === 'GET' && $sub === '') {
         "SELECT r.id, r.nama, r.nik, r.npwp, r.kategori, r.ptkp, r.entityId,
                 r.tanggalMulaiTugas, r.tanggalSelesaiTugas, r.projectId,
                 r.isTurunLapangan, r.nominalHonorBulanan,
-                p.code AS projectCode, p.name AS projectName, p.entityId AS projectEntityId
+                p.code AS projectCode, p.name AS projectName, p.entityId AS projectEntityId,
+                COALESCE(pe.name, re.name, 'Holding / Lainnya') AS projectEntityName,
+                re.name AS entityName
          FROM Rekanan r
+         LEFT JOIN Entity re ON r.entityId = re.id
          LEFT JOIN Project p ON r.projectId = p.id
+         LEFT JOIN Entity pe ON p.entityId = pe.id
          WHERE r.tipe = 'TENAGA_AHLI'
          ORDER BY r.nama ASC"
     );
@@ -291,9 +295,11 @@ if ($method === 'GET' && $sub === '') {
         $rekanan_ids = array_column($rekanan_tenaga_ahli_raw, 'id');
         $placeholders = implode(',', array_fill(0, count($rekanan_ids), '?'));
         $stmt_tap = $pdo->prepare(
-            "SELECT tap.*, p.code AS projectCode, p.name AS projectName
+            "SELECT tap.*, p.code AS projectCode, p.name AS projectName, p.entityId AS projectEntityId,
+                    COALESCE(e.name, 'Holding / Lainnya') AS projectEntityName
              FROM TenagaAhliProject tap
              JOIN Project p ON tap.projectId = p.id
+             LEFT JOIN Entity e ON p.entityId = e.id
              WHERE tap.rekananId IN ($placeholders)
              ORDER BY tap.createdAt ASC"
         );
@@ -321,16 +327,18 @@ if ($method === 'GET' && $sub === '') {
             $r['proyekList'] = $tap_map[$r['id']];
         } elseif (!empty($r['projectId'])) {
             $r['proyekList'] = [[
-                'id'                  => null,
-                'projectId'           => $r['projectId'],
-                'projectCode'         => $r['projectCode'] ?? null,
-                'projectName'         => $r['projectName'] ?? null,
-                'tanggalMulaiTugas'   => $r['tanggalMulaiTugas'] ?? null,
-                'tanggalSelesaiTugas' => $r['tanggalSelesaiTugas'] ?? null,
-                'tanggalMulaiTugasFmt'=> $r['tanggalMulaiTugasFmt'] ?? null,
+                'id'                    => null,
+                'projectId'             => $r['projectId'],
+                'projectCode'           => $r['projectCode'] ?? null,
+                'projectName'           => $r['projectName'] ?? null,
+                'projectEntityId'       => $r['projectEntityId'] ?? $r['entityId'],
+                'projectEntityName'     => $r['projectEntityName'] ?? ($r['entityName'] ?? 'Holding / Lainnya'),
+                'tanggalMulaiTugas'     => $r['tanggalMulaiTugas'] ?? null,
+                'tanggalSelesaiTugas'   => $r['tanggalSelesaiTugas'] ?? null,
+                'tanggalMulaiTugasFmt'  => $r['tanggalMulaiTugasFmt'] ?? null,
                 'tanggalSelesaiTugasFmt'=> $r['tanggalSelesaiTugasFmt'] ?? null,
-                'isTurunLapangan'     => $r['isTurunLapangan'],
-                'nominalHonorBulanan' => $r['nominalHonorBulanan'],
+                'isTurunLapangan'       => $r['isTurunLapangan'],
+                'nominalHonorBulanan'   => $r['nominalHonorBulanan'],
                 'nominalHonorBulananFmt'=> $r['nominalHonorBulananFmt'],
             ]];
         } else {
@@ -731,68 +739,109 @@ if ($method === 'GET' && $sub === '') {
     }
 
     // Auto-populasikan tenaga ahli / freelance yang aktif dalam masa tugas & berstatus turun ke lapangan
+    // khusus untuk penugasan proyek pada entitas yang sedang aktif dipilih ($entity_id)
     foreach ($rekanan_tenaga_ahli as $ta) {
-        $is_entity_matched = empty($ta['entityId'])
-            || $ta['entityId'] === $entity_id
-            || (!empty($ta['projectEntityId']) && $ta['projectEntityId'] === $entity_id);
-
-        if (!$is_entity_matched) {
-            continue;
+        $p_assignments = !empty($ta['proyekList']) ? $ta['proyekList'] : [];
+        if (empty($p_assignments) && !empty($ta['projectId'])) {
+            $p_assignments = [[
+                'id'                  => null,
+                'projectId'           => $ta['projectId'],
+                'projectCode'         => $ta['projectCode'] ?? null,
+                'projectName'         => $ta['projectName'] ?? null,
+                'projectEntityId'     => $ta['projectEntityId'] ?? $ta['entityId'],
+                'projectEntityName'   => $ta['projectEntityName'] ?? ($ta['entityName'] ?? ''),
+                'tanggalMulaiTugas'   => $ta['tanggalMulaiTugas'] ?? null,
+                'tanggalSelesaiTugas' => $ta['tanggalSelesaiTugas'] ?? null,
+                'isTurunLapangan'     => $ta['isTurunLapangan'] ?? true,
+                'nominalHonorBulanan' => $ta['nominalHonorBulanan'] ?? 0.0,
+            ]];
         }
 
-        $already_paid = (!empty($ta['id']) && isset($paid_rekanan_ids[$ta['id']]))
-            || (!empty($ta['nik']) && isset($paid_rekanan_niks[$ta['nik']]));
+        foreach ($p_assignments as $pl) {
+            $assignment_entity_id = $pl['projectEntityId'] ?? $ta['entityId'];
+            // HANYA muncul jika penugasan proyek ini adalah milik entitas aktif saat ini!
+            if ($assignment_entity_id !== $entity_id) {
+                continue;
+            }
 
-        if ($already_paid) {
-            continue;
+            // Cek status turun lapangan penugasan proyek ini
+            $is_turun = isset($pl['isTurunLapangan']) ? ((bool)$pl['isTurunLapangan']) : true;
+            if (!$is_turun) {
+                continue;
+            }
+
+            // Cek masa tugas penugasan proyek ini
+            if (!is_tenaga_ahli_eligible_for_month($pl, $year, $month, false)) {
+                continue;
+            }
+
+            // Cek apakah penugasan ini sudah dibayarkan di entitas ini pada bulan ini untuk proyek ini
+            $p_id = $pl['projectId'] ?? '';
+            $already_paid = false;
+            foreach ($honor_list as $hl) {
+                if ($hl['statusPembayaran'] === 'DIBAYAR' && $hl['entityId'] === $entity_id) {
+                    $match_person = (!empty($ta['id']) && $hl['rekananId'] === $ta['id'])
+                        || (!empty($ta['nik']) && $hl['nik'] === $ta['nik']);
+                    if ($match_person) {
+                        if (!empty($p_id) && !empty($hl['projectId'])) {
+                            if ($hl['projectId'] === $p_id) {
+                                $already_paid = true;
+                                break;
+                            }
+                        } else {
+                            $already_paid = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($already_paid) {
+                continue;
+            }
+
+            $nominal_honor = (float)($pl['nominalHonorBulanan'] ?? 0.0);
+            $has_npwp      = !empty($ta['npwp']);
+            $tarif_pph     = $has_npwp ? 2.5 : 3.0; // Standar PPh 21 Bukan Pegawai (50% x 5% = 2.5%, non-NPWP 120% = 3%)
+            $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
+            $bersih        = max(0, $nominal_honor - $pph21);
+            $resolved_proj = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : ($pl['projectName'] ?? null);
+            $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
+            $unique_pending_id = 'pending_' . $ta['id'] . ($p_id ? '_' . $p_id : '');
+
+            $honor_list[] = [
+                'id'                  => $unique_pending_id,
+                'entityId'            => $entity_id,
+                'entityName'          => $entity['name'] ?? '',
+                'entityKey'           => $entity['key'] ?? '',
+                'rekananId'           => $ta['id'],
+                'nik'                 => $ta['nik'] ?? '',
+                'nama'                => $ta['nama'],
+                'npwp'                => $ta['npwp'] ?? null,
+                'ptkp'                => $ta['ptkp'] ?? 'TK/0',
+                'uraian'              => "Honorarium Tenaga Ahli: {$ta['nama']}" . ($resolved_proj ? " ({$resolved_proj})" : ""),
+                'tanggal'             => $tgl_default,
+                'tanggalFmt'          => fmt_tanggal_id($tgl_default),
+                'bulan'               => $month,
+                'tahun'               => $year,
+                'nominalHonor'        => $nominal_honor,
+                'nominalHonorFmt'     => fmt_rp_payroll($nominal_honor),
+                'tarifPph21Persen'    => $tarif_pph,
+                'pph21'               => $pph21,
+                'pph21Fmt'            => fmt_rp_payroll($pph21),
+                'nominalBersih'       => $bersih,
+                'nominalBersihFmt'    => fmt_rp_payroll($bersih),
+                'projectId'           => $pl['projectId'] ?? null,
+                'projectCode'         => $pl['projectCode'] ?? null,
+                'projectName'         => $pl['projectName'] ?? null,
+                'namaProyek'          => $resolved_proj,
+                'noBukti'             => null,
+                'isPendingPayment'    => true,
+                'statusPembayaran'    => 'BELUM_DIBAYAR',
+                'isTurunLapangan'     => true,
+                'tanggalMulaiTugas'   => $pl['tanggalMulaiTugas'] ?? null,
+                'tanggalSelesaiTugas' => $pl['tanggalSelesaiTugas'] ?? null,
+            ];
         }
-
-        $eligible = is_tenaga_ahli_eligible_for_month($ta, $year, $month, false);
-        if (!$eligible) {
-            continue;
-        }
-
-        $nominal_honor = (float)($ta['nominalHonorBulanan'] ?? 0.0);
-        $has_npwp      = !empty($ta['npwp']);
-        $tarif_pph     = $has_npwp ? 2.5 : 3.0; // Standar PPh 21 Bukan Pegawai (50% x 5% = 2.5%, non-NPWP 120% = 3%)
-        $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
-        $bersih        = max(0, $nominal_honor - $pph21);
-        $resolved_proj = $ta['projectCode'] ? "{$ta['projectCode']} - {$ta['projectName']}" : ($ta['projectName'] ?? null);
-        $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
-
-        $honor_list[] = [
-            'id'                  => 'pending_' . $ta['id'],
-            'entityId'            => $entity_id,
-            'entityName'          => $entity['name'] ?? '',
-            'entityKey'           => $entity['key'] ?? '',
-            'rekananId'           => $ta['id'],
-            'nik'                 => $ta['nik'] ?? '',
-            'nama'                => $ta['nama'],
-            'npwp'                => $ta['npwp'] ?? null,
-            'ptkp'                => $ta['ptkp'] ?? 'TK/0',
-            'uraian'              => "Honorarium Tenaga Ahli: {$ta['nama']}" . ($resolved_proj ? " ({$resolved_proj})" : ""),
-            'tanggal'             => $tgl_default,
-            'tanggalFmt'          => fmt_tanggal_id($tgl_default),
-            'bulan'               => $month,
-            'tahun'               => $year,
-            'nominalHonor'        => $nominal_honor,
-            'nominalHonorFmt'     => fmt_rp_payroll($nominal_honor),
-            'tarifPph21Persen'    => $tarif_pph,
-            'pph21'               => $pph21,
-            'pph21Fmt'            => fmt_rp_payroll($pph21),
-            'nominalBersih'       => $bersih,
-            'nominalBersihFmt'    => fmt_rp_payroll($bersih),
-            'projectId'           => $ta['projectId'] ?? null,
-            'projectCode'         => $ta['projectCode'] ?? null,
-            'projectName'         => $ta['projectName'] ?? null,
-            'namaProyek'          => $resolved_proj,
-            'noBukti'             => null,
-            'isPendingPayment'    => true,
-            'statusPembayaran'    => 'BELUM_DIBAYAR',
-            'isTurunLapangan'     => true,
-            'tanggalMulaiTugas'   => $ta['tanggalMulaiTugas'] ?? null,
-            'tanggalSelesaiTugas' => $ta['tanggalSelesaiTugas'] ?? null,
-        ];
     }
 
     // 7. All gaji for entity+year (for rekap bulanan)
@@ -896,46 +945,43 @@ if ($method === 'GET' && $sub === '') {
     $per_nama_map = [];
 
     // 1. Masukkan seluruh Master Tenaga Ahli yang terdaftar di Rekanan (tipe TENAGA_AHLI)
-    // agar tenaga ahli yang sudah terdaftar tetap muncul pada Akumulasi Tenaga Ahli walau belum ada pembayaran
-    $stmt_master_ahli = $pdo->prepare(
-        "SELECT r.*, e.name AS entityName, p.code AS projCode, p.name AS projName
-         FROM Rekanan r
-         JOIN Entity e ON r.entityId = e.id
-         LEFT JOIN Project p ON r.projectId = p.id
-         WHERE r.tipe = 'TENAGA_AHLI'
-         ORDER BY r.nama ASC"
-    );
-    $stmt_master_ahli->execute();
-    $all_registered_ahli = $stmt_master_ahli->fetchAll(PDO::FETCH_ASSOC);
-
-    // Ambil seluruh proyek dari TenagaAhliProject
-    $tap_by_rekanan = [];
-    try {
-        $stmt_all_tap = $pdo->prepare(
-            "SELECT tap.rekananId, p.code AS projCode, p.name AS projName
-             FROM TenagaAhliProject tap
-             JOIN Project p ON tap.projectId = p.id"
-        );
-        $stmt_all_tap->execute();
-        foreach ($stmt_all_tap->fetchAll(PDO::FETCH_ASSOC) as $trow) {
-            $label = $trow['projName']
-                ? ($trow['projCode'] ? "{$trow['projCode']} - {$trow['projName']}" : $trow['projName'])
-                : null;
-            if ($label) $tap_by_rekanan[$trow['rekananId']][] = $label;
-        }
-    } catch (\Throwable $e) {
-        // Abaikan jika tabel belum ada
-    }
-
-    foreach ($all_registered_ahli as $ra) {
+    // Gunakan data dari $rekanan_tenaga_ahli yang sudah memuat proyekList lengkap dengan projectEntityName & projectEntityId
+    foreach ($rekanan_tenaga_ahli as $ra) {
         $key = trim($ra['nik'] ?? '') ?: trim($ra['nama']);
         if (!$key) continue;
-        $proj_list = $tap_by_rekanan[$ra['id']] ?? [];
-        if (empty($proj_list) && ($ra['projName'] || $ra['projCode'])) {
-            $proj_label = $ra['projName']
-                ? ($ra['projCode'] ? "{$ra['projCode']} - {$ra['projName']}" : $ra['projName'])
-                : null;
-            if ($proj_label) $proj_list[] = $proj_label;
+
+        $p_list = !empty($ra['proyekList']) ? $ra['proyekList'] : [];
+
+        // Kumpulkan daftar entitas dan proyek yang relevan bagi tenaga ahli ini
+        $entities_for_this_ta = [];
+        if (!empty($ra['entityName'])) {
+            $entities_for_this_ta[] = $ra['entityName'];
+        }
+
+        $proj_names = [];
+        $proj_objs = [];
+
+        foreach ($p_list as $pl) {
+            $p_name = $pl['projectName']
+                ?: ($pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : null);
+            if ($p_name) {
+                $p_label = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : $pl['projectName'];
+                $proj_names[] = $p_label;
+
+                $ent_name = $pl['projectEntityName'] ?: ($ra['entityName'] ?: 'Holding / Lainnya');
+                $proj_objs[] = [
+                    'projectId'   => $pl['projectId'] ?? null,
+                    'projectCode' => $pl['projectCode'] ?? null,
+                    'projectName' => $pl['projectName'] ?? '',
+                    'namaProyek'  => $p_label,
+                    'entityId'    => $pl['projectEntityId'] ?? ($ra['entityId'] ?? null),
+                    'entityName'  => $ent_name,
+                ];
+
+                if (!in_array($ent_name, $entities_for_this_ta)) {
+                    $entities_for_this_ta[] = $ent_name;
+                }
+            }
         }
 
         if (!isset($per_nama_map[$key])) {
@@ -947,15 +993,33 @@ if ($method === 'GET' && $sub === '') {
                 'totalHonorBruto'   => 0.0,
                 'totalPph21'        => 0.0,
                 'totalHonorBersih'  => 0.0,
-                'daftarEntitas'     => $ra['entityName'] ? [$ra['entityName']] : [],
-                'daftarProyek'      => $proj_list,
+                'daftarEntitas'     => array_values(array_unique($entities_for_this_ta)),
+                'daftarProyek'      => array_values(array_unique($proj_names)),
+                'daftarProyekObj'   => $proj_objs,
                 'daftarBulan'       => [],
                 'rincian'           => [],
             ];
         } else {
-            foreach ($proj_list as $pl) {
-                if (!in_array($pl, $per_nama_map[$key]['daftarProyek'])) {
-                    $per_nama_map[$key]['daftarProyek'][] = $pl;
+            foreach ($entities_for_this_ta as $en) {
+                if (!in_array($en, $per_nama_map[$key]['daftarEntitas'])) {
+                    $per_nama_map[$key]['daftarEntitas'][] = $en;
+                }
+            }
+            foreach ($proj_names as $pn) {
+                if (!in_array($pn, $per_nama_map[$key]['daftarProyek'])) {
+                    $per_nama_map[$key]['daftarProyek'][] = $pn;
+                }
+            }
+            foreach ($proj_objs as $po) {
+                $exists = false;
+                foreach ($per_nama_map[$key]['daftarProyekObj'] as $existing_po) {
+                    if ($existing_po['namaProyek'] === $po['namaProyek'] && $existing_po['entityName'] === $po['entityName']) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                if (!$exists) {
+                    $per_nama_map[$key]['daftarProyekObj'][] = $po;
                 }
             }
         }
@@ -982,6 +1046,7 @@ if ($method === 'GET' && $sub === '') {
                 'totalHonorBersih'  => 0.0,
                 'daftarEntitas'     => [],
                 'daftarProyek'      => [],
+                'daftarProyekObj'   => [],
                 'daftarBulan'       => [],
                 'rincian'           => [],
             ];
@@ -996,6 +1061,25 @@ if ($method === 'GET' && $sub === '') {
         }
         if ($resolved_proj && !in_array($resolved_proj, $rec['daftarProyek'])) {
             $rec['daftarProyek'][] = $resolved_proj;
+        }
+        if ($resolved_proj && isset($rec['daftarProyekObj'])) {
+            $exists = false;
+            foreach ($rec['daftarProyekObj'] as $epo) {
+                if ($epo['namaProyek'] === $resolved_proj && $epo['entityName'] === $h['ename']) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                $rec['daftarProyekObj'][] = [
+                    'projectId'   => $h['projectId'] ?? null,
+                    'projectCode' => $h['projCode'] ?? null,
+                    'projectName' => $h['projName'] ?? '',
+                    'namaProyek'  => $resolved_proj,
+                    'entityId'    => $h['entityId'],
+                    'entityName'  => $h['ename'],
+                ];
+            }
         }
         if ($bulan_name && !in_array($bulan_name, $rec['daftarBulan'])) {
             $rec['daftarBulan'][] = $bulan_name;
@@ -1216,6 +1300,8 @@ if ($method === 'GET' && $sub === '') {
                 'projectId'           => $ta['projectId'],
                 'projectCode'         => $ta['projectCode'] ?? null,
                 'projectName'         => $ta['projectName'] ?? null,
+                'projectEntityId'     => $ta['projectEntityId'] ?? $ta['entityId'],
+                'projectEntityName'   => $ta['projectEntityName'] ?? ($ta['entityName'] ?? ''),
                 'tanggalMulaiTugas'   => $ta['tanggalMulaiTugas'] ?? null,
                 'tanggalSelesaiTugas' => $ta['tanggalSelesaiTugas'] ?? null,
                 'isTurunLapangan'     => $ta['isTurunLapangan'] ?? true,
@@ -1240,21 +1326,20 @@ if ($method === 'GET' && $sub === '') {
             $resolved_proj = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : ($pl['projectName'] ?? null);
             $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
 
-            $target_entity_name = $entity['name'] ?? '';
-            $target_entity_key  = $entity['key'] ?? '';
-            if (!empty($ta['entityId'])) {
-                foreach ($all_entities as $ent) {
-                    if ($ent['id'] === $ta['entityId']) {
-                        $target_entity_name = $ent['name'];
-                        $target_entity_key  = $ent['key'];
-                        break;
-                    }
+            $target_entity_id   = $pl['projectEntityId'] ?: ($ta['entityId'] ?: $entity_id);
+            $target_entity_name = $pl['projectEntityName'] ?: ($entity['name'] ?? '');
+            $target_entity_key  = '';
+            foreach ($all_entities as $ent) {
+                if ($ent['id'] === $target_entity_id) {
+                    $target_entity_name = $ent['name'];
+                    $target_entity_key  = $ent['key'];
+                    break;
                 }
             }
 
             $all_honor_bulan_ini[] = [
                 'id'                  => 'pending_' . $ta['id'] . '_' . ($pl['projectId'] ?: 'none'),
-                'entityId'            => $ta['entityId'] ?: $entity_id,
+                'entityId'            => $target_entity_id,
                 'entityName'          => $target_entity_name,
                 'entityKey'           => $target_entity_key,
                 'rekananId'           => $ta['id'],
@@ -1289,22 +1374,30 @@ if ($method === 'GET' && $sub === '') {
         }
     }
 
-    // Build rekapTenagaAhliPerProyek — honor per proyek, seluruh tahun
+    // Build rekapTenagaAhliPerProyek — honor per proyek, seluruh tahun untuk entitas aktif ini
     $per_proyek_map = [];
 
-    // 1. Masukkan seluruh proyek yang ditugaskan ke tenaga ahli di tabel Rekanan & TenagaAhliProject
+    // 1. Masukkan seluruh proyek yang ditugaskan ke tenaga ahli yang BERASAL DARI entitas ini
     // agar proyek dan nama tenaga ahlinya tetap muncul di rekap per proyek walau belum ada pembayaran
     foreach ($rekanan_tenaga_ahli as $r) {
         $proyek_list = !empty($r['proyekList']) ? $r['proyekList'] : [];
         if (empty($proyek_list) && !empty($r['projectId'])) {
             $proyek_list = [[
-                'projectId'   => $r['projectId'],
-                'projectCode' => $r['projectCode'] ?? null,
-                'projectName' => $r['projectName'] ?? null,
+                'projectId'           => $r['projectId'],
+                'projectCode'         => $r['projectCode'] ?? null,
+                'projectName'         => $r['projectName'] ?? null,
+                'projectEntityId'     => $r['projectEntityId'] ?? $r['entityId'],
+                'projectEntityName'   => $r['projectEntityName'] ?? ($r['entityName'] ?? ''),
             ]];
         }
         foreach ($proyek_list as $pl) {
             if (!empty($pl['projectId'])) {
+                $pl_entity_id = $pl['projectEntityId'] ?? $r['entityId'];
+                // HANYA jika proyek ini milik entitas aktif saat ini ($entity_id)!
+                if ($pl_entity_id !== $entity_id) {
+                    continue;
+                }
+
                 $proj_key = $pl['projectId'];
                 if (!isset($per_proyek_map[$proj_key])) {
                     $proj_name = $pl['projectName']

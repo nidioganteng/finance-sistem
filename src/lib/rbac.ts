@@ -30,6 +30,43 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       title: "Overview",
       items: [
         { label: "Dashboard", href: "/dashboard", icon: "grid" },
+        { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
+        { label: "Log Aktivitas", href: "/log", icon: "history" },
+      ],
+    },
+    {
+      title: "Operasional",
+      items: [
+        {
+          label: "Transaksi",
+          href: "/operasional-transaksi",
+          icon: "penLine",
+          subItems: [
+            { label: "Kas Kecil", href: "/kas-kecil" },
+            { label: "Kas Besar", href: "/kas-besar" },
+            { label: "Buku Bank", href: "/bank-buku" },
+            { label: "Entry Jurnal", href: "/jurnal-transaksi" },
+            { label: "Aktiva Tetap", href: "/aktiva-tetap" },
+          ],
+        },
+        {
+          label: "Monitoring",
+          href: "/operasional-monitoring",
+          icon: "fileText",
+          subItems: [
+            { label: "Jurnal Umum", href: "/jurnal" },
+            { label: "Buku Besar", href: "/buku-besar" },
+            { label: "Daftar Akun", href: "/daftar-akun" },
+            { label: "Kontrol Termin", href: "/piutang" },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Laporan",
+      collapsible: true,
+      items: [
+        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         {
           label: "Laporan Keuangan",
           href: "/laporan",
@@ -39,13 +76,19 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
             { label: "Laporan Umum", href: "/laporan?version=umum", version: "umum" },
           ],
         },
-        { label: "Laporan Pendapatan", href: "/pendapatan", icon: "receipt" },
         { label: "Laporan Hutang & Piutang", href: "/laporan-hutang-piutang", icon: "walletCards" },
         { label: "Laporan Gaji", href: "/payroll", icon: "banknote" },
-        { label: "Kontrol Termin", href: "/piutang", icon: "handCoins" },
+      ],
+    },
+    {
+      title: "Pengaturan",
+      collapsible: true,
+      items: [
+        { label: "Bagan Akun", href: "/coa", icon: "landmark" },
         { label: "Rekanan", href: "/rekanan", icon: "users" },
-        { label: "Log Aktivitas", href: "/log", icon: "history" },
-        { label: "Notifikasi", href: "/notifikasi", icon: "bell" },
+        { label: "Dokumen & SOP", href: "/dokumen", icon: "folderOpen" },
+        { label: "Kelola Jenis Input", href: "/jenis-input", icon: "layers" },
+        { label: "Manajemen Pengguna", href: "/pengguna", icon: "users" },
       ],
     },
   ],

@@ -171,11 +171,12 @@ if ($method === 'GET' && $sub_action === 'faktur') {
                 f.dpp, f.dppNilaiLain, f.ppn, f.pph,
                 f.nilaiProyek, f.labaSetelahPajak, f.nominalDiterima,
                 f.bank, f.projectId, f.tahunPajak, f.masaPajak,
+                f.tanggalTerima, f.createdAt,
                 p.code AS project_code, p.name AS project_name
            FROM FakturPendapatan f
            LEFT JOIN Project p ON f.projectId = p.id
           WHERE f.entityId = ?
-          ORDER BY f.tahunPajak DESC, f.masaPajak DESC, f.createdAt DESC'
+          ORDER BY f.tahunPajak DESC, f.masaPajak DESC, f.createdAt ASC'
     );
     $stmt->execute([$entity_id]);
     $rows = $stmt->fetchAll();

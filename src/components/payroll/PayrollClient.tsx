@@ -4069,6 +4069,8 @@ export function PayrollClient({
                               projectId: r.projectId,
                               projectCode: r.projectCode,
                               projectName: r.projectName,
+                              projectEntityId: r.projectEntityId ?? r.entityId,
+                              projectEntityName: r.projectEntityName || r.entityName || null,
                               tanggalMulaiTugas: r.tanggalMulaiTugas,
                               tanggalMulaiTugasFmt: r.tanggalMulaiTugasFmt,
                               tanggalSelesaiTugas: r.tanggalSelesaiTugas,
@@ -4107,11 +4109,16 @@ export function PayrollClient({
                               ) : (
                                 <div className="space-y-1.5 py-0.5">
                                   {pList.map((pl, pIdx) => (
-                                    <div key={pIdx} className="font-semibold text-navy-text flex items-center gap-1.5">
+                                    <div key={pIdx} className="font-semibold text-navy-text flex items-center gap-1.5 flex-wrap">
                                       <Briefcase size={12} className="text-muted-faint shrink-0" />
                                       <span className="truncate max-w-[200px]" title={`[${pl.projectCode}] ${pl.projectName}`}>
                                         [{pl.projectCode}] {pl.projectName}
                                       </span>
+                                      {pl.projectEntityName && (
+                                        <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 font-semibold">
+                                          {pl.projectEntityName}
+                                        </span>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -4321,19 +4328,24 @@ export function PayrollClient({
                   >
                     Semua Holding ({data.rekapTenagaAhliPerNama.length})
                   </button>
-                  {data.allEntities.map((ent) => (
-                    <button
-                      key={ent.id}
-                      onClick={() => setFilterEntitasNama(ent.name)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                        filterEntitasNama === ent.name
-                          ? "bg-navy text-white shadow-2xs"
-                          : "bg-surface-card border border-border text-muted-stronger hover:bg-surface-hover"
-                      }`}
-                    >
-                      {ent.name}
-                    </button>
-                  ))}
+                  {data.allEntities.map((ent) => {
+                    const count = data.rekapTenagaAhliPerNama.filter((x) =>
+                      (x.daftarEntitas || []).includes(ent.name)
+                    ).length;
+                    return (
+                      <button
+                        key={ent.id}
+                        onClick={() => setFilterEntitasNama(ent.name)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          filterEntitasNama === ent.name
+                            ? "bg-navy text-white shadow-2xs"
+                            : "bg-surface-card border border-border text-muted-stronger hover:bg-surface-hover"
+                        }`}
+                      >
+                        {ent.name} ({count})
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -4360,6 +4372,43 @@ export function PayrollClient({
                     ) : (
                       filteredRekapPerNama.map((r) => {
                         const isExpanded = expandedNik === r.nik;
+                        const isAll = filterEntitasNama === "ALL";
+
+                        // Proyek yang relevan untuk entitas terpilih:
+                        const displayedProyekList: string[] = isAll
+                          ? (r.daftarProyek || [])
+                          : (r.daftarProyekObj || [])
+                              .filter((p) => p.entityName === filterEntitasNama)
+                              .map((p) => p.namaProyek)
+                              .filter(Boolean);
+                        const finalProyekList = displayedProyekList.length > 0
+                          ? Array.from(new Set(displayedProyekList))
+                          : (isAll ? (r.daftarProyek || []) : []);
+
+                        // Entitas yang ditampilkan:
+                        const displayedEntitasList: string[] = isAll
+                          ? (r.daftarEntitas || [])
+                          : (r.daftarEntitas || []).filter((e) => e === filterEntitasNama);
+
+                        // Rincian transaksi pembayaran yang sesuai entitas terpilih:
+                        const filteredRincian = isAll
+                          ? (r.rincian || [])
+                          : (r.rincian || []).filter((ri) => ri.entityName === filterEntitasNama);
+
+                        // Bulan pembayaran yang sesuai entitas terpilih:
+                        const displayedBulanList: string[] = isAll
+                          ? (r.daftarBulan || [])
+                          : Array.from(new Set(filteredRincian.map((ri) => ri.bulanName).filter(Boolean)));
+
+                        // Jumlah transaksi dan total bruto untuk entitas terpilih:
+                        const displayTxCount = isAll ? r.totalTransaksi : filteredRincian.length;
+                        const displayBruto = isAll
+                          ? r.totalHonorBruto
+                          : filteredRincian.reduce((acc, curr) => acc + (curr.nominalHonor || 0), 0);
+                        const displayBrutoFmt = isAll
+                          ? r.totalHonorBrutoFmt
+                          : (displayTxCount > 0 ? formatRupiah(displayBruto) : "Rp 0");
+
                         return (
                           <Fragment key={r.nik}>
                             <tr
@@ -4377,8 +4426,8 @@ export function PayrollClient({
 
                               <td className="py-3 px-3.5 border-b border-r border-border">
                                 <div className="flex flex-wrap gap-1 max-w-xs">
-                                  {r.daftarEntitas.length > 0 ? (
-                                    r.daftarEntitas.map((entName, i) => (
+                                  {displayedEntitasList.length > 0 ? (
+                                    displayedEntitasList.map((entName, i) => (
                                       <span
                                         key={i}
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 text-[10px] font-semibold border border-purple-200 dark:border-purple-800"
@@ -4395,8 +4444,8 @@ export function PayrollClient({
 
                               <td className="py-3 px-3.5 border-b border-r border-border">
                                 <div className="flex flex-wrap gap-1 max-w-xs">
-                                  {r.daftarProyek.length > 0 ? (
-                                    r.daftarProyek.map((projName, i) => (
+                                  {finalProyekList.length > 0 ? (
+                                    finalProyekList.map((projName, i) => (
                                       <span
                                         key={i}
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-medium border border-blue-200 dark:border-blue-800"
@@ -4413,8 +4462,8 @@ export function PayrollClient({
 
                               <td className="py-3 px-3.5 border-b border-r border-border">
                                 <div className="flex flex-wrap gap-1 max-w-xs">
-                                  {r.daftarBulan.length > 0 ? (
-                                    r.daftarBulan.map((bulanName, i) => (
+                                  {displayedBulanList.length > 0 ? (
+                                    displayedBulanList.map((bulanName, i) => (
                                       <span
                                         key={i}
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-subtle text-muted-stronger text-[10px] font-semibold border border-border"
@@ -4430,9 +4479,9 @@ export function PayrollClient({
                               </td>
 
                               <td className="py-3 px-3.5 text-center font-mono whitespace-nowrap border-b border-r border-border">
-                                {r.totalTransaksi > 0 ? (
+                                {displayTxCount > 0 ? (
                                   <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-bold text-[11px] text-navy-text">
-                                    {r.totalTransaksi}x
+                                    {displayTxCount}x
                                   </span>
                                 ) : (
                                   <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-muted-stronger font-semibold text-[10px] border border-border">
@@ -4442,7 +4491,7 @@ export function PayrollClient({
                               </td>
 
                               <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                                {r.totalHonorBrutoFmt}
+                                {displayBrutoFmt}
                               </td>
 
                               <td className="py-3 px-3.5 text-center whitespace-nowrap border-b border-border">
@@ -4508,11 +4557,11 @@ export function PayrollClient({
                                       <div className="flex items-center gap-2 text-[11px] flex-wrap">
                                         <span className="text-muted-faint">Entitas:</span>
                                         <span className="font-semibold text-navy-text">
-                                          {r.daftarEntitas.join(", ")}
+                                          {isAll ? r.daftarEntitas.join(", ") : filterEntitasNama}
                                         </span>
                                         <span className="text-muted-faint ml-2">Total Honor:</span>
                                         <span className="font-bold text-navy-text font-mono">
-                                          {r.totalHonorBrutoFmt}
+                                          {displayBrutoFmt}
                                         </span>
                                       </div>
                                     </div>
@@ -4529,14 +4578,14 @@ export function PayrollClient({
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {r.rincian.length === 0 ? (
+                                          {filteredRincian.length === 0 ? (
                                             <tr>
                                               <td colSpan={6} className="py-6 text-center text-muted-faint border-b border-border">
-                                                Belum ada transaksi pembayaran honorarium yang dicatat untuk tahun {selectedYear}.
+                                                Belum ada transaksi pembayaran honorarium yang dicatat{isAll ? "" : ` di ${filterEntitasNama}`} untuk tahun {selectedYear}.
                                               </td>
                                             </tr>
                                           ) : (
-                                            r.rincian.map((item) => (
+                                            filteredRincian.map((item) => (
                                               <tr key={item.id} className="hover:bg-surface-hover/20">
                                                 <td className="py-2 px-3 font-medium whitespace-nowrap border-b border-r border-border">
                                                   <div>{item.tanggalFmt}</div>

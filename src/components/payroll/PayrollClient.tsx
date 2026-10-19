@@ -2468,61 +2468,54 @@ export function PayrollClient({
           {pegawaiSubTab === "tahunan" && (
             <div className="space-y-4">
               {/* Header Box & Control Panel */}
-              <div className="rounded-2xl border border-border bg-surface-card p-5 space-y-4">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="p-2 rounded-xl bg-navy/10 text-navy dark:bg-navy/30 dark:text-blue-300">
-                        <Briefcase size={18} />
-                      </span>
-                      <div>
-                        <h3 className="text-base font-bold text-navy-text">
-                          Rekapitulasi Akumulasi Gaji Per Nama – Tahun {selectedYear}
-                        </h3>
-                        <p className="text-xs text-muted-faint mt-0.5">
-                          Filter periode bebas untuk melihat akumulasi rincian gaji pokok, tunjangan, potongan, dan PPh 21 untuk keperluan pelaporan SPT Pajak
-                        </p>
-                      </div>
-                    </div>
+              <div className="rounded-2xl border border-border bg-surface-card p-4 space-y-3 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-navy/10 text-navy dark:bg-navy/30 dark:text-blue-300">
+                      <Briefcase size={16} />
+                    </span>
+                    <h3 className="text-sm font-bold text-navy-text">
+                      Akumulasi Gaji & SPT Pegawai – Tahun {selectedYear}
+                    </h3>
                   </div>
 
                   {/* Mode Selector & Action Buttons */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center p-1 rounded-xl bg-surface-subtle border border-border">
+                  <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                    <div className="flex items-center p-0.5 rounded-lg bg-surface-subtle border border-border">
                       <button
                         type="button"
                         onClick={() => setAkumulasiMode("per-nama")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all inline-flex items-center gap-1.5 ${
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all inline-flex items-center gap-1.5 ${
                           akumulasiMode === "per-nama"
                             ? "bg-surface-card text-navy-text shadow-2xs font-bold"
                             : "text-muted-faint hover:text-navy-text"
                         }`}
                       >
-                        <User size={13} />
-                        <span>Khusus Satu Orang (Per Nama)</span>
+                        <User size={12} />
+                        <span>Per Nama</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setAkumulasiMode("semua")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all inline-flex items-center gap-1.5 ${
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all inline-flex items-center gap-1.5 ${
                           akumulasiMode === "semua"
                             ? "bg-surface-card text-navy-text shadow-2xs font-bold"
                             : "text-muted-faint hover:text-navy-text"
                         }`}
                       >
-                        <Users size={13} />
-                        <span>Semua Karyawan</span>
+                        <Users size={12} />
+                        <span>Semua</span>
                       </button>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => window.print()}
-                      className="h-8 px-3 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs print:hidden"
+                      className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs print:hidden"
                       title="Cetak Rekap Akumulasi SPT"
                     >
-                      <Printer size={13} className="text-navy" />
-                      <span>Cetak Rekap SPT</span>
+                      <Printer size={12} className="text-navy" />
+                      <span>Cetak SPT</span>
                     </button>
                   </div>
                 </div>
@@ -2582,67 +2575,43 @@ export function PayrollClient({
                       </select>
                     </div>
 
-                    {/* Quick Preset Buttons */}
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => {
+                    {/* Quick Preset Dropdown */}
+                    <select
+                      value={
+                        akumulasiStartMonth === 1 && akumulasiEndMonth === 12
+                          ? "12"
+                          : akumulasiStartMonth === 1 && akumulasiEndMonth === 9
+                          ? "9"
+                          : akumulasiStartMonth === 1 && akumulasiEndMonth === 6
+                          ? "s1"
+                          : akumulasiStartMonth === 7 && akumulasiEndMonth === 12
+                          ? "s2"
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "12") {
+                          setAkumulasiStartMonth(1);
+                          setAkumulasiEndMonth(12);
+                        } else if (val === "9") {
                           setAkumulasiStartMonth(1);
                           setAkumulasiEndMonth(9);
-                        }}
-                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
-                          akumulasiStartMonth === 1 && akumulasiEndMonth === 9
-                            ? "bg-navy text-white border-navy"
-                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
-                        }`}
-                        title="Rentang Januari s/d September"
-                      >
-                        Jan – Sep
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAkumulasiStartMonth(1);
-                          setAkumulasiEndMonth(12);
-                        }}
-                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
-                          akumulasiStartMonth === 1 && akumulasiEndMonth === 12
-                            ? "bg-navy text-white border-navy"
-                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
-                        }`}
-                        title="Setahun Penuh (12 Bulan)"
-                      >
-                        Full 12 Bulan (Jan – Des)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
+                        } else if (val === "s1") {
                           setAkumulasiStartMonth(1);
                           setAkumulasiEndMonth(6);
-                        }}
-                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
-                          akumulasiStartMonth === 1 && akumulasiEndMonth === 6
-                            ? "bg-navy text-white border-navy"
-                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
-                        }`}
-                      >
-                        Semester 1 (Jan – Jun)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
+                        } else if (val === "s2") {
                           setAkumulasiStartMonth(7);
                           setAkumulasiEndMonth(12);
-                        }}
-                        className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
-                          akumulasiStartMonth === 7 && akumulasiEndMonth === 12
-                            ? "bg-navy text-white border-navy"
-                            : "bg-surface-subtle text-muted-stronger border-border hover:bg-surface-hover"
-                        }`}
-                      >
-                        Semester 2 (Jul – Des)
-                      </button>
-                    </div>
+                        }
+                      }}
+                      className="h-8 text-xs rounded-lg border border-border bg-surface-subtle text-muted-stronger font-medium px-2 cursor-pointer"
+                    >
+                      <option value="">Pilih Preset...</option>
+                      <option value="12">1 Tahun Penuh (Jan – Des)</option>
+                      <option value="9">Jan – Sep (9 Bulan)</option>
+                      <option value="s1">Semester 1 (Jan – Jun)</option>
+                      <option value="s2">Semester 2 (Jul – Des)</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -2653,28 +2622,28 @@ export function PayrollClient({
                 return (
                   <div className="space-y-4">
                     {/* Profil Karyawan & Periode Terpilih */}
-                    <div className="p-4 rounded-2xl border border-border bg-surface-card flex flex-wrap items-center justify-between gap-4">
+                    <div className="p-3.5 rounded-2xl border border-border bg-surface-card flex flex-wrap items-center justify-between gap-3 shadow-2xs">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-navy-text text-base">{currentAkumulasiPegawai.nama}</span>
-                          <span className="font-mono text-xs text-muted-stronger px-2 py-0.5 rounded-md bg-surface-subtle border border-border">
+                          <span className="font-bold text-navy-text text-sm">{currentAkumulasiPegawai.nama}</span>
+                          <span className="font-mono text-[11px] text-muted-stronger px-2 py-0.5 rounded-md bg-surface-subtle border border-border">
                             NIK: {currentAkumulasiPegawai.nik}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                             {currentAkumulasiPegawai.jabatan}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               (currentAkumulasiPegawai.status ?? (currentAkumulasiPegawai.isActive ? "AKTIF" : "RESIGN")) === "AKTIF"
                                 ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                                : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                : "bg-surface-subtle text-muted-stronger border border-border"
                             }`}
                           >
                             {currentAkumulasiPegawai.status ?? "AKTIF"}
                           </span>
                         </div>
                         <div className="text-xs text-muted-faint flex items-center gap-3 flex-wrap">
-                          <span>Status PTKP: <strong className="font-mono text-navy-text">{currentAkumulasiPegawai.statusKeluarga}</strong> ({currentAkumulasiPegawai.ptkpFmt || formatRupiah(currentAkumulasiPegawai.ptkp ?? 54000000)}/thn)</span>
+                          <span>Status PTKP: <strong className="font-mono text-navy-text">{currentAkumulasiPegawai.statusKeluarga}</strong></span>
                           <span>·</span>
                           <span>Masa Kerja: <strong className="text-navy-text">{currentAkumulasiPegawai.masaKerja || "-"}</strong></span>
                           <span>·</span>
@@ -2682,84 +2651,65 @@ export function PayrollClient({
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-navy/10 text-navy font-bold text-xs border border-navy/20">
-                          <Calendar size={13} />
-                          <span>
-                            Periode: {BULAN_NAMES[ak.from - 1]} – {BULAN_NAMES[ak.to - 1]} {selectedYear} ({ak.totalBulanRentang} Bulan)
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-muted-faint mt-1">
-                          Gaji Pokok Master: <strong className="font-mono text-navy-text">{currentAkumulasiPegawai.gajiPokokFmt}</strong>
+                      <div className="flex items-center gap-3 text-right">
+                        <div className="text-right">
+                          <div className="text-xs text-muted-faint">
+                            Gaji Pokok Master: <strong className="font-mono text-navy-text">{currentAkumulasiPegawai.gajiPokokFmt}</strong>
+                          </div>
+                          <div className="text-[11px] text-muted-faint mt-0.5">
+                            Periode: <span className="font-semibold text-navy-text">{BULAN_NAMES[ak.from - 1]} – {BULAN_NAMES[ak.to - 1]} {selectedYear} ({ak.totalBulanRentang} Bulan)</span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Summary Cards (Detail Pelaporan SPT Pajak PPh 21) */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                      <div className="p-3.5 rounded-xl border border-border bg-surface-card shadow-2xs">
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                      <div className="p-3 rounded-xl border border-border bg-surface-card shadow-2xs">
                         <div className="text-[11px] text-muted-faint font-medium">Bulan Terbayar</div>
-                        <div className="text-lg font-bold font-mono text-navy-text mt-1">
-                          {ak.bulanTerbayar} / {ak.totalBulanRentang} Bln
-                        </div>
-                        <div className="text-[10px] text-muted-faint mt-0.5">
-                          {ak.bulanTerbayar === ak.totalBulanRentang ? "Lengkap terbayar" : `${ak.totalBulanRentang - ak.bulanTerbayar} bln belum terinput`}
+                        <div className="text-base font-bold font-mono text-navy-text mt-1">
+                          {ak.bulanTerbayar} <span className="text-xs font-normal text-muted-faint">/ {ak.totalBulanRentang} Bln</span>
                         </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-border bg-surface-card shadow-2xs">
+                      <div className="p-3 rounded-xl border border-border bg-surface-card shadow-2xs">
                         <div className="text-[11px] text-muted-faint font-medium">Total Gaji Pokok</div>
-                        <div className="text-lg font-bold font-mono text-navy-text mt-1">
+                        <div className="text-base font-bold font-mono text-navy-text mt-1">
                           {formatRupiah(ak.totalGajiPokok)}
                         </div>
-                        <div className="text-[10px] text-muted-faint mt-0.5">
-                          Akumulasi gaji pokok
-                        </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-border bg-surface-card shadow-2xs">
+                      <div className="p-3 rounded-xl border border-border bg-surface-card shadow-2xs">
                         <div className="text-[11px] text-muted-faint font-medium">Total Tunjangan</div>
-                        <div className="text-lg font-bold font-mono text-navy-text mt-1">
+                        <div className="text-base font-bold font-mono text-navy-text mt-1">
                           {formatRupiah(ak.totalTunjangan)}
                         </div>
-                        <div className="text-[10px] text-muted-faint mt-0.5" title={`Jabatan: ${formatRupiah(ak.totalTunjanganJabatan)}, Transport: ${formatRupiah(ak.totalTunjanganTransport)}, THR/Insentif: ${formatRupiah(ak.totalInsentifThr)}`}>
-                          Jabatan, transport, THR & BPJS
-                        </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 shadow-2xs">
-                        <div className="text-[11px] text-blue-900 dark:text-blue-200 font-semibold flex items-center justify-between">
-                          <span>Total Bruto (SPT PPh 21)</span>
+                      <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 shadow-2xs">
+                        <div className="text-[11px] text-blue-900 dark:text-blue-300 font-semibold">
+                          Total Bruto (SPT)
                         </div>
-                        <div className="text-lg font-bold font-mono text-blue-900 dark:text-blue-300 mt-1">
+                        <div className="text-base font-bold font-mono text-blue-900 dark:text-blue-200 mt-1">
                           {formatRupiah(ak.totalGajiTerlaporPajak)}
                         </div>
-                        <div className="text-[10px] text-blue-700/80 dark:text-blue-400 mt-0.5">
-                          Objek pemotongan pajak
-                        </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 shadow-2xs">
-                        <div className="text-[11px] text-amber-900 dark:text-amber-200 font-semibold flex items-center justify-between">
-                          <span>Total PPh 21 Terhitung</span>
+                      <div className="p-3 rounded-xl border border-border bg-surface-card shadow-2xs">
+                        <div className="text-[11px] text-muted-stronger font-semibold">
+                          Total PPh 21
                         </div>
-                        <div className="text-lg font-bold font-mono text-amber-800 dark:text-amber-300 mt-1">
+                        <div className="text-base font-bold font-mono text-navy-text mt-1">
                           {formatRupiah(ak.totalPph21)}
                         </div>
-                        <div className="text-[10px] text-amber-700/80 dark:text-amber-400 mt-0.5">
-                          Pajak PPh 21 disetor
-                        </div>
                       </div>
 
-                      <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-2xs">
-                        <div className="text-[11px] text-emerald-900 dark:text-emerald-200 font-semibold flex items-center justify-between">
-                          <span>Total Gaji Bersih (THP)</span>
+                      <div className="p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-2xs">
+                        <div className="text-[11px] text-emerald-900 dark:text-emerald-300 font-semibold">
+                          Gaji Bersih (THP)
                         </div>
-                        <div className="text-lg font-bold font-mono text-emerald-800 dark:text-emerald-300 mt-1">
+                        <div className="text-base font-bold font-mono text-emerald-800 dark:text-emerald-200 mt-1">
                           {formatRupiah(ak.totalGajiBersih)}
-                        </div>
-                        <div className="text-[10px] text-emerald-700/80 dark:text-emerald-400 mt-0.5">
-                          Diterima karyawan
                         </div>
                       </div>
                     </div>

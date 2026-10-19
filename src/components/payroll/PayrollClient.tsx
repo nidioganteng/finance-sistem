@@ -202,6 +202,44 @@ const TENAGA_AHLI_SUBTABS = [
   },
 ] as const;
 
+const PEGAWAI_SUBTABS = [
+  {
+    key: "gaji" as const,
+    label: "Gaji Bulanan",
+    description: "Input & daftar pembayaran gaji bulanan",
+    icon: CreditCard,
+    hasIndicator: false,
+  },
+  {
+    key: "rekap-bulan" as const,
+    label: "Rekap Setahun",
+    description: "Rekapitulasi pembayaran sepanjang tahun",
+    icon: Calendar,
+    hasIndicator: false,
+  },
+  {
+    key: "penyesuaian" as const,
+    label: "Penyesuaian Gaji",
+    description: "Sinkronisasi saldo Akun 511 dengan Laba Rugi",
+    icon: Scale,
+    hasIndicator: true,
+  },
+  {
+    key: "master" as const,
+    label: "Database Pegawai Tetap",
+    description: "Master data dan profil pegawai tetap entitas",
+    icon: Users,
+    hasIndicator: false,
+  },
+  {
+    key: "tahunan" as const,
+    label: "Akumulasi Pegawai",
+    description: "Akumulasi penghasilan & SPT per karyawan",
+    icon: Briefcase,
+    hasIndicator: false,
+  },
+] as const;
+
 export function PayrollClient({
   data,
   rekonsiliasiData,
@@ -236,6 +274,8 @@ export function PayrollClient({
   const [pegawaiSubTab, setPegawaiSubTab] = useState<
     "gaji" | "rekap-bulan" | "penyesuaian" | "master" | "tahunan"
   >("gaji");
+  const [isPegawaiSubTabDropdownOpen, setIsPegawaiSubTabDropdownOpen] = useState(false);
+  const pegawaiSubTabDropdownRef = useRef<HTMLDivElement>(null);
 
   // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-proyek" (Rekap Per Proyek) | "rekap-bulan" (Rekap Gaji Setahun) | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
@@ -251,6 +291,12 @@ export function PayrollClient({
         !ahliSubTabDropdownRef.current.contains(e.target as Node)
       ) {
         setIsAhliSubTabDropdownOpen(false);
+      }
+      if (
+        pegawaiSubTabDropdownRef.current &&
+        !pegawaiSubTabDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsPegawaiSubTabDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -1103,73 +1149,113 @@ export function PayrollClient({
         <div className="space-y-6">
           {/* Sub-Tabs Pegawai */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 bg-surface-subtle p-1 rounded-xl border border-border/60">
+            {/* Dropdown Selector Sub-Tab Pegawai Tetap */}
+            <div ref={pegawaiSubTabDropdownRef} className="relative z-30">
               <button
-                onClick={() => setPegawaiSubTab("gaji")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  pegawaiSubTab === "gaji"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
+                type="button"
+                onClick={() => setIsPegawaiSubTabDropdownOpen((prev) => !prev)}
+                className="h-9 px-3.5 rounded-xl border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-bold inline-flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs"
+                title="Pilih Halaman Pegawai Tetap"
               >
-                <CreditCard size={13} className={pegawaiSubTab === "gaji" ? "text-navy" : "text-muted-faint"} />
-                <span>Gaji Bulanan</span>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const currentTab = PEGAWAI_SUBTABS.find((t) => t.key === pegawaiSubTab) || PEGAWAI_SUBTABS[0];
+                    const Icon = currentTab.icon;
+                    return (
+                      <>
+                        <Icon size={14} className="text-navy shrink-0" />
+                        <span className="text-xs font-bold text-navy-text tracking-tight">
+                          {currentTab.label}
+                        </span>
+                        {currentTab.hasIndicator && (
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              (periodeFilterPegawai === "bulan"
+                                ? data.penyesuaianJurnal.pegawai.isSinkronBulan
+                                : data.penyesuaianJurnal.pegawai.isSinkronTahun)
+                                ? "bg-emerald-500"
+                                : "bg-amber-500 animate-pulse"
+                            }`}
+                            title={
+                              (periodeFilterPegawai === "bulan"
+                                ? data.penyesuaianJurnal.pegawai.isSinkronBulan
+                                : data.penyesuaianJurnal.pegawai.isSinkronTahun)
+                                ? "Jurnal Umum Sinkron"
+                                : "Terdapat Selisih Jurnal"
+                            }
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={`text-muted-faint transition-transform duration-200 ${
+                    isPegawaiSubTabDropdownOpen ? "rotate-180 text-navy" : ""
+                  }`}
+                />
               </button>
 
-              <button
-                onClick={() => setPegawaiSubTab("rekap-bulan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  pegawaiSubTab === "rekap-bulan"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Calendar size={13} className={pegawaiSubTab === "rekap-bulan" ? "text-navy" : "text-muted-faint"} />
-                <span>Rekap Setahun</span>
-              </button>
-
-              <button
-                onClick={() => setPegawaiSubTab("penyesuaian")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  pegawaiSubTab === "penyesuaian"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Scale size={13} className={pegawaiSubTab === "penyesuaian" ? "text-navy" : "text-muted-faint"} />
-                <span>Penyesuaian Gaji</span>
-                {(periodeFilterPegawai === "bulan"
-                  ? data.penyesuaianJurnal.pegawai.isSinkronBulan
-                  : data.penyesuaianJurnal.pegawai.isSinkronTahun) ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                )}
-              </button>
-
-              <button
-                onClick={() => setPegawaiSubTab("master")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  pegawaiSubTab === "master"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Users size={13} className={pegawaiSubTab === "master" ? "text-navy" : "text-muted-faint"} />
-                <span>Database Pegawai Tetap</span>
-              </button>
-
-              <button
-                onClick={() => setPegawaiSubTab("tahunan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  pegawaiSubTab === "tahunan"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Briefcase size={13} className={pegawaiSubTab === "tahunan" ? "text-navy" : "text-muted-faint"} />
-                <span>Akumulasi Pegawai</span>
-              </button>
+              {isPegawaiSubTabDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1.5 z-40 w-72 bg-surface-card border border-border rounded-xl shadow-xl overflow-hidden p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-2.5 py-1 text-[10px] font-bold text-muted-faint uppercase tracking-wider border-b border-border/50">
+                    Menu Pegawai Tetap
+                  </div>
+                  <div className="space-y-0.5">
+                    {PEGAWAI_SUBTABS.map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = pegawaiSubTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => {
+                            setPegawaiSubTab(tab.key);
+                            setIsPegawaiSubTabDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left cursor-pointer ${
+                            isActive
+                              ? "bg-navy text-white font-bold shadow-xs"
+                              : "text-navy-text hover:bg-surface-hover font-medium"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon
+                              size={14}
+                              className={isActive ? "text-white shrink-0" : "text-muted-stronger shrink-0"}
+                            />
+                            <div className="truncate">
+                              <div className="text-xs leading-snug flex items-center gap-1.5">
+                                <span className="truncate">{tab.label}</span>
+                                {tab.hasIndicator && (
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                      (periodeFilterPegawai === "bulan"
+                                        ? data.penyesuaianJurnal.pegawai.isSinkronBulan
+                                        : data.penyesuaianJurnal.pegawai.isSinkronTahun)
+                                        ? "bg-emerald-500"
+                                        : "bg-amber-500 animate-pulse"
+                                    }`}
+                                  />
+                                )}
+                              </div>
+                              <div
+                                className={`text-[10px] truncate ${
+                                  isActive ? "text-white/80" : "text-muted-faint"
+                                }`}
+                              >
+                                {tab.description}
+                              </div>
+                            </div>
+                          </div>
+                          {isActive && <Check size={14} className="text-white shrink-0 ml-2" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">

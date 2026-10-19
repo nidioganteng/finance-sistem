@@ -23,6 +23,12 @@ export type ProjectOption = {
   maxPercentage?: number;
   terminCount?: number;
   totalTerminTagih?: number;
+  termins?: Array<{
+    id: string;
+    name: string;
+    percentage: number | null;
+    nominal: number | null;
+  }>;
 };
 
 export type FakturOption = {
@@ -104,6 +110,7 @@ export function JurnalTransaksiClient({
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
   const [projectId, setProjectId] = useState("");
+  const [terminId, setTerminId] = useState("__NEW__");
   const [fakturId, setFakturId] = useState("");
   const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(null);
   const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(null);
@@ -237,21 +244,51 @@ export function JurnalTransaksiClient({
   const newPct = contractVal > 0 ? Math.min(100, Math.round((cumulativeAfter / contractVal) * 100)) : maxPctSoFar;
   const deltaPct = Math.max(0, newPct - maxPctSoFar);
 
+  const selectedTermin = selectedProject?.termins?.find((t) => t.id === terminId);
+
   const autoKeterangan = selectedProject
-    ? `Pendapatan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`
+    ? (selectedTermin
+        ? `Pendapatan ${selectedTermin.name} - ${selectedProject.name} (${selectedProject.code})`
+        : `Pendapatan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`)
     : "";
 
   function handleProjectChange(newProjectId: string) {
     setProjectId(newProjectId);
-    if (!newProjectId) return;
+    if (!newProjectId) {
+      setTerminId("__NEW__");
+      return;
+    }
     const sel = projectOptions.find((p) => p.id === newProjectId);
     if (!sel) return;
+    const firstTerm = sel.termins && sel.termins.length > 0 ? sel.termins[0].id : "__NEW__";
+    setTerminId(firstTerm);
+
+    const targetTerm = sel.termins?.find((t) => t.id === firstTerm);
     const nextKe = (sel.terminCount ?? 0) + 1;
-    const autoKet = `Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`;
+    const autoKet = targetTerm
+      ? `Pendapatan ${targetTerm.name} - ${sel.name} (${sel.code})`
+      : `Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`;
     setCoaRows((prev) => {
       if (prev.length > 0 && (!prev[0].keterangan.trim() || prev[0].keterangan.startsWith("Pendapatan Termin"))) {
         const [first, ...rest] = prev;
         return [{ ...first, keterangan: autoKet }, ...rest];
+      }
+      return prev;
+    });
+  }
+
+  function handleTerminChange(newTerminId: string) {
+    setTerminId(newTerminId);
+    if (!selectedProject) return;
+    const term = selectedProject.termins?.find((t) => t.id === newTerminId);
+    const nextKe = (selectedProject.terminCount ?? 0) + 1;
+    const ket = term
+      ? `Pendapatan ${term.name} - ${selectedProject.name} (${selectedProject.code})`
+      : `Pendapatan Termin ${nextKe} - ${selectedProject.name} (${selectedProject.code})`;
+    setCoaRows((prev) => {
+      if (prev.length > 0 && (!prev[0].keterangan.trim() || prev[0].keterangan.startsWith("Pendapatan Termin") || prev[0].keterangan.startsWith("Pencairan Faktur"))) {
+        const [first, ...rest] = prev;
+        return [{ ...first, keterangan: ket }, ...rest];
       }
       return prev;
     });
@@ -266,6 +303,13 @@ export function JurnalTransaksiClient({
     // Otomatis isi kode proyek jika E-Faktur terdaftar di suatu proyek
     if (selFaktur.projectId) {
       setProjectId(selFaktur.projectId);
+      const sel = projectOptions.find((p) => p.id === selFaktur.projectId);
+      if (sel?.termins && sel.termins.length > 0) {
+        const matched = sel.termins.find((t) => t.nominal === selFaktur.dpp) || sel.termins[0];
+        setTerminId(matched.id);
+      } else {
+        setTerminId("__NEW__");
+      }
     }
 
     // Default keterangan transaksi pencairan faktur
@@ -375,6 +419,7 @@ export function JurnalTransaksiClient({
 
   function resetForm() {
     setNoBukti(""); setTanggal(todayStr()); setProjectId(""); setFakturId("");
+    setTerminId("__NEW__");
     setPeriodeBulanGaji(null); setPeriodeTahunGaji(null);
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
@@ -387,6 +432,7 @@ export function JurnalTransaksiClient({
     setTanggal(group.tanggalRaw.slice(0, 10));
     setProjectId(group.projectId ?? "");
     setFakturId(group.fakturId ?? "");
+    setTerminId(group.terminId || "__NEW__");
     setPeriodeBulanGaji(group.periodeBulanGaji ?? null);
     setPeriodeTahunGaji(group.periodeTahunGaji ?? null);
     const sortedRows = sortJurnalRows(group.rows);
@@ -427,7 +473,10 @@ export function JurnalTransaksiClient({
     fd.set("entityKey", entityKey);
     fd.set("noBukti", noBukti);
     fd.set("tanggal", tanggal);
-    if (projectId) fd.set("projectId", projectId);
+    if (projectId) {
+      fd.set("projectId", projectId);
+      if (terminId) fd.set("terminId", terminId);
+    }
     if (fakturId) fd.set("fakturId", fakturId);
     if (periodeBulanGaji) {
       fd.set("periodeBulanGaji", String(periodeBulanGaji));
@@ -652,7 +701,7 @@ export function JurnalTransaksiClient({
                     </label>
                     {selectedProject && (
                       <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
-                        Termin Ke-{nextTerminKe}
+                        {selectedTermin ? selectedTermin.name : `Termin Ke-${nextTerminKe}`}
                       </span>
                     )}
                   </div>
@@ -789,10 +838,50 @@ export function JurnalTransaksiClient({
                     </div>
                   </div>
 
+                  {/* Pilihan Tahap / Termin Pencairan */}
+                  <div className="flex flex-col gap-1.5 p-2.5 rounded-[9px] bg-surface-card border border-border-subtle">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-navy-text flex items-center gap-1.5">
+                        <Sparkles size={12} className="text-emerald-600 dark:text-emerald-400" />
+                        Tahap / Termin Pencairan Proyek
+                      </label>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-emerald-800 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/40">
+                        {selectedTermin ? `Alokasi ke: ${selectedTermin.name}` : `Termin Baru (Ke-${nextTerminKe})`}
+                      </span>
+                    </div>
+
+                    <select
+                      value={terminId}
+                      onChange={(e) => handleTerminChange(e.target.value)}
+                      className="w-full h-8.5 px-2.5 rounded-[8px] border border-emerald-300/80 dark:border-emerald-700/60 bg-surface-input text-[12px] text-navy-text focus:outline-none focus:border-brand font-medium cursor-pointer"
+                    >
+                      {selectedProject.termins && selectedProject.termins.length > 0 && (
+                        <optgroup label="Termin Terdaftar (Cicilan / Penyesuaian Pajak)">
+                          {selectedProject.termins.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} · {t.percentage ?? 0}% Kontrak · Rp {Math.round(t.nominal ?? 0).toLocaleString("id-ID")}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Buat Tahap Baru">
+                        <option value="__NEW__">
+                          + Buat Termin Baru (Termin Ke-{nextTerminKe})
+                        </option>
+                      </optgroup>
+                    </select>
+
+                    <p className="text-[10px] text-muted-faint">
+                      {selectedTermin
+                        ? `Uang masuk akan dialokasikan ke ${selectedTermin.name} tanpa membuat termin baru (mencegah duplikasi termin saat pencairan bertahap).`
+                        : `Sistem akan otomatis mencatat Termin ke-${nextTerminKe} baru di Kontrol Piutang & Laporan Pendapatan.`}
+                    </p>
+                  </div>
+
                   {/* Termin Simulation Box */}
                   {nominalTermin === 0 ? (
                     <div className="text-[11.5px] text-muted-strong bg-surface-card border border-border-subtle rounded-[9px] p-2.5">
-                      Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun di bawah untuk melihat simulasi termin ke-{nextTerminKe}.
+                      Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun di bawah untuk melihat simulasi {selectedTermin ? selectedTermin.name : `termin ke-${nextTerminKe}`}.
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2.5 bg-surface-card border border-border-subtle rounded-[10px] p-3">
@@ -831,7 +920,7 @@ export function JurnalTransaksiClient({
                           <span className="font-bold text-navy-text">Rp {Math.round(cumulativeBefore).toLocaleString("id-ID")}</span>
                         </div>
                         <div>
-                          <span className="text-muted-faint block">Termin {nextTerminKe}</span>
+                          <span className="text-muted-faint block">{selectedTermin ? selectedTermin.name : `Termin ${nextTerminKe}`}</span>
                           <span className="font-bold text-status-green">+Rp {Math.round(nominalTermin).toLocaleString("id-ID")}</span>
                         </div>
                         <div>

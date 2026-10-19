@@ -7243,10 +7243,15 @@ export function PayrollClient({
                   Nominal Honor Bulanan Standar (Rp)
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="nominalHonorBulanan"
-                  defaultValue={editingMasterAhli?.nominalHonorBulanan ?? 0}
-                  placeholder="Contoh: 5000000"
+                  defaultValue={formatRupiahInput(editingMasterAhli?.nominalHonorBulanan ? editingMasterAhli.nominalHonorBulanan : "")}
+                  onChange={(e) => {
+                    const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                    e.target.value = formatRupiahInput(num);
+                  }}
+                  placeholder="Contoh: 5.000.000"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
                 />
                 <span className="text-[10px] text-muted-faint mt-0.5 block">

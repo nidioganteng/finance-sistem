@@ -1813,37 +1813,19 @@ export function LaporanPendapatanClient({
                 >
                   <option value="">-- Pilih Kode Proyek yang Sesuai --</option>
                   {(() => {
-                    const curProjs = data.projectOptions.filter((p) => !p.entityId || p.entityId === data.entity.id);
-                    const otherProjs = data.projectOptions.filter((p) => p.entityId && p.entityId !== data.entity.id);
-                    const otherByEntity = otherProjs.reduce((acc, p) => {
-                      const key = p.entityName || p.entityKey || "Entitas Lain";
-                      if (!acc[key]) acc[key] = [];
-                      acc[key].push(p);
-                      return acc;
-                    }, {} as Record<string, typeof otherProjs>);
-
-                    return (
-                      <>
-                        {curProjs.length > 0 && (
-                          <optgroup label={`Proyek ${data.entity.name} (Entitas Ini)`}>
-                            {curProjs.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {Object.entries(otherByEntity).map(([entName, projs]) => (
-                          <optgroup key={entName} label={`Proyek ${entName} (Lintas Entitas)`}>
-                            {projs.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </>
+                    const curProjs = data.projectOptions.filter(
+                      (p) =>
+                        !p.entityId ||
+                        p.entityId === data.entity.id ||
+                        p.entityKey === data.entity.key ||
+                        p.id === formFaktur.projectId
                     );
+
+                    return curProjs.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.code}] {p.name} {p.contractValueFmt ? `• Nilai Kontrak: ${p.contractValueFmt}` : ""}
+                      </option>
+                    ));
                   })()}
                 </select>
                 {formFaktur.projectId ? (

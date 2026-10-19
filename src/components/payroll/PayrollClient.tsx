@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition, Fragment } from "react";
+import { useState, useEffect, useRef, useTransition, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -17,6 +17,7 @@ import {
   Trash2,
   FileText,
   Search,
+  Check,
   CheckCircle,
   AlertCircle,
   Calendar,
@@ -149,6 +150,58 @@ function formatRupiahInput(val: string | number | undefined | null) {
   return Number(num).toLocaleString("id-ID");
 }
 
+const TENAGA_AHLI_SUBTABS = [
+  {
+    key: "honor" as const,
+    label: "Gaji Bulanan",
+    description: "Input & daftar pembayaran gaji bulanan",
+    icon: CreditCard,
+    hasIndicator: false,
+  },
+  {
+    key: "rekap-proyek" as const,
+    label: "Rekap Per Proyek",
+    description: "Alokasi honorarium berdasarkan proyek",
+    icon: Briefcase,
+    hasIndicator: false,
+  },
+  {
+    key: "rekap-bulan" as const,
+    label: "Rekap Setahun",
+    description: "Rekapitulasi pembayaran sepanjang tahun",
+    icon: Calendar,
+    hasIndicator: false,
+  },
+  {
+    key: "penyesuaian" as const,
+    label: "Penyesuaian Gaji",
+    description: "Sinkronisasi saldo Akun 612 dengan Laba Rugi",
+    icon: Scale,
+    hasIndicator: true,
+  },
+  {
+    key: "database-ahli" as const,
+    label: "Database Tenaga Ahli",
+    description: "Daftar profil tenaga ahli lepas holding",
+    icon: Users,
+    hasIndicator: false,
+  },
+  {
+    key: "rekap-nama" as const,
+    label: "Akumulasi Tenaga Ahli",
+    description: "Akumulasi honor & PPh per NIK",
+    icon: Award,
+    hasIndicator: false,
+  },
+  {
+    key: "konsolidasi" as const,
+    label: "Konsolidasi Holding",
+    description: "Rekapitulasi lintas seluruh entitas",
+    icon: Building2,
+    hasIndicator: false,
+  },
+] as const;
+
 export function PayrollClient({
   data,
   rekonsiliasiData,
@@ -188,6 +241,21 @@ export function PayrollClient({
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
     "honor" | "rekap-proyek" | "rekap-bulan" | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   >("honor");
+  const [isAhliSubTabDropdownOpen, setIsAhliSubTabDropdownOpen] = useState(false);
+  const ahliSubTabDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        ahliSubTabDropdownRef.current &&
+        !ahliSubTabDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsAhliSubTabDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Filter Tenaga Ahli (Gaji Bulanan)
   const [honorFilterScope, setHonorFilterScope] = useState<"entitas" | "holding">("entitas");
@@ -2904,97 +2972,113 @@ export function PayrollClient({
         <div className="space-y-6">
           {/* Sub-Tabs Tenaga Ahli */}
           <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 bg-surface-subtle p-1 rounded-xl border border-border/60">
+            {/* Dropdown Selector Sub-Tab Tenaga Ahli */}
+            <div ref={ahliSubTabDropdownRef} className="relative z-30">
               <button
-                onClick={() => setTenagaAhliSubTab("honor")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "honor"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
+                type="button"
+                onClick={() => setIsAhliSubTabDropdownOpen((prev) => !prev)}
+                className="h-9 px-3.5 rounded-xl border border-border bg-surface-card hover:bg-surface-hover text-navy-text text-xs font-bold inline-flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs"
+                title="Pilih Halaman Tenaga Ahli"
               >
-                <CreditCard size={13} className={tenagaAhliSubTab === "honor" ? "text-navy" : "text-muted-faint"} />
-                <span>Gaji Bulanan</span>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const currentTab = TENAGA_AHLI_SUBTABS.find((t) => t.key === tenagaAhliSubTab) || TENAGA_AHLI_SUBTABS[0];
+                    const Icon = currentTab.icon;
+                    return (
+                      <>
+                        <Icon size={14} className="text-navy shrink-0" />
+                        <span className="text-xs font-bold text-navy-text tracking-tight">
+                          {currentTab.label}
+                        </span>
+                        {currentTab.hasIndicator && (
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              (periodeFilterAhli === "bulan"
+                                ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan
+                                : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun)
+                                ? "bg-emerald-500"
+                                : "bg-amber-500 animate-pulse"
+                            }`}
+                            title={
+                              (periodeFilterAhli === "bulan"
+                                ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan
+                                : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun)
+                                ? "Jurnal Umum Sinkron"
+                                : "Terdapat Selisih Jurnal"
+                            }
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={`text-muted-faint transition-transform duration-200 ${
+                    isAhliSubTabDropdownOpen ? "rotate-180 text-navy" : ""
+                  }`}
+                />
               </button>
 
-              <button
-                onClick={() => setTenagaAhliSubTab("rekap-proyek")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "rekap-proyek"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Briefcase size={13} className={tenagaAhliSubTab === "rekap-proyek" ? "text-navy" : "text-muted-faint"} />
-                <span>Rekap Per Proyek</span>
-              </button>
-
-              <button
-                onClick={() => setTenagaAhliSubTab("rekap-bulan")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "rekap-bulan"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Calendar size={13} className={tenagaAhliSubTab === "rekap-bulan" ? "text-navy" : "text-muted-faint"} />
-                <span>Rekap Setahun</span>
-              </button>
-
-              <button
-                onClick={() => setTenagaAhliSubTab("penyesuaian")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "penyesuaian"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Scale size={13} className={tenagaAhliSubTab === "penyesuaian" ? "text-navy" : "text-muted-faint"} />
-                <span>Penyesuaian Gaji</span>
-                {(periodeFilterAhli === "bulan"
-                  ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan
-                  : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun) ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                )}
-              </button>
-
-              <button
-                onClick={() => setTenagaAhliSubTab("database-ahli")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "database-ahli"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Users size={13} className={tenagaAhliSubTab === "database-ahli" ? "text-navy" : "text-muted-faint"} />
-                <span>Database Tenaga Ahli</span>
-              </button>
-
-              <button
-                onClick={() => setTenagaAhliSubTab("rekap-nama")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "rekap-nama"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Award size={13} className={tenagaAhliSubTab === "rekap-nama" ? "text-navy" : "text-muted-faint"} />
-                <span>Akumulasi Tenaga Ahli</span>
-              </button>
-
-              <button
-                onClick={() => setTenagaAhliSubTab("konsolidasi")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                  tenagaAhliSubTab === "konsolidasi"
-                    ? "bg-surface-card text-navy-text shadow-2xs font-bold"
-                    : "text-muted-faint hover:text-navy-text hover:bg-surface-card/50"
-                }`}
-              >
-                <Building2 size={13} className={tenagaAhliSubTab === "konsolidasi" ? "text-navy" : "text-muted-faint"} />
-                <span>Konsolidasi Holding</span>
-              </button>
+              {isAhliSubTabDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1.5 z-40 w-72 bg-surface-card border border-border rounded-xl shadow-xl overflow-hidden p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-2.5 py-1 text-[10px] font-bold text-muted-faint uppercase tracking-wider border-b border-border/50">
+                    Menu Tenaga Ahli
+                  </div>
+                  <div className="space-y-0.5">
+                    {TENAGA_AHLI_SUBTABS.map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = tenagaAhliSubTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => {
+                            setTenagaAhliSubTab(tab.key);
+                            setIsAhliSubTabDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left cursor-pointer ${
+                            isActive
+                              ? "bg-navy text-white font-bold shadow-xs"
+                              : "text-navy-text hover:bg-surface-hover font-medium"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon
+                              size={14}
+                              className={isActive ? "text-white shrink-0" : "text-muted-stronger shrink-0"}
+                            />
+                            <div className="truncate">
+                              <div className="text-xs leading-snug flex items-center gap-1.5">
+                                <span className="truncate">{tab.label}</span>
+                                {tab.hasIndicator && (
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                      (periodeFilterAhli === "bulan"
+                                        ? data.penyesuaianJurnal.tenagaAhli.isSinkronBulan
+                                        : data.penyesuaianJurnal.tenagaAhli.isSinkronTahun)
+                                        ? "bg-emerald-500"
+                                        : "bg-amber-500 animate-pulse"
+                                    }`}
+                                  />
+                                )}
+                              </div>
+                              <div
+                                className={`text-[10px] truncate ${
+                                  isActive ? "text-white/80" : "text-muted-faint"
+                                }`}
+                              >
+                                {tab.description}
+                              </div>
+                            </div>
+                          </div>
+                          {isActive && <Check size={14} className="text-white shrink-0 ml-2" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">

@@ -219,13 +219,19 @@ function get_tarif_ppn_aktif(PDO $pdo): float {
 function hitung_pajak_faktur(array $b, float $tarif_ppn_default = 11.0): array {
     $dpp            = (float)($b['dpp']            ?? 0);
     $dpp_nilai_lain = (float)($b['dppNilaiLain']   ?? $b['dpp_nilai_lain'] ?? 0);
+    if ($dpp_nilai_lain <= 0 && $dpp > 0) {
+        $dpp_nilai_lain = (float)round(($dpp * 11) / 12);
+    }
     $tarif_ppn      = (float)($b['tarifPpnPersen'] ?? $b['tarif_ppn_persen'] ?? $tarif_ppn_default);
     $tarif_pph      = (float)($b['tarifPphPersen'] ?? $b['tarif_pph_persen'] ?? 3.50);
     $nilai_kuitansi = (float)($b['nilaiKuitansi']  ?? 0);
 
     $pph = (int)round($dpp * $tarif_pph / 100);
 
-    if ($nilai_kuitansi > 0) {
+    if ($tarif_ppn == 0) {
+        $ppn          = 0;
+        $nilai_proyek = $nilai_kuitansi > 0 ? (int)$nilai_kuitansi : (int)$dpp;
+    } elseif ($nilai_kuitansi > 0) {
         // Kuitansi bruto: nilaiProyek = nilai kuitansi, ppn = 11/111 × nilaiKuitansi
         $ppn          = (int)round($nilai_kuitansi * 11 / 111);
         $nilai_proyek = (int)$nilai_kuitansi;
@@ -272,7 +278,7 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
         $body['namaRekanan'],
         $body['namaJkp'],
         (float)$body['dpp'],
-        (float)$body['dppNilaiLain'],
+        (float)($body['dppNilaiLain'] ?? 0) > 0 ? (float)$body['dppNilaiLain'] : (float)round(((float)$body['dpp'] * 11) / 12),
         (float)$body['tarifPpnPersen'],
         (float)$body['tarifPphPersen'],
         $kalkulasi['ppn'],

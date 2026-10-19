@@ -49,6 +49,8 @@ export type FakturOption = {
   projectName?: string | null;
   tahunPajak: number;
   masaPajak: number;
+  tanggalTerima?: string | null;
+  createdAt?: string;
 };
 
 type CoaRow = {
@@ -665,20 +667,38 @@ export function JurnalTransaksiClient({
                     <option value="">— Tanpa E-Faktur —</option>
                     {currentProjectFakturs.length > 0 && (
                       <optgroup label="E-Faktur Proyek Ini">
-                        {currentProjectFakturs.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.noFaktur} · {f.namaRekanan} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")}
-                          </option>
-                        ))}
+                        {currentProjectFakturs.map((f) => {
+                          const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === f.noFaktur.trim().toLowerCase());
+                          const isDup = sameNumber.length > 1;
+                          const partIdx = isDup ? sameNumber.findIndex((x) => x.id === f.id) + 1 : null;
+                          const partTag = isDup ? `[Tagihan #${partIdx}/${sameNumber.length}] ` : "";
+                          const isCair = (f.nominalDiterima && f.nominalDiterima > 0) || !!f.tanggalTerima;
+                          const statusTag = isCair ? " · [Lunas/Cair]" : " · [Belum Cair]";
+                          const netto = f.labaSetelahPajak > 0 ? f.labaSetelahPajak : Math.max(0, f.dpp - f.pph);
+                          return (
+                            <option key={f.id} value={f.id}>
+                              {partTag}{f.noFaktur} · {f.namaRekanan} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")} · Netto: Rp {Math.round(netto).toLocaleString("id-ID")}{statusTag}
+                            </option>
+                          );
+                        })}
                       </optgroup>
                     )}
                     {otherFakturs.length > 0 && (
                       <optgroup label={currentProjectFakturs.length > 0 ? "E-Faktur Lainnya" : "Daftar E-Faktur"}>
-                        {otherFakturs.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.noFaktur} · {f.namaRekanan} {f.projectCode ? `[${f.projectCode}]` : ""} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")}
-                          </option>
-                        ))}
+                        {otherFakturs.map((f) => {
+                          const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === f.noFaktur.trim().toLowerCase());
+                          const isDup = sameNumber.length > 1;
+                          const partIdx = isDup ? sameNumber.findIndex((x) => x.id === f.id) + 1 : null;
+                          const partTag = isDup ? `[Tagihan #${partIdx}/${sameNumber.length}] ` : "";
+                          const isCair = (f.nominalDiterima && f.nominalDiterima > 0) || !!f.tanggalTerima;
+                          const statusTag = isCair ? " · [Lunas/Cair]" : " · [Belum Cair]";
+                          const netto = f.labaSetelahPajak > 0 ? f.labaSetelahPajak : Math.max(0, f.dpp - f.pph);
+                          return (
+                            <option key={f.id} value={f.id}>
+                              {partTag}{f.noFaktur} · {f.namaRekanan} {f.projectCode ? `[${f.projectCode}]` : ""} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")} · Netto: Rp {Math.round(netto).toLocaleString("id-ID")}{statusTag}
+                            </option>
+                          );
+                        })}
                       </optgroup>
                     )}
                   </select>
@@ -746,6 +766,30 @@ export function JurnalTransaksiClient({
                       <span className="font-bold font-mono text-[12px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
                         {selectedFaktur.noFaktur}
                       </span>
+                      {(() => {
+                        const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === selectedFaktur.noFaktur.trim().toLowerCase());
+                        const isDup = sameNumber.length > 1;
+                        const partIdx = isDup ? sameNumber.findIndex((x) => x.id === selectedFaktur.id) + 1 : null;
+                        const isCair = (selectedFaktur.nominalDiterima && selectedFaktur.nominalDiterima > 0) || !!selectedFaktur.tanggalTerima;
+                        return (
+                          <>
+                            {isDup && (
+                              <span className="font-bold text-[10.5px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                                Tagihan #{partIdx} dari {sameNumber.length}
+                              </span>
+                            )}
+                            {isCair ? (
+                              <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                Sudah Cair
+                              </span>
+                            ) : (
+                              <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                                Belum Cair
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                       <span className="font-semibold text-navy-text">
                         {selectedFaktur.namaRekanan}
                       </span>

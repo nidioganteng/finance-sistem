@@ -703,15 +703,16 @@ export function PayrollClient({
   );
 
   const filteredRekapPerNama = data.rekapTenagaAhliPerNama.filter((k) => {
+    const q = searchQuery.toLowerCase();
     const matchSearch =
-      k.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      k.nik.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      k.daftarProyek.some((p) => p.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      k.daftarEntitas.some((e) => e.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      k.daftarBulan.some((b) => b.toLowerCase().includes(searchQuery.toLowerCase()));
+      (k.nama || "").toLowerCase().includes(q) ||
+      (k.nik || "").toLowerCase().includes(q) ||
+      (k.daftarProyek || []).some((p) => p.toLowerCase().includes(q)) ||
+      (k.daftarEntitas || []).some((e) => e.toLowerCase().includes(q)) ||
+      (k.daftarBulan || []).some((b) => b.toLowerCase().includes(q));
 
     const matchEntitas =
-      filterEntitasNama === "ALL" || k.daftarEntitas.includes(filterEntitasNama);
+      filterEntitasNama === "ALL" || (k.daftarEntitas || []).includes(filterEntitasNama);
 
     return matchSearch && matchEntitas;
   });
@@ -2828,7 +2829,7 @@ export function PayrollClient({
                 }`}
               >
                 <Award size={13} className={tenagaAhliSubTab === "rekap-nama" ? "text-navy" : "text-muted-faint"} />
-                <span>Cek Per Nama (NIK)</span>
+                <span>Akumulasi Tenaga Ahli</span>
                 <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
                   tenagaAhliSubTab === "rekap-nama" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
                 }`}>
@@ -3380,16 +3381,22 @@ export function PayrollClient({
                             </td>
 
                             <td className="py-3 px-3.5 text-center font-mono border-b border-r border-border">
-                              <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-bold text-[11px] text-navy-text">
-                                {p.totalTransaksi} transaksi
-                              </span>
+                              {p.totalTransaksi > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-bold text-[11px] text-navy-text">
+                                  {p.totalTransaksi} transaksi
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-muted-stronger font-bold text-[10px] border border-border">
+                                  Belum Dibayar
+                                </span>
+                              )}
                             </td>
 
                             <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap text-sm border-b border-r border-border">
                               {p.totalHonorBrutoFmt}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap border-b border-r border-border">
+                            <td className="py-3 px-3.5 text-right font-mono text-muted-faint whitespace-nowrap border-b border-r border-border">
                               {p.totalPphFmt}
                             </td>
 
@@ -3405,7 +3412,7 @@ export function PayrollClient({
                                 }}
                                 className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                               >
-                                <span>Lihat Rincian</span>
+                                <span>{p.totalTransaksi > 0 ? "Lihat Rincian" : "Lihat Daftar"}</span>
                                 <ChevronRight size={12} />
                               </button>
                             </td>
@@ -4020,17 +4027,17 @@ export function PayrollClient({
             </div>
           )}
 
-          {/* Sub-Tab Content 3: Cek Per Nama (Patokan NIK) */}
+          {/* Sub-Tab Content 3: Akumulasi Tenaga Ahli (Patokan NIK) */}
           {tenagaAhliSubTab === "rekap-nama" && (
             <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-surface-subtle/30">
                 <div>
                   <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                     <Award size={16} className="text-navy" />
-                    <span>Cek Gaji Per Nama (Patokan NIK Tenaga Ahli) – Tahun {selectedYear}</span>
+                    <span>Akumulasi Riwayat Per Tenaga Ahli (Berdasarkan NIK) – Tahun {selectedYear}</span>
                   </h3>
                   <p className="text-xs text-muted-faint mt-0.5">
-                    Lacak riwayat honorarium per nama/NIK: dapat gaji dari proyek mana saja, entitas mana saja di grup holding, dan pada bulan apa saja.
+                    Lacak akumulasi honorarium per tenaga ahli: entitas pembayar dalam grup holding, proyek penugasan, dan rincian transaksi.
                   </p>
                 </div>
 
@@ -4070,10 +4077,10 @@ export function PayrollClient({
                   <thead className="bg-surface-subtle text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">NIK & Tenaga Ahli</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px] border-b border-r border-border">🏢 Entitas Mana Saja</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px] border-b border-r border-border">🏗️ Proyek Mana Saja</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px] border-b border-r border-border">📅 Bulan Apa Saja</th>
-                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px] border-b border-r border-border">Jml Transaksi</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px] border-b border-r border-border">Entitas Pembayar</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px] border-b border-r border-border">Proyek Penugasan</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px] border-b border-r border-border">Periode Pembayaran</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[110px] border-b border-r border-border">Jml Transaksi</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[130px] border-b border-r border-border">Total Honorarium</th>
                       <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[100px] border-b border-border">Rincian</th>
                     </tr>
@@ -4082,7 +4089,7 @@ export function PayrollClient({
                     {filteredRekapPerNama.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-muted-faint border-b border-border">
-                          Belum ada transaksi honorarium tenaga ahli untuk filter terpilih tahun {selectedYear}.
+                          Belum ada data tenaga ahli yang terdaftar atau bertransaksi pada filter terpilih tahun {selectedYear}.
                         </td>
                       </tr>
                     ) : (
@@ -4145,7 +4152,7 @@ export function PayrollClient({
                                     r.daftarBulan.map((bulanName, i) => (
                                       <span
                                         key={i}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-[10px] font-semibold border border-amber-200 dark:border-amber-800"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-subtle text-muted-stronger text-[10px] font-semibold border border-border"
                                       >
                                         <Calendar size={10} />
                                         <span>{bulanName}</span>
@@ -4158,9 +4165,15 @@ export function PayrollClient({
                               </td>
 
                               <td className="py-3 px-3.5 text-center font-mono whitespace-nowrap border-b border-r border-border">
-                                <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-bold text-[11px]">
-                                  {r.totalTransaksi}x
-                                </span>
+                                {r.totalTransaksi > 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-surface-subtle font-bold text-[11px] text-navy-text">
+                                    {r.totalTransaksi}x
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-muted-stronger font-semibold text-[10px] border border-border">
+                                    Belum Dibayar
+                                  </span>
+                                )}
                               </td>
 
                               <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
@@ -4222,39 +4235,47 @@ export function PayrollClient({
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {r.rincian.map((item) => (
-                                            <tr key={item.id} className="hover:bg-surface-hover/20">
-                                              <td className="py-2 px-3 font-medium whitespace-nowrap border-b border-r border-border">
-                                                <div>{item.tanggalFmt}</div>
-                                                {item.noBukti && (
-                                                  <div className="text-[10px] font-mono text-muted-faint">
-                                                    {item.noBukti}
-                                                  </div>
-                                                )}
-                                              </td>
-                                              <td className="py-2 px-3 whitespace-nowrap border-b border-r border-border">
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 text-[10px] font-semibold border border-purple-200 dark:border-purple-800">
-                                                  <Building2 size={10} />
-                                                  <span>{item.entityName}</span>
-                                                </span>
-                                              </td>
-                                              <td className="py-2 px-3 text-muted-stronger font-medium whitespace-nowrap border-b border-r border-border">
-                                                {item.bulanName}
-                                              </td>
-                                              <td className="py-2 px-3 border-b border-r border-border">
-                                                <span className="font-semibold text-brand text-[11px] inline-flex items-center gap-1">
-                                                  <Briefcase size={11} />
-                                                  <span>{item.namaProyek}</span>
-                                                </span>
-                                              </td>
-                                              <td className="py-2 px-3 text-muted-stronger border-b border-r border-border">
-                                                {item.uraian}
-                                              </td>
-                                              <td className="py-2 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-border">
-                                                {item.nominalHonorFmt}
+                                          {r.rincian.length === 0 ? (
+                                            <tr>
+                                              <td colSpan={6} className="py-6 text-center text-muted-faint border-b border-border">
+                                                Belum ada transaksi pembayaran honorarium yang dicatat untuk tahun {selectedYear}.
                                               </td>
                                             </tr>
-                                          ))}
+                                          ) : (
+                                            r.rincian.map((item) => (
+                                              <tr key={item.id} className="hover:bg-surface-hover/20">
+                                                <td className="py-2 px-3 font-medium whitespace-nowrap border-b border-r border-border">
+                                                  <div>{item.tanggalFmt}</div>
+                                                  {item.noBukti && (
+                                                    <div className="text-[10px] font-mono text-muted-faint">
+                                                      {item.noBukti}
+                                                    </div>
+                                                  )}
+                                                </td>
+                                                <td className="py-2 px-3 whitespace-nowrap border-b border-r border-border">
+                                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 text-[10px] font-semibold border border-purple-200 dark:border-purple-800">
+                                                    <Building2 size={10} />
+                                                    <span>{item.entityName}</span>
+                                                  </span>
+                                                </td>
+                                                <td className="py-2 px-3 text-muted-stronger font-medium whitespace-nowrap border-b border-r border-border">
+                                                  {item.bulanName}
+                                                </td>
+                                                <td className="py-2 px-3 border-b border-r border-border">
+                                                  <span className="font-semibold text-navy-text text-[11px] inline-flex items-center gap-1">
+                                                    <Briefcase size={11} className="text-muted-faint" />
+                                                    <span>{item.namaProyek}</span>
+                                                  </span>
+                                                </td>
+                                                <td className="py-2 px-3 text-muted-stronger border-b border-r border-border">
+                                                  {item.uraian}
+                                                </td>
+                                                <td className="py-2 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-border">
+                                                  {item.nominalHonorFmt}
+                                                </td>
+                                              </tr>
+                                            ))
+                                          )}
                                         </tbody>
                                       </table>
                                     </div>

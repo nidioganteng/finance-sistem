@@ -4111,7 +4111,7 @@ export function PayrollClient({
 
                         return (
                           <tr key={r.id} className="group hover:bg-surface-hover/30 transition-colors">
-                            <td className="py-3 px-3.5 whitespace-nowrap sticky left-0 z-10 bg-surface-card group-hover:bg-surface-hover/50 hover:bg-surface-hover/50 transition-colors border-b border-r-2 border-border shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-2px_rgba(0,0,0,0.4)]">
+                            <td className="py-3 px-3.5 whitespace-nowrap sticky left-0 z-10 bg-surface-card group-hover:bg-surface-hover hover:bg-surface-hover transition-colors border-b border-r-2 border-border shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-2px_rgba(0,0,0,0.4)]">
                               <div className="font-bold text-navy-text text-sm">{r.nama}</div>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {r.kategori && (

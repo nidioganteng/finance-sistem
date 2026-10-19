@@ -66,6 +66,15 @@ if ($method === 'POST' && $sub === 'assignment') {
             $existing['id'],
         ]);
 
+        $notif_text  = "Penugasan diperbarui dari Sidamon: [{$existing['code']}] $job_name" . ($client_name ? " — $client_name" : '');
+        $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
+        foreach ($notif_roles as $role) {
+            $pdo->prepare(
+                "INSERT INTO Notifikasi (id, type, targetRole, text, `read`, createdAt)
+                 VALUES (?, 'PENUGASAN_BARU', ?, ?, 0, NOW())"
+            )->execute([uuid4(), $role, $notif_text]);
+        }
+
         json_response([
             'success'   => true,
             'action'    => 'updated',

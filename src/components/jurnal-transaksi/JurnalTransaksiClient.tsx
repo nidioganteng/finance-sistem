@@ -116,13 +116,20 @@ export function JurnalTransaksiClient({
   });
 
   useEffect(() => {
-    if (hasSalaryAccount && periodeBulanGaji === null) {
-      const txDate = tanggal ? new Date(tanggal) : new Date();
-      const curM = txDate.getMonth() + 1;
-      const defM = curM === 1 ? 12 : curM - 1;
-      const defY = curM === 1 ? txDate.getFullYear() - 1 : txDate.getFullYear();
-      setPeriodeBulanGaji(defM);
-      setPeriodeTahunGaji(defY);
+    if (hasSalaryAccount) {
+      if (periodeBulanGaji === null) {
+        const txDate = tanggal ? new Date(tanggal) : new Date();
+        const curM = txDate.getMonth() + 1;
+        const defM = curM === 1 ? 12 : curM - 1;
+        const defY = curM === 1 ? txDate.getFullYear() - 1 : txDate.getFullYear();
+        setPeriodeBulanGaji(defM);
+        setPeriodeTahunGaji(defY);
+      }
+    } else {
+      if (periodeBulanGaji !== null) {
+        setPeriodeBulanGaji(null);
+        setPeriodeTahunGaji(null);
+      }
     }
   }, [hasSalaryAccount, tanggal, periodeBulanGaji]);
 
@@ -826,7 +833,7 @@ export function JurnalTransaksiClient({
             </div>
 
             {/* Pilihan Periode Beban Gaji (Akrual) — Langsung tampil saat input gaji */}
-            {(hasSalaryAccount || !!periodeBulanGaji) && (
+            {hasSalaryAccount && (
               <div className="mb-4 rounded-[12px] border border-border-soft bg-surface-card p-4 flex flex-col gap-3 shadow-xs">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="text-[11.5px] font-bold text-navy-text uppercase tracking-wide">

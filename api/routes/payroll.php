@@ -814,6 +814,44 @@ if ($method === 'GET' && $sub === '') {
 
     // Build rekapTenagaAhliPerNama (grouped by NIK/nama, cross-entity)
     $per_nama_map = [];
+
+    // 1. Masukkan seluruh Master Tenaga Ahli yang terdaftar di Rekanan (tipe TENAGA_AHLI)
+    // agar tenaga ahli yang sudah terdaftar tetap muncul pada Akumulasi Tenaga Ahli walau belum ada pembayaran
+    $stmt_master_ahli = $pdo->prepare(
+        "SELECT r.*, e.name AS entityName, p.code AS projCode, p.name AS projName
+         FROM Rekanan r
+         JOIN Entity e ON r.entityId = e.id
+         LEFT JOIN Project p ON r.projectId = p.id
+         WHERE r.tipe = 'TENAGA_AHLI'
+         ORDER BY r.nama ASC"
+    );
+    $stmt_master_ahli->execute();
+    $all_registered_ahli = $stmt_master_ahli->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($all_registered_ahli as $ra) {
+        $key = trim($ra['nik'] ?? '') ?: trim($ra['nama']);
+        if (!$key) continue;
+        if (!isset($per_nama_map[$key])) {
+            $proj_label = $ra['projName']
+                ? ($ra['projCode'] ? "{$ra['projCode']} - {$ra['projName']}" : $ra['projName'])
+                : null;
+            $per_nama_map[$key] = [
+                'nik'               => $ra['nik'] ?: '-',
+                'nama'              => $ra['nama'],
+                'npwp'              => $ra['npwp'] ?? null,
+                'totalTransaksi'    => 0,
+                'totalHonorBruto'   => 0.0,
+                'totalPph21'        => 0.0,
+                'totalHonorBersih'  => 0.0,
+                'daftarEntitas'     => $ra['entityName'] ? [$ra['entityName']] : [],
+                'daftarProyek'      => $proj_label ? [$proj_label] : [],
+                'daftarBulan'       => [],
+                'rincian'           => [],
+            ];
+        }
+    }
+
+    // 2. Agregasikan data dari riwayat pembayaran honor
     foreach ($all_honor_tahun as $h) {
         $key = trim($h['nik'] ?? '') ?: trim($h['nama']);
         $bruto  = (float)$h['nominalHonor'];
@@ -880,7 +918,12 @@ if ($method === 'GET' && $sub === '') {
         $item['totalHonorBersihFmt'] = fmt_rp_payroll($item['totalHonorBersih']);
         $rekap_ta_per_nama[] = $item;
     }
-    usort($rekap_ta_per_nama, fn($a, $b) => $b['totalHonorBruto'] <=> $a['totalHonorBruto']);
+    usort($rekap_ta_per_nama, function($a, $b) {
+        if ($b['totalHonorBruto'] !== $a['totalHonorBruto']) {
+            return $b['totalHonorBruto'] <=> $a['totalHonorBruto'];
+        }
+        return strcmp($a['nama'], $b['nama']);
+    });
 
     // Build konsolidasiTenagaAhli
     $konsolidasi_map = [];
@@ -1070,7 +1113,37 @@ if ($method === 'GET' && $sub === '') {
 
     // Build rekapTenagaAhliPerProyek — honor per proyek, seluruh tahun
     $per_proyek_map = [];
+
+    // 1. Masukkan proyek yang ditugaskan ke tenaga ahli di tabel Rekanan
+    // agar proyek dan nama tenaga ahlinya tetap muncul di rekap per proyek walau belum ada pembayaran
+    foreach ($rekanan_tenaga_ahli as $r) {
+        if (!empty($r['projectId'])) {
+            $proj_key = $r['projectId'];
+            if (!isset($per_proyek_map[$proj_key])) {
+                $proj_name = $r['projectName']
+                    ?: ($r['projectCode'] ? "{$r['projectCode']} - {$r['projectName']}" : 'Proyek');
+                $per_proyek_map[$proj_key] = [
+                    'projectId'         => $r['projectId'],
+                    'projectCode'       => $r['projectCode'] ?? null,
+                    'projectName'       => $proj_name,
+                    'entityName'        => $entity['name'] ?? '',
+                    'totalTransaksi'    => 0,
+                    'totalHonorBruto'   => 0.0,
+                    'totalPph'          => 0.0,
+                    'totalHonorBersih'  => 0.0,
+                    'tenagaAhliList'    => [],
+                ];
+            }
+            $nama = trim($r['nama']);
+            if ($nama && !in_array($nama, $per_proyek_map[$proj_key]['tenagaAhliList'])) {
+                $per_proyek_map[$proj_key]['tenagaAhliList'][] = $nama;
+            }
+        }
+    }
+
+    // 2. Agregasikan data dari riwayat pembayaran honor per proyek di entitas ini
     foreach ($all_honor_tahun as $h) {
+        if ($h['entityId'] !== $entity_id) continue;
         $proj_key = $h['projectId'] ?: '__none__';
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
@@ -1110,7 +1183,12 @@ if ($method === 'GET' && $sub === '') {
         $item['totalHonorBersihFmt'] = fmt_rp_payroll($item['totalHonorBersih']);
         $rekap_ta_per_proyek[] = $item;
     }
-    usort($rekap_ta_per_proyek, fn($a, $b) => $b['totalHonorBruto'] <=> $a['totalHonorBruto']);
+    usort($rekap_ta_per_proyek, function($a, $b) {
+        if ($b['totalHonorBruto'] !== $a['totalHonorBruto']) {
+            return $b['totalHonorBruto'] <=> $a['totalHonorBruto'];
+        }
+        return strcmp($a['projectName'], $b['projectName']);
+    });
 
     // 10. Transactions for COA gaji/honor/tenaga ahli for year (for sync laba rugi)
     $year_start = "$year-01-01 00:00:00";

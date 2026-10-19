@@ -407,7 +407,7 @@ function get_or_create_jurnal_transaksi_jenis(PDO $pdo): string {
     $id = $stmt->fetchColumn();
     if ($id) return $id;
     $new_id = uuid4();
-    $pdo->prepare("INSERT INTO JenisInputTransaksi (id, `key`, nama, active, createdAt) VALUES (?, 'jurnalTransaksi', 'Jurnal Transaksi', 1, NOW())")
+    $pdo->prepare("INSERT INTO JenisInputTransaksi (id, `key`, nama, active, createdAt) VALUES (?, 'jurnalTransaksi', 'Entry Jurnal', 1, NOW())")
         ->execute([$new_id]);
     return $new_id;
 }

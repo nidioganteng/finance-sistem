@@ -151,6 +151,29 @@ if ($method === 'GET' && $sub === '') {
         unset($g);
     }
 
+    // Urutkan baris jurnal tiap grup: Debit di atas, Kredit di bawah (Pendapatan paling bawah)
+    foreach ($grouped as &$grp) {
+        usort($grp['rows'], function ($a, $b) {
+            $aDebit = (float)($a['debit'] ?? 0) > 0;
+            $bDebit = (float)($b['debit'] ?? 0) > 0;
+            $aKredit = (float)($a['kredit'] ?? 0) > 0;
+            $bKredit = (float)($b['kredit'] ?? 0) > 0;
+
+            if ($aDebit && !$bDebit) return -1;
+            if (!$aDebit && $bDebit) return 1;
+
+            if ($aKredit && $bKredit) {
+                $aPendapatan = str_starts_with((string)($a['coaCode'] ?? ''), '4') || stripos((string)($a['coaName'] ?? ''), 'pendapatan') !== false;
+                $bPendapatan = str_starts_with((string)($b['coaCode'] ?? ''), '4') || stripos((string)($b['coaName'] ?? ''), 'pendapatan') !== false;
+                if (!$aPendapatan && $bPendapatan) return -1;
+                if ($aPendapatan && !$bPendapatan) return 1;
+            }
+
+            return 0;
+        });
+    }
+    unset($grp);
+
     $groups = array_values(array_filter(
         array_map(fn($nb) => $grouped[$nb] ?? null, $paged_nbs)
     ));
@@ -279,6 +302,28 @@ elseif ($method === 'POST' && $sub === '') {
 
     $staff_id  = $user['staffId'] ?? $user['id'];
     $tanggal_dt = $tanggal . ' 00:00:00';
+    // Urutkan baris: Debit di atas, Kredit di bawah (Pendapatan ditaruh paling bawah)
+    usort($valid_rows, function ($a, $b) use ($coa_map) {
+        $aDebit = (float)($a['debit'] ?? 0) > 0;
+        $bDebit = (float)($b['debit'] ?? 0) > 0;
+        $aKredit = (float)($a['kredit'] ?? 0) > 0;
+        $bKredit = (float)($b['kredit'] ?? 0) > 0;
+
+        if ($aDebit && !$bDebit) return -1;
+        if (!$aDebit && $bDebit) return 1;
+
+        if ($aKredit && $bKredit) {
+            $coaA = $coa_map[$a['coaAccountId']] ?? null;
+            $coaB = $coa_map[$b['coaAccountId']] ?? null;
+            $aPendapatan = ($coaA && (str_starts_with((string)$coaA['code'], '4') || stripos((string)$coaA['name'], 'pendapatan') !== false));
+            $bPendapatan = ($coaB && (str_starts_with((string)$coaB['code'], '4') || stripos((string)$coaB['name'], 'pendapatan') !== false));
+            if (!$aPendapatan && $bPendapatan) return -1;
+            if ($aPendapatan && !$bPendapatan) return 1;
+        }
+
+        return 0;
+    });
+
     $first_keterangan = trim($valid_rows[0]['keterangan'] ?? '');
 
     $pdo->beginTransaction();

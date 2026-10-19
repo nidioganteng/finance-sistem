@@ -7,7 +7,7 @@ import { saveJurnalTransaksi, deleteJurnalTransaksi } from "@/lib/actions/jurnal
 import { PaginationNav } from "@/components/shared/PaginationNav";
 import { CoaCombobox } from "@/components/shared/CoaCombobox";
 import { formatRupiah } from "@/lib/dashboard-data";
-import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
+import { sortJurnalRows, type JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
 import { DeleteConfirmModal } from "@/components/kas/DeleteConfirmModal";
 
 type CoaOption = { id: string; code: string; name: string; kategori?: string };
@@ -389,7 +389,8 @@ export function JurnalTransaksiClient({
     setFakturId(group.fakturId ?? "");
     setPeriodeBulanGaji(group.periodeBulanGaji ?? null);
     setPeriodeTahunGaji(group.periodeTahunGaji ?? null);
-    setCoaRows(group.rows.map((r) => ({
+    const sortedRows = sortJurnalRows(group.rows);
+    setCoaRows(sortedRows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
       keterangan: r.keterangan,
@@ -433,15 +434,32 @@ export function JurnalTransaksiClient({
       fd.set("periodeTahunGaji", String(periodeTahunGaji || new Date(tanggal).getFullYear()));
     }
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
+
+    const sortedFormRows = [...coaRows]
+      .filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0)
+      .sort((a, b) => {
+        const aIsCredit = a.arah === "kredit";
+        const bIsCredit = b.arah === "kredit";
+        if (!aIsCredit && bIsCredit) return -1;
+        if (aIsCredit && !bIsCredit) return 1;
+        if (aIsCredit && bIsCredit) {
+          const coaA = coa.find((c) => c.id === a.coaAccountId);
+          const coaB = coa.find((c) => c.id === b.coaAccountId);
+          const aIsPendapatan = coaA?.code?.startsWith("4") || /pendapatan/i.test(coaA?.name || "");
+          const bIsPendapatan = coaB?.code?.startsWith("4") || /pendapatan/i.test(coaB?.name || "");
+          if (!aIsPendapatan && bIsPendapatan) return -1;
+          if (aIsPendapatan && !bIsPendapatan) return 1;
+        }
+        return 0;
+      });
+
     fd.set("rows", JSON.stringify(
-      coaRows
-        .filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0)
-        .map((r) => ({
-          coaAccountId: r.coaAccountId,
-          keterangan: r.keterangan,
-          debit: r.arah === "debit" ? parseNum(r.nominalRaw) : 0,
-          kredit: r.arah === "kredit" ? parseNum(r.nominalRaw) : 0,
-        }))
+      sortedFormRows.map((r) => ({
+        coaAccountId: r.coaAccountId,
+        keterangan: r.keterangan,
+        debit: r.arah === "debit" ? parseNum(r.nominalRaw) : 0,
+        kredit: r.arah === "kredit" ? parseNum(r.nominalRaw) : 0,
+      }))
     ));
     startTransition(async () => {
       try {
@@ -1053,10 +1071,11 @@ export function JurnalTransaksiClient({
             {sortedHistory.length === 0 ? (
               <tr><td colSpan={8} className="py-10 text-center text-[13px] text-muted">Belum ada entri jurnal.</td></tr>
             ) : (
-              sortedHistory.map((group) =>
-                group.rows.map((row, rowIdx) => (
+              sortedHistory.map((group) => {
+                const groupRows = sortJurnalRows(group.rows);
+                return groupRows.map((row, rowIdx) => (
                   <tr key={`${group.noBukti}-${rowIdx}`}
-                    className={`border-b align-top hover:bg-surface-hover/30 group transition-colors ${rowIdx === group.rows.length - 1 ? "border-border" : "border-surface-subtle"}`}>
+                    className={`border-b align-top hover:bg-surface-hover/30 group transition-colors ${rowIdx === groupRows.length - 1 ? "border-border" : "border-surface-subtle"}`}>
                     {rowIdx === 0 ? (
                       <>
                         <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
@@ -1115,7 +1134,7 @@ export function JurnalTransaksiClient({
                         <td className="py-2.5 px-1.5" />
                       </>
                     )}
-                    <td className="py-2.5 px-1.5 text-[12.5px] text-muted-stronger">
+                    <td className={`py-2.5 px-1.5 text-[12.5px] ${row.kredit > 0 ? "pl-5 text-muted" : "text-muted-stronger font-medium"}`}>
                       <span className="font-mono text-[11px] text-muted mr-1.5">{row.coaCode}</span>{row.coaName}
                     </td>
                     <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px] truncate">{row.keterangan || <span className="text-muted-faint">—</span>}</td>
@@ -1138,8 +1157,8 @@ export function JurnalTransaksiClient({
                       </td>
                     ) : <td className="py-2.5 px-1.5" />}
                   </tr>
-                ))
-              )
+                ));
+              })
             )}
           </tbody>
         </table>

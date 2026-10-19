@@ -43,6 +43,7 @@ import {
   type PegawaiItem,
   type GajiBulananItem,
   type HonorTenagaAhliItem,
+  type RekananTenagaAhliItem,
   type KonsolidasiTenagaAhliItem,
   type PayrollSyncLabaRugi,
   type RekapBulanPegawaiItem,
@@ -77,7 +78,7 @@ type PayrollData = {
   entity: { id: string; key: string; name: string; legalName: string } | null;
   allEntities: { id: string; key: string; name: string; legalName: string }[];
   projects: { id: string; code: string; name: string }[];
-  rekananTenagaAhli: { id: string; nama: string; nik: string | null; npwp: string | null; kategori: string | null; ptkp?: string | null }[];
+  rekananTenagaAhli: RekananTenagaAhliItem[];
   year: number;
   month: number;
   pegawaiList: PegawaiItem[];
@@ -383,7 +384,7 @@ export function PayrollClient({
   const [modalHonorNoBukti, setModalHonorNoBukti] = useState<string>("");
 
   function openHonorModal(h?: HonorTenagaAhliItem | null, rekananId?: string) {
-    if (h) {
+    if (h && !h.isPendingPayment) {
       setEditingHonor(h);
       setModalHonorBulan(h.bulan);
       setModalHonorTahun(h.tahun);
@@ -401,6 +402,27 @@ export function PayrollClient({
       setModalHonorUraian(h.uraian || "");
       setModalHonorNoBukti(h.noBukti || "");
       setSelectedRekananIdForHonor(h.rekananId || "");
+    } else if (h && h.isPendingPayment) {
+      setEditingHonor(null);
+      setModalHonorBulan(h.bulan || selectedMonth);
+      setModalHonorTahun(h.tahun || selectedYear);
+      const today = new Date();
+      const isCurrentPeriod =
+        today.getFullYear() === selectedYear && today.getMonth() + 1 === selectedMonth;
+      const defaultDate = isCurrentPeriod
+        ? today.toISOString().split("T")[0]
+        : `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
+      setModalHonorTanggal(defaultDate);
+      setSelectedRekananIdForHonor(h.rekananId || "");
+      setModalHonorPtkp(h.ptkp || "TK/0");
+      setModalHonorJenisPph("PPh 21");
+      setModalHonorNominal(h.nominalHonor || 0);
+      setModalHonorTarifPph(h.tarifPph21Persen || 0);
+      setModalHonorNominalPph(h.pph21 || 0);
+      setModalHonorProjectId(h.projectId || "");
+      setModalHonorNamaProyek(h.namaProyek || h.projectName || "");
+      setModalHonorUraian(h.uraian || "");
+      setModalHonorNoBukti("");
     } else {
       setEditingHonor(null);
       setModalHonorBulan(selectedMonth);
@@ -417,12 +439,22 @@ export function PayrollClient({
       const matchedRekanan = data.rekananTenagaAhli.find((r) => r.id === targetRekananId);
       setModalHonorPtkp(matchedRekanan?.ptkp || "TK/0");
       setModalHonorJenisPph("PPh 21");
-      setModalHonorNominal(0);
-      setModalHonorTarifPph(0);
-      setModalHonorNominalPph(0);
-      setModalHonorProjectId("");
-      setModalHonorNamaProyek("");
-      setModalHonorUraian("");
+      const defaultNominal = matchedRekanan?.nominalHonorBulanan || 0;
+      setModalHonorNominal(defaultNominal);
+      const pphRate = matchedRekanan?.npwp ? 2.5 : 3.0;
+      setModalHonorTarifPph(pphRate);
+      setModalHonorNominalPph(defaultNominal > 0 ? Math.round((defaultNominal * pphRate) / 100) : 0);
+      setModalHonorProjectId(matchedRekanan?.projectId || "");
+      setModalHonorNamaProyek(
+        matchedRekanan?.projectCode
+          ? `[${matchedRekanan.projectCode}] ${matchedRekanan.projectName}`
+          : (matchedRekanan?.projectName || "")
+      );
+      setModalHonorUraian(
+        matchedRekanan?.nama
+          ? `Honorarium Tenaga Ahli: ${matchedRekanan.nama} - Bulan ${BULAN_NAMES[selectedMonth - 1]} ${selectedYear}`
+          : ""
+      );
       setModalHonorNoBukti("");
     }
     setIsHonorModalOpen(true);
@@ -430,14 +462,7 @@ export function PayrollClient({
 
   // Master Tenaga Ahli Modal
   const [isMasterAhliModalOpen, setIsMasterAhliModalOpen] = useState(false);
-  const [editingMasterAhli, setEditingMasterAhli] = useState<{
-    id?: string;
-    nama: string;
-    nik: string | null;
-    npwp: string | null;
-    kategori: string | null;
-    ptkp?: string | null;
-  } | null>(null);
+  const [editingMasterAhli, setEditingMasterAhli] = useState<RekananTenagaAhliItem | null>(null);
 
   // State selection di modal honor
   const [selectedRekananIdForHonor, setSelectedRekananIdForHonor] = useState<string>("");
@@ -654,15 +679,18 @@ export function PayrollClient({
     return matchSearch && matchProyek;
   });
 
-  const totalHonorBrutoFiltered = filteredHonorList.reduce(
+  const paidHonorList = filteredHonorList.filter((h) => !h.isPendingPayment);
+  const pendingHonorList = filteredHonorList.filter((h) => h.isPendingPayment);
+
+  const totalHonorBrutoFiltered = paidHonorList.reduce(
     (acc, h) => acc + h.nominalHonor,
     0
   );
-  const totalHonorPphFiltered = filteredHonorList.reduce(
+  const totalHonorPphFiltered = paidHonorList.reduce(
     (acc, h) => acc + (h.pph21 || 0),
     0
   );
-  const totalHonorBersihFiltered = filteredHonorList.reduce(
+  const totalHonorBersihFiltered = paidHonorList.reduce(
     (acc, h) =>
       acc + (h.nominalBersih || Math.max(0, h.nominalHonor - (h.pph21 || 0))),
     0
@@ -3034,15 +3062,29 @@ export function PayrollClient({
                         return (
                           <tr key={h.id} className="hover:bg-surface-hover/30 transition-colors">
                             <td className="py-3 px-3.5 border-b border-r border-border">
-                              <div className="font-semibold text-navy-text">{h.tanggalFmt}</div>
-                              {h.noBukti ? (
-                                <div className="font-mono text-[11px] text-muted-faint mt-0.5">
-                                  Bukti: {h.noBukti}
-                                </div>
+                              {h.isPendingPayment ? (
+                                <>
+                                  <div className="font-semibold text-navy-text">
+                                    Bulan {BULAN_NAMES[(h.bulan || selectedMonth) - 1]} {h.tahun || selectedYear}
+                                  </div>
+                                  <div className="text-[10px] text-blue-700 dark:text-blue-300 font-semibold mt-0.5 inline-flex items-center gap-1">
+                                    <Calendar size={10} />
+                                    <span>Penugasan Aktif</span>
+                                  </div>
+                                </>
                               ) : (
-                                <div className="text-[10px] text-muted-faint/60 mt-0.5">
-                                  Bulan {h.bulan}/{h.tahun}
-                                </div>
+                                <>
+                                  <div className="font-semibold text-navy-text">{h.tanggalFmt}</div>
+                                  {h.noBukti ? (
+                                    <div className="font-mono text-[11px] text-muted-faint mt-0.5">
+                                      Bukti: {h.noBukti}
+                                    </div>
+                                  ) : (
+                                    <div className="text-[10px] text-muted-faint/60 mt-0.5">
+                                      Bulan {h.bulan}/{h.tahun}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </td>
 
@@ -3052,6 +3094,11 @@ export function PayrollClient({
                                 <span className="px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold">
                                   {h.ptkp || "TK/0"}
                                 </span>
+                                {h.isPendingPayment && (
+                                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-semibold">
+                                    Turun Lapangan
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[11px] text-muted-faint font-mono mt-0.5">
                                 NIK: {h.nik} {h.npwp ? `· NPWP: ${h.npwp}` : ""}
@@ -3098,50 +3145,74 @@ export function PayrollClient({
                               </div>
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap text-sm border-b border-r border-border">
-                              {formatRupiah(netVal)}
+                            <td className="py-3 px-3.5 text-right font-mono font-bold whitespace-nowrap text-sm border-b border-r border-border">
+                              <div className={h.isPendingPayment ? "text-navy-text" : "text-emerald-700 dark:text-emerald-300"}>
+                                {formatRupiah(netVal)}
+                              </div>
+                              {h.isPendingPayment && (
+                                <div className="mt-0.5">
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold">
+                                    Siap Dibayar
+                                  </span>
+                                </div>
+                              )}
                             </td>
 
                             <td className="py-3 px-3.5 text-right whitespace-nowrap border-b border-border">
                               {isManager && (
                                 <div className="inline-flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => {
-                                      openHonorModal(h);
-                                    }}
-                                    className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                  >
-                                    <Pencil size={11} />
-                                    <span>Edit</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setDeleteDialog({
-                                        isOpen: true,
-                                        title: "Hapus Honorarium Tenaga Ahli",
-                                        itemName: h.nama,
-                                        itemSub: `Nominal: ${h.nominalHonorFmt} · ${h.uraian}`,
-                                        warningNote:
-                                          "Data transaksi honorarium ini akan dihapus dari rekapitulasi penggajian dan jurnal beban honor.",
-                                        confirmLabel: "Ya, Hapus Honor",
-                                        onConfirm: async () => {
-                                          try {
-                                            await deleteHonorTenagaAhliAction(h.id);
-                                            setSuccessMsg("Honorarium berhasil dihapus.");
-                                            setDeleteDialog(null);
-                                            router.refresh();
-                                          } catch (e: unknown) {
-                                            setErrorMsg((e as Error).message);
-                                            setDeleteDialog(null);
-                                          }
-                                        },
-                                      });
-                                    }}
-                                    className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
-                                    title="Hapus Honorarium"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
+                                  {h.isPendingPayment ? (
+                                    <button
+                                      onClick={() => {
+                                        openHonorModal(h, h.rekananId || undefined);
+                                      }}
+                                      className="h-7 px-2.5 rounded-lg bg-navy hover:bg-navy-light text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      title="Bayar Gaji / Catat Transaksi Honor Tenaga Ahli"
+                                    >
+                                      <Plus size={11} />
+                                      <span>Bayar Gaji</span>
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          openHonorModal(h);
+                                        }}
+                                        className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      >
+                                        <Pencil size={11} />
+                                        <span>Edit</span>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setDeleteDialog({
+                                            isOpen: true,
+                                            title: "Hapus Honorarium Tenaga Ahli",
+                                            itemName: h.nama,
+                                            itemSub: `Nominal: ${h.nominalHonorFmt} · ${h.uraian}`,
+                                            warningNote:
+                                              "Data transaksi honorarium ini akan dihapus dari rekapitulasi penggajian dan jurnal beban honor.",
+                                            confirmLabel: "Ya, Hapus Honor",
+                                            onConfirm: async () => {
+                                              try {
+                                                await deleteHonorTenagaAhliAction(h.id);
+                                                setSuccessMsg("Honorarium berhasil dihapus.");
+                                                setDeleteDialog(null);
+                                                router.refresh();
+                                              } catch (e: unknown) {
+                                                setErrorMsg((e as Error).message);
+                                                setDeleteDialog(null);
+                                              }
+                                            },
+                                          });
+                                        }}
+                                        className="h-7 px-2 rounded-lg border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shadow-2xs"
+                                        title="Hapus Honorarium"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -3157,7 +3228,7 @@ export function PayrollClient({
                           colSpan={honorFilterScope === "holding" ? 4 : 3}
                           className="py-3 px-3.5 text-navy-text whitespace-nowrap border-t-2 border-b border-r border-border bg-surface-subtle"
                         >
-                          Total ({filteredHonorList.length} Transaksi Terpilih):
+                          Total Realisasi ({paidHonorList.length} Terbayar{pendingHonorList.length > 0 ? `, ${pendingHonorList.length} Siap Dibayar` : ""}):
                         </td>
                         <td className="py-3 px-3.5 text-right font-mono text-navy-text whitespace-nowrap text-sm border-t-2 border-b border-r border-border bg-surface-subtle">
                           {formatRupiah(totalHonorBrutoFiltered)}
@@ -3765,20 +3836,22 @@ export function PayrollClient({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-xs border-separate border-spacing-0">
+                <table className="w-full min-w-[980px] text-left text-xs border-separate border-spacing-0">
                   <thead className="bg-surface-subtle text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[180px] border-b border-r border-border">Nama & Spesialisasi</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">NIK (16 Digit Terdaftar)</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px] border-b border-r border-border">NPWP</th>
-                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[90px] border-b border-r border-border">Status PTKP</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[160px] border-b border-border">Aksi</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">Proyek Penugasan</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">Masa Tugas / Kontrak</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[150px] border-b border-r border-border">Status Lapangan</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Honor Standar</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[160px] border-b border-r border-border">NIK & NPWP</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px] border-b border-border">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRekananList.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-muted-faint border-b border-border">
+                        <td colSpan={7} className="py-8 text-center text-muted-faint border-b border-border">
                           {searchQuery
                             ? "Tidak ada tenaga ahli yang cocok dengan pencarian."
                             : "Belum ada tenaga ahli yang didaftarkan. Silakan klik '+ Tambah Tenaga Ahli Baru' untuk mendaftarkan profil tenaga ahli."}
@@ -3787,52 +3860,112 @@ export function PayrollClient({
                     ) : (
                       filteredRekananList.map((r) => {
                         const hasNpwp = !!(r.npwp && r.npwp.trim());
+                        const todayStr = new Date().toISOString().split("T")[0];
+                        const startStr = r.tanggalMulaiTugas ? r.tanggalMulaiTugas.substring(0, 10) : null;
+                        const endStr = r.tanggalSelesaiTugas ? r.tanggalSelesaiTugas.substring(0, 10) : null;
+                        const isEnded = endStr ? endStr < todayStr : false;
+                        const isUpcoming = startStr ? startStr > todayStr : false;
+                        const isTurun = r.isTurunLapangan !== false && (r.isTurunLapangan as unknown) !== 0;
+
                         return (
                           <tr key={r.id} className="hover:bg-surface-hover/30 transition-colors">
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
                               <div className="font-bold text-navy-text text-sm">{r.nama}</div>
-                              {r.kategori && (
-                                <div className="text-[11px] text-muted-faint mt-0.5 inline-flex items-center gap-1">
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {r.kategori && (
                                   <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-medium">
                                     {r.kategori}
                                   </span>
+                                )}
+                                <span className="px-1.5 py-0.2 rounded-md bg-surface-subtle border border-border text-[10px] font-mono font-bold text-navy-text">
+                                  {r.ptkp || "TK/0"}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
+                              {r.projectCode || r.projectName ? (
+                                <div className="font-semibold text-navy-text flex items-center gap-1.5">
+                                  <Briefcase size={12} className="text-muted-faint shrink-0" />
+                                  <span className="truncate max-w-[200px]" title={`[${r.projectCode}] ${r.projectName}`}>
+                                    [{r.projectCode}] {r.projectName}
+                                  </span>
                                 </div>
+                              ) : (
+                                <span className="text-muted-faint italic text-[11px]">Belum dialokasikan</span>
                               )}
                             </td>
-                            <td className="py-3 px-3.5 font-mono whitespace-nowrap border-b border-r border-border">
-                              {r.nik ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
-                                  <CheckCircle size={12} />
-                                  <span>{r.nik}</span>
+
+                            <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
+                              {startStr && endStr ? (
+                                <>
+                                  <div className="font-medium text-navy-text">
+                                    {r.tanggalMulaiTugasFmt || startStr} s.d. {r.tanggalSelesaiTugasFmt || endStr}
+                                  </div>
+                                  <div className="mt-0.5">
+                                    {isEnded ? (
+                                      <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-semibold">
+                                        Masa Tugas Berakhir
+                                      </span>
+                                    ) : isUpcoming ? (
+                                      <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-semibold">
+                                        Belum Mulai
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
+                                        Aktif Berjalan
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="text-muted-faint italic text-[11px]">Belum diatur</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
+                              {isTurun ? (
+                                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold inline-flex items-center gap-1.5">
+                                  <CheckCircle size={11} />
+                                  <span>Turun Lapangan (Riil)</span>
                                 </span>
                               ) : (
-                                <span className="text-amber-600 dark:text-amber-400 font-sans italic text-[11px]">
-                                  Belum diisi
+                                <span className="px-2.5 py-1 rounded-lg bg-surface-subtle text-muted-stronger border border-border font-semibold inline-flex items-center gap-1.5">
+                                  <FileText size={11} className="text-muted-faint" />
+                                  <span>Administrasi / SKA Only</span>
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-3.5 font-mono text-muted-stronger whitespace-nowrap border-b border-r border-border">
-                              {hasNpwp ? r.npwp : <span className="text-muted-faint">-</span>}
+
+                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
+                              {formatRupiah(r.nominalHonorBulanan || 0)}
                             </td>
-                            <td className="py-3 px-3.5 font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                              <span className="px-2 py-0.5 rounded-md bg-surface-subtle border border-border text-[11px]">
-                                {r.ptkp || "TK/0"}
-                              </span>
+
+                            <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
+                              <div className="font-mono text-xs text-navy-text font-bold">
+                                {r.nik || <span className="text-amber-600 font-sans italic font-normal text-[11px]">Belum diisi</span>}
+                              </div>
+                              <div className="font-mono text-[11px] text-muted-faint mt-0.5">
+                                NPWP: {hasNpwp ? r.npwp : "-"}
+                              </div>
                             </td>
+
                             <td className="py-3 px-3.5 text-right whitespace-nowrap border-b border-border">
                               <div className="inline-flex items-center justify-end gap-1.5">
                                 {isManager && (
                                   <>
-                                    <button
-                                      onClick={() => {
-                                        openHonorModal(null, r.id);
-                                      }}
-                                      className="h-7 px-2.5 rounded-lg bg-navy text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs hover:bg-navy-light"
-                                      title="Input Gaji untuk Tenaga Ahli ini"
-                                    >
-                                      <Plus size={11} />
-                                      <span>Input Gaji</span>
-                                    </button>
+                                    {isTurun && (
+                                      <button
+                                        onClick={() => {
+                                          openHonorModal(null, r.id);
+                                        }}
+                                        className="h-7 px-2.5 rounded-lg bg-navy text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs hover:bg-navy-light"
+                                        title="Input Gaji untuk Tenaga Ahli ini"
+                                      >
+                                        <Plus size={11} />
+                                        <span>Input Gaji</span>
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => {
                                         setEditingMasterAhli(r);
@@ -6030,6 +6163,23 @@ export function PayrollClient({
                                 const matched = data.rekananTenagaAhli.find((r) => r.id === val);
                                 if (matched) {
                                   setModalHonorPtkp(matched.ptkp || "TK/0");
+                                  if (matched.projectId) {
+                                    setModalHonorProjectId(matched.projectId);
+                                  }
+                                  if (matched.projectCode || matched.projectName) {
+                                    setModalHonorNamaProyek(
+                                      matched.projectCode
+                                        ? `[${matched.projectCode}] ${matched.projectName}`
+                                        : (matched.projectName || "")
+                                    );
+                                  }
+                                  if (matched.nominalHonorBulanan && matched.nominalHonorBulanan > 0) {
+                                    setModalHonorNominal(matched.nominalHonorBulanan);
+                                    const pphRate = matched.npwp ? 2.5 : 3.0;
+                                    setModalHonorTarifPph(pphRate);
+                                    setModalHonorNominalPph(Math.round((matched.nominalHonorBulanan * pphRate) / 100));
+                                  }
+                                  setModalHonorUraian(`Honorarium Tenaga Ahli: ${matched.nama} - Bulan ${BULAN_NAMES[modalHonorBulan - 1]} ${modalHonorTahun}`);
                                 }
                               }}
                               className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
@@ -6859,7 +7009,7 @@ export function PayrollClient({
       {/* ========================================================= */}
       {mounted && isMasterAhliModalOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <Users size={16} />
@@ -6896,7 +7046,7 @@ export function PayrollClient({
                   }
                 });
               }}
-              className="p-5 space-y-4 text-xs"
+              className="p-5 space-y-4 text-xs overflow-y-auto max-h-[82vh]"
             >
               {editingMasterAhli?.id && (
                 <input type="hidden" name="id" value={editingMasterAhli.id} />
@@ -6984,6 +7134,124 @@ export function PayrollClient({
                     className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground"
                   />
                 </div>
+              </div>
+
+              {/* Kode Proyek Penugasan (Wajib) */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Proyek Penugasan (Kode Proyek) *
+                </label>
+                <select
+                  name="projectId"
+                  required
+                  defaultValue={editingMasterAhli?.projectId ?? ""}
+                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                >
+                  <option value="">-- Pilih Proyek Penugasan (Wajib) --</option>
+                  {data.projects.map((proj) => (
+                    <option key={proj.id} value={proj.id}>
+                      [{proj.code}] {proj.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-muted-faint mt-0.5 block">
+                  Tenaga ahli wajib dialokasikan ke proyek spesifik untuk tracking beban dan pelaporan.
+                </span>
+              </div>
+
+              {/* Masa Tugas / Masa Kontrak (Wajib) */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Masa Tugas / Kontrak Kerja *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-[10px] text-muted-faint block mb-0.5 font-medium">Tanggal Mulai Tugas</span>
+                    <input
+                      type="date"
+                      name="tanggalMulaiTugas"
+                      required
+                      defaultValue={editingMasterAhli?.tanggalMulaiTugas ? editingMasterAhli.tanggalMulaiTugas.substring(0, 10) : ""}
+                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-faint block mb-0.5 font-medium">Tanggal Selesai Tugas</span>
+                    <input
+                      type="date"
+                      name="tanggalSelesaiTugas"
+                      required
+                      defaultValue={editingMasterAhli?.tanggalSelesaiTugas ? editingMasterAhli.tanggalSelesaiTugas.substring(0, 10) : ""}
+                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                    />
+                  </div>
+                </div>
+                <span className="text-[10px] text-muted-faint mt-1 block">
+                  Selama dalam rentang tanggal tersebut, nama freelance akan otomatis muncul di daftar penggajian bulanan dan hilang setelah masa tugas berakhir.
+                </span>
+              </div>
+
+              {/* Status Turun Lapangan vs Administrasi / SKA Only */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Status Penugasan / Kehadiran Lapangan *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-surface-card hover:bg-surface-hover/40 cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="isTurunLapangan"
+                      value="1"
+                      defaultChecked={editingMasterAhli?.isTurunLapangan === undefined || editingMasterAhli?.isTurunLapangan === true || (editingMasterAhli?.isTurunLapangan as unknown) === 1}
+                      className="mt-0.5 text-navy accent-navy cursor-pointer"
+                    />
+                    <div>
+                      <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                        <span>Turun Lapangan (Riil)</span>
+                      </div>
+                      <p className="text-[10px] text-muted-faint mt-0.5 leading-relaxed">
+                        Beneran bekerja / turun ke lapangan. Otomatis dimunculkan pada daftar pembayaran gaji riil bulanan.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-surface-card hover:bg-surface-hover/40 cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="isTurunLapangan"
+                      value="0"
+                      defaultChecked={editingMasterAhli?.isTurunLapangan === false || (editingMasterAhli?.isTurunLapangan as unknown) === 0}
+                      className="mt-0.5 text-navy accent-navy cursor-pointer"
+                    />
+                    <div>
+                      <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                        <span>Administrasi / SKA Only</span>
+                      </div>
+                      <p className="text-[10px] text-muted-faint mt-0.5 leading-relaxed">
+                        Nama hanya dipasang untuk sertifikasi/tender (SKA). Tidak dimunculkan di daftar pembayaran gaji riil.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Nominal Honor Bulanan Standar */}
+              <div>
+                <label className="font-semibold text-navy-text block mb-1">
+                  Nominal Honor Bulanan Standar (Rp)
+                </label>
+                <input
+                  type="number"
+                  name="nominalHonorBulanan"
+                  defaultValue={editingMasterAhli?.nominalHonorBulanan ?? 0}
+                  placeholder="Contoh: 5000000"
+                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
+                />
+                <span className="text-[10px] text-muted-faint mt-0.5 block">
+                  Nominal honorarium standar bulanan yang otomatis terisi saat pembayaran gaji bulanan diproses.
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">

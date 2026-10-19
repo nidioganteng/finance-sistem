@@ -956,9 +956,6 @@ export function PayrollClient({
           >
             <Users size={15} />
             <span>Pegawai Tetap</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">
-              {data.pegawaiList.length}
-            </span>
           </button>
 
           <button
@@ -970,10 +967,7 @@ export function PayrollClient({
             }`}
           >
             <Award size={15} />
-            <span>Tenaga Ahli (Bukan Pegawai)</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20">
-              {data.konsolidasiTenagaAhli.length}
-            </span>
+            <span>Tenaga Ahli</span>
           </button>
 
           <button
@@ -1052,11 +1046,6 @@ export function PayrollClient({
               >
                 <CreditCard size={13} className={pegawaiSubTab === "gaji" ? "text-navy" : "text-muted-faint"} />
                 <span>Gaji Bulanan</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  pegawaiSubTab === "gaji" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {BULAN_NAMES[selectedMonth - 1]}
-                </span>
               </button>
 
               <button
@@ -1069,11 +1058,6 @@ export function PayrollClient({
               >
                 <Calendar size={13} className={pegawaiSubTab === "rekap-bulan" ? "text-navy" : "text-muted-faint"} />
                 <span>Rekap Setahun</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  pegawaiSubTab === "rekap-bulan" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {selectedYear}
-                </span>
               </button>
 
               <button
@@ -1105,11 +1089,6 @@ export function PayrollClient({
               >
                 <Users size={13} className={pegawaiSubTab === "master" ? "text-navy" : "text-muted-faint"} />
                 <span>Database Pegawai Tetap</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  pegawaiSubTab === "master" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {data.pegawaiList.length}
-                </span>
               </button>
 
               <button
@@ -2936,11 +2915,6 @@ export function PayrollClient({
               >
                 <CreditCard size={13} className={tenagaAhliSubTab === "honor" ? "text-navy" : "text-muted-faint"} />
                 <span>Gaji Bulanan</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  tenagaAhliSubTab === "honor" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {BULAN_NAMES[selectedMonth - 1]}
-                </span>
               </button>
 
               <button
@@ -2953,11 +2927,6 @@ export function PayrollClient({
               >
                 <Briefcase size={13} className={tenagaAhliSubTab === "rekap-proyek" ? "text-navy" : "text-muted-faint"} />
                 <span>Rekap Per Proyek</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  tenagaAhliSubTab === "rekap-proyek" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {data.rekapTenagaAhliPerProyek.length}
-                </span>
               </button>
 
               <button
@@ -2970,11 +2939,6 @@ export function PayrollClient({
               >
                 <Calendar size={13} className={tenagaAhliSubTab === "rekap-bulan" ? "text-navy" : "text-muted-faint"} />
                 <span>Rekap Setahun</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  tenagaAhliSubTab === "rekap-bulan" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {selectedYear}
-                </span>
               </button>
 
               <button
@@ -3006,11 +2970,6 @@ export function PayrollClient({
               >
                 <Users size={13} className={tenagaAhliSubTab === "database-ahli" ? "text-navy" : "text-muted-faint"} />
                 <span>Database Tenaga Ahli</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  tenagaAhliSubTab === "database-ahli" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {data.rekananTenagaAhli.length}
-                </span>
               </button>
 
               <button
@@ -3023,11 +2982,6 @@ export function PayrollClient({
               >
                 <Award size={13} className={tenagaAhliSubTab === "rekap-nama" ? "text-navy" : "text-muted-faint"} />
                 <span>Akumulasi Tenaga Ahli</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  tenagaAhliSubTab === "rekap-nama" ? "bg-navy/10 text-navy font-bold" : "bg-surface-card text-muted-faint"
-                }`}>
-                  {data.rekapTenagaAhliPerNama.length}
-                </span>
               </button>
 
               <button
@@ -3445,58 +3399,131 @@ export function PayrollClient({
           {/* Sub-Tab Baru: Rekapitulasi Gaji Tenaga Ahli Per Proyek */}
           {tenagaAhliSubTab === "rekap-proyek" && (
             <div className="space-y-6">
-              {/* Card Banner & Penjelasan Realisasi Biaya Proyek */}
-              <div className="p-5 rounded-2xl border border-border bg-surface-card space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+              {/* Card Banner & Penjelasan Realisasi Biaya Proyek (Compact Card Format) */}
+              <div className="p-4 rounded-2xl border border-border bg-surface-card space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="p-2 rounded-xl bg-navy/10 text-navy font-bold">
-                        <Briefcase size={18} />
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-bold text-navy-text">
-                          Rekapitulasi Honorarium Tenaga Ahli Per Kode Proyek
-                        </h3>
-                        <p className="text-xs text-muted-faint mt-0.5">
-                          Alokasi beban honorarium per proyek pada entitas {data.entity?.name} – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}. Seluruh honor yang terhubung ke kode proyek otomatis memotong realisasi biaya proyek (<code className="font-mono text-navy">Project.spend</code>) dan tersinkronisasi ke laporan profitabilitas.
-                        </p>
-                      </div>
-                    </div>
+                    <h3 className="text-sm font-bold text-navy-text">
+                      Rekapitulasi Honorarium Tenaga Ahli Per Kode Proyek
+                    </h3>
+                    <p className="text-xs text-muted-faint mt-0.5">
+                      Alokasi honor per proyek entitas {data.entity?.name} · Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear} · Terhubung ke laporan profitabilitas (<code className="font-mono text-navy text-[10.5px]">Project.spend</code>)
+                    </p>
                   </div>
                 </div>
 
-                {/* 4 Stat Cards Rekap Proyek */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 pt-1">
-                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 space-y-1">
-                    <span className="text-[11px] text-muted-faint font-medium">Proyek Terlibat</span>
-                    <div className="text-lg font-bold font-mono text-navy-text">
-                      {data.rekapTenagaAhliPerProyek.length} Proyek
+                {/* 4 Stat Cards Rekap Proyek (Compact Format sesuai Screenshot) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/30 space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 flex items-center justify-center shrink-0">
+                        <Briefcase size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-navy-text truncate">Proyek Terlibat</div>
+                        <div className="text-[10px] text-muted-faint truncate">Alokasi honor aktif</div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-faint">Memiliki alokasi honor</span>
+                    <div>
+                      <div className="text-[10px] text-muted-faint">Total Proyek</div>
+                      <div className="text-base font-bold font-mono text-navy-text mt-0.5">
+                        {data.rekapTenagaAhliPerProyek.length} Proyek
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border/60 text-[10.5px] space-y-1">
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Status</span>
+                        <span className="font-semibold text-navy-text font-mono">{data.rekapTenagaAhliPerProyek.length > 0 ? "Aktif" : "Nihil"}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Alokasi Biaya</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300 font-mono">Riil</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 space-y-1">
-                    <span className="text-[11px] text-muted-faint font-medium">Total Honor Bruto</span>
-                    <div className="text-lg font-bold font-mono text-navy-text">
-                      {formatRupiah(data.rekapTenagaAhliPerProyek.reduce((s, p) => s + p.totalHonorBruto, 0))}
+                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/30 space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                        <CreditCard size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-navy-text truncate">Total Honor Bruto</div>
+                        <div className="text-[10px] text-muted-faint truncate">Beban riil proyek</div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-faint">Beban biaya proyek riil</span>
+                    <div>
+                      <div className="text-[10px] text-muted-faint">Beban Proyek</div>
+                      <div className="text-base font-bold font-mono text-navy-text mt-0.5">
+                        {formatRupiah(data.rekapTenagaAhliPerProyek.reduce((s, p) => s + p.totalHonorBruto, 0))}
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border/60 text-[10.5px] space-y-1">
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Beban Bruto</span>
+                        <span className="font-semibold text-navy-text font-mono">100%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Pengurang Margin</span>
+                        <span className="font-semibold text-rose-700 dark:text-rose-300 font-mono">Ya</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 space-y-1">
-                    <span className="text-[11px] text-muted-faint font-medium">Potongan Pajak (PPh)</span>
-                    <div className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">
-                      {formatRupiah(data.rekapTenagaAhliPerProyek.reduce((s, p) => s + p.totalPph, 0))}
+                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/30 space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300 flex items-center justify-center shrink-0">
+                        <Scale size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-navy-text truncate">Potongan Pajak</div>
+                        <div className="text-[10px] text-muted-faint truncate">PPh 21 / PPh 23</div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-faint">PPh 21 / PPh 23</span>
+                    <div>
+                      <div className="text-[10px] text-muted-faint">Total PPh Terpotong</div>
+                      <div className="text-base font-bold font-mono text-amber-700 dark:text-amber-300 mt-0.5">
+                        {formatRupiah(data.rekapTenagaAhliPerProyek.reduce((s, p) => s + p.totalPph, 0))}
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border/60 text-[10.5px] space-y-1">
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Kewajiban</span>
+                        <span className="font-semibold text-amber-700 dark:text-amber-300 font-mono">Kas Titipan</span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Setor Pajak</span>
+                        <span className="font-semibold text-navy-text font-mono">SPT Masa</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 space-y-1">
-                    <span className="text-[11px] text-muted-faint font-medium">Net Terbayarkan</span>
-                    <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">
-                      {formatRupiah(data.rekapTenagaAhliPerProyek.reduce((s, p) => s + p.totalHonorBersih, 0))}
+                  <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/30 space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                        <CheckCircle size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-navy-text truncate">Net Terbayarkan</div>
+                        <div className="text-[10px] text-muted-faint truncate">Kas keluar honor</div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-faint">Kas keluar untuk honor</span>
+                    <div>
+                      <div className="text-[10px] text-muted-faint">Kas Keluar Bersih</div>
+                      <div className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-300 mt-0.5">
+                        {formatRupiah(data.rekapTenagaAhliPerProyek.reduce((s, p) => s + p.totalHonorBersih, 0))}
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border/60 text-[10.5px] space-y-1">
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Arus Kas</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300 font-mono">Disalurkan</span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-faint">
+                        <span>Bukti Potong</span>
+                        <span className="font-semibold text-navy-text font-mono">Tersedia</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

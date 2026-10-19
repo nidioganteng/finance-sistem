@@ -68,14 +68,18 @@ export function hitungPajakFaktur(
 ): HitungPajakResult {
   let ppn: number;
   let nilaiProyek: number;
+  const effectiveDppNilaiLain = dppNilaiLain > 0 ? dppNilaiLain : hitungDppNilaiLain(dpp);
 
-  if (nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0) {
+  if (tarifPpnPersen === 0) {
+    ppn = 0;
+    nilaiProyek =
+      nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0 ? nilaiKwitansiManual : dpp;
+  } else if (nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0) {
     nilaiProyek = nilaiKwitansiManual;
     ppn = Math.round((nilaiKwitansiManual * 11) / 111);
   } else {
-    ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
-    nilaiProyek =
-      tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100);
+    ppn = Math.round((effectiveDppNilaiLain * tarifPpnPersen) / 100);
+    nilaiProyek = Math.round((dpp * 111) / 100);
   }
 
   const pph = Math.round((dpp * tarifPphPersen) / 100);

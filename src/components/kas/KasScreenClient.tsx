@@ -6,10 +6,15 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus, Receipt, Calendar, Check } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus, Receipt, Calendar } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 import { DatePicker } from "@/components/shared/DatePicker";
+
+const MONTH_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string };
@@ -126,10 +131,6 @@ export function KasScreenClient({
   });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Dropdown baru untuk memilih bulan & tanggal transaksi
-  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
-  const dateDropdownRef = useRef<HTMLDivElement>(null);
-
   function parseLocalDate(s: string): Date {
     if (s.includes("T") || s.includes(" ")) return new Date(s);
     const parts = s.split("-");
@@ -155,9 +156,6 @@ export function KasScreenClient({
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
-      }
-      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
-        setDateDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -242,77 +240,6 @@ export function KasScreenClient({
   const isNonDefault = activePreset !== "bulan-ini" || searchParams.get("periode") === "semua";
   const activeLabel = PRESET_OPTIONS.find((o) => o.key === activePreset)?.label ?? "Bulan Ini";
 
-  // ─── Dropdown Baru: Pilihan Bulan & Tanggal Transaksi ─────────────────────
-  const MONTH_NAMES = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
-
-  const MONTH_ITEMS = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    const startStr = toDateStr(new Date(y, m, 1));
-    const endStr = toDateStr(new Date(y, m + 1, 0));
-    const isCurrent = i === 0;
-    return {
-      key: `month-${y}-${String(m + 1).padStart(2, "0")}`,
-      label: `${MONTH_NAMES[m]} ${y}${isCurrent ? " (Bulan Ini)" : ""}`,
-      shortLabel: `${MONTH_NAMES[m]} ${y}`,
-      start: startStr,
-      end: endStr,
-    };
-  });
-
-  function selectMonthOrAll(key: string) {
-    setDateDropdownOpen(false);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("page");
-
-    if (key === "semua") {
-      params.delete("dari");
-      params.delete("sampai");
-      params.set("periode", "semua");
-      setFilterDari("");
-      setFilterSampai("");
-      setActivePreset("custom");
-      router.push(`${pathname}?${params.toString()}`);
-      return;
-    }
-
-    const m = MONTH_ITEMS.find((item) => item.key === key);
-    if (m) {
-      params.delete("periode");
-      params.set("dari", m.start);
-      params.set("sampai", m.end);
-      setFilterDari(m.start);
-      setFilterSampai(m.end);
-      if (m.key === MONTH_ITEMS[0]?.key) {
-        setActivePreset("bulan-ini");
-      } else if (m.key === MONTH_ITEMS[1]?.key) {
-        setActivePreset("bulan-lalu");
-      } else {
-        setActivePreset("custom");
-      }
-      router.push(`${pathname}?${params.toString()}`);
-    }
-  }
-
-  let dateViewLabel = "Pilih Bulan & Tanggal";
-  if (searchParams.get("periode") === "semua") {
-    dateViewLabel = "Semua Tanggal";
-  } else if (dari && sampai) {
-    const matchedMonth = MONTH_ITEMS.find((m) => m.start === dari && m.end === sampai);
-    if (matchedMonth) {
-      dateViewLabel = matchedMonth.shortLabel;
-    } else if (dari === sampai) {
-      dateViewLabel = `Tgl: ${fmtDateShort(dari)}`;
-    } else {
-      dateViewLabel = `${fmtDateShort(dari)} – ${fmtDateShort(sampai)}`;
-    }
-  } else if (!dari && !sampai) {
-    dateViewLabel = MONTH_ITEMS[0]?.shortLabel ?? "Bulan Ini";
-  }
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -466,66 +393,6 @@ export function KasScreenClient({
                     {opt.label}
                   </button>
                 ))}
-              </div>
-            )}
-          </div>
-
-          {/* Dropdown baru untuk memilih bulan & tanggal transaksi */}
-          <div className="relative" ref={dateDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setDateDropdownOpen((v) => !v)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] border border-border-soft bg-surface-input text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover hover:border-border transition-colors min-w-[160px] justify-between shadow-xs"
-              title="Pilih tanggal atau bulan untuk melihat transaksi"
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Calendar size={13} className="text-brand shrink-0" />
-                <span className="truncate">{dateViewLabel}</span>
-              </div>
-              <ChevronDown size={13} className={`text-muted-faint shrink-0 transition-transform ${dateDropdownOpen ? "rotate-180" : ""}`} />
-            </button>
-
-            {dateDropdownOpen && (
-              <div className="absolute top-[calc(100%+6px)] left-0 z-30 bg-surface-card border border-border-soft rounded-[13px] shadow-xl py-1.5 w-[230px] max-h-[360px] overflow-y-auto">
-                <div className="px-3.5 py-1 text-[10px] font-bold tracking-wider text-muted-faint uppercase">
-                  Semua Tanggal
-                </div>
-                <button
-                  type="button"
-                  onClick={() => selectMonthOrAll("semua")}
-                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[12px] transition-colors ${
-                    searchParams.get("periode") === "semua"
-                      ? "text-brand bg-blue-50 dark:bg-blue-500/10 font-bold"
-                      : "text-muted-stronger hover:bg-surface-hover font-semibold"
-                  }`}
-                >
-                  <span>Semua Tanggal (Lihat Semua)</span>
-                  {searchParams.get("periode") === "semua" && <Check size={14} className="text-brand shrink-0" />}
-                </button>
-
-                <div className="my-1 border-t border-border-soft" />
-
-                <div className="px-3.5 py-1 text-[10px] font-bold tracking-wider text-muted-faint uppercase">
-                  Pilih Bulan Transaksi
-                </div>
-                {MONTH_ITEMS.map((m) => {
-                  const isSelected = dari === m.start && sampai === m.end && searchParams.get("periode") !== "semua";
-                  return (
-                    <button
-                      type="button"
-                      key={m.key}
-                      onClick={() => selectMonthOrAll(m.key)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2 text-[12px] transition-colors ${
-                        isSelected
-                          ? "text-brand bg-blue-50 dark:bg-blue-500/10 font-bold"
-                          : "text-muted-stronger hover:bg-surface-hover font-semibold"
-                      }`}
-                    >
-                      <span className="truncate">{m.label}</span>
-                      {isSelected && <Check size={14} className="text-brand shrink-0" />}
-                    </button>
-                  );
-                })}
               </div>
             )}
           </div>

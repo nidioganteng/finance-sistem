@@ -1641,6 +1641,10 @@ if ($method === 'POST' && $sub_action === 'proyek' && $sub_sub === 'complete') {
 
     $pdo->prepare('UPDATE Project SET status = \'COMPLETED\' WHERE id = ?')->execute([$project_id]);
 
+    // Beritahu Sidamon bahwa proyek ini selesai
+    require_once __DIR__ . '/../helpers/sync-helpers.php';
+    sync_termin_to_sidamon($project_id);
+
     log_activity($user['id'], 'proyek.complete', 'FINANCIAL_CHANGE', ['projectId' => $project_id]);
 
     json_response(['message' => 'Proyek ditandai selesai.']);

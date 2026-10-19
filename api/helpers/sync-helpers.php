@@ -34,6 +34,12 @@ function sync_termin_to_sidamon(string $project_id): void {
         ? round(($total_dibayar / $contract_val) * 100, 1)
         : 0;
 
+    // Otomatis tandai proyek selesai di Simatra saat termin mencapai 100%
+    if ($persen >= 100) {
+        $pdo->prepare("UPDATE Project SET status = 'COMPLETED' WHERE id = ? AND status != 'COMPLETED'")
+            ->execute([$project_id]);
+    }
+
     $termins_payload = array_map(fn($t) => [
         'label'      => $t['name'],
         'status'     => $t['status'],
@@ -47,6 +53,7 @@ function sync_termin_to_sidamon(string $project_id): void {
         'projectCode'    => '', // diisi oleh caller kalau ada
         'persenTerbayar' => $persen,
         'termins'        => $termins_payload,
+        'statusProyek'   => $persen >= 100 ? 'Selesai' : 'Aktif',
     ]);
 
     $ch = curl_init(SIDAMON_URL . '/api/sync/termin/' . urlencode($assignment_id));

@@ -385,6 +385,10 @@ export async function bulkGenerateGajiBulananAction(params: {
  */
 export async function saveTenagaAhliMasterAction(formData: FormData) {
   const token = await getPhpToken();
+  const rawNominal = (formData.get("nominalHonorBulanan") as string)?.replace(/[^0-9.-]+/g, "") || "0";
+  const isTurunLapanganRaw = formData.get("isTurunLapangan");
+  const isTurunLapangan = isTurunLapanganRaw === "1" || isTurunLapanganRaw === "true";
+
   const body = {
     id: (formData.get("id") as string)?.trim() || null,
     nama: (formData.get("nama") as string)?.trim(),
@@ -393,6 +397,11 @@ export async function saveTenagaAhliMasterAction(formData: FormData) {
     ptkp: (formData.get("ptkp") as string)?.trim() || "TK/0",
     kategori: (formData.get("kategori") as string)?.trim() || null,
     entityId: (formData.get("entityId") as string)?.trim() || null,
+    projectId: (formData.get("projectId") as string)?.trim() || null,
+    tanggalMulaiTugas: (formData.get("tanggalMulaiTugas") as string)?.trim() || null,
+    tanggalSelesaiTugas: (formData.get("tanggalSelesaiTugas") as string)?.trim() || null,
+    isTurunLapangan,
+    nominalHonorBulanan: parseFloat(rawNominal) || 0,
   };
   try {
     const result = await phpFetch<{

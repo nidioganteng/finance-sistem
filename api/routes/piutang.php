@@ -384,10 +384,15 @@ if ($method === 'GET' && ($_GET['type'] ?? '') === 'projects') {
     if (!empty($projects)) {
         $pids = array_column($projects, 'id');
         $ph = implode(',', array_fill(0, count($pids), '?'));
-        $stmt_t = $pdo->prepare("SELECT projectId, percentage, nominal FROM Termin WHERE projectId IN ($ph)");
+        $stmt_t = $pdo->prepare("SELECT id, projectId, name, percentage, nominal FROM Termin WHERE projectId IN ($ph) ORDER BY createdAt ASC");
         $stmt_t->execute($pids);
         foreach ($stmt_t->fetchAll(PDO::FETCH_ASSOC) as $t) {
-            $termins_by_proj[$t['projectId']][] = $t;
+            $termins_by_proj[$t['projectId']][] = [
+                'id'         => $t['id'],
+                'name'       => $t['name'],
+                'percentage' => $t['percentage'] !== null ? (int)$t['percentage'] : null,
+                'nominal'    => $t['nominal'] !== null ? (float)$t['nominal'] : null,
+            ];
         }
     }
 
@@ -398,9 +403,9 @@ if ($method === 'GET' && ($_GET['type'] ?? '') === 'projects') {
         $max_pct = 0;
         $tot_nom = 0.0;
         foreach ($ts as $t) {
-            $pct = (int)$t['percentage'];
+            $pct = (int)($t['percentage'] ?? 0);
             if ($pct > $max_pct) $max_pct = $pct;
-            $tot_nom += (float)$t['nominal'];
+            $tot_nom += (float)($t['nominal'] ?? 0);
         }
         $cval = (float)$p['contractValue'];
 
@@ -417,6 +422,7 @@ if ($method === 'GET' && ($_GET['type'] ?? '') === 'projects') {
             'terminCount'      => count($ts),
             'totalTerminTagih' => $tot_nom,
             'status'           => $p['status'],
+            'termins'          => $ts,
         ];
     }
 

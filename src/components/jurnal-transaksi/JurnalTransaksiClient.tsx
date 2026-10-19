@@ -8,6 +8,7 @@ import { PaginationNav } from "@/components/shared/PaginationNav";
 import { CoaCombobox } from "@/components/shared/CoaCombobox";
 import { formatRupiah } from "@/lib/dashboard-data";
 import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
+import { DeleteConfirmModal } from "@/components/kas/DeleteConfirmModal";
 
 type CoaOption = { id: string; code: string; name: string; kategori?: string };
 export type ProjectOption = {
@@ -93,6 +94,7 @@ export function JurnalTransaksiClient({
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<JurnalTransaksiGroup | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<JurnalTransaksiGroup | null>(null);
   const [sortAsc, setSortAsc] = useState(false);
 
   const [filterDari, setFilterDari] = useState(dari);
@@ -458,11 +460,19 @@ export function JurnalTransaksiClient({
   }
 
   function handleDelete(group: JurnalTransaksiGroup) {
-    if (!confirm(`Hapus jurnal ${group.noBukti}?`)) return;
+    setDeletingGroup(group);
+  }
+
+  function handleConfirmDelete() {
+    if (!deletingGroup) return;
     startTransition(async () => {
-      const res = await deleteJurnalTransaksi(group.allTxIds);
-      if (res?.error) setActionError(res.error);
-      else router.refresh();
+      const res = await deleteJurnalTransaksi(deletingGroup.allTxIds);
+      if (res?.error) {
+        setActionError(res.error);
+      } else {
+        setDeletingGroup(null);
+        router.refresh();
+      }
     });
   }
 
@@ -1143,6 +1153,22 @@ export function JurnalTransaksiClient({
           return `${pathname}?${params.toString()}`;
         }}
       />
+
+      {/* Modal Konfirmasi Hapus Jurnal */}
+      {deletingGroup && (
+        <DeleteConfirmModal
+          title="Hapus Jurnal Transaksi?"
+          noBukti={deletingGroup.noBukti}
+          keterangan={
+            deletingGroup.keterangan ||
+            deletingGroup.rows.find((r) => r.keterangan)?.keterangan ||
+            (deletingGroup.project ? `Proyek ${deletingGroup.project.code} - ${deletingGroup.project.name}` : "Jurnal Transaksi")
+          }
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeletingGroup(null)}
+          isPending={isPending}
+        />
+      )}
     </div>
   );
 }

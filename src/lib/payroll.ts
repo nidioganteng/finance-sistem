@@ -334,6 +334,20 @@ export type HonorTenagaAhliItem = {
   tanggalSelesaiTugas?: string | null;
 };
 
+export type TenagaAhliProjectAssignment = {
+  id?: string | null;
+  projectId: string;
+  projectCode?: string | null;
+  projectName?: string | null;
+  tanggalMulaiTugas?: string | null;
+  tanggalMulaiTugasFmt?: string | null;
+  tanggalSelesaiTugas?: string | null;
+  tanggalSelesaiTugasFmt?: string | null;
+  isTurunLapangan: boolean;
+  nominalHonorBulanan: number;
+  nominalHonorBulananFmt?: string;
+};
+
 export type RekananTenagaAhliItem = {
   id: string;
   nama: string;
@@ -352,6 +366,7 @@ export type RekananTenagaAhliItem = {
   isTurunLapangan?: boolean;
   nominalHonorBulanan?: number;
   nominalHonorBulananFmt?: string;
+  proyekList?: TenagaAhliProjectAssignment[];
 };
 
 export const BULAN_NAMES = [

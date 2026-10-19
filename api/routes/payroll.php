@@ -256,10 +256,19 @@ if ($method === 'GET' && $sub === '') {
     $stmt->execute();
     $all_entities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 3. Projects for entity
+    // 3. Projects for entity & all projects across holding
     $stmt = $pdo->prepare("SELECT id, code, name FROM Project WHERE entityId = ? ORDER BY code ASC");
     $stmt->execute([$entity_id]);
     $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $pdo->prepare(
+        "SELECT p.id, p.code, p.name, p.entityId, COALESCE(e.name, 'Holding / Lainnya') AS entityName
+         FROM Project p
+         LEFT JOIN Entity e ON p.entityId = e.id
+         ORDER BY e.name ASC, p.code ASC"
+    );
+    $stmt->execute();
+    $all_projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 4. Tenaga Ahli master (rekanan tipe TENAGA_AHLI)
     ensure_tenaga_ahli_tables($pdo);
@@ -869,18 +878,19 @@ if ($method === 'GET' && $sub === '') {
         ];
     }
 
-    // 9. All honor for all entities+year (for konsolidasi)
+    // 9. All honor for all entities (lifetime & current year for konsolidasi)
     $stmt = $pdo->prepare(
         "SELECT h.*, e.id AS eid, e.`key` AS ekey, e.name AS ename,
                 p.code AS projCode, p.name AS projName
          FROM HonorTenagaAhli h
          JOIN Entity e ON h.entityId = e.id
          LEFT JOIN Project p ON h.projectId = p.id
-         WHERE h.tahun = ?
          ORDER BY h.tanggal DESC"
     );
-    $stmt->execute([$year]);
-    $all_honor_tahun = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute();
+    $all_honor_history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $all_honor_tahun = array_values(array_filter($all_honor_history, fn($h) => (int)$h['tahun'] === $year));
 
     // Build rekapTenagaAhliPerNama (grouped by NIK/nama, cross-entity)
     $per_nama_map = [];
@@ -1024,6 +1034,57 @@ if ($method === 'GET' && $sub === '') {
         }
         return strcmp($a['nama'], $b['nama']);
     });
+
+    // Build riwayatGaji lifetime untuk setiap Tenaga Ahli (Master Rekanan)
+    $rincian_by_nik = [];
+    $rincian_by_rek_id = [];
+    foreach ($all_honor_history as $h) {
+        $nik_key = trim($h['nik'] ?? '');
+        $rek_key = trim($h['rekananId'] ?? '');
+        $bruto   = (float)$h['nominalHonor'];
+        $pph     = (float)$h['pph21'];
+        $bersih  = (float)$h['nominalBersih'];
+        $resolved_proj = $h['namaProyek'] ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
+        $bulan_name = $bulan_names[(int)$h['bulan'] - 1] ?? "Bulan {$h['bulan']}";
+        $tgl_str = substr($h['tanggal'], 0, 10);
+
+        $item_entry = [
+            'id'              => $h['id'],
+            'entityId'        => $h['entityId'],
+            'entityName'      => $h['ename'],
+            'tanggal'         => $tgl_str,
+            'tanggalFmt'      => fmt_tanggal_id($tgl_str),
+            'bulan'           => (int)$h['bulan'],
+            'bulanName'       => $bulan_name,
+            'tahun'           => (int)$h['tahun'],
+            'uraian'          => $h['uraian'],
+            'projectId'       => $h['projectId'] ?? null,
+            'projectCode'     => $h['projCode'] ?? null,
+            'projectName'     => $h['projName'] ?? null,
+            'namaProyek'      => $resolved_proj,
+            'noBukti'         => $h['noBukti'] ?? null,
+            'nominalHonor'    => $bruto,
+            'nominalHonorFmt' => fmt_rp_payroll($bruto),
+            'pph21'           => $pph,
+            'pph21Fmt'        => fmt_rp_payroll($pph),
+            'nominalBersih'   => $bersih,
+            'nominalBersihFmt'=> fmt_rp_payroll($bersih),
+        ];
+
+        if ($nik_key) {
+            $rincian_by_nik[$nik_key][] = $item_entry;
+        }
+        if ($rek_key) {
+            $rincian_by_rek_id[$rek_key][] = $item_entry;
+        }
+    }
+
+    foreach ($rekanan_tenaga_ahli as &$rta_item) {
+        $rta_nik = trim($rta_item['nik'] ?? '');
+        $rta_id  = trim($rta_item['id'] ?? '');
+        $rta_item['riwayatGaji'] = $rincian_by_rek_id[$rta_id] ?? ($rincian_by_nik[$rta_nik] ?? []);
+    }
+    unset($rta_item);
 
     // Build konsolidasiTenagaAhli
     $konsolidasi_map = [];
@@ -1507,6 +1568,7 @@ if ($method === 'GET' && $sub === '') {
         'entity'                => $entity,
         'allEntities'           => $all_entities,
         'projects'              => $projects,
+        'allProjects'           => $all_projects,
         'rekananTenagaAhli'     => $rekanan_tenaga_ahli,
         'year'                  => $year,
         'month'                 => $month,

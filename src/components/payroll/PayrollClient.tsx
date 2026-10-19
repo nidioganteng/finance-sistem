@@ -44,6 +44,7 @@ import {
   type GajiBulananItem,
   type HonorTenagaAhliItem,
   type RekananTenagaAhliItem,
+  type TenagaAhliProjectAssignment,
   type KonsolidasiTenagaAhliItem,
   type PayrollSyncLabaRugi,
   type RekapBulanPegawaiItem,
@@ -383,7 +384,7 @@ export function PayrollClient({
   const [modalHonorUraian, setModalHonorUraian] = useState<string>("");
   const [modalHonorNoBukti, setModalHonorNoBukti] = useState<string>("");
 
-  function openHonorModal(h?: HonorTenagaAhliItem | null, rekananId?: string) {
+  function openHonorModal(h?: HonorTenagaAhliItem | null, rekananId?: string, specificProjectId?: string) {
     if (h && !h.isPendingPayment) {
       setEditingHonor(h);
       setModalHonorBulan(h.bulan);
@@ -439,16 +440,28 @@ export function PayrollClient({
       const matchedRekanan = data.rekananTenagaAhli.find((r) => r.id === targetRekananId);
       setModalHonorPtkp(matchedRekanan?.ptkp || "TK/0");
       setModalHonorJenisPph("PPh 21");
-      const defaultNominal = matchedRekanan?.nominalHonorBulanan || 0;
+
+      const matchedProj = specificProjectId && matchedRekanan?.proyekList
+        ? matchedRekanan.proyekList.find((p) => p.projectId === specificProjectId)
+        : null;
+
+      const defaultNominal = matchedProj
+        ? matchedProj.nominalHonorBulanan
+        : (matchedRekanan?.nominalHonorBulanan || 0);
       setModalHonorNominal(defaultNominal);
       const pphRate = matchedRekanan?.npwp ? 2.5 : 3.0;
       setModalHonorTarifPph(pphRate);
       setModalHonorNominalPph(defaultNominal > 0 ? Math.round((defaultNominal * pphRate) / 100) : 0);
-      setModalHonorProjectId(matchedRekanan?.projectId || "");
+
+      const targetProjId = matchedProj ? matchedProj.projectId : (matchedRekanan?.projectId || "");
+      setModalHonorProjectId(targetProjId);
+
+      const targetProjCode = matchedProj ? matchedProj.projectCode : matchedRekanan?.projectCode;
+      const targetProjName = matchedProj ? matchedProj.projectName : matchedRekanan?.projectName;
       setModalHonorNamaProyek(
-        matchedRekanan?.projectCode
-          ? `[${matchedRekanan.projectCode}] ${matchedRekanan.projectName}`
-          : (matchedRekanan?.projectName || "")
+        targetProjCode
+          ? `[${targetProjCode}] ${targetProjName}`
+          : (targetProjName || "")
       );
       setModalHonorUraian(
         matchedRekanan?.nama
@@ -463,6 +476,88 @@ export function PayrollClient({
   // Master Tenaga Ahli Modal
   const [isMasterAhliModalOpen, setIsMasterAhliModalOpen] = useState(false);
   const [editingMasterAhli, setEditingMasterAhli] = useState<RekananTenagaAhliItem | null>(null);
+  const [masterProyekList, setMasterProyekList] = useState<
+    Array<{
+      id?: string | null;
+      projectId: string;
+      tanggalMulaiTugas: string;
+      tanggalSelesaiTugas: string;
+      isTurunLapangan: boolean;
+      nominalHonorBulanan: number;
+    }>
+  >([
+    {
+      projectId: "",
+      tanggalMulaiTugas: "",
+      tanggalSelesaiTugas: "",
+      isTurunLapangan: true,
+      nominalHonorBulanan: 0,
+    },
+  ]);
+
+  useEffect(() => {
+    if (isMasterAhliModalOpen) {
+      if (editingMasterAhli?.proyekList && editingMasterAhli.proyekList.length > 0) {
+        setMasterProyekList(
+          editingMasterAhli.proyekList.map((p) => ({
+            id: p.id || null,
+            projectId: p.projectId || "",
+            tanggalMulaiTugas: p.tanggalMulaiTugas ? p.tanggalMulaiTugas.substring(0, 10) : "",
+            tanggalSelesaiTugas: p.tanggalSelesaiTugas ? p.tanggalSelesaiTugas.substring(0, 10) : "",
+            isTurunLapangan: p.isTurunLapangan !== false && (p.isTurunLapangan as unknown) !== 0,
+            nominalHonorBulanan: p.nominalHonorBulanan || 0,
+          }))
+        );
+      } else if (editingMasterAhli?.projectId) {
+        setMasterProyekList([
+          {
+            projectId: editingMasterAhli.projectId,
+            tanggalMulaiTugas: editingMasterAhli.tanggalMulaiTugas ? editingMasterAhli.tanggalMulaiTugas.substring(0, 10) : "",
+            tanggalSelesaiTugas: editingMasterAhli.tanggalSelesaiTugas ? editingMasterAhli.tanggalSelesaiTugas.substring(0, 10) : "",
+            isTurunLapangan: editingMasterAhli.isTurunLapangan !== false && (editingMasterAhli.isTurunLapangan as unknown) !== 0,
+            nominalHonorBulanan: editingMasterAhli.nominalHonorBulanan || 0,
+          },
+        ]);
+      } else {
+        setMasterProyekList([
+          {
+            projectId: "",
+            tanggalMulaiTugas: "",
+            tanggalSelesaiTugas: "",
+            isTurunLapangan: true,
+            nominalHonorBulanan: 0,
+          },
+        ]);
+      }
+    }
+  }, [isMasterAhliModalOpen, editingMasterAhli]);
+
+  function handleAddProyekAssignment() {
+    setMasterProyekList((prev) => [
+      ...prev,
+      {
+        projectId: "",
+        tanggalMulaiTugas: "",
+        tanggalSelesaiTugas: "",
+        isTurunLapangan: true,
+        nominalHonorBulanan: 0,
+      },
+    ]);
+  }
+
+  function handleRemoveProyekAssignment(index: number) {
+    setMasterProyekList((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleUpdateProyekAssignment<K extends keyof (typeof masterProyekList)[0]>(
+    index: number,
+    field: K,
+    value: (typeof masterProyekList)[0][K]
+  ) {
+    setMasterProyekList((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  }
 
   // State selection di modal honor
   const [selectedRekananIdForHonor, setSelectedRekananIdForHonor] = useState<string>("");
@@ -717,12 +812,24 @@ export function PayrollClient({
     return matchSearch && matchEntitas;
   });
 
-  const filteredRekananList = data.rekananTenagaAhli.filter(
-    (r) =>
-      r.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.nik && r.nik.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (r.kategori && r.kategori.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredRekananList = data.rekananTenagaAhli.filter((r) => {
+    const q = searchQuery.toLowerCase();
+    const matchBasic =
+      r.nama.toLowerCase().includes(q) ||
+      (r.nik && r.nik.toLowerCase().includes(q)) ||
+      (r.kategori && r.kategori.toLowerCase().includes(q)) ||
+      (r.projectName && r.projectName.toLowerCase().includes(q)) ||
+      (r.projectCode && r.projectCode.toLowerCase().includes(q));
+    if (matchBasic) return true;
+    if (r.proyekList && r.proyekList.length > 0) {
+      return r.proyekList.some(
+        (p) =>
+          (p.projectName && p.projectName.toLowerCase().includes(q)) ||
+          (p.projectCode && p.projectCode.toLowerCase().includes(q))
+      );
+    }
+    return false;
+  });
 
   return (
     <div className="space-y-6">
@@ -3870,17 +3977,28 @@ export function PayrollClient({
                       filteredRekananList.map((r) => {
                         const hasNpwp = !!(r.npwp && r.npwp.trim());
                         const todayStr = new Date().toISOString().split("T")[0];
-                        const startStr = r.tanggalMulaiTugas ? r.tanggalMulaiTugas.substring(0, 10) : null;
-                        const endStr = r.tanggalSelesaiTugas ? r.tanggalSelesaiTugas.substring(0, 10) : null;
-                        const isEnded = endStr ? endStr < todayStr : false;
-                        const isUpcoming = startStr ? startStr > todayStr : false;
-                        const isTurun = r.isTurunLapangan !== false && (r.isTurunLapangan as unknown) !== 0;
+                        const pList = (r.proyekList && r.proyekList.length > 0)
+                          ? r.proyekList
+                          : (r.projectId ? [{
+                              projectId: r.projectId,
+                              projectCode: r.projectCode,
+                              projectName: r.projectName,
+                              tanggalMulaiTugas: r.tanggalMulaiTugas,
+                              tanggalMulaiTugasFmt: r.tanggalMulaiTugasFmt,
+                              tanggalSelesaiTugas: r.tanggalSelesaiTugas,
+                              tanggalSelesaiTugasFmt: r.tanggalSelesaiTugasFmt,
+                              isTurunLapangan: r.isTurunLapangan !== false && (r.isTurunLapangan as unknown) !== 0,
+                              nominalHonorBulanan: r.nominalHonorBulanan || 0,
+                            }] : []);
+
+                        const anyTurun = pList.some((p) => p.isTurunLapangan !== false && (p.isTurunLapangan as unknown) !== 0);
+                        const totalHonorStandar = pList.reduce((acc, p) => acc + (p.nominalHonorBulanan || 0), 0);
 
                         return (
                           <tr key={r.id} className="group hover:bg-surface-hover/30 transition-colors">
                             <td className="py-3 px-3.5 whitespace-nowrap sticky left-0 z-10 bg-surface-card group-hover:bg-surface-hover/50 hover:bg-surface-hover/50 transition-colors border-b border-r-2 border-border shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-2px_rgba(0,0,0,0.4)]">
                               <div className="font-bold text-navy-text text-sm">{r.nama}</div>
-                              <div className="flex items-center gap-1.5 mt-1">
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {r.kategori && (
                                   <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-medium">
                                     {r.kategori}
@@ -3889,65 +4007,116 @@ export function PayrollClient({
                                 <span className="px-1.5 py-0.2 rounded-md bg-surface-subtle border border-border text-[10px] font-mono font-bold text-navy-text">
                                   {r.ptkp || "TK/0"}
                                 </span>
+                                {pList.length > 1 && (
+                                  <span className="px-1.5 py-0.2 rounded-md bg-navy/10 text-navy border border-navy/20 text-[10px] font-bold">
+                                    {pList.length} Proyek
+                                  </span>
+                                )}
                               </div>
                             </td>
 
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                              {r.projectCode || r.projectName ? (
-                                <div className="font-semibold text-navy-text flex items-center gap-1.5">
-                                  <Briefcase size={12} className="text-muted-faint shrink-0" />
-                                  <span className="truncate max-w-[200px]" title={`[${r.projectCode}] ${r.projectName}`}>
-                                    [{r.projectCode}] {r.projectName}
-                                  </span>
-                                </div>
-                              ) : (
+                              {pList.length === 0 ? (
                                 <span className="text-muted-faint italic text-[11px]">Belum dialokasikan</span>
+                              ) : (
+                                <div className="space-y-1.5 py-0.5">
+                                  {pList.map((pl, pIdx) => (
+                                    <div key={pIdx} className="font-semibold text-navy-text flex items-center gap-1.5">
+                                      <Briefcase size={12} className="text-muted-faint shrink-0" />
+                                      <span className="truncate max-w-[200px]" title={`[${pl.projectCode}] ${pl.projectName}`}>
+                                        [{pl.projectCode}] {pl.projectName}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </td>
 
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                              {startStr && endStr ? (
-                                <>
-                                  <div className="font-medium text-navy-text">
-                                    {r.tanggalMulaiTugasFmt || startStr} s.d. {r.tanggalSelesaiTugasFmt || endStr}
-                                  </div>
-                                  <div className="mt-0.5">
-                                    {isEnded ? (
-                                      <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-semibold">
-                                        Masa Tugas Berakhir
-                                      </span>
-                                    ) : isUpcoming ? (
-                                      <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-semibold">
-                                        Belum Mulai
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
-                                        Aktif Berjalan
-                                      </span>
-                                    )}
-                                  </div>
-                                </>
-                              ) : (
+                              {pList.length === 0 ? (
                                 <span className="text-muted-faint italic text-[11px]">Belum diatur</span>
+                              ) : (
+                                <div className="space-y-1.5 py-0.5">
+                                  {pList.map((pl, pIdx) => {
+                                    const sStr = pl.tanggalMulaiTugas ? pl.tanggalMulaiTugas.substring(0, 10) : null;
+                                    const eStr = pl.tanggalSelesaiTugas ? pl.tanggalSelesaiTugas.substring(0, 10) : null;
+                                    const isEnded = eStr ? eStr < todayStr : false;
+                                    const isUpcoming = sStr ? sStr > todayStr : false;
+                                    return (
+                                      <div key={pIdx} className="text-[11px]">
+                                        {sStr && eStr ? (
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-medium text-navy-text">
+                                              {pl.tanggalMulaiTugasFmt || sStr} s.d. {pl.tanggalSelesaiTugasFmt || eStr}
+                                            </span>
+                                            {isEnded ? (
+                                              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[9.5px] font-semibold">
+                                                Berakhir
+                                              </span>
+                                            ) : isUpcoming ? (
+                                              <span className="px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[9.5px] font-semibold">
+                                                Belum Mulai
+                                              </span>
+                                            ) : (
+                                              <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[9.5px] font-bold">
+                                                Aktif
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="text-muted-faint italic">Belum diatur</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               )}
                             </td>
 
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                              {isTurun ? (
-                                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold inline-flex items-center gap-1.5">
-                                  <CheckCircle size={11} />
-                                  <span>Turun Lapangan (Riil)</span>
-                                </span>
+                              {pList.length === 0 ? (
+                                <span className="text-muted-faint italic text-[11px]">-</span>
                               ) : (
-                                <span className="px-2.5 py-1 rounded-lg bg-surface-subtle text-muted-stronger border border-border font-semibold inline-flex items-center gap-1.5">
-                                  <FileText size={11} className="text-muted-faint" />
-                                  <span>Administrasi / SKA Only</span>
-                                </span>
+                                <div className="space-y-1.5 py-0.5">
+                                  {pList.map((pl, pIdx) => {
+                                    const isTurun = pl.isTurunLapangan !== false && (pl.isTurunLapangan as unknown) !== 0;
+                                    return (
+                                      <div key={pIdx}>
+                                        {isTurun ? (
+                                          <span className="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold inline-flex items-center gap-1 text-[10.5px]">
+                                            <CheckCircle size={10} />
+                                            <span>Turun Lapangan</span>
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded-lg bg-surface-subtle text-muted-stronger border border-border font-semibold inline-flex items-center gap-1 text-[10.5px]">
+                                            <FileText size={10} className="text-muted-faint" />
+                                            <span>SKA Only</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               )}
                             </td>
 
                             <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                              {formatRupiah(r.nominalHonorBulanan || 0)}
+                              {pList.length === 0 ? (
+                                <span>{formatRupiah(r.nominalHonorBulanan || 0)}</span>
+                              ) : (
+                                <div className="space-y-1.5 py-0.5 text-right font-mono">
+                                  {pList.map((pl, pIdx) => (
+                                    <div key={pIdx} className="font-bold text-navy-text text-xs">
+                                      {formatRupiah(pl.nominalHonorBulanan || 0)}
+                                    </div>
+                                  ))}
+                                  {pList.length > 1 && (
+                                    <div className="text-[10px] text-muted-faint border-t border-border/60 pt-0.5 font-semibold">
+                                      Total: {formatRupiah(totalHonorStandar)}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </td>
 
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
@@ -3963,7 +4132,7 @@ export function PayrollClient({
                               <div className="inline-flex items-center justify-end gap-1.5">
                                 {isManager && (
                                   <>
-                                    {isTurun && (
+                                    {anyTurun && (
                                       <button
                                         onClick={() => {
                                           openHonorModal(null, r.id);
@@ -7032,7 +7201,7 @@ export function PayrollClient({
       {/* ========================================================= */}
       {mounted && isMasterAhliModalOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-2xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
               <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                 <Users size={16} />
@@ -7053,8 +7222,35 @@ export function PayrollClient({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                if (masterProyekList.length === 0) {
+                  setErrorMsg("Minimal 1 penugasan proyek wajib diisi.");
+                  return;
+                }
+                for (let i = 0; i < masterProyekList.length; i++) {
+                  const item = masterProyekList[i];
+                  if (!item.projectId) {
+                    setErrorMsg(`Kode Proyek pada penugasan #${i + 1} wajib dipilih.`);
+                    return;
+                  }
+                  if (!item.tanggalMulaiTugas || !item.tanggalSelesaiTugas) {
+                    setErrorMsg(`Masa tugas (mulai & selesai) pada penugasan #${i + 1} wajib diisi.`);
+                    return;
+                  }
+                  if (item.tanggalSelesaiTugas < item.tanggalMulaiTugas) {
+                    setErrorMsg(`Tanggal selesai tidak boleh lebih awal dari tanggal mulai pada penugasan #${i + 1}.`);
+                    return;
+                  }
+                }
                 const form = e.currentTarget;
                 const fd = new FormData(form);
+                fd.append("proyekList", JSON.stringify(masterProyekList));
+                const primary = masterProyekList[0];
+                fd.set("projectId", primary.projectId);
+                fd.set("tanggalMulaiTugas", primary.tanggalMulaiTugas);
+                fd.set("tanggalSelesaiTugas", primary.tanggalSelesaiTugas);
+                fd.set("isTurunLapangan", primary.isTurunLapangan ? "1" : "0");
+                fd.set("nominalHonorBulanan", String(primary.nominalHonorBulanan));
+
                 startTransition(async () => {
                   try {
                     const res = await saveTenagaAhliMasterAction(fd);
@@ -7159,127 +7355,189 @@ export function PayrollClient({
                 </div>
               </div>
 
-              {/* Kode Proyek Penugasan (Wajib) */}
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Proyek Penugasan (Kode Proyek) *
-                </label>
-                <select
-                  name="projectId"
-                  required
-                  defaultValue={editingMasterAhli?.projectId ?? ""}
-                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
-                >
-                  <option value="">-- Pilih Proyek Penugasan (Wajib) --</option>
-                  {data.projects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      [{proj.code}] {proj.name}
-                    </option>
+              {/* Multi-Project Assignments Section */}
+              <div className="space-y-3 pt-3 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="font-bold text-navy-text text-xs flex items-center gap-1.5">
+                      <Briefcase size={14} className="text-navy" />
+                      <span>Penugasan Proyek & Masa Kontrak ({masterProyekList.length} Proyek)</span>
+                    </label>
+                    <p className="text-[10px] text-muted-faint mt-0.5">
+                      Satu tenaga ahli dapat ditugaskan pada beberapa proyek dengan masa tugas, status, dan honor bulanan masing-masing.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddProyekAssignment}
+                    className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <Plus size={12} />
+                    <span>Tambah Proyek</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {masterProyekList.map((pl, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 space-y-3 relative"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-navy-text px-2 py-0.5 rounded-md bg-navy/10 inline-flex items-center gap-1">
+                          <span>Proyek Penugasan #{idx + 1}</span>
+                        </span>
+                        {masterProyekList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProyekAssignment(idx)}
+                            className="h-6 px-2 rounded-md border border-rose-200 dark:border-rose-900 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[10px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Hapus penugasan proyek ini"
+                          >
+                            <Trash2 size={11} />
+                            <span>Hapus Proyek</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Proyek Penugasan Select */}
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">
+                          Pilih Proyek Penugasan *
+                        </label>
+                        <select
+                          value={pl.projectId}
+                          onChange={(e) => handleUpdateProyekAssignment(idx, "projectId", e.target.value)}
+                          required
+                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                        >
+                          <option value="">-- Pilih Proyek Penugasan (Wajib) --</option>
+                          {data.projects.map((proj) => (
+                            <option key={proj.id} value={proj.id}>
+                              [{proj.code}] {proj.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Masa Tugas Mulai & Selesai */}
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">
+                          Masa Tugas / Kontrak Kerja *
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[10px] text-muted-faint block mb-0.5 font-medium">Tanggal Mulai Tugas</span>
+                            <input
+                              type="date"
+                              required
+                              value={pl.tanggalMulaiTugas}
+                              onChange={(e) => handleUpdateProyekAssignment(idx, "tanggalMulaiTugas", e.target.value)}
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted-faint block mb-0.5 font-medium">Tanggal Selesai Tugas</span>
+                            <input
+                              type="date"
+                              required
+                              value={pl.tanggalSelesaiTugas}
+                              onChange={(e) => handleUpdateProyekAssignment(idx, "tanggalSelesaiTugas", e.target.value)}
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-muted-faint mt-1 block">
+                          Selama dalam rentang tanggal tersebut, nama freelance akan otomatis muncul di daftar penggajian bulanan untuk proyek ini.
+                        </span>
+                      </div>
+
+                      {/* Status Turun Lapangan vs Administrasi / SKA Only */}
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">
+                          Status Penugasan / Kehadiran Lapangan *
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className={`flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer transition-colors ${
+                            pl.isTurunLapangan
+                              ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20"
+                              : "border-border bg-surface-card hover:bg-surface-hover/40"
+                          }`}>
+                            <input
+                              type="radio"
+                              name={`isTurunLapangan_${idx}`}
+                              checked={pl.isTurunLapangan}
+                              onChange={() => handleUpdateProyekAssignment(idx, "isTurunLapangan", true)}
+                              className="mt-0.5 text-navy accent-navy cursor-pointer"
+                            />
+                            <div>
+                              <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                <span>Turun Lapangan (Riil)</span>
+                              </div>
+                              <p className="text-[10px] text-muted-faint mt-0.5 leading-relaxed">
+                                Beneran bekerja / turun ke lapangan. Otomatis dimunculkan di daftar pembayaran gaji bulanan.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className={`flex items-start gap-2.5 p-2 rounded-xl border cursor-pointer transition-colors ${
+                            !pl.isTurunLapangan
+                              ? "border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/20"
+                              : "border-border bg-surface-card hover:bg-surface-hover/40"
+                          }`}>
+                            <input
+                              type="radio"
+                              name={`isTurunLapangan_${idx}`}
+                              checked={!pl.isTurunLapangan}
+                              onChange={() => handleUpdateProyekAssignment(idx, "isTurunLapangan", false)}
+                              className="mt-0.5 text-navy accent-navy cursor-pointer"
+                            />
+                            <div>
+                              <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                                <span>Administrasi / SKA Only</span>
+                              </div>
+                              <p className="text-[10px] text-muted-faint mt-0.5 leading-relaxed">
+                                Nama untuk tender/administrasi (SKA). Tidak dimunculkan di pembayaran riil.
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Nominal Honor Bulanan Standar */}
+                      <div>
+                        <label className="font-semibold text-navy-text block mb-1">
+                          Nominal Honor Bulanan Standar (Rp)
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={formatRupiahInput(pl.nominalHonorBulanan ? pl.nominalHonorBulanan : "")}
+                          onChange={(e) => {
+                            const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
+                            handleUpdateProyekAssignment(idx, "nominalHonorBulanan", num);
+                          }}
+                          placeholder="Contoh: 5.000.000"
+                          className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
+                        />
+                        <span className="text-[10px] text-muted-faint mt-0.5 block">
+                          Honorarium standar bulanan untuk alokasi proyek ini.
+                        </span>
+                      </div>
+                    </div>
                   ))}
-                </select>
-                <span className="text-[10px] text-muted-faint mt-0.5 block">
-                  Tenaga ahli wajib dialokasikan ke proyek spesifik untuk tracking beban dan pelaporan.
-                </span>
-              </div>
-
-              {/* Masa Tugas / Masa Kontrak (Wajib) */}
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Masa Tugas / Kontrak Kerja *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-[10px] text-muted-faint block mb-0.5 font-medium">Tanggal Mulai Tugas</span>
-                    <input
-                      type="date"
-                      name="tanggalMulaiTugas"
-                      required
-                      defaultValue={editingMasterAhli?.tanggalMulaiTugas ? editingMasterAhli.tanggalMulaiTugas.substring(0, 10) : ""}
-                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-muted-faint block mb-0.5 font-medium">Tanggal Selesai Tugas</span>
-                    <input
-                      type="date"
-                      name="tanggalSelesaiTugas"
-                      required
-                      defaultValue={editingMasterAhli?.tanggalSelesaiTugas ? editingMasterAhli.tanggalSelesaiTugas.substring(0, 10) : ""}
-                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
-                    />
-                  </div>
                 </div>
-                <span className="text-[10px] text-muted-faint mt-1 block">
-                  Selama dalam rentang tanggal tersebut, nama freelance akan otomatis muncul di daftar penggajian bulanan dan hilang setelah masa tugas berakhir.
-                </span>
-              </div>
 
-              {/* Status Turun Lapangan vs Administrasi / SKA Only */}
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Status Penugasan / Kehadiran Lapangan *
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-surface-card hover:bg-surface-hover/40 cursor-pointer transition-colors">
-                    <input
-                      type="radio"
-                      name="isTurunLapangan"
-                      value="1"
-                      defaultChecked={editingMasterAhli?.isTurunLapangan === undefined || editingMasterAhli?.isTurunLapangan === true || (editingMasterAhli?.isTurunLapangan as unknown) === 1}
-                      className="mt-0.5 text-navy accent-navy cursor-pointer"
-                    />
-                    <div>
-                      <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                        <span>Turun Lapangan (Riil)</span>
-                      </div>
-                      <p className="text-[10px] text-muted-faint mt-0.5 leading-relaxed">
-                        Beneran bekerja / turun ke lapangan. Otomatis dimunculkan pada daftar pembayaran gaji riil bulanan.
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-surface-card hover:bg-surface-hover/40 cursor-pointer transition-colors">
-                    <input
-                      type="radio"
-                      name="isTurunLapangan"
-                      value="0"
-                      defaultChecked={editingMasterAhli?.isTurunLapangan === false || (editingMasterAhli?.isTurunLapangan as unknown) === 0}
-                      className="mt-0.5 text-navy accent-navy cursor-pointer"
-                    />
-                    <div>
-                      <div className="font-semibold text-navy-text text-xs flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                        <span>Administrasi / SKA Only</span>
-                      </div>
-                      <p className="text-[10px] text-muted-faint mt-0.5 leading-relaxed">
-                        Nama hanya dipasang untuk sertifikasi/tender (SKA). Tidak dimunculkan di daftar pembayaran gaji riil.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Nominal Honor Bulanan Standar */}
-              <div>
-                <label className="font-semibold text-navy-text block mb-1">
-                  Nominal Honor Bulanan Standar (Rp)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  name="nominalHonorBulanan"
-                  defaultValue={formatRupiahInput(editingMasterAhli?.nominalHonorBulanan ? editingMasterAhli.nominalHonorBulanan : "")}
-                  onChange={(e) => {
-                    const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
-                    e.target.value = formatRupiahInput(num);
-                  }}
-                  placeholder="Contoh: 5.000.000"
-                  className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
-                />
-                <span className="text-[10px] text-muted-faint mt-0.5 block">
-                  Nominal honorarium standar bulanan yang otomatis terisi saat pembayaran gaji bulanan diproses.
-                </span>
+                <button
+                  type="button"
+                  onClick={handleAddProyekAssignment}
+                  className="w-full py-2 rounded-xl border border-dashed border-border hover:border-navy text-muted-stronger hover:text-navy text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors bg-surface-subtle/30 hover:bg-surface-subtle"
+                >
+                  <Plus size={14} />
+                  <span>+ Tambah Penugasan Proyek Lain</span>
+                </button>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">

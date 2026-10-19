@@ -287,21 +287,21 @@ export function JurnalTable({
 
                   {/* Badge & Editor Periode Akrual Beban Gaji */}
                   {r.periodeBulanGaji && (
-                    <div className="mt-1 flex items-center gap-1">
+                    <div className="mt-1 flex items-center gap-1.5">
                       <span
-                        className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 text-amber-700 dark:text-amber-300"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 text-blue-700 dark:text-blue-300"
                         title={`Beban Gaji Bulan ${BULAN_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
                       >
-                        <CalendarDays size={9} className="text-amber-500 flex-none" />
+                        <CalendarDays size={10} className="text-blue-500 flex-none" />
                         Akrual: {BULAN_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
                       </span>
                       {canEditAkun && (
                         <button
                           onClick={() => startEditAkrual(r)}
-                          className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text cursor-pointer"
+                          className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text cursor-pointer transition-colors"
                           title="Ubah periode akrual gaji"
                         >
-                          <Pencil size={10} />
+                          <Pencil size={11} />
                         </button>
                       )}
                     </div>
@@ -311,27 +311,26 @@ export function JurnalTable({
                     <div className="mt-1">
                       <button
                         onClick={() => startEditAkrual(r)}
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-faint hover:text-navy-text border border-dashed border-border-soft hover:border-brand px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand hover:text-navy-text border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 px-2 py-0.5 rounded transition-colors cursor-pointer"
                         title="Tentukan periode akrual gaji jika transaksi ini untuk beban bulan lain"
                       >
-                        <CalendarDays size={9} />
-                        + Akrual Gaji
+                        + Atur Bulan Gaji
                       </button>
                     </div>
                   )}
 
                   {editingAkrualId === r.id && (
-                    <div className="mt-1.5 p-2 rounded-[10px] bg-surface-card border border-border-soft shadow-lg flex flex-col gap-1.5 z-20">
-                      <div className="text-[10px] font-bold text-navy-text flex items-center gap-1">
-                        <CalendarDays size={11} className="text-brand" /> Periode Akrual Beban Gaji
+                    <div className="mt-2 p-3 rounded-[11px] bg-surface-card border border-border-soft shadow-lg flex flex-col gap-2 z-20 min-w-[240px]">
+                      <div className="text-[11px] font-bold text-navy-text">
+                        Periode Beban Gaji (Akrual)
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <select
                           value={editBulan}
                           onChange={(e) => setEditBulan(parseInt(e.target.value, 10) || 0)}
-                          className="h-6 px-1 text-[11px] rounded border border-border-soft bg-surface-input text-navy-text flex-1"
+                          className="h-8 px-2 text-[11.5px] rounded-[7px] border border-border-soft bg-surface-input text-navy-text"
                         >
-                          <option value={0}>— Sesuai Tanggal —</option>
+                          <option value={0}>Sesuai Tanggal</option>
                           {BULAN_NAMES.map((name, i) => (
                             <option key={i + 1} value={i + 1}>
                               Bulan {name}
@@ -343,24 +342,24 @@ export function JurnalTable({
                           value={editTahun || ""}
                           onChange={(e) => setEditTahun(parseInt(e.target.value, 10) || 0)}
                           placeholder="Tahun"
-                          className="h-6 w-16 px-1 text-[11px] rounded border border-border-soft bg-surface-input text-navy-text font-mono"
+                          className="h-8 px-2 text-[11.5px] rounded-[7px] border border-border-soft bg-surface-input text-navy-text font-mono"
                         />
+                      </div>
+                      <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-border-subtle">
+                        <button
+                          type="button"
+                          onClick={() => setEditingAkrualId(null)}
+                          className="px-2.5 py-1 text-[11px] font-semibold rounded-[6px] border border-border-soft hover:bg-surface-hover text-muted-stronger cursor-pointer transition-colors"
+                        >
+                          Batal
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleSaveAkrual(r.id)}
                           disabled={isPending}
-                          className="p-1 rounded hover:bg-surface-hover text-status-green disabled:opacity-40 cursor-pointer"
-                          title="Simpan"
+                          className="px-3 py-1 text-[11px] font-bold rounded-[6px] bg-navy text-white hover:bg-navy/90 disabled:opacity-40 cursor-pointer shadow-xs transition-colors"
                         >
-                          <Check size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingAkrualId(null)}
-                          className="p-1 rounded hover:bg-surface-hover text-muted-stronger cursor-pointer"
-                          title="Batal"
-                        >
-                          <X size={12} />
+                          Simpan
                         </button>
                       </div>
                     </div>

@@ -10,6 +10,7 @@ export type JurnalTransaksiGroup = {
   project?: { id: string; code: string; name: string } | null;
   fakturId?: string | null;
   faktur?: { noFaktur: string; namaRekanan: string; ppn: number; pph: number } | null;
+  terminId?: string | null;
   rows: { coaAccountId: string; coaName: string; coaCode: string; keterangan: string; debit: number; kredit: number }[];
   totalDebit: number;
   totalKredit: number;

@@ -1508,7 +1508,7 @@ if ($method === 'GET' && $sub === '') {
         'kasKecil'        => 'Kas Kecil',
         'kasBesar'        => 'Kas Besar',
         'bankBuku'        => 'Buku Bank',
-        'jurnalTransaksi' => 'Jurnal Umum',
+        'jurnalTransaksi' => 'Entry Jurnal',
     ];
 
     foreach ($tx_gaji_tahun as $t) {

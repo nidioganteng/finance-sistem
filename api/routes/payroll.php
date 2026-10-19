@@ -95,6 +95,53 @@ function is_pegawai_eligible_for_month(array $p, int $year, int $month, bool $ha
 }
 
 /**
+ * Menentukan apakah Tenaga Ahli / Freelance berhak muncul di daftar penggajian bulanan riil.
+ * Aturan:
+ * 1. Jika sudah ada data transaksi honor di bulan ini (arsip historis), SELALU TAMPILKAN
+ *    agar rekam jejak honor masa lalu tidak hilang.
+ * 2. Status "Turun Lapangan": Khusus freelance / tenaga ahli, hanya yang berstatus
+ *    "turun ke lapangan" yang dimunculkan pada daftar pembayaran gaji riil bulanan.
+ *    Tenaga ahli yang berstatus kelengkapan administrasi/sertifikasi (SKA) TIDAK dimunculkan.
+ * 3. Masa Tugas / Masa Kontrak: Selama dalam rentang tanggal penugasan (mulai s.d. selesai),
+ *    nama freelance otomatis muncul di daftar penggajian bulanan dan hilang setelah masa tugas berakhir.
+ */
+function is_tenaga_ahli_eligible_for_month(array $ta, int $year, int $month, bool $has_honor_this_month): bool {
+    // 1. Jika sudah ada pembayaran honor di bulan ini, selalu tampilkan
+    if ($has_honor_this_month) return true;
+
+    // 2. Status "Turun Lapangan": hanya yang bernilai true (1) yang muncul di daftar gaji riil
+    $is_turun = isset($ta['isTurunLapangan']) ? ((int)$ta['isTurunLapangan'] === 1 || $ta['isTurunLapangan'] === true) : true;
+    if (!$is_turun) {
+        return false;
+    }
+
+    // 3. Masa Tugas / Masa Kontrak: cek apakah bulan & tahun target berada dalam rentang penugasan
+    $target_ym = $year * 12 + $month;
+
+    if (!empty($ta['tanggalMulaiTugas'])) {
+        $mulai_ts = strtotime(substr($ta['tanggalMulaiTugas'], 0, 10));
+        if ($mulai_ts) {
+            $mulai_ym = ((int)date('Y', $mulai_ts)) * 12 + ((int)date('n', $mulai_ts));
+            if ($target_ym < $mulai_ym) {
+                return false;
+            }
+        }
+    }
+
+    if (!empty($ta['tanggalSelesaiTugas'])) {
+        $selesai_ts = strtotime(substr($ta['tanggalSelesaiTugas'], 0, 10));
+        if ($selesai_ts) {
+            $selesai_ym = ((int)date('Y', $selesai_ts)) * 12 + ((int)date('n', $selesai_ts));
+            if ($target_ym > $selesai_ym) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
  * Kalkulasi PPh 21 bulanan berdasarkan Tarif Efektif Rata-rata (TER) PP 58/2023 & PMK 168/2023.
  */
 function hitung_pph21_ter(float $bruto, string $status_keluarga = 'TK/0'): array {
@@ -192,10 +239,27 @@ if ($method === 'GET' && $sub === '') {
 
     // 4. Tenaga Ahli master (rekanan tipe TENAGA_AHLI)
     $stmt = $pdo->prepare(
-        "SELECT id, nama, nik, npwp, kategori FROM Rekanan WHERE tipe = 'TENAGA_AHLI' ORDER BY nama ASC"
+        "SELECT r.id, r.nama, r.nik, r.npwp, r.kategori, r.ptkp, r.entityId,
+                r.tanggalMulaiTugas, r.tanggalSelesaiTugas, r.projectId,
+                r.isTurunLapangan, r.nominalHonorBulanan,
+                p.code AS projectCode, p.name AS projectName, p.entityId AS projectEntityId
+         FROM Rekanan r
+         LEFT JOIN Project p ON r.projectId = p.id
+         WHERE r.tipe = 'TENAGA_AHLI'
+         ORDER BY r.nama ASC"
     );
     $stmt->execute();
-    $rekanan_tenaga_ahli = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rekanan_tenaga_ahli_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $rekanan_tenaga_ahli = [];
+    foreach ($rekanan_tenaga_ahli_raw as $r) {
+        $r['isTurunLapangan']       = isset($r['isTurunLapangan']) ? ((int)$r['isTurunLapangan'] === 1) : true;
+        $r['nominalHonorBulanan']    = (float)($r['nominalHonorBulanan'] ?? 0.0);
+        $r['nominalHonorBulananFmt'] = fmt_rp_payroll($r['nominalHonorBulanan']);
+        $r['tanggalMulaiTugasFmt']   = !empty($r['tanggalMulaiTugas']) ? fmt_tanggal_id($r['tanggalMulaiTugas']) : null;
+        $r['tanggalSelesaiTugasFmt'] = !empty($r['tanggalSelesaiTugas']) ? fmt_tanggal_id($r['tanggalSelesaiTugas']) : null;
+        $rekanan_tenaga_ahli[] = $r;
+    }
 
     // 5. Master Pegawai untuk entitas (query mandiri tanpa tertimpa kolom gaji bulanan)
     $stmt = $pdo->prepare(
@@ -510,10 +574,12 @@ if ($method === 'GET' && $sub === '') {
     // 6. Honor list for entity+year+month
     $stmt = $pdo->prepare(
         "SELECT h.*, e.`key` AS entityKey, e.name AS entityName,
-                p.code AS projCode, p.name AS projName
+                p.code AS projCode, p.name AS projName,
+                r.ptkp, r.isTurunLapangan, r.tanggalMulaiTugas, r.tanggalSelesaiTugas
          FROM HonorTenagaAhli h
          JOIN Entity e ON h.entityId = e.id
          LEFT JOIN Project p ON h.projectId = p.id
+         LEFT JOIN Rekanan r ON h.rekananId = r.id
          WHERE h.entityId = ? AND h.tahun = ? AND h.bulan = ?
          ORDER BY h.tanggal DESC"
     );
@@ -527,6 +593,8 @@ if ($method === 'GET' && $sub === '') {
         'totalPph21'      => 0.0,
         'totalHonorBersih'=> 0.0,
     ];
+    $paid_rekanan_ids  = [];
+    $paid_rekanan_niks = [];
 
     foreach ($honor_raw as $h) {
         $bruto  = (float)$h['nominalHonor'];
@@ -536,38 +604,116 @@ if ($method === 'GET' && $sub === '') {
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
         $tgl_str = substr($h['tanggal'], 0, 10); // YYYY-MM-DD
 
+        if (!empty($h['rekananId'])) {
+            $paid_rekanan_ids[$h['rekananId']] = true;
+        }
+        if (!empty($h['nik'])) {
+            $paid_rekanan_niks[$h['nik']] = true;
+        }
+
         $honor_list[] = [
-            'id'               => $h['id'],
-            'entityId'         => $h['entityId'],
-            'entityName'       => $h['entityName'],
-            'entityKey'        => $h['entityKey'],
-            'rekananId'        => $h['rekananId'] ?? null,
-            'nik'              => $h['nik'],
-            'nama'             => $h['nama'],
-            'npwp'             => $h['npwp'] ?? null,
-            'uraian'           => $h['uraian'],
-            'tanggal'          => $tgl_str,
-            'tanggalFmt'       => fmt_tanggal_id($tgl_str),
-            'bulan'            => (int)$h['bulan'],
-            'tahun'            => (int)$h['tahun'],
-            'nominalHonor'     => $bruto,
-            'nominalHonorFmt'  => fmt_rp_payroll($bruto),
-            'tarifPph21Persen' => (float)$h['tarifPph21Persen'],
-            'pph21'            => $pph,
-            'pph21Fmt'         => fmt_rp_payroll($pph),
-            'nominalBersih'    => $bersih,
-            'nominalBersihFmt' => fmt_rp_payroll($bersih),
-            'projectId'        => $h['projectId'] ?? null,
-            'projectCode'      => $h['projCode'] ?? null,
-            'projectName'      => $h['projName'] ?? null,
-            'namaProyek'       => $resolved_proj,
-            'noBukti'          => $h['noBukti'] ?? null,
+            'id'                  => $h['id'],
+            'entityId'            => $h['entityId'],
+            'entityName'          => $h['entityName'],
+            'entityKey'           => $h['entityKey'],
+            'rekananId'           => $h['rekananId'] ?? null,
+            'nik'                 => $h['nik'],
+            'nama'                => $h['nama'],
+            'npwp'                => $h['npwp'] ?? null,
+            'ptkp'                => $h['ptkp'] ?? 'TK/0',
+            'uraian'              => $h['uraian'],
+            'tanggal'             => $tgl_str,
+            'tanggalFmt'          => fmt_tanggal_id($tgl_str),
+            'bulan'               => (int)$h['bulan'],
+            'tahun'               => (int)$h['tahun'],
+            'nominalHonor'        => $bruto,
+            'nominalHonorFmt'     => fmt_rp_payroll($bruto),
+            'tarifPph21Persen'    => (float)$h['tarifPph21Persen'],
+            'pph21'               => $pph,
+            'pph21Fmt'            => fmt_rp_payroll($pph),
+            'nominalBersih'       => $bersih,
+            'nominalBersihFmt'    => fmt_rp_payroll($bersih),
+            'projectId'           => $h['projectId'] ?? null,
+            'projectCode'         => $h['projCode'] ?? null,
+            'projectName'         => $h['projName'] ?? null,
+            'namaProyek'          => $resolved_proj,
+            'noBukti'             => $h['noBukti'] ?? null,
+            'isPendingPayment'    => false,
+            'statusPembayaran'    => 'DIBAYAR',
+            'isTurunLapangan'     => isset($h['isTurunLapangan']) ? ((int)$h['isTurunLapangan'] === 1) : true,
+            'tanggalMulaiTugas'   => $h['tanggalMulaiTugas'] ?? null,
+            'tanggalSelesaiTugas' => $h['tanggalSelesaiTugas'] ?? null,
         ];
 
         $summary_honor_bulan_ini['totalTransaksi']++;
         $summary_honor_bulan_ini['totalHonorBruto']  += $bruto;
         $summary_honor_bulan_ini['totalPph21']        += $pph;
         $summary_honor_bulan_ini['totalHonorBersih']  += $bersih;
+    }
+
+    // Auto-populasikan tenaga ahli / freelance yang aktif dalam masa tugas & berstatus turun ke lapangan
+    foreach ($rekanan_tenaga_ahli as $ta) {
+        $is_entity_matched = empty($ta['entityId'])
+            || $ta['entityId'] === $entity_id
+            || (!empty($ta['projectEntityId']) && $ta['projectEntityId'] === $entity_id);
+
+        if (!$is_entity_matched) {
+            continue;
+        }
+
+        $already_paid = (!empty($ta['id']) && isset($paid_rekanan_ids[$ta['id']]))
+            || (!empty($ta['nik']) && isset($paid_rekanan_niks[$ta['nik']]));
+
+        if ($already_paid) {
+            continue;
+        }
+
+        $eligible = is_tenaga_ahli_eligible_for_month($ta, $year, $month, false);
+        if (!$eligible) {
+            continue;
+        }
+
+        $nominal_honor = (float)($ta['nominalHonorBulanan'] ?? 0.0);
+        $has_npwp      = !empty($ta['npwp']);
+        $tarif_pph     = $has_npwp ? 2.5 : 3.0; // Standar PPh 21 Bukan Pegawai (50% x 5% = 2.5%, non-NPWP 120% = 3%)
+        $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
+        $bersih        = max(0, $nominal_honor - $pph21);
+        $resolved_proj = $ta['projectCode'] ? "{$ta['projectCode']} - {$ta['projectName']}" : ($ta['projectName'] ?? null);
+        $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
+
+        $honor_list[] = [
+            'id'                  => 'pending_' . $ta['id'],
+            'entityId'            => $entity_id,
+            'entityName'          => $entity['name'] ?? '',
+            'entityKey'           => $entity['key'] ?? '',
+            'rekananId'           => $ta['id'],
+            'nik'                 => $ta['nik'] ?? '',
+            'nama'                => $ta['nama'],
+            'npwp'                => $ta['npwp'] ?? null,
+            'ptkp'                => $ta['ptkp'] ?? 'TK/0',
+            'uraian'              => "Honorarium Tenaga Ahli: {$ta['nama']}" . ($resolved_proj ? " ({$resolved_proj})" : ""),
+            'tanggal'             => $tgl_default,
+            'tanggalFmt'          => fmt_tanggal_id($tgl_default),
+            'bulan'               => $month,
+            'tahun'               => $year,
+            'nominalHonor'        => $nominal_honor,
+            'nominalHonorFmt'     => fmt_rp_payroll($nominal_honor),
+            'tarifPph21Persen'    => $tarif_pph,
+            'pph21'               => $pph21,
+            'pph21Fmt'            => fmt_rp_payroll($pph21),
+            'nominalBersih'       => $bersih,
+            'nominalBersihFmt'    => fmt_rp_payroll($bersih),
+            'projectId'           => $ta['projectId'] ?? null,
+            'projectCode'         => $ta['projectCode'] ?? null,
+            'projectName'         => $ta['projectName'] ?? null,
+            'namaProyek'          => $resolved_proj,
+            'noBukti'             => null,
+            'isPendingPayment'    => true,
+            'statusPembayaran'    => 'BELUM_DIBAYAR',
+            'isTurunLapangan'     => true,
+            'tanggalMulaiTugas'   => $ta['tanggalMulaiTugas'] ?? null,
+            'tanggalSelesaiTugas' => $ta['tanggalSelesaiTugas'] ?? null,
+        ];
     }
 
     // 7. All gaji for entity+year (for rekap bulanan)
@@ -802,6 +948,9 @@ if ($method === 'GET' && $sub === '') {
 
     // Build allHonorBulanIni — semua honor bulan ini, lintas entitas
     $all_honor_bulan_ini = [];
+    $paid_holding_ids  = [];
+    $paid_holding_niks = [];
+
     foreach ($all_honor_tahun as $h) {
         if ((int)$h['bulan'] !== $month) continue;
         $bruto  = (float)$h['nominalHonor'];
@@ -810,33 +959,112 @@ if ($method === 'GET' && $sub === '') {
         $resolved_proj = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
         $tgl_str = substr($h['tanggal'], 0, 10);
+
+        if (!empty($h['rekananId'])) {
+            $paid_holding_ids[$h['rekananId']] = true;
+        }
+        if (!empty($h['nik'])) {
+            $paid_holding_niks[$h['nik']] = true;
+        }
+
         $all_honor_bulan_ini[] = [
-            'id'               => $h['id'],
-            'entityId'         => $h['entityId'],
-            'entityName'       => $h['ename'],
-            'entityKey'        => $h['ekey'],
-            'rekananId'        => $h['rekananId'] ?? null,
-            'nik'              => $h['nik'],
-            'nama'             => $h['nama'],
-            'npwp'             => $h['npwp'] ?? null,
-            'uraian'           => $h['uraian'],
-            'tanggal'          => $tgl_str,
-            'tanggalFmt'       => fmt_tanggal_id($tgl_str),
-            'bulan'            => (int)$h['bulan'],
-            'tahun'            => (int)$h['tahun'],
-            'nominalHonor'     => $bruto,
-            'nominalHonorFmt'  => fmt_rp_payroll($bruto),
-            'tarifPph21Persen' => (float)($h['tarifPph21Persen'] ?? 0),
-            'pph21'            => $pph,
-            'pph21Fmt'         => fmt_rp_payroll($pph),
-            'nominalBersih'    => $bersih,
-            'nominalBersihFmt' => fmt_rp_payroll($bersih),
-            'projectId'        => $h['projectId'] ?? null,
-            'projectCode'      => $h['projCode'] ?? null,
-            'namaProyek'       => $resolved_proj,
-            'ptkp'             => $h['ptkp'] ?? null,
-            'jenisPph'         => $h['jenisPph'] ?? null,
-            'noBukti'          => $h['noBukti'] ?? null,
+            'id'                  => $h['id'],
+            'entityId'            => $h['entityId'],
+            'entityName'          => $h['ename'],
+            'entityKey'           => $h['ekey'],
+            'rekananId'           => $h['rekananId'] ?? null,
+            'nik'                 => $h['nik'],
+            'nama'                => $h['nama'],
+            'npwp'                => $h['npwp'] ?? null,
+            'uraian'              => $h['uraian'],
+            'tanggal'             => $tgl_str,
+            'tanggalFmt'          => fmt_tanggal_id($tgl_str),
+            'bulan'               => (int)$h['bulan'],
+            'tahun'               => (int)$h['tahun'],
+            'nominalHonor'        => $bruto,
+            'nominalHonorFmt'     => fmt_rp_payroll($bruto),
+            'tarifPph21Persen'    => (float)($h['tarifPph21Persen'] ?? 0),
+            'pph21'               => $pph,
+            'pph21Fmt'            => fmt_rp_payroll($pph),
+            'nominalBersih'       => $bersih,
+            'nominalBersihFmt'    => fmt_rp_payroll($bersih),
+            'projectId'           => $h['projectId'] ?? null,
+            'projectCode'         => $h['projCode'] ?? null,
+            'projectName'         => $h['projName'] ?? null,
+            'namaProyek'          => $resolved_proj,
+            'ptkp'                => $h['ptkp'] ?? null,
+            'jenisPph'            => $h['jenisPph'] ?? null,
+            'noBukti'             => $h['noBukti'] ?? null,
+            'isPendingPayment'    => false,
+            'statusPembayaran'    => 'DIBAYAR',
+            'isTurunLapangan'     => true,
+            'tanggalMulaiTugas'   => $h['tanggalMulaiTugas'] ?? null,
+            'tanggalSelesaiTugas' => $h['tanggalSelesaiTugas'] ?? null,
+        ];
+    }
+
+    // Auto-populasikan freelance holding yang berstatus turun lapangan dan masih aktif dalam masa tugas
+    foreach ($rekanan_tenaga_ahli as $ta) {
+        $already_paid = (!empty($ta['id']) && isset($paid_holding_ids[$ta['id']]))
+            || (!empty($ta['nik']) && isset($paid_holding_niks[$ta['nik']]));
+
+        if ($already_paid) continue;
+
+        if (!is_tenaga_ahli_eligible_for_month($ta, $year, $month, false)) continue;
+
+        $nominal_honor = (float)($ta['nominalHonorBulanan'] ?? 0.0);
+        $has_npwp      = !empty($ta['npwp']);
+        $tarif_pph     = $has_npwp ? 2.5 : 3.0;
+        $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
+        $bersih        = max(0, $nominal_honor - $pph21);
+        $resolved_proj = $ta['projectCode'] ? "{$ta['projectCode']} - {$ta['projectName']}" : ($ta['projectName'] ?? null);
+        $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
+
+        $target_entity_name = $entity['name'] ?? '';
+        $target_entity_key  = $entity['key'] ?? '';
+        if (!empty($ta['entityId'])) {
+            foreach ($all_entities as $ent) {
+                if ($ent['id'] === $ta['entityId']) {
+                    $target_entity_name = $ent['name'];
+                    $target_entity_key  = $ent['key'];
+                    break;
+                }
+            }
+        }
+
+        $all_honor_bulan_ini[] = [
+            'id'                  => 'pending_' . $ta['id'],
+            'entityId'            => $ta['entityId'] ?: $entity_id,
+            'entityName'          => $target_entity_name,
+            'entityKey'           => $target_entity_key,
+            'rekananId'           => $ta['id'],
+            'nik'                 => $ta['nik'] ?? '',
+            'nama'                => $ta['nama'],
+            'npwp'                => $ta['npwp'] ?? null,
+            'uraian'              => "Honorarium Tenaga Ahli: {$ta['nama']}" . ($resolved_proj ? " ({$resolved_proj})" : ""),
+            'tanggal'             => $tgl_default,
+            'tanggalFmt'          => fmt_tanggal_id($tgl_default),
+            'bulan'               => $month,
+            'tahun'               => $year,
+            'nominalHonor'        => $nominal_honor,
+            'nominalHonorFmt'     => fmt_rp_payroll($nominal_honor),
+            'tarifPph21Persen'    => $tarif_pph,
+            'pph21'               => $pph21,
+            'pph21Fmt'            => fmt_rp_payroll($pph21),
+            'nominalBersih'       => $bersih,
+            'nominalBersihFmt'    => fmt_rp_payroll($bersih),
+            'projectId'           => $ta['projectId'] ?? null,
+            'projectCode'         => $ta['projectCode'] ?? null,
+            'projectName'         => $ta['projectName'] ?? null,
+            'namaProyek'          => $resolved_proj,
+            'ptkp'                => $ta['ptkp'] ?? 'TK/0',
+            'jenisPph'            => 'PPh 21',
+            'noBukti'             => null,
+            'isPendingPayment'    => true,
+            'statusPembayaran'    => 'BELUM_DIBAYAR',
+            'isTurunLapangan'     => true,
+            'tanggalMulaiTugas'   => $ta['tanggalMulaiTugas'] ?? null,
+            'tanggalSelesaiTugas' => $ta['tanggalSelesaiTugas'] ?? null,
         ];
     }
 
@@ -1927,12 +2155,18 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
     $user = require_auth();
     $pdo  = get_pdo();
 
-    $id       = trim($body['id'] ?? '') ?: null;
-    $nama     = trim($body['nama'] ?? '');
-    $nik      = trim($body['nik'] ?? '');
-    $npwp     = trim($body['npwp'] ?? '') ?: null;
-    $kategori = trim($body['kategori'] ?? '') ?: null;
-    $entity_id = trim($body['entityId'] ?? '') ?: null;
+    $id                    = trim($body['id'] ?? '') ?: null;
+    $nama                  = trim($body['nama'] ?? '');
+    $nik                   = trim($body['nik'] ?? '');
+    $npwp                  = trim($body['npwp'] ?? '') ?: null;
+    $kategori              = trim($body['kategori'] ?? '') ?: null;
+    $ptkp                  = trim($body['ptkp'] ?? 'TK/0') ?: 'TK/0';
+    $entity_id             = trim($body['entityId'] ?? '') ?: null;
+    $project_id            = trim($body['projectId'] ?? '') ?: null;
+    $tanggal_mulai_tugas   = trim($body['tanggalMulaiTugas'] ?? '') ?: null;
+    $tanggal_selesai_tugas = trim($body['tanggalSelesaiTugas'] ?? '') ?: null;
+    $is_turun_lapangan     = isset($body['isTurunLapangan']) ? ($body['isTurunLapangan'] ? 1 : 0) : 1;
+    $nominal_honor_bulanan = parse_rupiah_num($body['nominalHonorBulanan'] ?? null, 0.0);
 
     if (!$nama || !$nik) {
         return error_response('Nama Lengkap dan NIK Tenaga Ahli wajib diisi.', 400);
@@ -1943,12 +2177,39 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
         return error_response('NIK Tenaga Ahli harus berupa 16 digit angka KTP.', 400);
     }
 
+    if (!$project_id) {
+        return error_response('Kode Proyek Penugasan wajib dipilih.', 400);
+    }
+
+    if (!$tanggal_mulai_tugas || !$tanggal_selesai_tugas) {
+        return error_response('Masa Tugas (Tanggal Mulai dan Tanggal Selesai) wajib diisi.', 400);
+    }
+
+    $tgl_mulai_ts   = strtotime($tanggal_mulai_tugas);
+    $tgl_selesai_ts = strtotime($tanggal_selesai_tugas);
+    if (!$tgl_mulai_ts || !$tgl_selesai_ts) {
+        return error_response('Format Tanggal Masa Tugas tidak valid.', 400);
+    }
+    if ($tgl_selesai_ts < $tgl_mulai_ts) {
+        return error_response('Tanggal Selesai Tugas tidak boleh lebih awal dari Tanggal Mulai Tugas.', 400);
+    }
+
+    $tanggal_mulai_db   = date('Y-m-d', $tgl_mulai_ts);
+    $tanggal_selesai_db = date('Y-m-d', $tgl_selesai_ts);
     $now = date('Y-m-d H:i:s');
 
     if ($id) {
         $pdo->prepare(
-            "UPDATE Rekanan SET nama=?, nik=?, npwp=?, kategori=?, entityId=?, updatedAt=? WHERE id=?"
-        )->execute([$nama, $clean_nik, $npwp, $kategori, $entity_id, $now, $id]);
+            "UPDATE Rekanan
+             SET nama=?, nik=?, npwp=?, kategori=?, ptkp=?, entityId=?,
+                 tanggalMulaiTugas=?, tanggalSelesaiTugas=?, projectId=?,
+                 isTurunLapangan=?, nominalHonorBulanan=?, updatedAt=?
+             WHERE id=?"
+        )->execute([
+            $nama, $clean_nik, $npwp, $kategori, $ptkp, $entity_id,
+            $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
+            $is_turun_lapangan, $nominal_honor_bulanan, $now, $id
+        ]);
 
         log_activity($user['id'], "Update Database Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $id]);
         $record_id = $id;
@@ -1963,16 +2224,36 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
 
         $record_id = uuid4();
         $pdo->prepare(
-            "INSERT INTO Rekanan (id, nama, nik, npwp, tipe, kategori, entityId, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?)"
-        )->execute([$record_id, $nama, $clean_nik, $npwp, $kategori, $entity_id, $now, $now]);
+            "INSERT INTO Rekanan
+             (id, nama, nik, npwp, tipe, kategori, ptkp, entityId,
+              tanggalMulaiTugas, tanggalSelesaiTugas, projectId,
+              isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )->execute([
+            $record_id, $nama, $clean_nik, $npwp, $kategori, $ptkp, $entity_id,
+            $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
+            $is_turun_lapangan, $nominal_honor_bulanan, $now, $now
+        ]);
 
         log_activity($user['id'], "Tambah Database Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $record_id]);
     }
 
-    $stmt = $pdo->prepare("SELECT id, nama, nik, npwp, kategori FROM Rekanan WHERE id = ?");
+    $stmt = $pdo->prepare(
+        "SELECT r.id, r.nama, r.nik, r.npwp, r.kategori, r.ptkp, r.entityId,
+                r.tanggalMulaiTugas, r.tanggalSelesaiTugas, r.projectId,
+                r.isTurunLapangan, r.nominalHonorBulanan,
+                p.code AS projectCode, p.name AS projectName
+         FROM Rekanan r
+         LEFT JOIN Project p ON r.projectId = p.id
+         WHERE r.id = ?"
+    );
     $stmt->execute([$record_id]);
     $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($record) {
+        $record['isTurunLapangan']       = ((int)($record['isTurunLapangan'] ?? 1) === 1);
+        $record['nominalHonorBulanan']    = (float)($record['nominalHonorBulanan'] ?? 0.0);
+        $record['nominalHonorBulananFmt'] = fmt_rp_payroll($record['nominalHonorBulanan']);
+    }
 
     json_response([
         'success' => true,

@@ -99,15 +99,15 @@ if ($method === 'GET' && $sub_action === 'projects') {
 
     $pdo = get_pdo();
 
-    // Prioritize the requested entity, but include all ACTIVE projects from all entities
+    // Filter proyek khusus entitas yang diminta (via entityId UUID atau entity.key)
     $stmt = $pdo->prepare(
         'SELECT p.*, e.name as entity_name, e.`key` as entity_key
            FROM Project p
            JOIN Entity e ON p.entityId = e.id
-          WHERE p.status = \'ACTIVE\'
-          ORDER BY CASE WHEN p.entityId = ? THEN 0 ELSE 1 END, e.name ASC, p.code ASC'
+          WHERE p.status = \'ACTIVE\' AND (p.entityId = ? OR e.`key` = ?)
+          ORDER BY p.code ASC'
     );
-    $stmt->execute([$entity_id]);
+    $stmt->execute([$entity_id, $entity_id]);
     $projects = $stmt->fetchAll();
 
     // Fetch termins for all projects in one query

@@ -121,6 +121,10 @@ if ($method === 'GET' && $sub === 'ledger') {
             elseif (!empty($extra['crossingEntityKey'])) $g['crossingEntityKeys'] = [$extra['crossingEntityKey']]; // backward compat
             if (!empty($extra['crossingFromEntityKey'])) $g['crossingFromEntityKey'] = $extra['crossingFromEntityKey'];
             if (!empty($extra['crossingGroupId']))     $g['crossingGroupId']     = $extra['crossingGroupId'];
+            if (!empty($extra['autoPostedFromJurnal']) && !empty($r['coa_name'])) {
+                $g['bankCoaName'] = $r['coa_name'];
+                $g['bankCoaId']   = $r['coa_id'] ?? '';
+            }
         } else {
             // Jika row berasal dari auto-post jurnal, abaikan baris potongan pajak PPN & PPh
             if (!empty($extra['autoPostedFromJurnal'])) {
@@ -153,10 +157,22 @@ if ($method === 'GET' && $sub === 'ledger') {
         unset($g);
     }
 
-    // Sinkronisasi nominal coaRows jika auto-posted dari jurnal agar tepat sesuai mutasi bank
+    // Sinkronisasi nominal & nama akun coaRows jika auto-posted dari jurnal agar sesuai akun bank yang dipilih
     foreach ($groups as &$grp) {
         $net_mutasi = ($grp['masuk'] > 0) ? $grp['masuk'] : $grp['keluar'];
-        if ($net_mutasi > 0 && count($grp['coaRows']) === 1 && $grp['coaRows'][0]['nominal'] != $net_mutasi) {
+        if (!empty($grp['bankCoaName'])) {
+            $grp['akunTags'] = [$grp['bankCoaName']];
+            $grp['coaRows'] = [
+                [
+                    'id'            => $grp['allTxIds'][0] ?? uuid4(),
+                    'coaAccountId'  => $grp['bankCoaId'] ?? '',
+                    'coaName'       => $grp['bankCoaName'],
+                    'nominal'       => $net_mutasi,
+                    'isDebit'       => $grp['masuk'] > 0,
+                    'itemDescription' => null,
+                ]
+            ];
+        } elseif ($net_mutasi > 0 && count($grp['coaRows']) === 1 && $grp['coaRows'][0]['nominal'] != $net_mutasi) {
             $grp['coaRows'][0]['nominal'] = $net_mutasi;
         }
     }

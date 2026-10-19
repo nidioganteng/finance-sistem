@@ -45,6 +45,8 @@ import {
   type HonorTenagaAhliItem,
   type RekananTenagaAhliItem,
   type TenagaAhliProjectAssignment,
+  type ProjectHoldingItem,
+  type RiwayatGajiTenagaAhliItem,
   type KonsolidasiTenagaAhliItem,
   type PayrollSyncLabaRugi,
   type RekapBulanPegawaiItem,
@@ -79,6 +81,7 @@ type PayrollData = {
   entity: { id: string; key: string; name: string; legalName: string } | null;
   allEntities: { id: string; key: string; name: string; legalName: string }[];
   projects: { id: string; code: string; name: string }[];
+  allProjects?: ProjectHoldingItem[];
   rekananTenagaAhli: RekananTenagaAhliItem[];
   year: number;
   month: number;
@@ -480,6 +483,8 @@ export function PayrollClient({
     Array<{
       id?: string | null;
       projectId: string;
+      projectCode?: string | null;
+      projectName?: string | null;
       tanggalMulaiTugas: string;
       tanggalSelesaiTugas: string;
       isTurunLapangan: boolean;
@@ -488,6 +493,8 @@ export function PayrollClient({
   >([
     {
       projectId: "",
+      projectCode: null,
+      projectName: null,
       tanggalMulaiTugas: "",
       tanggalSelesaiTugas: "",
       isTurunLapangan: true,
@@ -502,6 +509,8 @@ export function PayrollClient({
           editingMasterAhli.proyekList.map((p) => ({
             id: p.id || null,
             projectId: p.projectId || "",
+            projectCode: p.projectCode || null,
+            projectName: p.projectName || null,
             tanggalMulaiTugas: p.tanggalMulaiTugas ? p.tanggalMulaiTugas.substring(0, 10) : "",
             tanggalSelesaiTugas: p.tanggalSelesaiTugas ? p.tanggalSelesaiTugas.substring(0, 10) : "",
             isTurunLapangan: p.isTurunLapangan !== false && (p.isTurunLapangan as unknown) !== 0,
@@ -512,6 +521,8 @@ export function PayrollClient({
         setMasterProyekList([
           {
             projectId: editingMasterAhli.projectId,
+            projectCode: editingMasterAhli.projectCode || null,
+            projectName: editingMasterAhli.projectName || null,
             tanggalMulaiTugas: editingMasterAhli.tanggalMulaiTugas ? editingMasterAhli.tanggalMulaiTugas.substring(0, 10) : "",
             tanggalSelesaiTugas: editingMasterAhli.tanggalSelesaiTugas ? editingMasterAhli.tanggalSelesaiTugas.substring(0, 10) : "",
             isTurunLapangan: editingMasterAhli.isTurunLapangan !== false && (editingMasterAhli.isTurunLapangan as unknown) !== 0,
@@ -522,6 +533,8 @@ export function PayrollClient({
         setMasterProyekList([
           {
             projectId: "",
+            projectCode: null,
+            projectName: null,
             tanggalMulaiTugas: "",
             tanggalSelesaiTugas: "",
             isTurunLapangan: true,
@@ -537,6 +550,8 @@ export function PayrollClient({
       ...prev,
       {
         projectId: "",
+        projectCode: null,
+        projectName: null,
         tanggalMulaiTugas: "",
         tanggalSelesaiTugas: "",
         isTurunLapangan: true,
@@ -564,6 +579,66 @@ export function PayrollClient({
 
   const [slipModalItem, setSlipModalItem] = useState<GajiBulananItem | null>(null);
   const [riwayatPegawaiTarget, setRiwayatPegawaiTarget] = useState<PegawaiItem | null>(null);
+
+  // State Riwayat & Rekam Jejak Gaji Tenaga Ahli (Masa Kerja s/d Selesai / Filter Bulan)
+  const [riwayatAhliTarget, setRiwayatAhliTarget] = useState<RekananTenagaAhliItem | null>(null);
+  const [ahliFilterMode, setAhliFilterMode] = useState<"sepanjang-tugas" | "filter-bulan">("sepanjang-tugas");
+  const [ahliModalStartMonth, setAhliModalStartMonth] = useState<number>(1);
+  const [ahliModalEndMonth, setAhliModalEndMonth] = useState<number>(12);
+  const [ahliModalStartYear, setAhliModalStartYear] = useState<number>(selectedYear);
+  const [ahliModalEndYear, setAhliModalEndYear] = useState<number>(selectedYear);
+
+  function getAhliHistoryData(
+    ahli: RekananTenagaAhliItem,
+    mode: "sepanjang-tugas" | "filter-bulan",
+    startM: number,
+    endM: number,
+    startY: number,
+    endY: number
+  ) {
+    const rawHistory = ahli.riwayatGaji || [];
+    const pList = (ahli.proyekList && ahli.proyekList.length > 0)
+      ? ahli.proyekList
+      : (ahli.projectId ? [{
+          projectId: ahli.projectId,
+          projectCode: ahli.projectCode,
+          projectName: ahli.projectName,
+          tanggalMulaiTugas: ahli.tanggalMulaiTugas,
+          tanggalMulaiTugasFmt: ahli.tanggalMulaiTugasFmt,
+          tanggalSelesaiTugas: ahli.tanggalSelesaiTugas,
+          tanggalSelesaiTugasFmt: ahli.tanggalSelesaiTugasFmt,
+          isTurunLapangan: ahli.isTurunLapangan !== false && (ahli.isTurunLapangan as unknown) !== 0,
+          nominalHonorBulanan: ahli.nominalHonorBulanan || 0,
+        }] : []);
+
+    const fromM = Math.min(startM, endM);
+    const toM = Math.max(startM, endM);
+    const fromY = Math.min(startY, endY);
+    const toY = Math.max(startY, endY);
+
+    const filteredRows = rawHistory.filter((item) => {
+      if (mode === "sepanjang-tugas") return true;
+      const yr = item.tahun;
+      const mo = item.bulan;
+      if (yr < fromY || yr > toY) return false;
+      if (yr === fromY && mo < fromM) return false;
+      if (yr === toY && mo > toM) return false;
+      return true;
+    });
+
+    const totalHonorBruto = filteredRows.reduce((acc, r) => acc + (r.nominalHonor || 0), 0);
+    const totalPph21 = filteredRows.reduce((acc, r) => acc + (r.pph21 || 0), 0);
+    const totalHonorBersih = filteredRows.reduce((acc, r) => acc + (r.nominalBersih || 0), 0);
+
+    return {
+      pList,
+      filteredRows,
+      totalHonorBruto,
+      totalPph21,
+      totalHonorBersih,
+      totalTransaksi: filteredRows.length,
+    };
+  }
 
   // State Rekapitulasi Akumulasi Gaji Setahun Per Nama (Filter Periode Bebas)
   const [akumulasiMode, setAkumulasiMode] = useState<"per-nama" | "semua">("per-nama");
@@ -830,6 +905,17 @@ export function PayrollClient({
     }
     return false;
   });
+
+  const projectListToUse: Array<{ id: string; code: string; name: string; entityId?: string; entityName: string }> =
+    data.allProjects && data.allProjects.length > 0
+      ? data.allProjects.map((p) => ({
+          ...p,
+          entityName: p.entityName || "Holding / Lainnya",
+        }))
+      : data.projects.map((p) => ({
+          ...p,
+          entityName: data.entity?.name || "Entitas Aktif",
+        }));
 
   return (
     <div className="space-y-6">
@@ -4130,6 +4216,16 @@ export function PayrollClient({
 
                             <td className="py-3 px-3.5 text-right whitespace-nowrap border-b border-border">
                               <div className="inline-flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setRiwayatAhliTarget(r);
+                                  }}
+                                  className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                  title="Lihat Riwayat & Rekam Jejak Gaji Tenaga Ahli"
+                                >
+                                  <History size={11} className="text-navy" />
+                                  <span>Riwayat Gaji</span>
+                                </button>
                                 {isManager && (
                                   <>
                                     {anyTurun && (
@@ -4350,21 +4446,50 @@ export function PayrollClient({
                               </td>
 
                               <td className="py-3 px-3.5 text-center whitespace-nowrap border-b border-border">
-                                <button
-                                  onClick={() => setExpandedNik(isExpanded ? null : r.nik)}
-                                  className={`h-7 px-2.5 rounded-lg border text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs ${
-                                    isExpanded
-                                      ? "bg-navy text-white border-navy"
-                                      : "border-border bg-surface-subtle hover:bg-surface-hover text-navy-text"
-                                  }`}
-                                >
-                                  <span>{isExpanded ? "Tutup" : "Lihat Detail"}</span>
-                                  {isExpanded ? (
-                                    <ChevronDown size={12} />
-                                  ) : (
-                                    <ChevronRight size={12} />
-                                  )}
-                                </button>
+                                <div className="inline-flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      const matched = data.rekananTenagaAhli.find(
+                                        (x) => (x.nik && x.nik === r.nik) || x.nama.toLowerCase() === r.nama.toLowerCase()
+                                      );
+                                      if (matched) {
+                                        setRiwayatAhliTarget(matched);
+                                      } else {
+                                        setRiwayatAhliTarget({
+                                          id: r.nik || r.nama,
+                                          nama: r.nama,
+                                          nik: r.nik,
+                                          npwp: r.npwp || null,
+                                          kategori: "Tenaga Ahli",
+                                          riwayatGaji: r.rincian.map((ri) => ({
+                                            ...ri,
+                                            tahun: selectedYear,
+                                          })),
+                                        });
+                                      }
+                                    }}
+                                    className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-navy-text text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    title="Lihat Riwayat & Rekam Jejak Gaji Tenaga Ahli"
+                                  >
+                                    <History size={11} className="text-navy" />
+                                    <span>Riwayat Gaji</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setExpandedNik(isExpanded ? null : r.nik)}
+                                    className={`h-7 px-2.5 rounded-lg border text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs ${
+                                      isExpanded
+                                        ? "bg-navy text-white border-navy"
+                                        : "border-border bg-surface-subtle hover:bg-surface-hover text-navy-text"
+                                    }`}
+                                  >
+                                    <span>{isExpanded ? "Tutup" : "Lihat Detail"}</span>
+                                    {isExpanded ? (
+                                      <ChevronDown size={12} />
+                                    ) : (
+                                      <ChevronRight size={12} />
+                                    )}
+                                  </button>
+                                </div>
                               </td>
                             </tr>
 
@@ -6476,13 +6601,13 @@ export function PayrollClient({
                   </span>
                 </label>
                 <div className="space-y-1.5">
-                  {data.projects.length > 0 && (
+                  {projectListToUse.length > 0 && (
                     <select
                       value={modalHonorProjectId}
                       onChange={(e) => {
                         const val = e.target.value;
                         setModalHonorProjectId(val);
-                        const matched = data.projects.find((p) => p.id === val);
+                        const matched = projectListToUse.find((p) => p.id === val);
                         if (matched) {
                           setModalHonorNamaProyek(`[${matched.code}] ${matched.name}`);
                         }
@@ -6490,10 +6615,26 @@ export function PayrollClient({
                       className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground text-xs font-semibold"
                     >
                       <option value="">-- Tanpa Alokasi Proyek (Non-Proyek) --</option>
-                      {data.projects.map((pr) => (
-                        <option key={pr.id} value={pr.id}>
-                          [{pr.code}] {pr.name}
+                      {modalHonorProjectId && !projectListToUse.some((p) => p.id === modalHonorProjectId) && (
+                        <option value={modalHonorProjectId}>
+                          {modalHonorNamaProyek || modalHonorProjectId} (Tersimpan)
                         </option>
+                      )}
+                      {Object.entries(
+                        projectListToUse.reduce<Record<string, typeof projectListToUse>>((acc, proj) => {
+                          const key = proj.entityName || "Holding / Lainnya";
+                          if (!acc[key]) acc[key] = [];
+                          acc[key].push(proj);
+                          return acc;
+                        }, {})
+                      ).map(([entName, projs]) => (
+                        <optgroup key={entName} label={entName}>
+                          {projs.map((pr) => (
+                            <option key={pr.id} value={pr.id}>
+                              [{pr.code}] {pr.name}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   )}
@@ -6965,6 +7106,476 @@ export function PayrollClient({
       )}
 
       {/* ========================================================= */}
+      {/* MODAL 3B: RIWAYAT & REKAM JEJAK GAJI TENAGA AHLI */}
+      {/* ========================================================= */}
+      {mounted && riwayatAhliTarget && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-4xl max-h-[90vh] bg-surface-card rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 border-b border-border bg-surface-subtle/50 flex items-center justify-between shrink-0 flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-navy/10 text-navy flex items-center justify-center font-bold">
+                  <History size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-navy-text">
+                    Rekam Jejak & Riwayat Gaji Tenaga Ahli
+                  </h3>
+                  <p className="text-xs text-muted-faint">
+                    Arsip pembayaran honorarium & riwayat penugasan proyek {riwayatAhliTarget.nama} (NIK: {riwayatAhliTarget.nik || "-"})
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Tenaga Ahli Switcher Dropdown */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-surface-card px-2.5 py-1 rounded-xl border border-border shadow-2xs">
+                  <span className="text-[11px] text-muted-faint font-medium hidden sm:inline">Pilih Ahli:</span>
+                  <select
+                    value={riwayatAhliTarget.id}
+                    onChange={(e) => {
+                      const next = data.rekananTenagaAhli.find((x) => x.id === e.target.value);
+                      if (next) setRiwayatAhliTarget(next);
+                    }}
+                    className="h-7 text-xs rounded-lg border-0 bg-transparent text-navy-text font-semibold focus:outline-none cursor-pointer max-w-[180px] truncate"
+                  >
+                    {data.rekananTenagaAhli.map((ra) => (
+                      <option key={ra.id} value={ra.id}>
+                        {ra.nama} {ra.nik ? `(${ra.nik})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => setRiwayatAhliTarget(null)}
+                  className="p-1.5 text-muted-faint hover:text-navy-text rounded-lg hover:bg-surface-hover transition-colors cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Scrollable */}
+            <div className="p-5 space-y-5 overflow-y-auto">
+              {(() => {
+                const historyData = getAhliHistoryData(
+                  riwayatAhliTarget,
+                  ahliFilterMode,
+                  ahliModalStartMonth,
+                  ahliModalEndMonth,
+                  ahliModalStartYear,
+                  ahliModalEndYear
+                );
+                const hasNpwp = !!(riwayatAhliTarget.npwp && riwayatAhliTarget.npwp.trim());
+                const totalHonorStandar = historyData.pList.reduce((acc, p) => acc + (p.nominalHonorBulanan || 0), 0);
+
+                return (
+                  <div className="space-y-5">
+                    {/* Profil Singkat & Penugasan Proyek */}
+                    <div className="p-4 rounded-xl border border-border bg-surface-subtle/40 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-navy-text text-base">{riwayatAhliTarget.nama}</span>
+                            <span className="font-mono text-xs text-muted-stronger">
+                              NIK: {riwayatAhliTarget.nik || "-"}
+                            </span>
+                            {hasNpwp && (
+                              <span className="font-mono text-xs text-muted-faint">
+                                · NPWP: {riwayatAhliTarget.npwp}
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-navy/10 text-navy border border-navy/20">
+                              PTKP: {riwayatAhliTarget.ptkp || "TK/0"}
+                            </span>
+                            {riwayatAhliTarget.kategori && (
+                              <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-medium">
+                                {riwayatAhliTarget.kategori}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-faint flex items-center gap-2 flex-wrap">
+                            <span>Status Penugasan:</span>
+                            {historyData.pList.some((p) => p.isTurunLapangan) ? (
+                              <span className="text-emerald-700 dark:text-emerald-300 font-bold inline-flex items-center gap-1">
+                                <CheckCircle size={11} /> Turun Lapangan
+                              </span>
+                            ) : (
+                              <span className="text-muted-stronger font-medium inline-flex items-center gap-1">
+                                <FileText size={11} className="text-muted-faint" /> Administrasi / SKA Only
+                              </span>
+                            )}
+                            <span>·</span>
+                            <span>Total Penugasan: <strong className="text-navy-text">{historyData.pList.length} Proyek</strong></span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-[11px] text-muted-faint">Honor Standar Master</div>
+                          <div className="font-mono font-bold text-navy-text text-sm">
+                            {formatRupiah(totalHonorStandar || riwayatAhliTarget.nominalHonorBulanan || 0)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detail Proyek & Masa Kontrak */}
+                      {historyData.pList.length > 0 && (
+                        <div className="pt-2 border-t border-border/60">
+                          <div className="text-[11px] font-semibold text-muted-faint mb-1.5">
+                            Rincian Masa Tugas & Alokasi Proyek:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {historyData.pList.map((pl, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2.5 rounded-lg border border-border bg-surface-card text-xs space-y-1"
+                              >
+                                <div className="font-semibold text-navy-text flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <Briefcase size={12} className="text-navy shrink-0" />
+                                    <span className="truncate">
+                                      {pl.projectCode ? `[${pl.projectCode}] ` : ""}{pl.projectName || "Proyek Tidak Dinamai"}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-xs font-bold text-navy shrink-0">
+                                    {formatRupiah(pl.nominalHonorBulanan || 0)}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-muted-faint flex items-center justify-between gap-2">
+                                  <span>
+                                    Masa Tugas: <strong className="text-navy-text font-normal">{pl.tanggalMulaiTugasFmt || pl.tanggalMulaiTugas || "-"} s.d. {pl.tanggalSelesaiTugasFmt || pl.tanggalSelesaiTugas || "-"}</strong>
+                                  </span>
+                                  <span>
+                                    {pl.isTurunLapangan ? (
+                                      <span className="text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
+                                        Turun Lapangan
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-faint text-[10px]">
+                                        SKA Only
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Filter Periode: Sepanjang Masa Tugas vs Rentang Bulan Tertentu */}
+                    <div className="p-3.5 rounded-xl border border-border bg-surface-subtle/50 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-muted-stronger flex items-center gap-1">
+                            <Filter size={12} className="text-navy" />
+                            <span>Pilihan Riwayat:</span>
+                          </span>
+                          <div className="flex items-center bg-surface-card p-0.5 rounded-xl border border-border">
+                            <button
+                              type="button"
+                              onClick={() => setAhliFilterMode("sepanjang-tugas")}
+                              className={`h-6 px-2.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                                ahliFilterMode === "sepanjang-tugas"
+                                  ? "bg-navy text-white shadow-2xs font-bold"
+                                  : "text-muted-stronger hover:text-navy-text"
+                              }`}
+                            >
+                              Sepanjang Masa Tugas (Seluruh Kontrak)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAhliFilterMode("filter-bulan")}
+                              className={`h-6 px-2.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                                ahliFilterMode === "filter-bulan"
+                                  ? "bg-navy text-white shadow-2xs font-bold"
+                                  : "text-muted-stronger hover:text-navy-text"
+                              }`}
+                            >
+                              Filter Bulan Tertentu
+                            </button>
+                          </div>
+                        </div>
+
+                        {ahliFilterMode === "filter-bulan" && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAhliModalStartMonth(1);
+                                setAhliModalEndMonth(12);
+                                setAhliModalStartYear(selectedYear);
+                                setAhliModalEndYear(selectedYear);
+                              }}
+                              className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                                ahliModalStartMonth === 1 && ahliModalEndMonth === 12
+                                  ? "bg-navy text-white border-navy"
+                                  : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                              }`}
+                            >
+                              Tahun {selectedYear}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAhliModalStartMonth(1);
+                                setAhliModalEndMonth(6);
+                                setAhliModalStartYear(selectedYear);
+                                setAhliModalEndYear(selectedYear);
+                              }}
+                              className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                                ahliModalStartMonth === 1 && ahliModalEndMonth === 6
+                                  ? "bg-navy text-white border-navy"
+                                  : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                              }`}
+                            >
+                              Sem 1
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAhliModalStartMonth(7);
+                                setAhliModalEndMonth(12);
+                                setAhliModalStartYear(selectedYear);
+                                setAhliModalEndYear(selectedYear);
+                              }}
+                              className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                                ahliModalStartMonth === 7 && ahliModalEndMonth === 12
+                                  ? "bg-navy text-white border-navy"
+                                  : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                              }`}
+                            >
+                              Sem 2
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAhliModalStartMonth(selectedMonth);
+                                setAhliModalEndMonth(selectedMonth);
+                                setAhliModalStartYear(selectedYear);
+                                setAhliModalEndYear(selectedYear);
+                              }}
+                              className={`h-6 px-2 rounded-md text-[10px] font-semibold border cursor-pointer transition-colors ${
+                                ahliModalStartMonth === selectedMonth && ahliModalEndMonth === selectedMonth
+                                  ? "bg-navy text-white border-navy"
+                                  : "bg-surface-card text-muted-stronger border-border hover:bg-surface-hover"
+                              }`}
+                            >
+                              Bulan Ini ({BULAN_NAMES[selectedMonth - 1]})
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {ahliFilterMode === "filter-bulan" && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-border/60 flex-wrap text-xs">
+                          <span className="text-muted-faint font-medium">Rentang Bulan:</span>
+                          <div className="inline-flex items-center gap-1.5">
+                            <select
+                              value={ahliModalStartMonth}
+                              onChange={(e) => setAhliModalStartMonth(Number(e.target.value))}
+                              className="h-7 text-xs rounded-lg border border-border bg-surface-card text-navy-text font-semibold px-2"
+                            >
+                              {BULAN_NAMES.map((name, idx) => (
+                                <option key={idx + 1} value={idx + 1}>
+                                  {name}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-muted-faint font-semibold">s/d</span>
+                            <select
+                              value={ahliModalEndMonth}
+                              onChange={(e) => setAhliModalEndMonth(Number(e.target.value))}
+                              className="h-7 text-xs rounded-lg border border-border bg-surface-card text-navy-text font-semibold px-2"
+                            >
+                              {BULAN_NAMES.map((name, idx) => (
+                                <option key={idx + 1} value={idx + 1}>
+                                  {name}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-muted-faint font-semibold">Tahun</span>
+                            <select
+                              value={ahliModalStartYear}
+                              onChange={(e) => {
+                                const y = Number(e.target.value);
+                                setAhliModalStartYear(y);
+                                setAhliModalEndYear(y);
+                              }}
+                              className="h-7 text-xs rounded-lg border border-border bg-surface-card text-navy-text font-semibold px-2"
+                            >
+                              {[selectedYear - 2, selectedYear - 1, selectedYear, selectedYear + 1].map((y) => (
+                                <option key={y} value={y}>
+                                  {y}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 4 Cards Summary */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Bulan / Transaksi Terbayar</div>
+                        <div className="text-lg font-bold font-mono text-navy-text mt-0.5">
+                          {historyData.totalTransaksi} Transaksi
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Total Honor Bruto</div>
+                        <div className="text-lg font-bold font-mono text-blue-900 dark:text-blue-300 mt-0.5">
+                          {formatRupiah(historyData.totalHonorBruto)}
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Total PPh 21 Terpotong</div>
+                        <div className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300 mt-0.5">
+                          {formatRupiah(historyData.totalPph21)}
+                        </div>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-border bg-surface-card">
+                        <div className="text-[11px] text-muted-faint font-medium">Total Bersih (Diterima)</div>
+                        <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">
+                          {formatRupiah(historyData.totalHonorBersih)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabel Riwayat Bulanan Honorarium */}
+                    <div className="rounded-xl border border-border overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[750px] text-left text-xs border-separate border-spacing-0">
+                          <thead className="bg-surface-subtle text-muted-stronger font-bold">
+                            <tr>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[40px] text-center border-b border-r border-border">No</th>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[120px] border-b border-r border-border">Periode (Bln/Thn)</th>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[130px] border-b border-r border-border">Tanggal & No Bukti</th>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[150px] border-b border-r border-border">Proyek & Entitas</th>
+                              <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[160px] border-b border-r border-border">Uraian Tugas</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Honor Bruto</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[90px] border-b border-r border-border">PPh 21</th>
+                              <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[110px] border-b border-r border-border">Honor Bersih</th>
+                              <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[90px] border-b border-border">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historyData.filteredRows.length === 0 ? (
+                              <tr>
+                                <td colSpan={9} className="py-8 text-center text-muted-faint border-b border-border">
+                                  Belum ada arsip riwayat pembayaran honorarium pada filter periode yang dipilih.
+                                </td>
+                              </tr>
+                            ) : (
+                              historyData.filteredRows.map((item, idx) => (
+                                <tr key={item.id || idx} className="hover:bg-surface-hover/30 transition-colors">
+                                  <td className="py-2.5 px-3.5 text-center font-mono text-muted-faint whitespace-nowrap border-b border-r border-border">
+                                    {idx + 1}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
+                                    {item.bulanName || `Bulan ${item.bulan}`} {item.tahun}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 whitespace-nowrap border-b border-r border-border">
+                                    <div className="font-semibold text-navy-text">{item.tanggalFmt}</div>
+                                    {item.noBukti && (
+                                      <div className="font-mono text-[10.5px] text-muted-faint">{item.noBukti}</div>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 whitespace-nowrap border-b border-r border-border">
+                                    <div className="font-semibold text-navy-text flex items-center gap-1">
+                                      <Briefcase size={11} className="text-muted-faint shrink-0" />
+                                      <span className="truncate max-w-[180px]" title={item.namaProyek}>
+                                        {item.namaProyek}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-muted-faint flex items-center gap-1 mt-0.5">
+                                      <Building2 size={10} className="shrink-0" />
+                                      <span>{item.entityName}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3.5 whitespace-nowrap border-b border-r border-border">
+                                    <div className="text-xs text-navy-text truncate max-w-[200px]" title={item.uraian}>
+                                      {item.uraian}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono font-semibold text-navy-text whitespace-nowrap border-b border-r border-border">
+                                    {item.nominalHonorFmt}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 whitespace-nowrap border-b border-r border-border">
+                                    {item.pph21Fmt}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap border-b border-r border-border">
+                                    {item.nominalBersihFmt}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-center whitespace-nowrap border-b border-border">
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
+                                      Terbayar
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                          <tfoot className="bg-surface-subtle font-bold text-xs">
+                            <tr>
+                              <td colSpan={5} className="py-2.5 px-3.5 text-navy-text border-t-2 border-b border-r border-border">
+                                Total ({historyData.totalTransaksi} Transaksi):
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-blue-900 dark:text-blue-300 border-t-2 border-b border-r border-border">
+                                {formatRupiah(historyData.totalHonorBruto)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-amber-700 dark:text-amber-300 border-t-2 border-b border-r border-border">
+                                {formatRupiah(historyData.totalPph21)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-emerald-700 dark:text-emerald-400 border-t-2 border-b border-r border-border">
+                                {formatRupiah(historyData.totalHonorBersih)}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-center border-t-2 border-b border-border">
+                                -
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-border bg-surface-subtle/30 flex items-center justify-between shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (riwayatAhliTarget.nik) {
+                    setExpandedNik(riwayatAhliTarget.nik);
+                    setFilterEntitasNama("ALL");
+                  }
+                  setTenagaAhliSubTab("rekap-nama");
+                  setRiwayatAhliTarget(null);
+                }}
+                className="h-8 px-3 rounded-xl bg-navy text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-navy-light transition-colors cursor-pointer shadow-2xs"
+              >
+                <Award size={13} />
+                <span>Buka Rekapitulasi Lengkap di Tab Rekap NIK</span>
+              </button>
+              <button
+                onClick={() => setRiwayatAhliTarget(null)}
+                className="h-8 px-4 rounded-xl border border-border bg-surface-subtle hover:bg-surface-hover text-xs font-semibold text-navy-text cursor-pointer transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================= */}
       {/* MODAL 4: SLIP GAJI PEGAWAI TETAP */}
       {/* ========================================================= */}
       {mounted && slipModalItem && typeof document !== "undefined" && createPortal(
@@ -7407,15 +8018,46 @@ export function PayrollClient({
                         </label>
                         <select
                           value={pl.projectId}
-                          onChange={(e) => handleUpdateProyekAssignment(idx, "projectId", e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const matched = projectListToUse.find((p) => p.id === val);
+                            setMasterProyekList((prev) =>
+                              prev.map((item, i) =>
+                                i === idx
+                                  ? {
+                                      ...item,
+                                      projectId: val,
+                                      projectCode: matched?.code ?? item.projectCode,
+                                      projectName: matched?.name ?? item.projectName,
+                                    }
+                                  : item
+                              )
+                            );
+                          }}
                           required
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
                         >
                           <option value="">-- Pilih Proyek Penugasan (Wajib) --</option>
-                          {data.projects.map((proj) => (
-                            <option key={proj.id} value={proj.id}>
-                              [{proj.code}] {proj.name}
+                          {pl.projectId && !projectListToUse.some((p) => p.id === pl.projectId) && (
+                            <option value={pl.projectId}>
+                              {pl.projectCode ? `[${pl.projectCode}] ` : ""}{pl.projectName || pl.projectId} (Tersimpan)
                             </option>
+                          )}
+                          {Object.entries(
+                            projectListToUse.reduce<Record<string, typeof projectListToUse>>((acc, proj) => {
+                              const key = proj.entityName || "Holding / Lainnya";
+                              if (!acc[key]) acc[key] = [];
+                              acc[key].push(proj);
+                              return acc;
+                            }, {})
+                          ).map(([entName, projs]) => (
+                            <optgroup key={entName} label={entName}>
+                              {projs.map((proj) => (
+                                <option key={proj.id} value={proj.id}>
+                                  [{proj.code}] {proj.name}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </div>

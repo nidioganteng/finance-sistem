@@ -647,14 +647,14 @@ export async function getLaporanPendapatanData(
       const selisihDpp = rekap.dpp - dppTerlapor;
       const selisihPajak = rekap.ppn - pajakTerlapor;
       const pphRekap = rekap.pph;
-      const pphTerlapor = 0; // not tracked separately in RekonsiliasiPajakBulanan
+      const pphTerlapor = rekon?.pphTerlapor ?? 0;
       const selisihPph = pphRekap - pphTerlapor;
       const totalPajakRekap = rekap.ppn + pphRekap;
       const totalPajakTerlapor = pajakTerlapor + pphTerlapor;
       const selisihTotalPajak = totalPajakRekap - totalPajakTerlapor;
       let status: RekonsiliasiPajakItem["status"] = "BELUM_DILAPORKAN";
       if (rekon) {
-        status = selisihDpp === 0 && selisihPajak === 0 ? "MATCH" : "SELISIH";
+        status = selisihDpp === 0 && selisihPajak === 0 && selisihPph === 0 ? "MATCH" : "SELISIH";
       }
       return {
         month: rekap.month,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition, Fragment } from "react";
+import { useState, useEffect, useRef, useTransition, useMemo, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -311,8 +311,25 @@ export function PayrollClient({
   const [periodeFilterPegawai, setPeriodeFilterPegawai] = useState<"bulan" | "tahun">("bulan");
   const [periodeFilterAhli, setPeriodeFilterAhli] = useState<"bulan" | "tahun">("bulan");
 
-  // Tab rincian transaksi di Tab Sinkronisasi: "pegawai" (Akun 511) | "tenaga-ahli" (Akun 612)
-  const [syncDetailTab, setSyncDetailTab] = useState<"pegawai" | "tenaga-ahli">("pegawai");
+  // Tab rincian transaksi di Tab Sinkronisasi: "semua" | "pegawai" (Akun 511) | "tenaga-ahli" (Akun 612)
+  const [syncDetailTab, setSyncDetailTab] = useState<"semua" | "pegawai" | "tenaga-ahli">("semua");
+
+  // Semua baris transaksi sinkronisasi (kombinasi 511 dan 612)
+  const allSyncRows = useMemo(() => {
+    if (data.syncData.jurnalSemuaRows && data.syncData.jurnalSemuaRows.length > 0) {
+      return data.syncData.jurnalSemuaRows;
+    }
+    return [...data.syncData.jurnalPegawaiRows, ...data.syncData.jurnalTenagaAhliRows].sort((a, b) =>
+      b.tanggal.localeCompare(a.tanggal)
+    );
+  }, [data.syncData]);
+
+  // Baris yang sedang ditampilkan berdasarkan tab aktif
+  const displayedSyncRows = useMemo(() => {
+    if (syncDetailTab === "pegawai") return data.syncData.jurnalPegawaiRows;
+    if (syncDetailTab === "tenaga-ahli") return data.syncData.jurnalTenagaAhliRows;
+    return allSyncRows;
+  }, [syncDetailTab, data.syncData, allSyncRows]);
 
   // Filter entitas untuk tab Cek Per Nama
   const [filterEntitasNama, setFilterEntitasNama] = useState<string>("ALL");
@@ -586,6 +603,32 @@ export function PayrollClient({
           : ""
       );
       setModalHonorNoBukti("");
+    }
+    setIsHonorModalOpen(true);
+  }
+
+  function openHonorModalFromJurnal(tx: JurnalTransaksiGajiItem) {
+    setEditingHonor(null);
+    setModalHonorBulan(tx.bulan || selectedMonth);
+    setModalHonorTahun(tx.tahun || selectedYear);
+    const dStr = tx.tanggal
+      ? new Date(tx.tanggal).toISOString().split("T")[0]
+      : `${tx.tahun || selectedYear}-${String(tx.bulan || selectedMonth).padStart(2, "0")}-01`;
+    setModalHonorTanggal(dStr);
+    setModalHonorNominal(tx.debit || 0);
+    setModalHonorNoBukti(tx.noBukti || "");
+    setModalHonorUraian(tx.keterangan || "");
+    if (tx.projectId) {
+      setModalHonorProjectId(tx.projectId);
+      setModalHonorNamaProyek(tx.namaProyek || tx.projectName || "");
+    }
+    const defaultRekanan = data.rekananTenagaAhli.length > 0 ? data.rekananTenagaAhli[0] : null;
+    if (defaultRekanan) {
+      setSelectedRekananIdForHonor(defaultRekanan.id);
+      setModalHonorPtkp(defaultRekanan.ptkp || "TK/0");
+      const pphRate = defaultRekanan.npwp ? 2.5 : 3.0;
+      setModalHonorTarifPph(pphRate);
+      setModalHonorNominalPph(tx.debit > 0 ? Math.round((tx.debit * pphRate) / 100) : 0);
     }
     setIsHonorModalOpen(true);
   }
@@ -2092,9 +2135,16 @@ export function PayrollClient({
                               )}
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
-                                {tx.jenisInputNama}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
+                                  {tx.jenisInputNama}
+                                </span>
+                                {tx.isCrossingEntry && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                    Pinjaman: {tx.crossingFromEntityName || "Entitas Lain"}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-3.5 border-b border-r border-border">
                               <div className="font-mono font-bold text-navy-text text-xs whitespace-nowrap">
@@ -4107,9 +4157,16 @@ export function PayrollClient({
                               )}
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
-                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
-                                {tx.jenisInputNama}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
+                                  {tx.jenisInputNama}
+                                </span>
+                                {tx.isCrossingEntry && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                    Pinjaman: {tx.crossingFromEntityName || "Entitas Lain"}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-3.5 border-b border-r border-border">
                               <div className="font-mono font-bold text-navy-text text-xs whitespace-nowrap">
@@ -4998,6 +5055,20 @@ export function PayrollClient({
 
                 <div className="flex items-center gap-1.5 bg-surface-subtle p-1 rounded-xl border border-border">
                   <button
+                    onClick={() => setSyncDetailTab("semua")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                      syncDetailTab === "semua"
+                        ? "bg-surface-card text-navy-text shadow-2xs font-bold"
+                        : "text-muted-faint hover:text-navy-text"
+                    }`}
+                  >
+                    <span>Semua Transaksi Gaji</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-navy/10 text-navy">
+                      {allSyncRows.length}
+                    </span>
+                  </button>
+
+                  <button
                     onClick={() => setSyncDetailTab("pegawai")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                       syncDetailTab === "pegawai"
@@ -5033,29 +5104,30 @@ export function PayrollClient({
                   <thead className="bg-surface-subtle text-muted-stronger font-bold">
                     <tr>
                       <th className="py-2.5 px-3 whitespace-nowrap min-w-[130px] border-b border-r border-border">Tanggal & Bukti</th>
-                      <th className="py-2.5 px-3 whitespace-nowrap min-w-[100px] border-b border-r border-border">Sumber Jurnal</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap min-w-[120px] border-b border-r border-border">Sumber Jurnal</th>
                       <th className="py-2.5 px-3 whitespace-nowrap min-w-[150px] border-b border-r border-border">Kode Akun</th>
                       <th className="py-2.5 px-3 border-b border-r border-border">Keterangan</th>
                       <th className="py-2.5 px-3 whitespace-nowrap min-w-[120px] border-b border-r border-border">Proyek</th>
                       <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[130px] border-b border-r border-border">Debit (Beban)</th>
-                      <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[90px] border-b border-border">Staff</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[90px] border-b border-r border-border">Staff</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[110px] border-b border-border">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(syncDetailTab === "pegawai"
-                      ? data.syncData.jurnalPegawaiRows
-                      : data.syncData.jurnalTenagaAhliRows
-                    ).length === 0 ? (
+                    {displayedSyncRows.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-muted-faint border-b border-border">
-                          Belum ada transaksi di Jurnal Umum untuk {syncDetailTab === "pegawai" ? "Akun 511 (Gaji Pegawai Tetap)" : "Akun 612 (Gaji Tenaga Ahli)"} pada bulan {BULAN_NAMES[selectedMonth - 1]} {selectedYear}.
+                        <td colSpan={8} className="py-8 text-center text-muted-faint border-b border-border">
+                          Belum ada transaksi di Jurnal Umum untuk {
+                            syncDetailTab === "semua"
+                              ? "Beban Gaji (Akun 511 & 612)"
+                              : syncDetailTab === "pegawai"
+                              ? "Akun 511 (Gaji Pegawai Tetap)"
+                              : "Akun 612 (Gaji Tenaga Ahli)"
+                          } pada bulan {BULAN_NAMES[selectedMonth - 1]} {selectedYear}.
                         </td>
                       </tr>
                     ) : (
-                      (syncDetailTab === "pegawai"
-                        ? data.syncData.jurnalPegawaiRows
-                        : data.syncData.jurnalTenagaAhliRows
-                      ).map((tx) => (
+                      displayedSyncRows.map((tx) => (
                         <tr key={tx.id} className="hover:bg-surface-hover/30 transition-colors">
                           <td className="py-2.5 px-3 font-medium whitespace-nowrap border-b border-r border-border">
                             <div className="text-navy-text">{tx.tanggalFmt}</div>
@@ -5084,12 +5156,32 @@ export function PayrollClient({
                             )}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap border-b border-r border-border">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
-                              {tx.jenisInputNama}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
+                                {tx.jenisInputNama}
+                              </span>
+                              {tx.isCrossingEntry && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                  Pinjaman: {tx.crossingFromEntityName || "Entitas Lain"}
+                                </span>
+                              )}
+                            </div>
                           </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                            {tx.coaCode} - {tx.coaName}
+                          <td className="py-2.5 px-3 whitespace-nowrap border-b border-r border-border">
+                            <div className="font-mono font-bold text-navy-text text-xs">
+                              {tx.coaCode} - {tx.coaName}
+                            </div>
+                            <div className="mt-0.5">
+                              {tx.coaCode === "612" ? (
+                                <span className="inline-block text-[9.5px] font-semibold px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                                  Tenaga Ahli
+                                </span>
+                              ) : tx.coaCode === "511" ? (
+                                <span className="inline-block text-[9.5px] font-semibold px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
+                                  Pegawai Tetap
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 text-muted-stronger border-b border-r border-border">
                             {tx.keterangan}
@@ -5107,28 +5199,54 @@ export function PayrollClient({
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
                             {tx.debitFmt}
                           </td>
-                          <td className="py-2.5 px-3 text-center text-[11px] text-muted-faint whitespace-nowrap border-b border-border">
+                          <td className="py-2.5 px-3 text-center text-[11px] text-muted-faint whitespace-nowrap border-b border-r border-border">
                             {tx.staffName || "-"}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap border-b border-border">
+                            {tx.coaCode === "612" ? (
+                              <button
+                                type="button"
+                                onClick={() => openHonorModalFromJurnal(tx)}
+                                className="px-2 py-1 rounded text-[10.5px] font-semibold bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                title="Catat transaksi ini ke Modul Payroll Tenaga Ahli"
+                              >
+                                <Plus size={11} />
+                                <span>Catat Honor</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMainTab("pegawai");
+                                  setPegawaiSubTab("gaji");
+                                  setIsGajiModalOpen(true);
+                                }}
+                                className="px-2 py-1 rounded text-[10.5px] font-semibold bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                title="Buka form Gaji Pegawai Bulanan"
+                              >
+                                <Plus size={11} />
+                                <span>Catat Gaji</span>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                  {(syncDetailTab === "pegawai"
-                    ? data.syncData.jurnalPegawaiRows
-                    : data.syncData.jurnalTenagaAhliRows
-                  ).length > 0 && (
+                  {displayedSyncRows.length > 0 && (
                     <tfoot className="bg-surface-subtle font-bold text-xs">
                       <tr>
                         <td colSpan={5} className="py-2.5 px-3 text-navy-text border-t-2 border-b border-r border-border bg-surface-subtle">
-                          Total Debit ({syncDetailTab === "pegawai" ? "Akun 511" : "Akun 612"}):
+                          Total Debit ({syncDetailTab === "semua" ? "Semua Beban Gaji" : syncDetailTab === "pegawai" ? "Akun 511" : "Akun 612"}):
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-navy-text whitespace-nowrap border-t-2 border-b border-r border-border bg-surface-subtle">
-                          {syncDetailTab === "pegawai"
+                          {syncDetailTab === "semua"
+                            ? data.syncData.totalGLBebanFmt
+                            : syncDetailTab === "pegawai"
                             ? data.syncData.glBebanGaji511Fmt
                             : data.syncData.glBebanTenagaAhli612Fmt}
                         </td>
-                        <td className="py-2.5 px-3 border-t-2 border-b border-border bg-surface-subtle" />
+                        <td colSpan={2} className="py-2.5 px-3 border-t-2 border-b border-border bg-surface-subtle" />
                       </tr>
                     </tfoot>
                   )}

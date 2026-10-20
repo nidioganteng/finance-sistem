@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { canManageTransaksi } from "@/lib/rbac";
-import { getJenisInput, getCoaOptions, getRunningSaldo, getKasLedger, getSaldoSebelum, getInitialSaldoAwal } from "@/lib/kas";
+import { getJenisInput, getCoaOptions, getKasLedger } from "@/lib/kas";
 import { getProjectOptions } from "@/lib/piutang";
 import { REKENING_BY_ENTITY, type RekeningOption } from "@/lib/bank-accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -78,20 +78,18 @@ export async function KasScreen({
     ? new Date(searchParams.sampai).getFullYear()
     : new Date().getFullYear();
 
-  const [coaOptions, saldo, kasLedger, projectOptions, saldoAwal] = await Promise.all([
+  const [coaOptions, kasLedger, projectOptions] = await Promise.all([
     getCoaOptions(),
-    getRunningSaldo(selectedEntity.id, jenisInput.id, selectedRekeningNama, currentYear),
     getKasLedger(selectedEntity.id, jenisInputKey, selectedRekeningNama, searchParams.dari, searchParams.sampai, kasPage, currentYear),
     getProjectOptions(selectedEntity.key),
-    searchParams.dari
-      ? getSaldoSebelum(selectedEntity.id, jenisInput.id, searchParams.dari, selectedRekeningNama, currentYear)
-      : getInitialSaldoAwal(selectedEntity.id, jenisInput.id, selectedRekeningNama, currentYear),
   ]);
 
   const { entries: ledger, totalPages: ledgerTotalPages, page: ledgerPage } = kasLedger;
 
-  const totalMasuk = ledger.reduce((s, r) => s + r.masuk, 0);
-  const totalKeluar = ledger.reduce((s, r) => s + r.keluar, 0);
+  const totalMasuk = kasLedger.totalMasuk;
+  const totalKeluar = kasLedger.totalKeluar;
+  const saldoAwal = kasLedger.saldoAwal;
+  const saldo = kasLedger.runningSaldo;
 
   const coaList = coaOptions.map((c) => ({ id: c.id, code: c.code, name: c.name }));
   const extra = jenisInput.extraFieldsJson as { arahLaporan?: string[] } | null;

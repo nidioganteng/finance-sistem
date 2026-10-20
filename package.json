@@ -11,6 +11,9 @@
     "Jalankan Bosku": "concurrently -n \"PHP,Next\" -c \"cyan,magenta\" \"php -S localhost:8000 api/index.php\" \"next dev\""
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
     "framer-motion": "^13.4.0",
@@ -20,7 +23,10 @@
     "react": "^18.3.1",
     "react-day-picker": "^10.0.2",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/exceljs": "^0.5.3",

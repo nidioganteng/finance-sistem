@@ -518,8 +518,8 @@ export function JurnalTransaksiClient({
         if (result?.error) {
           setFeedback({ type: "error", msg: result.error });
         } else {
-          setFeedback({ type: "success", msg: editingGroup ? "Jurnal berhasil diperbarui." : "Jurnal berhasil disimpan." });
-          if (!editingGroup) { resetForm(); setPanelOpen(false); }
+          resetForm();
+          setPanelOpen(false);
           router.refresh();
         }
       } catch (err) {

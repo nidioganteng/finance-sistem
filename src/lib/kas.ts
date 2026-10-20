@@ -44,44 +44,81 @@ export async function getCoaOptions() {
   return result.data.sort((a, b) => parseInt(a.code) - parseInt(b.code));
 }
 
-// Saldo awal dihitung di PHP side — fungsi-fungsi ini disederhanakan
+// Saldo awal dihitung di PHP side
 export async function getInitialSaldoAwal(
-  _entityId: string,
-  _jenisInputKeyOrId: string,
-  _rekeningNamaOrId?: string,
-  _year?: number
+  entityId: string,
+  jenisInputKeyOrId: string,
+  rekeningNamaOrId?: string,
+  year?: number
 ): Promise<number> {
-  return 0;
+  try {
+    const token = await getPhpToken();
+    const params = new URLSearchParams();
+    params.set("entityId", entityId);
+    params.set("jenisInputKey", jenisInputKeyOrId);
+    if (rekeningNamaOrId) params.set("rekeningNamaOrId", rekeningNamaOrId);
+    if (year) params.set("year", String(year));
+    const res = await phpFetch<{ saldo: number }>(`/api/kas/saldo-awal?${params.toString()}`, token);
+    return Number(res.saldo ?? 0);
+  } catch {
+    return 0;
+  }
 }
 
 export async function getRunningSaldo(
-  _entityId: string,
-  _jenisInputId: string,
-  _rekeningNama?: string,
-  _year?: number
+  entityId: string,
+  jenisInputId: string,
+  rekeningNama?: string,
+  year?: number
 ): Promise<number> {
-  return 0;
+  try {
+    const token = await getPhpToken();
+    const params = new URLSearchParams();
+    params.set("entityId", entityId);
+    params.set("jenisInputKey", jenisInputId);
+    if (rekeningNama) params.set("rekeningNama", rekeningNama);
+    if (year) params.set("year", String(year));
+    const res = await phpFetch<{ saldo: number }>(`/api/kas/running-saldo?${params.toString()}`, token);
+    return Number(res.saldo ?? 0);
+  } catch {
+    return 0;
+  }
 }
 
 export async function getSaldoSebelum(
-  _entityId: string,
-  _jenisInputId: string,
-  _sebelum: string,
-  _rekeningNama?: string,
-  _year?: number
+  entityId: string,
+  jenisInputId: string,
+  sebelum: string,
+  rekeningNama?: string,
+  year?: number
 ): Promise<number> {
-  return 0;
+  try {
+    const token = await getPhpToken();
+    const params = new URLSearchParams();
+    params.set("entityId", entityId);
+    params.set("jenisInputKey", jenisInputId);
+    params.set("sebelum", sebelum);
+    if (rekeningNama) params.set("rekeningNamaOrId", rekeningNama);
+    if (year) params.set("year", String(year));
+    const res = await phpFetch<{ saldo: number }>(`/api/kas/saldo-awal?${params.toString()}`, token);
+    return Number(res.saldo ?? 0);
+  } catch {
+    return 0;
+  }
 }
 
 export type KasLedgerEntry = {
   tanggal: string;
   tanggalRaw: string;
+  tanggalNota?: string | null;
   noBukti: string;
   keterangan: string;
   akunTags: string[];
   rekening?: string;
   crossingEntityKeys?: string[];
   crossingFromEntityKey?: string;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
   masuk: number;
   keluar: number;
   saldo: number;
@@ -97,6 +134,11 @@ export type KasLedgerResult = {
   totalCount: number;
   totalPages: number;
   page: number;
+  saldoAwal: number;
+  totalMasuk: number;
+  totalKeluar: number;
+  saldoAkhir: number;
+  runningSaldo: number;
   entries: KasLedgerEntry[];
 };
 
@@ -107,7 +149,7 @@ export async function getKasLedger(
   dari?: string,
   sampai?: string,
   page = 1,
-  _year?: number
+  year?: number
 ): Promise<KasLedgerResult> {
   const token = await getPhpToken();
   const params = new URLSearchParams();
@@ -117,15 +159,33 @@ export async function getKasLedger(
   if (dari) params.set("dari", dari);
   if (sampai) params.set("sampai", sampai);
   params.set("page", String(page));
+  if (year) params.set("year", String(year));
 
   type RawEntry = Omit<KasLedgerEntry, "tanggal" | "masukFmt" | "keluarFmt" | "saldoFmt">;
-  type RawResult = { totalCount: number; totalPages: number; page: number; entries: RawEntry[] };
+  type RawResult = {
+    totalCount: number;
+    totalPages: number;
+    page: number;
+    saldoAwal?: number;
+    totalMasuk?: number;
+    totalKeluar?: number;
+    saldoAkhir?: number;
+    runningSaldo?: number;
+    entries: RawEntry[];
+  };
 
   const raw = await phpFetch<RawResult>(`/api/kas/ledger?${params.toString()}`, token);
 
   return {
-    ...raw,
-    entries: raw.entries.map((e) => ({
+    totalCount: raw.totalCount,
+    totalPages: raw.totalPages,
+    page: raw.page,
+    saldoAwal: Number(raw.saldoAwal ?? 0),
+    totalMasuk: Number(raw.totalMasuk ?? 0),
+    totalKeluar: Number(raw.totalKeluar ?? 0),
+    saldoAkhir: Number(raw.saldoAkhir ?? 0),
+    runningSaldo: Number(raw.runningSaldo ?? 0),
+    entries: (raw.entries ?? []).map((e) => ({
       ...e,
       tanggal: e.tanggalRaw,
       masukFmt: formatRupiah(e.masuk),

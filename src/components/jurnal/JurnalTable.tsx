@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Check, X } from "lucide-react";
-import { updateKodeAkunJurnal, updateProyekJurnal } from "@/lib/actions/jurnal";
+import { Pencil, Check, X, CalendarDays, Receipt } from "lucide-react";
+import { updateKodeAkunJurnal, updateProyekJurnal, updateAkrualJurnal } from "@/lib/actions/jurnal";
 import { CoaCombobox } from "@/components/kas/CoaCombobox";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 
@@ -28,6 +28,9 @@ type JurnalRow = {
   staffName: string;
   staffInitial: string;
   arahLaporan: string[];
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
 };
 
 function fmtDateShort(s: string) {
@@ -41,6 +44,11 @@ function fmtDateFull(s: string) {
   return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) +
     (d.getHours() || d.getMinutes() ? ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
 }
+
+const BULAN_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 const ARAH_LABEL: Record<string, string> = {
   JURNAL_UMUM: "Jurnal", BUKU_BESAR: "Buku Besar",
@@ -71,8 +79,32 @@ export function JurnalTable({
   const [editCode, setEditCode] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectId, setEditProjectId] = useState("");
+  const [editingAkrualRow, setEditingAkrualRow] = useState<JurnalRow | null>(null);
+  const [editBulan, setEditBulan] = useState<number>(0);
+  const [editTahun, setEditTahun] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function startEditAkrual(r: JurnalRow) {
+    setError(null);
+    setEditBulan(r.periodeBulanGaji ?? (new Date(r.tanggal).getMonth() + 1));
+    setEditTahun(r.periodeTahunGaji ?? (new Date(r.tanggal).getFullYear()));
+    setEditingAkrualRow(r);
+  }
+
+  function handleSaveAkrual() {
+    if (!editingAkrualRow) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateAkrualJurnal(editingAkrualRow.id, entityId, editBulan || null, editTahun || null);
+        router.refresh();
+        setEditingAkrualRow(null);
+      } catch (e: any) {
+        setError(e.message);
+      }
+    });
+  }
 
   function startEditProject(r: JurnalRow) {
     setError(null);
@@ -158,6 +190,17 @@ export function JurnalTable({
                       {fmtDateFull(r.tanggal)}
                     </div>
                   </div>
+                  {r.tanggalNota && r.tanggalNota !== r.tanggal.slice(0, 10) && (
+                    <div className="mt-0.5">
+                      <span
+                        className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1 py-0.2 rounded"
+                        title={`Tanggal Nota / Kuitansi Riil: ${r.tanggalNota}`}
+                      >
+                        <Receipt size={8} className="text-blue-500 flex-none" />
+                        Nota: {fmtDateShort(r.tanggalNota)}
+                      </span>
+                    </div>
+                  )}
                 </td>
                 <td className="py-2.5 px-1.5 text-[11.5px] text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                 <td className="py-2.5 px-1.5">
@@ -225,7 +268,7 @@ export function JurnalTable({
                     </div>
                   )}
                 </td>
-                <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px]">
+                <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[220px]">
                   {r.isKasEntry ? (
                     <span className="text-muted-faint italic text-[12px]">{r.keterangan}</span>
                   ) : (
@@ -241,6 +284,40 @@ export function JurnalTable({
                         </div>
                       )}
                     </>
+                  )}
+
+                  {/* Badge & Editor Periode Akrual Beban Gaji */}
+                  {r.periodeBulanGaji && (
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 text-blue-700 dark:text-blue-300"
+                        title={`Beban Gaji Bulan ${BULAN_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
+                      >
+                        <CalendarDays size={10} className="text-blue-500 flex-none" />
+                        Akrual: {BULAN_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
+                      </span>
+                      {canEditAkun && (
+                        <button
+                          onClick={() => startEditAkrual(r)}
+                          className="p-0.5 rounded hover:bg-surface-hover text-muted-faint hover:text-navy-text cursor-pointer transition-colors"
+                          title="Ubah periode akrual gaji"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {!r.periodeBulanGaji && canEditAkun && (r.kodeAkun === "511" || r.kodeAkun === "612" || r.kodeAkun.startsWith("511") || r.kodeAkun.startsWith("612") || /gaji|honor|upah|tenaga ahli/i.test(r.namaAkun)) && (
+                    <div className="mt-1">
+                      <button
+                        onClick={() => startEditAkrual(r)}
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand hover:text-navy-text border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                        title="Tentukan periode akrual gaji jika transaksi ini untuk beban bulan lain"
+                      >
+                        + Atur Bulan Gaji
+                      </button>
+                    </div>
                   )}
                 </td>
                 <td className={`py-2.5 px-1.5 text-[12px] font-mono text-muted ${r.isKredit ? "pl-6" : ""}`}>
@@ -330,6 +407,85 @@ export function JurnalTable({
           </tfoot>
         )}
       </table>
+
+      {/* Modal Dialog Ubah Periode Akrual Gaji */}
+      {editingAkrualRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-[16px] bg-surface-card border border-border-soft shadow-2xl p-5 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-navy-text">
+                  Periode Beban Gaji (Akrual)
+                </h3>
+                <p className="text-[11.5px] text-muted-faint mt-0.5 font-mono">
+                  {editingAkrualRow.noBukti} · {editingAkrualRow.namaAkun}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAkrualRow(null)}
+                className="p-1 rounded-lg hover:bg-surface-hover text-muted-stronger cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                  Bulan Gaji
+                </label>
+                <select
+                  value={editBulan}
+                  onChange={(e) => setEditBulan(parseInt(e.target.value, 10) || 0)}
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand"
+                >
+                  <option value={0}>Sesuai Tanggal</option>
+                  {BULAN_NAMES.map((name, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Bulan {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                  Tahun Gaji
+                </label>
+                <input
+                  type="number"
+                  value={editTahun || ""}
+                  onChange={(e) => setEditTahun(parseInt(e.target.value, 10) || 0)}
+                  placeholder="Tahun"
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text font-mono focus:outline-none focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-faint leading-relaxed">
+              Beban gaji akan diakui pada laporan operasional & pajak bulan yang dipilih secara akrual.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setEditingAkrualRow(null)}
+                className="px-3.5 py-2 text-[12px] font-semibold rounded-[9px] border border-border-soft hover:bg-surface-hover text-muted-stronger cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAkrual}
+                disabled={isPending}
+                className="px-4 py-2 text-[12px] font-bold rounded-[9px] bg-navy text-white hover:bg-navy/90 disabled:opacity-40 cursor-pointer shadow-xs transition-colors"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

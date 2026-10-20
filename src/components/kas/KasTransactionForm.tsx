@@ -30,9 +30,17 @@ type InitialValues = {
   rekeningId?: string;
   crossingEntityKeys?: string[];
   projectId?: string;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
   rows: { coaAccountId: string; nominal: string; keterangan?: string }[];
   existingTxIds: string[];
 };
+
+const BULAN_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 const SYSTEM_KEYS = ["kasKecil", "kasBesar", "bankBuku"];
 
@@ -58,6 +66,14 @@ function formatRupiahInput(val: string) {
   const num = val.replace(/[^0-9]/g, "");
   if (!num) return "";
   return Number(num).toLocaleString("id-ID");
+}
+
+function getTodayLocalDate(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function KasTransactionForm({
@@ -90,7 +106,7 @@ export function KasTransactionForm({
   const isEdit = !!initialValues;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? new Date().toISOString().slice(0, 10));
+  const [tanggal, setTanggal] = useState(initialValues?.tanggal ?? getTodayLocalDate());
   const [noBukti, setNoBukti] = useState(initialValues?.noBukti ?? "");
   const [isNoBuktiManual, setIsNoBuktiManual] = useState(isEdit);
 
@@ -217,6 +233,32 @@ export function KasTransactionForm({
   const [error, setError] = useState<string | null>(null);
   const [syncBukuBank, setSyncBukuBank] = useState(false);
   const [syncRekeningId, setSyncRekeningId] = useState(bukuBankRekeningOptions[0]?.id ?? "");
+  const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
+  const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
+
+  const hasSalaryAccount = rows.some((r) => {
+    const c = coaOptions.find((opt) => opt.id === r.coaAccountId);
+    if (!c) return false;
+    return c.code === "511" || c.code === "612" || c.code.startsWith("511") || c.code.startsWith("612") || /gaji|honor|upah|tenaga ahli|payroll/i.test(c.name);
+  });
+
+  useEffect(() => {
+    if (hasSalaryAccount) {
+      if (periodeBulanGaji === null && !initialValues?.periodeBulanGaji) {
+        const txDate = tanggal ? new Date(tanggal) : new Date();
+        const curM = txDate.getMonth() + 1;
+        const defM = curM === 1 ? 12 : curM - 1;
+        const defY = curM === 1 ? txDate.getFullYear() - 1 : txDate.getFullYear();
+        setPeriodeBulanGaji(defM);
+        setPeriodeTahunGaji(defY);
+      }
+    } else {
+      if (periodeBulanGaji !== null) {
+        setPeriodeBulanGaji(null);
+        setPeriodeTahunGaji(null);
+      }
+    }
+  }, [hasSalaryAccount, tanggal, periodeBulanGaji, initialValues]);
 
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
@@ -274,6 +316,7 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
+      ...(periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
       ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
@@ -281,7 +324,32 @@ export function KasTransactionForm({
         ? await replaceKasTransaction({ ...payload, existingTxIds: initialValues!.existingTxIds })
         : await createKasTransaction(payload);
       if (result?.error) { setError(result.error); return; }
-      router.refresh();
+
+      if (typeof window !== "undefined") {
+        const currentParams = new URLSearchParams(window.location.search);
+        let changed = false;
+        const curDari = currentParams.get("dari");
+        const curSampai = currentParams.get("sampai");
+        if ((curDari && tanggal < curDari) || (curSampai && tanggal > curSampai)) {
+          const ym = tanggal.slice(0, 7);
+          const [y, m] = ym.split("-").map(Number);
+          const lastDay = new Date(y, m, 0).getDate();
+          currentParams.set("dari", `${ym}-01`);
+          currentParams.set("sampai", `${ym}-${String(lastDay).padStart(2, "0")}`);
+          changed = true;
+        }
+        if (isBankBuku && rekeningId && currentParams.get("rekening") !== rekeningId) {
+          currentParams.set("rekening", rekeningId);
+          changed = true;
+        }
+        if (changed) {
+          router.push(`${pagePath}?${currentParams.toString()}`);
+        } else {
+          router.refresh();
+        }
+      } else {
+        router.refresh();
+      }
       onClose();
     });
   }
@@ -715,6 +783,65 @@ export function KasTransactionForm({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Pilihan Periode Beban Gaji (Akrual) — Langsung tampil saat input gaji */}
+        {hasSalaryAccount && (
+          <div className="rounded-[12px] border border-border-soft bg-surface-card p-4 flex flex-col gap-3 shadow-xs">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="text-[11.5px] font-bold text-navy-text uppercase tracking-wide">
+                Periode Beban Gaji (Akrual)
+              </label>
+              {periodeBulanGaji && (
+                <span className="text-[11px] font-semibold text-brand">
+                  Beban Diakui: {BULAN_NAMES[periodeBulanGaji - 1]} {periodeTahunGaji || new Date(tanggal).getFullYear()}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                  Bulan Gaji
+                </label>
+                <select
+                  value={periodeBulanGaji ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setPeriodeBulanGaji(val);
+                    if (val && !periodeTahunGaji) {
+                      setPeriodeTahunGaji(new Date(tanggal).getFullYear());
+                    }
+                  }}
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text focus:outline-none focus:border-brand"
+                >
+                  <option value="">Sesuai Tanggal Transaksi ({BULAN_NAMES[new Date(tanggal).getMonth()]})</option>
+                  {BULAN_NAMES.map((name, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Bulan {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                  Tahun Gaji
+                </label>
+                <input
+                  type="number"
+                  value={periodeTahunGaji ?? (periodeBulanGaji ? new Date(tanggal).getFullYear() : "")}
+                  onChange={(e) => setPeriodeTahunGaji(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  placeholder={String(new Date(tanggal).getFullYear())}
+                  className="w-full h-9 px-2.5 rounded-[9px] border border-border-soft bg-surface-input text-[12.5px] text-navy-text font-mono focus:outline-none focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-faint leading-relaxed">
+              Dicatat di tanggal pembayaran riil, namun dibukukan sebagai biaya operasional bulan yang dipilih secara akrual.
+            </p>
           </div>
         )}
 

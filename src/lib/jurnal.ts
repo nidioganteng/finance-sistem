@@ -42,6 +42,9 @@ export type JurnalRow = {
   staffName: string;
   staffInitial: string;
   arahLaporan: string[];
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
+  tanggalNota?: string | null;
 };
 
 export type JurnalRowsResult = {

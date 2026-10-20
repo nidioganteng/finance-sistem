@@ -17,12 +17,23 @@ interface DatePickerProps {
 
 function parseDate(s: string): Date | undefined {
   if (!s) return undefined;
+  const parts = s.split("-");
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const date = new Date(y, m, d);
+    return isNaN(date.getTime()) ? undefined : date;
+  }
   const d = new Date(s + "T00:00:00");
   return isNaN(d.getTime()) ? undefined : d;
 }
 
 function toStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function fmtDisplay(s: string): string {
@@ -32,8 +43,8 @@ function fmtDisplay(s: string): string {
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
-const START_YEAR = CURRENT_YEAR - 5;
-const END_YEAR = CURRENT_YEAR;
+const START_YEAR = CURRENT_YEAR - 10;
+const END_YEAR = CURRENT_YEAR + 5;
 
 const POPUP_W = 300;
 

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil, Briefcase, TrendingUp, Receipt, Sparkles } from "lucide-react";
 import { saveJurnalTransaksi, deleteJurnalTransaksi } from "@/lib/actions/jurnal-transaksi";
 import { PaginationNav } from "@/components/shared/PaginationNav";
 import { CoaCombobox } from "@/components/shared/CoaCombobox";
 import { formatRupiah } from "@/lib/dashboard-data";
-import type { JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
+import { sortJurnalRows, type JurnalTransaksiGroup } from "@/lib/jurnal-transaksi";
+import { DeleteConfirmModal } from "@/components/kas/DeleteConfirmModal";
 
 type CoaOption = { id: string; code: string; name: string; kategori?: string };
 export type ProjectOption = {
@@ -22,6 +23,12 @@ export type ProjectOption = {
   maxPercentage?: number;
   terminCount?: number;
   totalTerminTagih?: number;
+  termins?: Array<{
+    id: string;
+    name: string;
+    percentage: number | null;
+    nominal: number | null;
+  }>;
 };
 
 export type FakturOption = {
@@ -42,6 +49,8 @@ export type FakturOption = {
   projectName?: string | null;
   tahunPajak: number;
   masaPajak: number;
+  tanggalTerima?: string | null;
+  createdAt?: string;
 };
 
 type CoaRow = {
@@ -54,8 +63,19 @@ type CoaRow = {
 
 let _counter = 0;
 function uid() { return `r${++_counter}`; }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 function makeCoaRow(): CoaRow { return { uid: uid(), coaAccountId: "", keterangan: "", arah: "debit", nominalRaw: "" }; }
+const BULAN_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
 function parseNum(s: string) { return parseInt(s.replace(/\./g, "").replace(/[^0-9]/g, ""), 10) || 0; }
 function fmtNum(raw: string) {
   const n = parseInt(raw.replace(/\./g, "").replace(/[^0-9]/g, ""), 10);
@@ -82,6 +102,7 @@ export function JurnalTransaksiClient({
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<JurnalTransaksiGroup | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<JurnalTransaksiGroup | null>(null);
   const [sortAsc, setSortAsc] = useState(false);
 
   const [filterDari, setFilterDari] = useState(dari);
@@ -91,10 +112,37 @@ export function JurnalTransaksiClient({
   const [noBukti, setNoBukti] = useState("");
   const [tanggal, setTanggal] = useState(todayStr());
   const [projectId, setProjectId] = useState("");
+  const [terminId, setTerminId] = useState("__NEW__");
   const [fakturId, setFakturId] = useState("");
+  const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(null);
+  const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(null);
   const [coaRows, setCoaRows] = useState<CoaRow[]>([makeCoaRow()]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const hasSalaryAccount = coaRows.some((r) => {
+    const c = coa.find((acc) => acc.id === r.coaAccountId);
+    if (!c) return false;
+    return c.code === "511" || c.code === "612" || c.code.startsWith("511") || c.code.startsWith("612") || /gaji|honor|upah|tenaga ahli|payroll/i.test(c.name);
+  });
+
+  useEffect(() => {
+    if (hasSalaryAccount) {
+      if (periodeBulanGaji === null) {
+        const txDate = tanggal ? new Date(tanggal) : new Date();
+        const curM = txDate.getMonth() + 1;
+        const defM = curM === 1 ? 12 : curM - 1;
+        const defY = curM === 1 ? txDate.getFullYear() - 1 : txDate.getFullYear();
+        setPeriodeBulanGaji(defM);
+        setPeriodeTahunGaji(defY);
+      }
+    } else {
+      if (periodeBulanGaji !== null) {
+        setPeriodeBulanGaji(null);
+        setPeriodeTahunGaji(null);
+      }
+    }
+  }, [hasSalaryAccount, tanggal, periodeBulanGaji]);
 
   const totalDebit = coaRows.reduce((s, r) => s + (r.arah === "debit" ? parseNum(r.nominalRaw) : 0), 0);
   const totalKredit = coaRows.reduce((s, r) => s + (r.arah === "kredit" ? parseNum(r.nominalRaw) : 0), 0);
@@ -198,21 +246,51 @@ export function JurnalTransaksiClient({
   const newPct = contractVal > 0 ? Math.min(100, Math.round((cumulativeAfter / contractVal) * 100)) : maxPctSoFar;
   const deltaPct = Math.max(0, newPct - maxPctSoFar);
 
+  const selectedTermin = selectedProject?.termins?.find((t) => t.id === terminId);
+
   const autoKeterangan = selectedProject
-    ? `Pendapatan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`
+    ? (selectedTermin
+        ? `Pendapatan ${selectedTermin.name} - ${selectedProject.name} (${selectedProject.code})`
+        : `Pendapatan Termin ${nextTerminKe} - ${selectedProject.name} (${selectedProject.code})`)
     : "";
 
   function handleProjectChange(newProjectId: string) {
     setProjectId(newProjectId);
-    if (!newProjectId) return;
+    if (!newProjectId) {
+      setTerminId("__NEW__");
+      return;
+    }
     const sel = projectOptions.find((p) => p.id === newProjectId);
     if (!sel) return;
+    const firstTerm = sel.termins && sel.termins.length > 0 ? sel.termins[0].id : "__NEW__";
+    setTerminId(firstTerm);
+
+    const targetTerm = sel.termins?.find((t) => t.id === firstTerm);
     const nextKe = (sel.terminCount ?? 0) + 1;
-    const autoKet = `Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`;
+    const autoKet = targetTerm
+      ? `Pendapatan ${targetTerm.name} - ${sel.name} (${sel.code})`
+      : `Pendapatan Termin ${nextKe} - ${sel.name} (${sel.code})`;
     setCoaRows((prev) => {
       if (prev.length > 0 && (!prev[0].keterangan.trim() || prev[0].keterangan.startsWith("Pendapatan Termin"))) {
         const [first, ...rest] = prev;
         return [{ ...first, keterangan: autoKet }, ...rest];
+      }
+      return prev;
+    });
+  }
+
+  function handleTerminChange(newTerminId: string) {
+    setTerminId(newTerminId);
+    if (!selectedProject) return;
+    const term = selectedProject.termins?.find((t) => t.id === newTerminId);
+    const nextKe = (selectedProject.terminCount ?? 0) + 1;
+    const ket = term
+      ? `Pendapatan ${term.name} - ${selectedProject.name} (${selectedProject.code})`
+      : `Pendapatan Termin ${nextKe} - ${selectedProject.name} (${selectedProject.code})`;
+    setCoaRows((prev) => {
+      if (prev.length > 0 && (!prev[0].keterangan.trim() || prev[0].keterangan.startsWith("Pendapatan Termin") || prev[0].keterangan.startsWith("Pencairan Faktur"))) {
+        const [first, ...rest] = prev;
+        return [{ ...first, keterangan: ket }, ...rest];
       }
       return prev;
     });
@@ -227,6 +305,13 @@ export function JurnalTransaksiClient({
     // Otomatis isi kode proyek jika E-Faktur terdaftar di suatu proyek
     if (selFaktur.projectId) {
       setProjectId(selFaktur.projectId);
+      const sel = projectOptions.find((p) => p.id === selFaktur.projectId);
+      if (sel?.termins && sel.termins.length > 0) {
+        const matched = sel.termins.find((t) => t.nominal === selFaktur.dpp) || sel.termins[0];
+        setTerminId(matched.id);
+      } else {
+        setTerminId("__NEW__");
+      }
     }
 
     // Default keterangan transaksi pencairan faktur
@@ -336,6 +421,8 @@ export function JurnalTransaksiClient({
 
   function resetForm() {
     setNoBukti(""); setTanggal(todayStr()); setProjectId(""); setFakturId("");
+    setTerminId("__NEW__");
+    setPeriodeBulanGaji(null); setPeriodeTahunGaji(null);
     setCoaRows([makeCoaRow()]); setFeedback(null); setEditingGroup(null);
   }
 
@@ -347,7 +434,11 @@ export function JurnalTransaksiClient({
     setTanggal(group.tanggalRaw.slice(0, 10));
     setProjectId(group.projectId ?? "");
     setFakturId(group.fakturId ?? "");
-    setCoaRows(group.rows.map((r) => ({
+    setTerminId(group.terminId || "__NEW__");
+    setPeriodeBulanGaji(group.periodeBulanGaji ?? null);
+    setPeriodeTahunGaji(group.periodeTahunGaji ?? null);
+    const sortedRows = sortJurnalRows(group.rows);
+    setCoaRows(sortedRows.map((r) => ({
       uid: uid(),
       coaAccountId: r.coaAccountId,
       keterangan: r.keterangan,
@@ -384,18 +475,42 @@ export function JurnalTransaksiClient({
     fd.set("entityKey", entityKey);
     fd.set("noBukti", noBukti);
     fd.set("tanggal", tanggal);
-    if (projectId) fd.set("projectId", projectId);
+    if (projectId) {
+      fd.set("projectId", projectId);
+      if (terminId) fd.set("terminId", terminId);
+    }
     if (fakturId) fd.set("fakturId", fakturId);
+    if (periodeBulanGaji) {
+      fd.set("periodeBulanGaji", String(periodeBulanGaji));
+      fd.set("periodeTahunGaji", String(periodeTahunGaji || new Date(tanggal).getFullYear()));
+    }
     if (editingGroup) fd.set("editNoBukti", editingGroup.noBukti);
+
+    const sortedFormRows = [...coaRows]
+      .filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0)
+      .sort((a, b) => {
+        const aIsCredit = a.arah === "kredit";
+        const bIsCredit = b.arah === "kredit";
+        if (!aIsCredit && bIsCredit) return -1;
+        if (aIsCredit && !bIsCredit) return 1;
+        if (aIsCredit && bIsCredit) {
+          const coaA = coa.find((c) => c.id === a.coaAccountId);
+          const coaB = coa.find((c) => c.id === b.coaAccountId);
+          const aIsPendapatan = coaA?.code?.startsWith("4") || /pendapatan/i.test(coaA?.name || "");
+          const bIsPendapatan = coaB?.code?.startsWith("4") || /pendapatan/i.test(coaB?.name || "");
+          if (!aIsPendapatan && bIsPendapatan) return -1;
+          if (aIsPendapatan && !bIsPendapatan) return 1;
+        }
+        return 0;
+      });
+
     fd.set("rows", JSON.stringify(
-      coaRows
-        .filter((r) => r.coaAccountId && parseNum(r.nominalRaw) > 0)
-        .map((r) => ({
-          coaAccountId: r.coaAccountId,
-          keterangan: r.keterangan,
-          debit: r.arah === "debit" ? parseNum(r.nominalRaw) : 0,
-          kredit: r.arah === "kredit" ? parseNum(r.nominalRaw) : 0,
-        }))
+      sortedFormRows.map((r) => ({
+        coaAccountId: r.coaAccountId,
+        keterangan: r.keterangan,
+        debit: r.arah === "debit" ? parseNum(r.nominalRaw) : 0,
+        kredit: r.arah === "kredit" ? parseNum(r.nominalRaw) : 0,
+      }))
     ));
     startTransition(async () => {
       try {
@@ -403,8 +518,8 @@ export function JurnalTransaksiClient({
         if (result?.error) {
           setFeedback({ type: "error", msg: result.error });
         } else {
-          setFeedback({ type: "success", msg: editingGroup ? "Jurnal berhasil diperbarui." : "Jurnal berhasil disimpan." });
-          if (!editingGroup) { resetForm(); setPanelOpen(false); }
+          resetForm();
+          setPanelOpen(false);
           router.refresh();
         }
       } catch (err) {
@@ -414,11 +529,19 @@ export function JurnalTransaksiClient({
   }
 
   function handleDelete(group: JurnalTransaksiGroup) {
-    if (!confirm(`Hapus jurnal ${group.noBukti}?`)) return;
+    setDeletingGroup(group);
+  }
+
+  function handleConfirmDelete() {
+    if (!deletingGroup) return;
     startTransition(async () => {
-      const res = await deleteJurnalTransaksi(group.allTxIds);
-      if (res?.error) setActionError(res.error);
-      else router.refresh();
+      const res = await deleteJurnalTransaksi(deletingGroup.allTxIds);
+      if (res?.error) {
+        setActionError(res.error);
+      } else {
+        setDeletingGroup(null);
+        router.refresh();
+      }
     });
   }
 
@@ -544,20 +667,38 @@ export function JurnalTransaksiClient({
                     <option value="">— Tanpa E-Faktur —</option>
                     {currentProjectFakturs.length > 0 && (
                       <optgroup label="E-Faktur Proyek Ini">
-                        {currentProjectFakturs.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.noFaktur} · {f.namaRekanan} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")}
-                          </option>
-                        ))}
+                        {currentProjectFakturs.map((f) => {
+                          const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === f.noFaktur.trim().toLowerCase());
+                          const isDup = sameNumber.length > 1;
+                          const partIdx = isDup ? sameNumber.findIndex((x) => x.id === f.id) + 1 : null;
+                          const partTag = isDup ? `[Termin #${partIdx}] ` : "";
+                          const isCair = (f.nominalDiterima && f.nominalDiterima > 0) || !!f.tanggalTerima;
+                          const statusTag = isCair ? " · [Lunas/Cair]" : " · [Belum Cair]";
+                          const netto = f.labaSetelahPajak > 0 ? f.labaSetelahPajak : Math.max(0, f.dpp - f.pph);
+                          return (
+                            <option key={f.id} value={f.id}>
+                              {partTag}{f.noFaktur} · {f.namaRekanan} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")} · Netto: Rp {Math.round(netto).toLocaleString("id-ID")}{statusTag}
+                            </option>
+                          );
+                        })}
                       </optgroup>
                     )}
                     {otherFakturs.length > 0 && (
                       <optgroup label={currentProjectFakturs.length > 0 ? "E-Faktur Lainnya" : "Daftar E-Faktur"}>
-                        {otherFakturs.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.noFaktur} · {f.namaRekanan} {f.projectCode ? `[${f.projectCode}]` : ""} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")}
-                          </option>
-                        ))}
+                        {otherFakturs.map((f) => {
+                          const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === f.noFaktur.trim().toLowerCase());
+                          const isDup = sameNumber.length > 1;
+                          const partIdx = isDup ? sameNumber.findIndex((x) => x.id === f.id) + 1 : null;
+                          const partTag = isDup ? `[Termin #${partIdx}] ` : "";
+                          const isCair = (f.nominalDiterima && f.nominalDiterima > 0) || !!f.tanggalTerima;
+                          const statusTag = isCair ? " · [Lunas/Cair]" : " · [Belum Cair]";
+                          const netto = f.labaSetelahPajak > 0 ? f.labaSetelahPajak : Math.max(0, f.dpp - f.pph);
+                          return (
+                            <option key={f.id} value={f.id}>
+                              {partTag}{f.noFaktur} · {f.namaRekanan} {f.projectCode ? `[${f.projectCode}]` : ""} · DPP: Rp {Math.round(f.dpp).toLocaleString("id-ID")} · Netto: Rp {Math.round(netto).toLocaleString("id-ID")}{statusTag}
+                            </option>
+                          );
+                        })}
                       </optgroup>
                     )}
                   </select>
@@ -580,7 +721,7 @@ export function JurnalTransaksiClient({
                     </label>
                     {selectedProject && (
                       <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
-                        Termin Ke-{nextTerminKe}
+                        {selectedTermin ? selectedTermin.name : `Termin Ke-${nextTerminKe}`}
                       </span>
                     )}
                   </div>
@@ -625,6 +766,30 @@ export function JurnalTransaksiClient({
                       <span className="font-bold font-mono text-[12px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
                         {selectedFaktur.noFaktur}
                       </span>
+                      {(() => {
+                        const sameNumber = (fakturOptions ?? []).filter((x) => x.noFaktur.trim().toLowerCase() === selectedFaktur.noFaktur.trim().toLowerCase());
+                        const isDup = sameNumber.length > 1;
+                        const partIdx = isDup ? sameNumber.findIndex((x) => x.id === selectedFaktur.id) + 1 : null;
+                        const isCair = (selectedFaktur.nominalDiterima && selectedFaktur.nominalDiterima > 0) || !!selectedFaktur.tanggalTerima;
+                        return (
+                          <>
+                            {isDup && (
+                              <span className="font-bold text-[10.5px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                                Termin #{partIdx}
+                              </span>
+                            )}
+                            {isCair ? (
+                              <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                Sudah Cair
+                              </span>
+                            ) : (
+                              <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                                Belum Cair
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                       <span className="font-semibold text-navy-text">
                         {selectedFaktur.namaRekanan}
                       </span>
@@ -717,10 +882,50 @@ export function JurnalTransaksiClient({
                     </div>
                   </div>
 
+                  {/* Pilihan Tahap / Termin Pencairan */}
+                  <div className="flex flex-col gap-1.5 p-2.5 rounded-[9px] bg-surface-card border border-border-subtle">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-navy-text flex items-center gap-1.5">
+                        <Sparkles size={12} className="text-emerald-600 dark:text-emerald-400" />
+                        Tahap / Termin Pencairan Proyek
+                      </label>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-emerald-800 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/40">
+                        {selectedTermin ? `Alokasi ke: ${selectedTermin.name}` : `Termin Baru (Ke-${nextTerminKe})`}
+                      </span>
+                    </div>
+
+                    <select
+                      value={terminId}
+                      onChange={(e) => handleTerminChange(e.target.value)}
+                      className="w-full h-8.5 px-2.5 rounded-[8px] border border-emerald-300/80 dark:border-emerald-700/60 bg-surface-input text-[12px] text-navy-text focus:outline-none focus:border-brand font-medium cursor-pointer"
+                    >
+                      {selectedProject.termins && selectedProject.termins.length > 0 && (
+                        <optgroup label="Termin Terdaftar (Cicilan / Penyesuaian Pajak)">
+                          {selectedProject.termins.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} · {t.percentage ?? 0}% Kontrak · Rp {Math.round(t.nominal ?? 0).toLocaleString("id-ID")}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Buat Tahap Baru">
+                        <option value="__NEW__">
+                          + Buat Termin Baru (Termin Ke-{nextTerminKe})
+                        </option>
+                      </optgroup>
+                    </select>
+
+                    <p className="text-[10px] text-muted-faint">
+                      {selectedTermin
+                        ? `Uang masuk akan dialokasikan ke ${selectedTermin.name} tanpa membuat termin baru (mencegah duplikasi termin saat pencairan bertahap).`
+                        : `Sistem akan otomatis mencatat Termin ke-${nextTerminKe} baru di Kontrol Piutang & Laporan Pendapatan.`}
+                    </p>
+                  </div>
+
                   {/* Termin Simulation Box */}
                   {nominalTermin === 0 ? (
                     <div className="text-[11.5px] text-muted-strong bg-surface-card border border-border-subtle rounded-[9px] p-2.5">
-                      Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun di bawah untuk melihat simulasi termin ke-{nextTerminKe}.
+                      Progres saat ini: <b className="text-navy-text">{maxPctSoFar}%</b> ({terminCount} termin tercatat). Masukkan nominal uang masuk pada Rincian Akun di bawah untuk melihat simulasi {selectedTermin ? selectedTermin.name : `termin ke-${nextTerminKe}`}.
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2.5 bg-surface-card border border-border-subtle rounded-[10px] p-3">
@@ -759,7 +964,7 @@ export function JurnalTransaksiClient({
                           <span className="font-bold text-navy-text">Rp {Math.round(cumulativeBefore).toLocaleString("id-ID")}</span>
                         </div>
                         <div>
-                          <span className="text-muted-faint block">Termin {nextTerminKe}</span>
+                          <span className="text-muted-faint block">{selectedTermin ? selectedTermin.name : `Termin ${nextTerminKe}`}</span>
                           <span className="font-bold text-status-green">+Rp {Math.round(nominalTermin).toLocaleString("id-ID")}</span>
                         </div>
                         <div>
@@ -787,6 +992,65 @@ export function JurnalTransaksiClient({
                 </div>
               )}
             </div>
+
+            {/* Pilihan Periode Beban Gaji (Akrual) — Langsung tampil saat input gaji */}
+            {hasSalaryAccount && (
+              <div className="mb-4 rounded-[12px] border border-border-soft bg-surface-card p-4 flex flex-col gap-3 shadow-xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-[11.5px] font-bold text-navy-text uppercase tracking-wide">
+                    Periode Beban Gaji (Akrual)
+                  </label>
+                  {periodeBulanGaji && (
+                    <span className="text-[11px] font-semibold text-brand">
+                      Beban Diakui: {BULAN_NAMES[periodeBulanGaji - 1]} {periodeTahunGaji || new Date(tanggal).getFullYear()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                      Bulan Gaji
+                    </label>
+                    <select
+                      value={periodeBulanGaji ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                        setPeriodeBulanGaji(val);
+                        if (val && !periodeTahunGaji) {
+                          setPeriodeTahunGaji(new Date(tanggal).getFullYear());
+                        }
+                      }}
+                      className="w-full h-8 px-2.5 rounded-[8px] border border-border-soft bg-surface-input text-xs text-navy-text focus:outline-none focus:border-brand"
+                    >
+                      <option value="">Sesuai Tanggal Transaksi ({BULAN_NAMES[new Date(tanggal).getMonth()]})</option>
+                      {BULAN_NAMES.map((name, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          Bulan {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
+                      Tahun Gaji
+                    </label>
+                    <input
+                      type="number"
+                      value={periodeTahunGaji ?? (periodeBulanGaji ? new Date(tanggal).getFullYear() : "")}
+                      onChange={(e) => setPeriodeTahunGaji(e.target.value ? parseInt(e.target.value, 10) : null)}
+                      placeholder={String(new Date(tanggal).getFullYear())}
+                      className="w-full h-8 px-2.5 rounded-[8px] border border-border-soft bg-surface-input text-xs text-navy-text font-mono focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-faint leading-relaxed">
+                  Dicatat di tanggal pembayaran riil, namun dibukukan sebagai biaya operasional bulan yang dipilih secara akrual.
+                </p>
+              </div>
+            )}
 
             {/* Tabel baris COA */}
             <div className="rounded-[12px] border border-border-soft overflow-hidden mb-4">
@@ -940,14 +1204,37 @@ export function JurnalTransaksiClient({
             {sortedHistory.length === 0 ? (
               <tr><td colSpan={8} className="py-10 text-center text-[13px] text-muted">Belum ada entri jurnal.</td></tr>
             ) : (
-              sortedHistory.map((group) =>
-                group.rows.map((row, rowIdx) => (
+              sortedHistory.map((group) => {
+                const groupRows = sortJurnalRows(group.rows);
+                return groupRows.map((row, rowIdx) => (
                   <tr key={`${group.noBukti}-${rowIdx}`}
-                    className={`border-b align-top hover:bg-surface-hover/30 group transition-colors ${rowIdx === group.rows.length - 1 ? "border-border" : "border-surface-subtle"}`}>
+                    className={`border-b align-top hover:bg-surface-hover/30 group transition-colors ${rowIdx === groupRows.length - 1 ? "border-border" : "border-surface-subtle"}`}>
                     {rowIdx === 0 ? (
                       <>
                         <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">{group.tanggal}</td>
-                        <td className="py-2.5 px-1.5 text-xs text-muted font-mono">{group.noBukti}</td>
+                        <td className="py-2.5 px-1.5 text-xs text-muted font-mono">
+                          <div>{group.noBukti}</div>
+                          {group.periodeBulanGaji && (
+                            <span
+                              className="mt-0.5 inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1.5 py-0.5 rounded font-sans"
+                              title={`Diakui Beban: Bulan ${BULAN_NAMES[group.periodeBulanGaji - 1]} ${group.periodeTahunGaji ?? ""}`}
+                            >
+                              <CalendarDays size={8} className="text-blue-500 flex-none" />
+                              Akrual: {BULAN_NAMES[group.periodeBulanGaji - 1].slice(0, 3)} {group.periodeTahunGaji ?? ""}
+                            </span>
+                          )}
+                          {group.tanggalNota && group.tanggalNota !== group.tanggalRaw?.slice(0, 10) && (
+                            <div className="mt-0.5">
+                              <span
+                                className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1.5 py-0.5 rounded font-sans"
+                                title={`Tanggal nota/kuitansi fisik: ${group.tanggalNota}`}
+                              >
+                                <Receipt size={8} className="text-blue-500 flex-none" />
+                                Nota: {group.tanggalNota}
+                              </span>
+                            </div>
+                          )}
+                        </td>
                         <td className="py-2.5 px-1.5 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">
                             {group.project ? (
@@ -980,7 +1267,7 @@ export function JurnalTransaksiClient({
                         <td className="py-2.5 px-1.5" />
                       </>
                     )}
-                    <td className="py-2.5 px-1.5 text-[12.5px] text-muted-stronger">
+                    <td className={`py-2.5 px-1.5 text-[12.5px] ${row.kredit > 0 ? "pl-5 text-muted" : "text-muted-stronger font-medium"}`}>
                       <span className="font-mono text-[11px] text-muted mr-1.5">{row.coaCode}</span>{row.coaName}
                     </td>
                     <td className="py-2.5 px-1.5 text-[13px] text-navy-text max-w-[200px] truncate">{row.keterangan || <span className="text-muted-faint">—</span>}</td>
@@ -1003,8 +1290,8 @@ export function JurnalTransaksiClient({
                       </td>
                     ) : <td className="py-2.5 px-1.5" />}
                   </tr>
-                ))
-              )
+                ));
+              })
             )}
           </tbody>
         </table>
@@ -1018,6 +1305,22 @@ export function JurnalTransaksiClient({
           return `${pathname}?${params.toString()}`;
         }}
       />
+
+      {/* Modal Konfirmasi Hapus Jurnal */}
+      {deletingGroup && (
+        <DeleteConfirmModal
+          title="Hapus Jurnal Transaksi?"
+          noBukti={deletingGroup.noBukti}
+          keterangan={
+            deletingGroup.keterangan ||
+            deletingGroup.rows.find((r) => r.keterangan)?.keterangan ||
+            (deletingGroup.project ? `Proyek ${deletingGroup.project.code} - ${deletingGroup.project.name}` : "Jurnal Transaksi")
+          }
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeletingGroup(null)}
+          isPending={isPending}
+        />
+      )}
     </div>
   );
 }

@@ -68,14 +68,18 @@ export function hitungPajakFaktur(
 ): HitungPajakResult {
   let ppn: number;
   let nilaiProyek: number;
+  const effectiveDppNilaiLain = dppNilaiLain > 0 ? dppNilaiLain : hitungDppNilaiLain(dpp);
 
-  if (nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0) {
+  if (tarifPpnPersen === 0) {
+    ppn = 0;
+    nilaiProyek =
+      nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0 ? nilaiKwitansiManual : dpp;
+  } else if (nilaiKwitansiManual !== undefined && nilaiKwitansiManual > 0) {
     nilaiProyek = nilaiKwitansiManual;
     ppn = Math.round((nilaiKwitansiManual * 11) / 111);
   } else {
-    ppn = Math.round((dppNilaiLain * tarifPpnPersen) / 100);
-    nilaiProyek =
-      tarifPpnPersen === 0 ? dpp : Math.round((dpp * 111) / 100);
+    ppn = Math.round((effectiveDppNilaiLain * tarifPpnPersen) / 100);
+    nilaiProyek = Math.round((dpp * 111) / 100);
   }
 
   const pph = Math.round((dpp * tarifPphPersen) / 100);
@@ -139,6 +143,10 @@ export interface FakturPendapatanItem {
   isRealized: boolean;
   selisihBank: number;
   selisihBankFmt: string;
+  selisihPpn: number;
+  selisihPph: number;
+  selisihTotal: number;
+  selisihTotalFmt: string;
   balanceStatus: "BALANCE" | "SELISIH" | "BELUM_CAIR";
 }
 
@@ -390,6 +398,27 @@ const JENIS_PROYEK_LABEL: Record<number, string> = {
 function makeFakturItem(f: RawFaktur): FakturPendapatanItem {
   const isRealized = f.isRealized !== undefined ? Boolean(f.isRealized) : (f.nominalDiterima > 0);
   const selisihBank = isRealized ? f.nominalDiterima - f.labaSetelahPajak : 0;
+  const ppnReal = f.ppnRealisasi != null ? f.ppnRealisasi : f.ppn;
+  const selisihPpn = isRealized && f.ppnRealisasi != null ? f.ppnRealisasi - f.ppn : 0;
+  const pphReal = f.pphRealisasi != null ? f.pphRealisasi : f.pph;
+  const selisihPph = isRealized && f.pphRealisasi != null ? f.pphRealisasi - f.pph : 0;
+  const totalRealisasi = isRealized ? (f.nominalDiterima || 0) + ppnReal + pphReal : 0;
+  const selisihTotal = isRealized ? totalRealisasi - f.nilaiProyek : 0;
+
+  // Faktur benar-benar BALANCE jika seluruh komponen (uang masuk bank, PPN, dan PPh) cocok dengan estimasi faktur
+  const isBalanced =
+    isRealized &&
+    Math.abs(selisihBank) <= 1 &&
+    Math.abs(selisihPpn) <= 1 &&
+    Math.abs(selisihPph) <= 1 &&
+    Math.abs(selisihTotal) <= 1;
+
+  const balanceStatus: "BALANCE" | "SELISIH" | "BELUM_CAIR" = isRealized
+    ? isBalanced
+      ? "BALANCE"
+      : "SELISIH"
+    : "BELUM_CAIR";
+
   return {
     ppnRealisasi: f.ppnRealisasi,
     pphRealisasi: f.pphRealisasi,
@@ -439,7 +468,11 @@ function makeFakturItem(f: RawFaktur): FakturPendapatanItem {
     isRealized,
     selisihBank,
     selisihBankFmt: formatRupiah(selisihBank),
-    balanceStatus: isRealized ? (selisihBank === 0 ? "BALANCE" : "SELISIH") : "BELUM_CAIR",
+    selisihPpn,
+    selisihPph,
+    selisihTotal,
+    selisihTotalFmt: formatRupiah(selisihTotal),
+    balanceStatus,
   };
 }
 
@@ -614,14 +647,14 @@ export async function getLaporanPendapatanData(
       const selisihDpp = rekap.dpp - dppTerlapor;
       const selisihPajak = rekap.ppn - pajakTerlapor;
       const pphRekap = rekap.pph;
-      const pphTerlapor = 0; // not tracked separately in RekonsiliasiPajakBulanan
+      const pphTerlapor = rekon?.pphTerlapor ?? 0;
       const selisihPph = pphRekap - pphTerlapor;
       const totalPajakRekap = rekap.ppn + pphRekap;
       const totalPajakTerlapor = pajakTerlapor + pphTerlapor;
       const selisihTotalPajak = totalPajakRekap - totalPajakTerlapor;
       let status: RekonsiliasiPajakItem["status"] = "BELUM_DILAPORKAN";
       if (rekon) {
-        status = selisihDpp === 0 && selisihPajak === 0 ? "MATCH" : "SELISIH";
+        status = selisihDpp === 0 && selisihPajak === 0 && selisihPph === 0 ? "MATCH" : "SELISIH";
       }
       return {
         month: rekap.month,

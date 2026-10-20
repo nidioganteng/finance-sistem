@@ -197,6 +197,12 @@ export type ProjectOption = {
   terminCount?: number;
   totalTerminTagih?: number;
   status?: string;
+  termins?: Array<{
+    id: string;
+    name: string;
+    percentage: number | null;
+    nominal: number | null;
+  }>;
 };
 
 export async function getProjectOptions(currentEntityKey?: string): Promise<ProjectOption[]> {

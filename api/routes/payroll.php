@@ -1506,35 +1506,53 @@ if ($method === 'GET' && $sub === '') {
         $tahun_tx  = $akrual_tahun ?: (int)date('Y', strtotime($tgl));
         $is_akrual = !empty($akrual_bulan) || (!empty($tgl_nota) && $tgl_nota !== $tgl);
 
+        $is_crossing = !empty($extra['isCrossingEntry']);
+        $crossing_from_key = $extra['crossingFromEntityKey'] ?? null;
+        $entity_names = [
+            'kencana'   => 'Kencana',
+            'gaharu'    => 'Gaharu',
+            'tataring'  => 'Tataring',
+            'ciptaAsri' => 'Cipta Asri',
+            'umum'      => 'Umum',
+        ];
+        $crossing_from_name = $crossing_from_key ? ($entity_names[$crossing_from_key] ?? ucfirst($crossing_from_key)) : null;
+
         $jenis_nama_str = $jenis_map[$t['jenis_key'] ?? ''] ?? ($t['jenis_nama'] ?? 'Jurnal Umum');
+        if ($is_crossing && $crossing_from_name) {
+            $jenis_nama_str = "Entry Jurnal (Pinjaman {$crossing_from_name})";
+        }
 
         $item = [
-            'id'               => $t['id'],
-            'entityId'         => $t['entityId'],
-            'tanggal'          => $tgl,
-            'tanggalFmt'       => fmt_tanggal_id($tgl),
-            'bulan'            => $bulan_tx,
-            'tahun'            => $tahun_tx,
-            'isAkrual'         => $is_akrual,
-            'periodeBulanGaji' => $akrual_bulan,
-            'periodeTahunGaji' => $akrual_tahun,
-            'tanggalNota'      => $tgl_nota,
-            'noBukti'          => $t['noBukti'],
-            'keterangan'       => $t['keterangan'],
-            'coaAccountId'     => $t['coaAccountId'],
-            'coaCode'          => $code ?: '-',
-            'coaName'          => $t['coa_name'] ?: 'Beban Gaji',
-            'jenisInputKey'    => $t['jenis_key'] ?? 'jurnalTransaksi',
-            'jenisInputNama'   => $jenis_nama_str,
-            'projectId'        => $t['projectId'] ?? null,
-            'projectCode'      => $t['proj_code'] ?? null,
-            'projectName'      => $t['proj_name'] ?? null,
-            'namaProyek'       => $t['proj_code'] ? "{$t['proj_code']} - {$t['proj_name']}" : null,
-            'debit'            => $d,
-            'debitFmt'         => fmt_rp_payroll($d),
-            'kredit'           => $k,
-            'kreditFmt'        => fmt_rp_payroll($k),
-            'staffName'        => $t['staff_name'] ?? null,
+            'id'                     => $t['id'],
+            'entityId'               => $t['entityId'],
+            'tanggal'                => $tgl,
+            'tanggalFmt'             => fmt_tanggal_id($tgl),
+            'bulan'                  => $bulan_tx,
+            'tahun'                  => $tahun_tx,
+            'isAkrual'               => $is_akrual,
+            'periodeBulanGaji'       => $akrual_bulan,
+            'periodeTahunGaji'       => $akrual_tahun,
+            'tanggalNota'            => $tgl_nota,
+            'noBukti'                => $t['noBukti'],
+            'keterangan'             => $t['keterangan'],
+            'coaAccountId'           => $t['coaAccountId'],
+            'coaCode'                => $code ?: '-',
+            'coaName'                => $t['coa_name'] ?: 'Beban Gaji',
+            'jenisInputKey'          => $t['jenis_key'] ?? 'jurnalTransaksi',
+            'jenisInputNama'         => $jenis_nama_str,
+            'isCrossingEntry'        => $is_crossing,
+            'crossingFromEntityKey'  => $crossing_from_key,
+            'crossingFromEntityName' => $crossing_from_name,
+            'crossingRole'           => $extra['crossingRole'] ?? null,
+            'projectId'              => $t['projectId'] ?? null,
+            'projectCode'            => $t['proj_code'] ?? null,
+            'projectName'            => $t['proj_name'] ?? null,
+            'namaProyek'             => $t['proj_code'] ? "{$t['proj_code']} - {$t['proj_name']}" : null,
+            'debit'                  => $d,
+            'debitFmt'               => fmt_rp_payroll($d),
+            'kredit'                 => $k,
+            'kreditFmt'              => fmt_rp_payroll($k),
+            'staffName'              => $t['staff_name'] ?? null,
         ];
 
         if ($code === '612' || preg_match('/tenaga ahli|honor/i', $name)) {
@@ -1608,6 +1626,13 @@ if ($method === 'GET' && $sub === '') {
     $total_gl_bulan      = $total_jurnal_pegawai_bulan  + $total_jurnal_ta_bulan;
     $total_selisih_bulan = abs($total_payload_bulan - $total_gl_bulan);
 
+    $tx_semua_bulan = array_merge($tx_pegawai_bulan, $tx_ta_bulan);
+    usort($tx_semua_bulan, function($a, $b) {
+        $cmp = strcmp($b['tanggal'], $a['tanggal']);
+        if ($cmp !== 0) return $cmp;
+        return strcmp($b['noBukti'], $a['noBukti']);
+    });
+
     $sync_data = [
         'tahun'                    => $year,
         'bulan'                    => $month,
@@ -1634,6 +1659,7 @@ if ($method === 'GET' && $sub === '') {
         'isOverallSinkron'         => $total_selisih_bulan === 0.0,
         'jurnalPegawaiRows'        => $tx_pegawai_bulan,
         'jurnalTenagaAhliRows'     => $tx_ta_bulan,
+        'jurnalSemuaRows'          => $tx_semua_bulan,
     ];
 
     json_response([

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProvider } from "@/components/SessionProvider";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Sistem Data Keuangan - Gaharu Sempana Group",
@@ -30,6 +31,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans">
         <SessionProvider>{children}</SessionProvider>
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast: "font-sans text-sm",
+            },
+          }}
+        />
       </body>
     </html>
   );

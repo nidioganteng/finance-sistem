@@ -1487,7 +1487,7 @@ if ($method === 'GET' && $sub === '') {
         'kasKecil'        => 'Kas Kecil',
         'kasBesar'        => 'Kas Besar',
         'bankBuku'        => 'Buku Bank',
-        'jurnalTransaksi' => 'Entry Jurnal',
+        'jurnalTransaksi' => 'Jurnal Umum',
     ];
 
     foreach ($tx_gaji_tahun as $t) {
@@ -1518,8 +1518,11 @@ if ($method === 'GET' && $sub === '') {
         $crossing_from_name = $crossing_from_key ? ($entity_names[$crossing_from_key] ?? ucfirst($crossing_from_key)) : null;
 
         $jenis_nama_str = $jenis_map[$t['jenis_key'] ?? ''] ?? ($t['jenis_nama'] ?? 'Jurnal Umum');
+        if ($jenis_nama_str === 'Entry Jurnal') {
+            $jenis_nama_str = 'Jurnal Umum';
+        }
         if ($is_crossing && $crossing_from_name) {
-            $jenis_nama_str = "Entry Jurnal (Pinjaman {$crossing_from_name})";
+            $jenis_nama_str = "Jurnal Umum (Pinjaman {$crossing_from_name})";
         }
 
         $item = [

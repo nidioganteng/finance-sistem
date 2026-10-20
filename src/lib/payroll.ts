@@ -186,6 +186,8 @@ export function hitungPph21Ter(bruto: number, statusKeluarga: string): HasilHitu
 export type PegawaiItem = {
   id: string;
   entityId: string;
+  entityName?: string;
+  entityKey?: string;
   nik: string;
   nama: string;
   jabatan: string;

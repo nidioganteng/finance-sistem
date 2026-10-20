@@ -1497,7 +1497,7 @@ export function PayrollClient({
                 <span className="truncate">Setelah BPJS & kasbon</span>
                 {data.penyesuaianJurnal.pegawai.isSinkronBulan ? (
                   <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 font-mono whitespace-nowrap shrink-0">
-                    ✓ Balance
+                    Balance
                   </span>
                 ) : (
                   <button
@@ -1505,7 +1505,7 @@ export function PayrollClient({
                     className="text-[9px] font-bold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer whitespace-nowrap shrink-0"
                     title={`Selisih Akun 511: ${data.penyesuaianJurnal.pegawai.selisihBulanFmt}`}
                   >
-                    ⚠️ Cek Jurnal
+                    Cek Jurnal
                   </button>
                 )}
               </div>
@@ -1521,7 +1521,7 @@ export function PayrollClient({
                       <span>Daftar Gaji Pegawai Tetap – Periode {BULAN_NAMES[selectedMonth - 1]} {selectedYear}</span>
                       {countBelumInput === 0 && data.pegawaiList.length > 0 && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                          ✓ Lengkap ({data.summaryBulanIni.totalPegawaiInput} Karyawan)
+                          Lengkap ({data.summaryBulanIni.totalPegawaiInput} Karyawan)
                         </span>
                       )}
                     </h3>
@@ -3429,7 +3429,7 @@ export function PayrollClient({
                                   {h.ptkp || "TK/0"}
                                 </span>
                                 {h.isPegawaiTetapLain && h.pegawaiHomeEntityName && (
-                                  <span className="px-1.5 py-0.2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold">
+                                  <span className="px-1.5 py-0.2 rounded-full bg-surface-subtle text-navy-text border border-border text-[10px] font-semibold">
                                     Pegawai Tetap {h.pegawaiHomeEntityName}
                                   </span>
                                 )}
@@ -4313,7 +4313,7 @@ export function PayrollClient({
                               <div className="font-bold text-navy-text text-sm">{r.nama}</div>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {r.isPegawaiTetap && r.pegawaiHomeEntityName && (
-                                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold">
+                                  <span className="px-2 py-0.5 rounded-full bg-surface-subtle text-navy-text border border-border text-[10px] font-semibold">
                                     Pegawai Tetap {r.pegawaiHomeEntityName}
                                   </span>
                                 )}
@@ -6852,7 +6852,7 @@ export function PayrollClient({
                                   {r.isPegawaiTetap && r.pegawaiHomeEntityName
                                     ? ` (Pegawai Tetap ${r.pegawaiHomeEntityName})`
                                     : r.kategori
-                                    ? ` · ${r.kategori}`
+                                    ? ` - ${r.kategori}`
                                     : ""}{" "}
                                   (NIK: {r.nik || "-"})
                                 </option>
@@ -6870,16 +6870,13 @@ export function PayrollClient({
                           <span className="text-sm font-bold text-navy-text">
                             {currentExpert.nama}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-1">
-                            <CheckCircle size={10} /> Terverifikasi di Database
+                          <span className="px-2 py-0.5 rounded-full bg-surface-card text-navy-text border border-border text-[10px] font-semibold">
+                            Terverifikasi di Database
                           </span>
                         </div>
                         {currentExpert.isPegawaiTetap && currentExpert.pegawaiHomeEntityName && (
-                          <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[10.5px] text-indigo-800 dark:text-indigo-200 flex items-start gap-1.5">
-                            <Info size={13} className="text-indigo-600 shrink-0 mt-0.5" />
-                            <span>
-                              Personil ini adalah <strong>Pegawai Tetap {currentExpert.pegawaiHomeEntityName}</strong>. Pembayaran honorarium ini dicatat khusus untuk bulan {BULAN_NAMES[modalHonorBulan - 1]} {modalHonorTahun} dan tidak memunculkan tagihan rutin bulanan di entitas {data.entity?.name}.
-                            </span>
+                          <div className="p-2 rounded-lg bg-surface-card border border-border text-[10.5px] text-muted-stronger">
+                            Personil ini adalah <strong>Pegawai Tetap {currentExpert.pegawaiHomeEntityName}</strong>. Pembayaran honorarium ini dicatat khusus untuk bulan {BULAN_NAMES[modalHonorBulan - 1]} {modalHonorTahun} dan tidak memunculkan tagihan rutin bulanan di entitas {data.entity?.name}.
                           </div>
                         )}
                         <div className="grid grid-cols-3 gap-2 text-[11px] pt-1.5 border-t border-border/60">
@@ -7012,9 +7009,8 @@ export function PayrollClient({
                   />
                 </div>
                 {modalHonorProjectId ? (
-                  <div className="mt-1.5 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-[11px] flex items-center gap-1.5 font-medium">
-                    <CheckCircle size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    <span>✓ Otomatis tercatat pada realisasi biaya proyek &amp; profitabilitas.</span>
+                  <div className="mt-1.5 p-2 rounded-lg bg-surface-subtle border border-border text-navy-text text-[11px] font-medium">
+                    Otomatis tercatat pada realisasi biaya proyek &amp; profitabilitas.
                   </div>
                 ) : (
                   <span className="text-[10px] text-muted-faint mt-0.5 block">
@@ -8173,13 +8169,10 @@ export function PayrollClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-2xl bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-subtle/50">
-              <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
-                <Users size={16} />
-                <span>
-                  {editingMasterAhli?.id
-                    ? "Edit Data Tenaga Ahli"
-                    : "Tambah Tenaga Ahli Baru"}
-                </span>
+              <h3 className="text-sm font-bold text-navy-text">
+                {editingMasterAhli?.id
+                  ? "Edit Data Tenaga Ahli"
+                  : "Tambah Tenaga Ahli Baru"}
               </h3>
               <button
                 onClick={() => setIsMasterAhliModalOpen(false)}
@@ -8243,11 +8236,10 @@ export function PayrollClient({
               <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
 
               {!editingMasterAhli?.id && data.allHoldingPegawaiMaster && data.allHoldingPegawaiMaster.length > 0 && (
-                <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-800/60 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-indigo-900 dark:text-indigo-200 font-bold text-xs">
-                    <User size={14} className="text-indigo-600" />
-                    <span>Salin dari Pegawai Tetap Lintas Entitas (Opsional)</span>
-                  </div>
+                <div>
+                  <label className="font-semibold text-navy-text block mb-1">
+                    Salin dari Pegawai Tetap Lintas Entitas (Opsional)
+                  </label>
                   <select
                     defaultValue=""
                     onChange={(e) => {
@@ -8271,9 +8263,9 @@ export function PayrollClient({
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10.5px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                  <span className="text-[10px] text-muted-faint mt-0.5 block">
                     Pegawai tetap dari entitas lain hanya akan muncul di daftar gaji tenaga ahli pada bulan ketika honorarium dibayarkan (tidak muncul sebagai tagihan rutin bulanan).
-                  </p>
+                  </span>
                 </div>
               )}
 

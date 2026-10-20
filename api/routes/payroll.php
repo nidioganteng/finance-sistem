@@ -119,21 +119,50 @@ function ensure_tenaga_ahli_tables(PDO $pdo): void {
 }
 
 /**
+ * Cari apakah seseorang terdaftar sebagai Pegawai Tetap di salah satu entitas holding.
+ */
+function get_pegawai_tetap_info(array $person, array $pegawai_by_nik, array $pegawai_by_name): ?array {
+    $nik = trim($person['nik'] ?? '');
+    if ($nik !== '' && isset($pegawai_by_nik[$nik])) {
+        return $pegawai_by_nik[$nik];
+    }
+    $name = strtolower(trim($person['nama'] ?? ''));
+    if ($name !== '' && isset($pegawai_by_name[$name])) {
+        return $pegawai_by_name[$name];
+    }
+    $name_stripped = preg_replace('/^(ir\.|dr\.|drs\.|drg\.|prof\.)\s+/i', '', $name);
+    $name_stripped = trim(preg_replace('/,.*$/', '', $name_stripped));
+    if ($name_stripped !== '' && isset($pegawai_by_name[$name_stripped])) {
+        return $pegawai_by_name[$name_stripped];
+    }
+    return null;
+}
+
+/**
  * Menentukan apakah Tenaga Ahli / Freelance berhak muncul di daftar penggajian bulanan riil.
  * Aturan:
  * 1. Jika sudah ada data transaksi honor di bulan ini (arsip historis), SELALU TAMPILKAN
  *    agar rekam jejak honor masa lalu tidak hilang.
- * 2. Status "Turun Lapangan": Khusus freelance / tenaga ahli, hanya yang berstatus
+ * 2. Jika tenaga ahli ini adalah Pegawai Tetap di entitas lain (misal pegawai tetap Kencana
+ *    yang ditugaskan sebagai tenaga ahli di Gaharu atau entitas lain), HANYA muncul
+ *    di bulan ketika mereka digaji/dibayarkan honor. Tidak muncul setiap bulan sebagai pending.
+ * 3. Status "Turun Lapangan": Khusus freelance / tenaga ahli, hanya yang berstatus
  *    "turun ke lapangan" yang dimunculkan pada daftar pembayaran gaji riil bulanan.
  *    Tenaga ahli yang berstatus kelengkapan administrasi/sertifikasi (SKA) TIDAK dimunculkan.
- * 3. Masa Tugas / Masa Kontrak: Selama dalam rentang tanggal penugasan (mulai s.d. selesai),
+ * 4. Masa Tugas / Masa Kontrak: Selama dalam rentang tanggal penugasan (mulai s.d. selesai),
  *    nama freelance otomatis muncul di daftar penggajian bulanan dan hilang setelah masa tugas berakhir.
  */
-function is_tenaga_ahli_eligible_for_month(array $ta, int $year, int $month, bool $has_honor_this_month): bool {
+function is_tenaga_ahli_eligible_for_month(array $ta, int $year, int $month, bool $has_honor_this_month, bool $is_pegawai_tetap_lain = false): bool {
     // 1. Jika sudah ada pembayaran honor di bulan ini, selalu tampilkan
     if ($has_honor_this_month) return true;
 
-    // 2. Status "Turun Lapangan": hanya yang bernilai true (1) yang muncul di daftar gaji riil
+    // 2. Jika tenaga ahli ini adalah Pegawai Tetap di entitas lain, HANYA muncul ketika digaji di bulan tersebut.
+    //    Tidak dimunculkan sebagai baris tagihan rutin / pending bulanan.
+    if ($is_pegawai_tetap_lain) {
+        return false;
+    }
+
+    // 3. Status "Turun Lapangan": hanya yang bernilai true (1) yang muncul di daftar gaji riil
     $is_turun = isset($ta['isTurunLapangan']) ? ((int)$ta['isTurunLapangan'] === 1 || $ta['isTurunLapangan'] === true) : true;
     if (!$is_turun) {
         return false;
@@ -249,6 +278,36 @@ if ($method === 'GET' && $sub === '') {
     $stmt->execute();
     $all_projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // 3b. Master seluruh pegawai tetap lintas entitas (holding)
+    $stmt_all_pgw = $pdo->prepare(
+        "SELECT p.id, p.entityId, p.nik, p.nama, p.jabatan, p.statusKeluarga, p.ptkp,
+                e.name AS entityName, e.`key` AS entityKey
+         FROM Pegawai p
+         JOIN Entity e ON p.entityId = e.id
+         WHERE p.isActive = 1
+         ORDER BY e.name ASC, p.nama ASC"
+    );
+    $stmt_all_pgw->execute();
+    $all_holding_pegawai = $stmt_all_pgw->fetchAll(PDO::FETCH_ASSOC);
+
+    $pegawai_by_nik  = [];
+    $pegawai_by_name = [];
+    foreach ($all_holding_pegawai as $pgw) {
+        $nik_clean = trim($pgw['nik'] ?? '');
+        if ($nik_clean !== '') {
+            $pegawai_by_nik[$nik_clean] = $pgw;
+        }
+        $name_clean = strtolower(trim($pgw['nama'] ?? ''));
+        if ($name_clean !== '') {
+            $pegawai_by_name[$name_clean] = $pgw;
+            $name_stripped = preg_replace('/^(ir\.|dr\.|drs\.|drg\.|prof\.)\s+/i', '', $name_clean);
+            $name_stripped = trim(preg_replace('/,.*$/', '', $name_stripped));
+            if ($name_stripped !== '' && $name_stripped !== $name_clean) {
+                $pegawai_by_name[$name_stripped] = $pgw;
+            }
+        }
+    }
+
     // 4. Tenaga Ahli master (rekanan tipe TENAGA_AHLI)
     ensure_tenaga_ahli_tables($pdo);
     $stmt = $pdo->prepare(
@@ -323,6 +382,13 @@ if ($method === 'GET' && $sub === '') {
         } else {
             $r['proyekList'] = [];
         }
+
+        // Cek status apakah personil ini adalah Pegawai Tetap di entitas tertentu
+        $pgw_info = get_pegawai_tetap_info($r, $pegawai_by_nik, $pegawai_by_name);
+        $r['isPegawaiTetap']        = ($pgw_info !== null);
+        $r['pegawaiHomeEntityId']   = $pgw_info ? $pgw_info['entityId'] : null;
+        $r['pegawaiHomeEntityName'] = $pgw_info ? $pgw_info['entityName'] : null;
+        $r['pegawaiHomeEntityKey']  = $pgw_info ? $pgw_info['entityKey'] : null;
 
         $rekanan_tenaga_ahli[] = $r;
     }
@@ -677,6 +743,9 @@ if ($method === 'GET' && $sub === '') {
             $paid_rekanan_niks[$h['nik']] = true;
         }
 
+        $pgw_info = get_pegawai_tetap_info($h, $pegawai_by_nik, $pegawai_by_name);
+        $is_pegawai_tetap_lain = ($pgw_info && $pgw_info['entityId'] !== $h['entityId']);
+
         $honor_list[] = [
             'id'                  => $h['id'],
             'entityId'            => $h['entityId'],
@@ -709,6 +778,11 @@ if ($method === 'GET' && $sub === '') {
             'isTurunLapangan'     => isset($h['isTurunLapangan']) ? ((int)$h['isTurunLapangan'] === 1) : true,
             'tanggalMulaiTugas'   => $h['tanggalMulaiTugas'] ?? null,
             'tanggalSelesaiTugas' => $h['tanggalSelesaiTugas'] ?? null,
+            'isPegawaiTetap'        => ($pgw_info !== null),
+            'isPegawaiTetapLain'    => $is_pegawai_tetap_lain,
+            'pegawaiHomeEntityId'   => $pgw_info ? $pgw_info['entityId'] : null,
+            'pegawaiHomeEntityName' => $pgw_info ? $pgw_info['entityName'] : null,
+            'pegawaiHomeEntityKey'  => $pgw_info ? $pgw_info['entityKey'] : null,
         ];
 
         $summary_honor_bulan_ini['totalTransaksi']++;
@@ -749,8 +823,14 @@ if ($method === 'GET' && $sub === '') {
                 continue;
             }
 
-            // Cek masa tugas penugasan proyek ini
-            if (!is_tenaga_ahli_eligible_for_month($pl, $year, $month, false)) {
+            // ATURAN KHUSUS: Jika tenaga ahli ini adalah Pegawai Tetap di entitas lain (misal Pegawai Tetap Kencana
+            // yang ditugaskan sebagai Tenaga Ahli di Gaharu), HANYA muncul jika sudah digaji (ada transaksi honor).
+            // Jangan dimunculkan sebagai baris pending / siap dibayar setiap bulan di entitas lain.
+            $pgw_info = get_pegawai_tetap_info($ta, $pegawai_by_nik, $pegawai_by_name);
+            $is_pegawai_tetap_lain = ($pgw_info && $pgw_info['entityId'] !== $assignment_entity_id);
+
+            // Cek masa tugas penugasan proyek ini & status pegawai tetap entitas lain
+            if (!is_tenaga_ahli_eligible_for_month($pl, $year, $month, false, $is_pegawai_tetap_lain)) {
                 continue;
             }
 
@@ -1235,6 +1315,9 @@ if ($method === 'GET' && $sub === '') {
             $paid_holding_pairs[$h['nik'] . '_' . $proj_id_paid] = true;
         }
 
+        $pgw_info = get_pegawai_tetap_info($h, $pegawai_by_nik, $pegawai_by_name);
+        $is_pegawai_tetap_lain = ($pgw_info && $pgw_info['entityId'] !== $h['entityId']);
+
         $all_honor_bulan_ini[] = [
             'id'                  => $h['id'],
             'entityId'            => $h['entityId'],
@@ -1268,6 +1351,11 @@ if ($method === 'GET' && $sub === '') {
             'isTurunLapangan'     => true,
             'tanggalMulaiTugas'   => $h['tanggalMulaiTugas'] ?? null,
             'tanggalSelesaiTugas' => $h['tanggalSelesaiTugas'] ?? null,
+            'isPegawaiTetap'        => ($pgw_info !== null),
+            'isPegawaiTetapLain'    => $is_pegawai_tetap_lain,
+            'pegawaiHomeEntityId'   => $pgw_info ? $pgw_info['entityId'] : null,
+            'pegawaiHomeEntityName' => $pgw_info ? $pgw_info['entityName'] : null,
+            'pegawaiHomeEntityKey'  => $pgw_info ? $pgw_info['entityKey'] : null,
         ];
     }
 
@@ -1295,7 +1383,11 @@ if ($method === 'GET' && $sub === '') {
 
             if ($already_paid) continue;
 
-            if (!is_tenaga_ahli_eligible_for_month($pl, $year, $month, false)) continue;
+            $target_entity_id = $pl['projectEntityId'] ?: ($ta['entityId'] ?: $entity_id);
+            $pgw_info = get_pegawai_tetap_info($ta, $pegawai_by_nik, $pegawai_by_name);
+            $is_pegawai_tetap_lain = ($pgw_info && $pgw_info['entityId'] !== $target_entity_id);
+
+            if (!is_tenaga_ahli_eligible_for_month($pl, $year, $month, false, $is_pegawai_tetap_lain)) continue;
 
             $nominal_honor = (float)($pl['nominalHonorBulanan'] ?? 0.0);
             $has_npwp      = !empty($ta['npwp']);
@@ -1675,6 +1767,7 @@ if ($method === 'GET' && $sub === '') {
         'month'                 => $month,
         'pegawaiList'           => $pegawai_list,
         'allPegawaiMaster'      => $all_pegawai_master,
+        'allHoldingPegawaiMaster' => $all_holding_pegawai,
         'gajiBulanIni'          => $gaji_bulan_ini,
         'rekapBulananPegawai'   => $rekap_bulanan_pegawai,
         'summaryBulanIni'       => array_merge($summary_bulan_ini, [

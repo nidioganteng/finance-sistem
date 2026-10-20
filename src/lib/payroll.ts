@@ -570,6 +570,10 @@ export type JurnalTransaksiGajiItem = {
   periodeBulanGaji?: number | null;
   periodeTahunGaji?: number | null;
   tanggalNota?: string | null;
+  isCrossingEntry?: boolean;
+  crossingFromEntityKey?: string | null;
+  crossingFromEntityName?: string | null;
+  crossingRole?: string | null;
 };
 
 export type PenyesuaianAkunGajiDetail = {
@@ -633,6 +637,7 @@ export type PayrollSyncLabaRugi = {
   // Transaksi Jurnal Umum
   jurnalPegawaiRows: JurnalTransaksiGajiItem[];
   jurnalTenagaAhliRows: JurnalTransaksiGajiItem[];
+  jurnalSemuaRows?: JurnalTransaksiGajiItem[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

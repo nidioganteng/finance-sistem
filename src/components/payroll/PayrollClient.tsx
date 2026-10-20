@@ -88,6 +88,7 @@ type PayrollData = {
   month: number;
   pegawaiList: PegawaiItem[];
   allPegawaiMaster?: PegawaiItem[];
+  allHoldingPegawaiMaster?: PegawaiItem[];
   gajiBulanIni: GajiBulananItem[];
   rekapBulananPegawai: RekapBulanPegawaiItem[];
   summaryBulanIni: {
@@ -636,6 +637,10 @@ export function PayrollClient({
   // Master Tenaga Ahli Modal
   const [isMasterAhliModalOpen, setIsMasterAhliModalOpen] = useState(false);
   const [editingMasterAhli, setEditingMasterAhli] = useState<RekananTenagaAhliItem | null>(null);
+  const [masterAhliNama, setMasterAhliNama] = useState("");
+  const [masterAhliNik, setMasterAhliNik] = useState("");
+  const [masterAhliPtkp, setMasterAhliPtkp] = useState("TK/0");
+  const [masterAhliNpwp, setMasterAhliNpwp] = useState("");
   const [masterProyekList, setMasterProyekList] = useState<
     Array<{
       id?: string | null;
@@ -661,6 +666,17 @@ export function PayrollClient({
 
   useEffect(() => {
     if (isMasterAhliModalOpen) {
+      if (editingMasterAhli) {
+        setMasterAhliNama(editingMasterAhli.nama || "");
+        setMasterAhliNik(editingMasterAhli.nik || "");
+        setMasterAhliPtkp(editingMasterAhli.ptkp || "TK/0");
+        setMasterAhliNpwp(editingMasterAhli.npwp || "");
+      } else {
+        setMasterAhliNama("");
+        setMasterAhliNik("");
+        setMasterAhliPtkp("TK/0");
+        setMasterAhliNpwp("");
+      }
       if (editingMasterAhli?.proyekList && editingMasterAhli.proyekList.length > 0) {
         setMasterProyekList(
           editingMasterAhli.proyekList.map((p) => ({
@@ -3412,6 +3428,11 @@ export function PayrollClient({
                                 <span className="px-1.5 py-0.2 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold">
                                   {h.ptkp || "TK/0"}
                                 </span>
+                                {h.isPegawaiTetapLain && h.pegawaiHomeEntityName && (
+                                  <span className="px-1.5 py-0.2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold">
+                                    Pegawai Tetap {h.pegawaiHomeEntityName}
+                                  </span>
+                                )}
                                 {h.isPendingPayment && (
                                   <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-semibold">
                                     Turun Lapangan
@@ -4291,6 +4312,11 @@ export function PayrollClient({
                             <td className="py-3 px-3.5 whitespace-nowrap sticky left-0 z-10 bg-surface-card group-hover:bg-surface-hover hover:bg-surface-hover transition-colors border-b border-r-2 border-border shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-2px_rgba(0,0,0,0.4)]">
                               <div className="font-bold text-navy-text text-sm">{r.nama}</div>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                {r.isPegawaiTetap && r.pegawaiHomeEntityName && (
+                                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold">
+                                    Pegawai Tetap {r.pegawaiHomeEntityName}
+                                  </span>
+                                )}
                                 {r.kategori && (
                                   <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-medium">
                                     {r.kategori}
@@ -6731,6 +6757,11 @@ export function PayrollClient({
                       npwp: editingHonor.npwp,
                       kategori: null as string | null,
                       ptkp: editingHonor.ptkp || "TK/0",
+                      isPegawaiTetap: editingHonor.isPegawaiTetap,
+                      isPegawaiTetapLain: editingHonor.isPegawaiTetapLain,
+                      pegawaiHomeEntityId: editingHonor.pegawaiHomeEntityId,
+                      pegawaiHomeEntityName: editingHonor.pegawaiHomeEntityName,
+                      pegawaiHomeEntityKey: editingHonor.pegawaiHomeEntityKey,
                     }
                   : data.rekananTenagaAhli.find((r) => r.id === selectedRekananIdForHonor) ||
                     data.rekananTenagaAhli[0] ||
@@ -6817,7 +6848,13 @@ export function PayrollClient({
                             >
                               {data.rekananTenagaAhli.map((r) => (
                                 <option key={r.id} value={r.id}>
-                                  {r.nama} {r.kategori ? `· ${r.kategori}` : ""} (NIK: {r.nik || "-"})
+                                  {r.nama}
+                                  {r.isPegawaiTetap && r.pegawaiHomeEntityName
+                                    ? ` (Pegawai Tetap ${r.pegawaiHomeEntityName})`
+                                    : r.kategori
+                                    ? ` · ${r.kategori}`
+                                    : ""}{" "}
+                                  (NIK: {r.nik || "-"})
                                 </option>
                               ))}
                             </select>
@@ -6837,6 +6874,14 @@ export function PayrollClient({
                             <CheckCircle size={10} /> Terverifikasi di Database
                           </span>
                         </div>
+                        {currentExpert.isPegawaiTetap && currentExpert.pegawaiHomeEntityName && (
+                          <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[10.5px] text-indigo-800 dark:text-indigo-200 flex items-start gap-1.5">
+                            <Info size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                            <span>
+                              Personil ini adalah <strong>Pegawai Tetap {currentExpert.pegawaiHomeEntityName}</strong>. Pembayaran honorarium ini dicatat khusus untuk bulan {BULAN_NAMES[modalHonorBulan - 1]} {modalHonorTahun} dan tidak memunculkan tagihan rutin bulanan di entitas {data.entity?.name}.
+                            </span>
+                          </div>
+                        )}
                         <div className="grid grid-cols-3 gap-2 text-[11px] pt-1.5 border-t border-border/60">
                           <div>
                             <span className="text-muted-faint block">NIK (16 Digit):</span>
@@ -8197,6 +8242,41 @@ export function PayrollClient({
               )}
               <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
 
+              {!editingMasterAhli?.id && data.allHoldingPegawaiMaster && data.allHoldingPegawaiMaster.length > 0 && (
+                <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-800/60 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-indigo-900 dark:text-indigo-200 font-bold text-xs">
+                    <User size={14} className="text-indigo-600" />
+                    <span>Salin dari Pegawai Tetap Lintas Entitas (Opsional)</span>
+                  </div>
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const pId = e.target.value;
+                      if (!pId) return;
+                      const targetPegawai = data.allHoldingPegawaiMaster?.find((p) => p.id === pId);
+                      if (targetPegawai) {
+                        setMasterAhliNama(targetPegawai.nama);
+                        setMasterAhliNik(targetPegawai.nik);
+                        if (targetPegawai.ptkp) {
+                          setMasterAhliPtkp(String(targetPegawai.ptkp));
+                        }
+                      }
+                    }}
+                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
+                  >
+                    <option value="">-- Pilih jika personil adalah Pegawai Tetap (Kencana/Gaharu/dll) --</option>
+                    {data.allHoldingPegawaiMaster.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nama} ({p.entityName} - {p.jabatan}) - NIK: {p.nik}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10.5px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                    Pegawai tetap dari entitas lain hanya akan muncul di daftar gaji tenaga ahli pada bulan ketika honorarium dibayarkan (tidak muncul sebagai tagihan rutin bulanan).
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="font-semibold text-navy-text block mb-1">
                   Nama Lengkap & Gelar *
@@ -8205,7 +8285,8 @@ export function PayrollClient({
                   type="text"
                   name="nama"
                   required
-                  defaultValue={editingMasterAhli?.nama ?? ""}
+                  value={masterAhliNama}
+                  onChange={(e) => setMasterAhliNama(e.target.value)}
                   placeholder="Contoh: Ir. Budi Santoso, M.T."
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-semibold"
                 />
@@ -8221,7 +8302,8 @@ export function PayrollClient({
                   required
                   minLength={16}
                   maxLength={16}
-                  defaultValue={editingMasterAhli?.nik ?? ""}
+                  value={masterAhliNik}
+                  onChange={(e) => setMasterAhliNik(e.target.value)}
                   placeholder="Contoh: 6203011204850002"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
@@ -8237,7 +8319,8 @@ export function PayrollClient({
                 <input
                   type="text"
                   name="npwp"
-                  defaultValue={editingMasterAhli?.npwp ?? ""}
+                  value={masterAhliNpwp}
+                  onChange={(e) => setMasterAhliNpwp(e.target.value)}
                   placeholder="Contoh: 75.888.999.1-711.000"
                   className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                 />
@@ -8253,7 +8336,8 @@ export function PayrollClient({
                   </label>
                   <select
                     name="ptkp"
-                    defaultValue={editingMasterAhli?.ptkp ?? "TK/0"}
+                    value={masterAhliPtkp}
+                    onChange={(e) => setMasterAhliPtkp(e.target.value)}
                     className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
                   >
                     <option value="TK/0">TK/0</option>

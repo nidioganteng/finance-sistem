@@ -139,29 +139,8 @@ function is_tenaga_ahli_eligible_for_month(array $ta, int $year, int $month, boo
         return false;
     }
 
-    // 3. Masa Tugas / Masa Kontrak: cek apakah bulan & tahun target berada dalam rentang penugasan
-    $target_ym = $year * 12 + $month;
-
-    if (!empty($ta['tanggalMulaiTugas'])) {
-        $mulai_ts = strtotime(substr($ta['tanggalMulaiTugas'], 0, 10));
-        if ($mulai_ts) {
-            $mulai_ym = ((int)date('Y', $mulai_ts)) * 12 + ((int)date('n', $mulai_ts));
-            if ($target_ym < $mulai_ym) {
-                return false;
-            }
-        }
-    }
-
-    if (!empty($ta['tanggalSelesaiTugas'])) {
-        $selesai_ts = strtotime(substr($ta['tanggalSelesaiTugas'], 0, 10));
-        if ($selesai_ts) {
-            $selesai_ym = ((int)date('Y', $selesai_ts)) * 12 + ((int)date('n', $selesai_ts));
-            if ($target_ym > $selesai_ym) {
-                return false;
-            }
-        }
-    }
-
+    // Tenaga ahli yang berstatus turun lapangan selalu dimunculkan di daftar gaji bulanan
+    // entitas proyeknya (walau belum dibayar), agar dapat diproses pembayarannya oleh bagian keuangan.
     return true;
 }
 
@@ -2316,11 +2295,11 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
             "UPDATE HonorTenagaAhli
              SET entityId=?, rekananId=?, nik=?, nama=?, npwp=?, uraian=?, tanggal=?,
                  bulan=?, tahun=?, nominalHonor=?, tarifPph21Persen=?, pph21=?, nominalBersih=?,
-                 projectId=?, namaProyek=?, noBukti=?
+                 projectId=?, namaProyek=?, noBukti=?, updatedAt=?
              WHERE id=?"
         )->execute([$entity_id, $final_rekanan_id, $nik, $nama, $npwp, $uraian, $tanggal_db,
                     $bulan, $tahun, $nominal_honor, $tarif_pph, $pph21, $nominal_bersih,
-                    $project_id, $nama_proyek, $no_bukti, $id]);
+                    $project_id, $nama_proyek, $no_bukti, $now, $id]);
 
         log_activity($user['id'],
             "Update Honorarium Tenaga Ahli: $nama - Rp " . number_format((int)$nominal_honor, 0, ',', '.'),
@@ -2334,11 +2313,11 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
             "INSERT INTO HonorTenagaAhli
              (id, entityId, rekananId, nik, nama, npwp, uraian, tanggal,
               bulan, tahun, nominalHonor, tarifPph21Persen, pph21, nominalBersih,
-              projectId, namaProyek, noBukti, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+              projectId, namaProyek, noBukti, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([$honor_id, $entity_id, $final_rekanan_id, $nik, $nama, $npwp, $uraian, $tanggal_db,
                     $bulan, $tahun, $nominal_honor, $tarif_pph, $pph21, $nominal_bersih,
-                    $project_id, $nama_proyek, $no_bukti, $now]);
+                    $project_id, $nama_proyek, $no_bukti, $now, $now]);
 
         log_activity($user['id'],
             "Input Honorarium Tenaga Ahli: $nama - Rp " . number_format((int)$nominal_honor, 0, ',', '.'),

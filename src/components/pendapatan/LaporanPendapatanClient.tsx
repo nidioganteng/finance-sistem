@@ -29,6 +29,7 @@ import {
   Building,
   Sparkles,
   Copy,
+  RefreshCw,
 } from "lucide-react";
 import type {
   LaporanPendapatanData,
@@ -46,6 +47,8 @@ import {
   updateFakturPendapatanAction,
   deleteFakturPendapatanAction,
   upsertRekonsiliasiPajakAction,
+  deleteRekonsiliasiPajakAction,
+  syncAllRekonsiliasiPajakAction,
   toggleCeklisDokumenFakturAction,
   type FakturPendapatanInput,
 } from "@/lib/actions/pendapatan";
@@ -740,6 +743,59 @@ export function LaporanPendapatanClient({
     }
   }
 
+  async function handleDeleteRecon() {
+    if (!editingRecon) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await deleteRekonsiliasiPajakAction({
+        entityId: data.entity.id,
+        year: data.year,
+        month: formRecon.month,
+      });
+
+      if (res.error) {
+        setErrorMessage(res.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      setIsReconModalOpen(false);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || "Terjadi kesalahan.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSyncAllRecon() {
+    if (!window.confirm("Sinkronkan seluruh bulan rekonsiliasi SPT dengan data rekap faktur sistem saat ini?")) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await syncAllRekonsiliasiPajakAction({
+        entityId: data.entity.id,
+        year: data.year,
+      });
+      if (res.error) {
+        alert(res.error);
+      } else {
+        startTransition(() => {
+          router.refresh();
+        });
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal menyinkronkan rekonsiliasi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const exportUrl = `/api/pendapatan/export?entityId=${data.entity.id}&year=${data.year}${
     data.masaPajak ? `&masaPajak=${data.masaPajak}` : ""
   }`;
@@ -1211,7 +1267,7 @@ export function LaporanPendapatanClient({
                                 : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
                             }`}
                           >
-                            PPN {f.ceklisPpn ? "✓" : "○"}
+                            PPN {f.ceklisPpn ? "Ada" : "Belum"}
                           </button>
                           <button
                             type="button"
@@ -1224,7 +1280,7 @@ export function LaporanPendapatanClient({
                                 : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
                             }`}
                           >
-                            PPh {f.ceklisPph ? "✓" : "○"}
+                            PPh {f.ceklisPph ? "Ada" : "Belum"}
                           </button>
                           <button
                             type="button"
@@ -1237,7 +1293,7 @@ export function LaporanPendapatanClient({
                                 : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
                             }`}
                           >
-                            Bupot {f.ceklisBuktiPotong ? "✓" : "○"}
+                            Bupot {f.ceklisBuktiPotong ? "Ada" : "Belum"}
                           </button>
                         </div>
                       </td>
@@ -1478,6 +1534,18 @@ export function LaporanPendapatanClient({
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap self-start lg:self-center">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleSyncAllRecon}
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-surface-card hover:bg-surface-hover text-navy-text border border-border transition-colors cursor-pointer disabled:opacity-50 shadow-2xs mr-1"
+                  title="Sinkronkan seluruh bulan rekonsiliasi dengan rekap faktur sistem saat ini"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
+                  <span>Sinkronkan ke Rekap Faktur</span>
+                </button>
+              )}
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 whitespace-nowrap shadow-2xs">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <span>Selisih Rp 0 = Sesuai</span>
@@ -2079,7 +2147,7 @@ export function LaporanPendapatanClient({
                       <option value="">-- Pilih dari Master Rekanan --</option>
                       {data.rekananOptions && data.rekananOptions.length > 0 && (
                         <>
-                          <optgroup label="🏢 Klien / Pemberi Kerja">
+                          <optgroup label="Klien / Pemberi Kerja">
                             {data.rekananOptions
                               .filter((r) => !r.tipe || r.tipe === "KLIEN")
                               .map((r) => (
@@ -2089,7 +2157,7 @@ export function LaporanPendapatanClient({
                               ))}
                           </optgroup>
                           {data.rekananOptions.some((r) => r.tipe && r.tipe !== "KLIEN") && (
-                            <optgroup label="📦 Vendor & Tenaga Ahli">
+                            <optgroup label="Vendor & Tenaga Ahli">
                               {data.rekananOptions
                                 .filter((r) => r.tipe && r.tipe !== "KLIEN")
                                 .map((r) => (
@@ -2103,7 +2171,7 @@ export function LaporanPendapatanClient({
                       )}
                       <optgroup label="Input Manual">
                         <option value="__MANUAL__" className="bg-surface-card font-semibold text-blue-600 dark:text-blue-400">
-                          ✏️ Rekanan Baru / Input Manual...
+                          Rekanan Baru / Input Manual...
                         </option>
                       </optgroup>
                     </select>
@@ -2819,22 +2887,36 @@ export function LaporanPendapatanClient({
               </div>
 
               {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border-soft bg-surface-subtle/30 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsReconModalOpen(false)}
-                  disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-xl border border-border-soft transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-navy hover:opacity-90 rounded-xl transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-                >
-                  {isSubmitting ? "Menyimpan..." : "Simpan SPT"}
-                </button>
+              <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border-soft bg-surface-subtle/30 shrink-0">
+                <div>
+                  {(editingRecon.dppTerlapor > 0 || editingRecon.pajakTerlapor > 0 || editingRecon.pphTerlapor > 0) && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteRecon}
+                      disabled={isSubmitting}
+                      className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Reset / Hapus Rekonsiliasi
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsReconModalOpen(false)}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 text-xs font-semibold text-navy-soft hover:text-navy-text hover:bg-surface-hover rounded-xl border border-border-soft transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-5 py-2 text-xs font-bold text-white bg-navy hover:opacity-90 rounded-xl transition-opacity shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isSubmitting ? "Menyimpan..." : "Simpan SPT"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3303,17 +3385,17 @@ export function LaporanPendapatanClient({
                         <span className={`px-2 py-0.5 rounded-md border font-semibold ${
                           f.ceklisPpn ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-surface-subtle text-muted-faint border-border"
                         }`}>
-                          Faktur Pajak PPN: {f.ceklisPpn ? "✓ Ada" : "○ Belum"}
+                          Faktur Pajak PPN: {f.ceklisPpn ? "Ada" : "Belum"}
                         </span>
                         <span className={`px-2 py-0.5 rounded-md border font-semibold ${
                           f.ceklisPph ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-surface-subtle text-muted-faint border-border"
                         }`}>
-                          Bukti Bayar PPh: {f.ceklisPph ? "✓ Ada" : "○ Belum"}
+                          Bukti Bayar PPh: {f.ceklisPph ? "Ada" : "Belum"}
                         </span>
                         <span className={`px-2 py-0.5 rounded-md border font-semibold ${
                           f.ceklisBuktiPotong ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-surface-subtle text-muted-faint border-border"
                         }`}>
-                          Sertifikat Bupot: {f.ceklisBuktiPotong ? "✓ Ada" : "○ Belum"}
+                          Sertifikat Bupot: {f.ceklisBuktiPotong ? "Ada" : "Belum"}
                         </span>
                       </div>
                     </div>

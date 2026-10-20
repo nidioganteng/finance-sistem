@@ -8164,24 +8164,14 @@ export function PayrollClient({
 
               {/* Multi-Project Assignments Section */}
               <div className="space-y-3 pt-3 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="font-bold text-navy-text text-xs flex items-center gap-1.5">
-                      <Briefcase size={14} className="text-navy" />
-                      <span>Penugasan Proyek & Masa Kontrak ({masterProyekList.length} Proyek)</span>
-                    </label>
-                    <p className="text-[10px] text-muted-faint mt-0.5">
-                      Satu tenaga ahli dapat ditugaskan pada beberapa proyek dengan masa tugas, status, dan honor bulanan masing-masing.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddProyekAssignment}
-                    className="h-7 px-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-surface-hover text-[11px] font-semibold text-navy-text inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    <Plus size={12} />
-                    <span>Tambah Proyek</span>
-                  </button>
+                <div>
+                  <label className="font-bold text-navy-text text-xs flex items-center gap-1.5">
+                    <Briefcase size={14} className="text-navy" />
+                    <span>Penugasan Proyek & Masa Kontrak ({masterProyekList.length} Proyek)</span>
+                  </label>
+                  <p className="text-[10px] text-muted-faint mt-0.5">
+                    Satu tenaga ahli dapat ditugaskan pada beberapa proyek dengan masa tugas, status, dan honor bulanan masing-masing.
+                  </p>
                 </div>
 
                 <div className="space-y-3">

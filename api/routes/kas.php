@@ -190,9 +190,13 @@ if ($method === 'GET' && $sub === 'ledger') {
 
     // Akumulasi saldo kronologis dari startingBalance
     $running = $starting_balance;
+    $total_masuk = 0.0;
+    $total_keluar = 0.0;
     foreach ($groups as &$g) {
         $running += $g['masuk'] - $g['keluar'];
         $g['saldo'] = $running;
+        $total_masuk += (float)$g['masuk'];
+        $total_keluar += (float)$g['keluar'];
     }
     unset($g);
 
@@ -205,11 +209,18 @@ if ($method === 'GET' && $sub === 'ledger') {
     $safe_page   = min(max(1, $page), $total_pages);
     $paginated   = array_slice($display_groups, ($safe_page - 1) * $page_size, $page_size);
 
+    $current_running_saldo = get_running_saldo($pdo, $entity_id, $jenis_input_id, $rekening_nama, $current_year);
+
     json_response([
-        'totalCount'  => $total_count,
-        'totalPages'  => $total_pages,
-        'page'        => $safe_page,
-        'entries'     => array_map(function($g) {
+        'totalCount'    => $total_count,
+        'totalPages'    => $total_pages,
+        'page'          => $safe_page,
+        'saldoAwal'     => (float)$starting_balance,
+        'totalMasuk'    => (float)$total_masuk,
+        'totalKeluar'   => (float)$total_keluar,
+        'saldoAkhir'    => (float)$running,
+        'runningSaldo'  => (float)$current_running_saldo,
+        'entries'       => array_map(function($g) {
             return [
                 'tanggalRaw'          => $g['tanggalRaw'],
                 'tanggalNota'         => $g['tanggalNota'],
@@ -230,6 +241,55 @@ if ($method === 'GET' && $sub === 'ledger') {
             ];
         }, $paginated),
     ]);
+}
+
+// ─── GET /api/kas/running-saldo ────────────────────────────────────────────────
+elseif ($method === 'GET' && $sub === 'running-saldo') {
+    require_auth();
+    $pdo = get_pdo();
+
+    $entity_id       = $_GET['entityId']       ?? '';
+    $jenis_input_key = $_GET['jenisInputKey']  ?? 'kasKecil';
+    $rekening_nama   = $_GET['rekeningNama']   ?? null;
+    $year            = (int)($_GET['year'] ?? date('Y'));
+
+    if (!$entity_id) return error_response('entityId wajib diisi.', 400);
+
+    // Cari jenisInputId dari key atau id
+    $stmt = $pdo->prepare("SELECT id FROM JenisInputTransaksi WHERE `key` = ? OR id = ? LIMIT 1");
+    $stmt->execute([$jenis_input_key, $jenis_input_key]);
+    $jenis_input_id = $stmt->fetchColumn();
+    if (!$jenis_input_id) return error_response('Jenis input tidak ditemukan.', 404);
+
+    $saldo = get_running_saldo($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year);
+    json_response(['saldo' => (float)$saldo]);
+}
+
+// ─── GET /api/kas/saldo-awal ───────────────────────────────────────────────────
+elseif ($method === 'GET' && $sub === 'saldo-awal') {
+    require_auth();
+    $pdo = get_pdo();
+
+    $entity_id          = $_GET['entityId']          ?? '';
+    $jenis_input_key_id = $_GET['jenisInputKey']     ?? 'kasKecil';
+    $rekening_nama_id   = $_GET['rekeningNamaOrId']  ?? null;
+    $sebelum            = $_GET['sebelum']           ?? null;
+    $year               = (int)($_GET['year'] ?? date('Y'));
+
+    if (!$entity_id) return error_response('entityId wajib diisi.', 400);
+
+    // Cari jenisInputId dari key atau id
+    $stmt = $pdo->prepare("SELECT id FROM JenisInputTransaksi WHERE `key` = ? OR id = ? LIMIT 1");
+    $stmt->execute([$jenis_input_key_id, $jenis_input_key_id]);
+    $jenis_input_id = $stmt->fetchColumn();
+    if (!$jenis_input_id) return error_response('Jenis input tidak ditemukan.', 404);
+
+    if ($sebelum) {
+        $saldo = get_saldo_sebelum($pdo, $entity_id, $jenis_input_id, $sebelum, $rekening_nama_id, $year);
+    } else {
+        $saldo = get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama_id, $year);
+    }
+    json_response(['saldo' => (float)$saldo]);
 }
 
 // ─── POST /api/kas/no-bukti ────────────────────────────────────────────────────

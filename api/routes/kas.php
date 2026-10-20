@@ -88,11 +88,23 @@ if ($method === 'GET' && $sub === 'ledger') {
                 'allTxIds'            => [],
                 'coaRows'             => [],
                 'project'             => null,
+                'periodeBulanGaji'    => null,
+                'periodeTahunGaji'    => null,
+                'tanggalNota'         => null,
             ];
         }
 
         $g = &$groups[$key];
         $g['allTxIds'][] = $r['id'];
+
+        if (!empty($extra['periodeBulanGaji']) && empty($g['periodeBulanGaji'])) {
+            $g['periodeBulanGaji'] = (int)$extra['periodeBulanGaji'];
+            $g['periodeTahunGaji'] = !empty($extra['periodeTahunGaji']) ? (int)$extra['periodeTahunGaji'] : (int)date('Y', strtotime($r['tanggal']));
+        }
+
+        if (!empty($extra['tanggalNota']) && empty($g['tanggalNota'])) {
+            $g['tanggalNota'] = (string)$extra['tanggalNota'];
+        }
 
         if ($r['project_code'] && !$g['project']) {
             $g['project'] = ['id' => $r['projectId'], 'code' => $r['project_code'], 'name' => $r['project_name']];
@@ -109,7 +121,26 @@ if ($method === 'GET' && $sub === 'ledger') {
             elseif (!empty($extra['crossingEntityKey'])) $g['crossingEntityKeys'] = [$extra['crossingEntityKey']]; // backward compat
             if (!empty($extra['crossingFromEntityKey'])) $g['crossingFromEntityKey'] = $extra['crossingFromEntityKey'];
             if (!empty($extra['crossingGroupId']))     $g['crossingGroupId']     = $extra['crossingGroupId'];
+            if (!empty($extra['autoPostedFromJurnal']) && !empty($r['coa_name'])) {
+                $g['bankCoaName'] = $r['coa_name'];
+                $g['bankCoaId']   = $r['coa_id'] ?? '';
+            }
         } else {
+            // Jika row berasal dari auto-post jurnal, abaikan baris potongan pajak PPN & PPh
+            if (!empty($extra['autoPostedFromJurnal'])) {
+                $c_code = (string)($r['coa_code'] ?? '');
+                $c_name = (string)($r['coa_name'] ?? '');
+                if (
+                    in_array($c_code, ['533', '534', '535', '536', '116', '117', '213'], true)
+                    || preg_match('/\b(pph|ppn)\b/i', $c_name)
+                    || preg_match('/^53[3-6]/', $c_code)
+                    || stripos($c_name, 'pajak') !== false
+                ) {
+                    unset($g);
+                    continue;
+                }
+            }
+
             if ($r['coa_id']) {
                 $item_desc = isset($extra['itemDescription']) ? (string)$extra['itemDescription'] : null;
                 $g['akunTags'][] = $item_desc ?? $r['coa_name'];
@@ -126,6 +157,27 @@ if ($method === 'GET' && $sub === 'ledger') {
         unset($g);
     }
 
+    // Sinkronisasi nominal & nama akun coaRows jika auto-posted dari jurnal agar sesuai akun bank yang dipilih
+    foreach ($groups as &$grp) {
+        $net_mutasi = ($grp['masuk'] > 0) ? $grp['masuk'] : $grp['keluar'];
+        if (!empty($grp['bankCoaName'])) {
+            $grp['akunTags'] = [$grp['bankCoaName']];
+            $grp['coaRows'] = [
+                [
+                    'id'            => $grp['allTxIds'][0] ?? uuid4(),
+                    'coaAccountId'  => $grp['bankCoaId'] ?? '',
+                    'coaName'       => $grp['bankCoaName'],
+                    'nominal'       => $net_mutasi,
+                    'isDebit'       => $grp['masuk'] > 0,
+                    'itemDescription' => null,
+                ]
+            ];
+        } elseif ($net_mutasi > 0 && count($grp['coaRows']) === 1 && $grp['coaRows'][0]['nominal'] != $net_mutasi) {
+            $grp['coaRows'][0]['nominal'] = $net_mutasi;
+        }
+    }
+    unset($grp);
+
     // Filter per rekening (bankBuku)
     if ($rekening_nama) {
         $groups = array_filter($groups, function($g) use ($rekening_nama) {
@@ -138,9 +190,13 @@ if ($method === 'GET' && $sub === 'ledger') {
 
     // Akumulasi saldo kronologis dari startingBalance
     $running = $starting_balance;
+    $total_masuk = 0.0;
+    $total_keluar = 0.0;
     foreach ($groups as &$g) {
         $running += $g['masuk'] - $g['keluar'];
         $g['saldo'] = $running;
+        $total_masuk += (float)$g['masuk'];
+        $total_keluar += (float)$g['keluar'];
     }
     unset($g);
 
@@ -153,13 +209,21 @@ if ($method === 'GET' && $sub === 'ledger') {
     $safe_page   = min(max(1, $page), $total_pages);
     $paginated   = array_slice($display_groups, ($safe_page - 1) * $page_size, $page_size);
 
+    $current_running_saldo = get_running_saldo($pdo, $entity_id, $jenis_input_id, $rekening_nama, $current_year);
+
     json_response([
-        'totalCount'  => $total_count,
-        'totalPages'  => $total_pages,
-        'page'        => $safe_page,
-        'entries'     => array_map(function($g) {
+        'totalCount'    => $total_count,
+        'totalPages'    => $total_pages,
+        'page'          => $safe_page,
+        'saldoAwal'     => (float)$starting_balance,
+        'totalMasuk'    => (float)$total_masuk,
+        'totalKeluar'   => (float)$total_keluar,
+        'saldoAkhir'    => (float)$running,
+        'runningSaldo'  => (float)$current_running_saldo,
+        'entries'       => array_map(function($g) {
             return [
                 'tanggalRaw'          => $g['tanggalRaw'],
+                'tanggalNota'         => $g['tanggalNota'],
                 'noBukti'             => $g['noBukti'],
                 'keterangan'          => $g['keterangan'],
                 'akunTags'            => $g['akunTags'],
@@ -172,9 +236,60 @@ if ($method === 'GET' && $sub === 'ledger') {
                 'allTxIds'            => $g['allTxIds'],
                 'coaRows'             => $g['coaRows'],
                 'project'             => $g['project'],
+                'periodeBulanGaji'    => $g['periodeBulanGaji'],
+                'periodeTahunGaji'    => $g['periodeTahunGaji'],
             ];
         }, $paginated),
     ]);
+}
+
+// ─── GET /api/kas/running-saldo ────────────────────────────────────────────────
+elseif ($method === 'GET' && $sub === 'running-saldo') {
+    require_auth();
+    $pdo = get_pdo();
+
+    $entity_id       = $_GET['entityId']       ?? '';
+    $jenis_input_key = $_GET['jenisInputKey']  ?? 'kasKecil';
+    $rekening_nama   = $_GET['rekeningNama']   ?? null;
+    $year            = (int)($_GET['year'] ?? date('Y'));
+
+    if (!$entity_id) return error_response('entityId wajib diisi.', 400);
+
+    // Cari jenisInputId dari key atau id
+    $stmt = $pdo->prepare("SELECT id FROM JenisInputTransaksi WHERE `key` = ? OR id = ? LIMIT 1");
+    $stmt->execute([$jenis_input_key, $jenis_input_key]);
+    $jenis_input_id = $stmt->fetchColumn();
+    if (!$jenis_input_id) return error_response('Jenis input tidak ditemukan.', 404);
+
+    $saldo = get_running_saldo($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year);
+    json_response(['saldo' => (float)$saldo]);
+}
+
+// ─── GET /api/kas/saldo-awal ───────────────────────────────────────────────────
+elseif ($method === 'GET' && $sub === 'saldo-awal') {
+    require_auth();
+    $pdo = get_pdo();
+
+    $entity_id          = $_GET['entityId']          ?? '';
+    $jenis_input_key_id = $_GET['jenisInputKey']     ?? 'kasKecil';
+    $rekening_nama_id   = $_GET['rekeningNamaOrId']  ?? null;
+    $sebelum            = $_GET['sebelum']           ?? null;
+    $year               = (int)($_GET['year'] ?? date('Y'));
+
+    if (!$entity_id) return error_response('entityId wajib diisi.', 400);
+
+    // Cari jenisInputId dari key atau id
+    $stmt = $pdo->prepare("SELECT id FROM JenisInputTransaksi WHERE `key` = ? OR id = ? LIMIT 1");
+    $stmt->execute([$jenis_input_key_id, $jenis_input_key_id]);
+    $jenis_input_id = $stmt->fetchColumn();
+    if (!$jenis_input_id) return error_response('Jenis input tidak ditemukan.', 404);
+
+    if ($sebelum) {
+        $saldo = get_saldo_sebelum($pdo, $entity_id, $jenis_input_id, $sebelum, $rekening_nama_id, $year);
+    } else {
+        $saldo = get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama_id, $year);
+    }
+    json_response(['saldo' => (float)$saldo]);
 }
 
 // ─── POST /api/kas/no-bukti ────────────────────────────────────────────────────
@@ -235,6 +350,9 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
     $project_id      = $body['projectId']      ?? null;
     $arah_laporan    = $body['arahLaporan']    ?? null;
     $sync_bank_rek_id = $body['syncBukuBankRekeningId'] ?? null;
+    $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
+    $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
+    $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
 
     // Validasi dasar
     if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$keterangan || !$arah) {
@@ -321,6 +439,17 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
                 if ($arah_laporan_arr)   $extra['arahLaporan']    = $arah_laporan_arr;
                 if (!empty($row['keterangan'])) $extra['itemDescription'] = $row['keterangan'];
                 if ($crossing_group_id) { $extra['crossingEntityKeys'] = array_values($crossing_keys); $extra['crossingGroupId'] = $crossing_group_id; }
+                $row_bulan = !empty($row['periodeBulanGaji']) ? (int)$row['periodeBulanGaji'] : $periode_bulan_gaji;
+                $row_tahun = !empty($row['periodeTahunGaji']) ? (int)$row['periodeTahunGaji'] : ($row_bulan ? $periode_tahun_gaji : null);
+                if ($row_bulan) {
+                    $extra['periodeBulanGaji'] = $row_bulan;
+                    if ($row_tahun) {
+                        $extra['periodeTahunGaji'] = $row_tahun;
+                    }
+                }
+                if ($tanggal_nota) {
+                    $extra['tanggalNota'] = $tanggal_nota;
+                }
                 $stmt = $pdo->prepare(
                     "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                      debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
@@ -344,6 +473,7 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
         if ($crossing_group_id) { $kas_extra['crossingEntityKeys'] = array_values($crossing_keys); $kas_extra['crossingGroupId'] = $crossing_group_id; }
         if ($arah_laporan_arr)   $kas_extra['arahLaporan']         = $arah_laporan_arr;
         if ($proj_id)            $kas_extra['projectId']           = $proj_id;
+        if ($tanggal_nota)       $kas_extra['tanggalNota']         = $tanggal_nota;
 
         $stmt = $pdo->prepare(
             "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
@@ -517,6 +647,9 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
     $crossing_keys   = array_filter((array)($body['crossingEntityKeys'] ?? []));
     $project_id      = $body['projectId']      ?? null;
     $arah_laporan    = $body['arahLaporan']    ?? null;
+    $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
+    $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
+    $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
 
     if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$keterangan || !$arah) {
         return error_response('Data wajib tidak lengkap.', 400);
@@ -595,6 +728,17 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
             if ($arah_laporan_arr)           $extra['arahLaporan']    = $arah_laporan_arr;
             if (!empty($row['keterangan']))  $extra['itemDescription'] = $row['keterangan'];
             if ($crossing_group_id) { $extra['crossingEntityKeys'] = array_values($crossing_keys); $extra['crossingGroupId'] = $crossing_group_id; }
+            $row_bulan = !empty($row['periodeBulanGaji']) ? (int)$row['periodeBulanGaji'] : $periode_bulan_gaji;
+            $row_tahun = !empty($row['periodeTahunGaji']) ? (int)$row['periodeTahunGaji'] : ($row_bulan ? $periode_tahun_gaji : null);
+            if ($row_bulan) {
+                $extra['periodeBulanGaji'] = $row_bulan;
+                if ($row_tahun) {
+                    $extra['periodeTahunGaji'] = $row_tahun;
+                }
+            }
+            if ($tanggal_nota) {
+                $extra['tanggalNota'] = $tanggal_nota;
+            }
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                  debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
@@ -615,6 +759,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
         if ($crossing_group_id) { $kas_extra['crossingEntityKeys'] = array_values($crossing_keys); $kas_extra['crossingGroupId'] = $crossing_group_id; }
         if ($arah_laporan_arr)   $kas_extra['arahLaporan']         = $arah_laporan_arr;
         if ($proj_id)            $kas_extra['projectId']           = $proj_id;
+        if ($tanggal_nota)       $kas_extra['tanggalNota']         = $tanggal_nota;
 
         $pdo->prepare(
             "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,

@@ -6,16 +6,24 @@ import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
-import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus } from "lucide-react";
+import { Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ChevronDown, X, Plus, Receipt, Calendar } from "lucide-react";
 import { formatRupiah } from "@/lib/dashboard-data";
 import { LoadingOverlay } from "@/components/shared/LoadingOverlay";
 import { DatePicker } from "@/components/shared/DatePicker";
+
+const MONTH_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 type CoaOption = { id: string; code: string; name: string };
 type CoaRow = { id: string; coaAccountId: string; coaName: string; nominal: number; isDebit: boolean; itemDescription?: string };
 type LedgerRow = {
   tanggal: string;
   tanggalRaw: string;
+  tanggalNota?: string | null;
+  periodeBulanGaji?: number | null;
+  periodeTahunGaji?: number | null;
   noBukti: string;
   keterangan: string;
   akunTags: string[];
@@ -101,10 +109,17 @@ export function KasScreenClient({
   const [filterDari, setFilterDari] = useState(dari);
   const [filterSampai, setFilterSampai] = useState(sampai);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  function toDateStr(d: Date) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
   const [activePreset, setActivePreset] = useState<string>(() => {
     if (!dari && !sampai) return "bulan-ini";
     const t = new Date();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const fmt = (d: Date) => toDateStr(d);
     const presetRanges: Record<string, [string, string]> = {
       "bulan-ini":  [fmt(new Date(t.getFullYear(), t.getMonth(), 1)),     fmt(new Date(t.getFullYear(), t.getMonth() + 1, 0))],
       "bulan-lalu": [fmt(new Date(t.getFullYear(), t.getMonth() - 1, 1)), fmt(new Date(t.getFullYear(), t.getMonth(), 0))],
@@ -116,17 +131,23 @@ export function KasScreenClient({
   });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  function toDateStr(d: Date) {
-    return d.toISOString().slice(0, 10);
+  function parseLocalDate(s: string): Date {
+    if (s.includes("T") || s.includes(" ")) return new Date(s);
+    const parts = s.split("-");
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+    return new Date(s);
   }
+
   function fmtDateShort(s: string) {
     if (!s) return "—";
-    const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+    const d = parseLocalDate(s);
     return isNaN(d.getTime()) ? s.slice(0, 10) : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
   }
   function fmtDateFull(s: string) {
     if (!s) return "";
-    const d = new Date(s.includes("T") || s.includes(" ") ? s : s + "T00:00:00");
+    const d = parseLocalDate(s);
     return isNaN(d.getTime()) ? s : d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) +
       (d.getHours() || d.getMinutes() ? ", " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "");
   }
@@ -143,7 +164,7 @@ export function KasScreenClient({
 
   // Auto-apply bulan ini kalau halaman dibuka tanpa filter
   useEffect(() => {
-    if (!dari && !sampai) {
+    if (!dari && !sampai && searchParams.get("periode") !== "semua") {
       const t = new Date();
       const d = toDateStr(new Date(t.getFullYear(), t.getMonth(), 1));
       const s = toDateStr(new Date(t.getFullYear(), t.getMonth() + 1, 0));
@@ -196,6 +217,8 @@ export function KasScreenClient({
     setFilterDari(d);
     setFilterSampai(s);
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("periode");
+    params.delete("page");
     if (d) params.set("dari", d); else params.delete("dari");
     if (s) params.set("sampai", s); else params.delete("sampai");
     router.push(`${pathname}?${params.toString()}`);
@@ -203,6 +226,8 @@ export function KasScreenClient({
 
   function applyDateFilter() {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("periode");
+    params.delete("page");
     if (filterDari) params.set("dari", filterDari); else params.delete("dari");
     if (filterSampai) params.set("sampai", filterSampai); else params.delete("sampai");
     router.push(`${pathname}?${params.toString()}`);
@@ -212,8 +237,9 @@ export function KasScreenClient({
     applyPreset("bulan-ini");
   }
 
-  const isNonDefault = activePreset !== "bulan-ini";
+  const isNonDefault = activePreset !== "bulan-ini" || searchParams.get("periode") === "semua";
   const activeLabel = PRESET_OPTIONS.find((o) => o.key === activePreset)?.label ?? "Bulan Ini";
+
 
   const switchRekening = useCallback(
     (id: string) => {
@@ -279,12 +305,15 @@ export function KasScreenClient({
               bukuBankRekeningOptions={bukuBankRekeningOptions}
               initialValues={{
                 tanggal: editingRow.tanggalRaw,
+                tanggalNota: editingRow.tanggalNota ?? null,
                 noBukti: editingRow.noBukti,
                 keterangan: editingRow.keterangan,
                 arah: editingRow.masuk > 0 ? "masuk" : "keluar",
                 rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
                 crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
                 projectId: editingRow.project?.id,
+                periodeBulanGaji: editingRow.periodeBulanGaji ?? null,
+                periodeTahunGaji: editingRow.periodeTahunGaji ?? null,
                 rows: editingRow.coaRows.map((cr) => ({
                   coaAccountId: cr.coaAccountId,
                   nominal: String(cr.nominal),
@@ -337,9 +366,10 @@ export function KasScreenClient({
 
       <div className="flex items-center justify-between flex-wrap gap-3.5">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Dropdown filter periode */}
+          {/* Dropdown filter periode (ASLI) */}
           <div className="relative" ref={dropdownRef}>
             <button
+              type="button"
               onClick={() => setDropdownOpen((v) => !v)}
               className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] border border-border-soft bg-surface-input text-[12.5px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors min-w-[140px] justify-between"
             >
@@ -351,6 +381,7 @@ export function KasScreenClient({
               <div className="absolute top-[calc(100%+6px)] left-0 z-30 bg-surface-card border border-border-soft rounded-[12px] shadow-lg py-1.5 min-w-[160px]">
                 {PRESET_OPTIONS.map((opt) => (
                   <button
+                    type="button"
                     key={opt.key}
                     onClick={() => applyPreset(opt.key)}
                     className={`w-full text-left px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
@@ -367,22 +398,26 @@ export function KasScreenClient({
           </div>
 
           {activePreset === "custom" && (
-            <>
+            <div className="flex items-center gap-1.5 flex-wrap">
               <DatePicker value={filterDari} onChange={setFilterDari} placeholder="Dari" className="w-[140px]" />
+              <span className="text-muted-faint text-[12px]">s/d</span>
               <DatePicker value={filterSampai} onChange={setFilterSampai} placeholder="Sampai" className="w-[140px]" />
               <button
+                type="button"
                 onClick={applyDateFilter}
-                className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold"
+                className="px-3 py-2 rounded-[9px] bg-navy text-white text-[12px] font-bold hover:bg-navy/90 transition-colors shadow-xs"
               >
                 Terapkan
               </button>
-            </>
+            </div>
           )}
 
           {isNonDefault && activePreset !== "custom" && (
             <button
+              type="button"
               onClick={resetToDefault}
-              className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover"
+              className="flex items-center gap-1 px-2.5 py-2 rounded-[9px] border border-border-soft text-[12px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors"
+              title="Reset kembali ke Bulan Ini"
             >
               <X size={11} /> Reset
             </button>
@@ -557,10 +592,30 @@ export function KasScreenClient({
                             {fmtDateFull(r.tanggalRaw || r.tanggal)}
                           </div>
                         </div>
+                        {r.tanggalNota && r.tanggalNota !== (r.tanggalRaw || r.tanggal).slice(0, 10) && (
+                          <div className="mt-0.5">
+                            <span
+                              className="inline-flex items-center gap-1 text-[9.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-1 py-0.2 rounded"
+                              title={`Tanggal Nota / Kuitansi Riil: ${r.tanggalNota}`}
+                            >
+                              <Receipt size={9} className="text-blue-500 flex-none" />
+                              Nota: {fmtDateShort(r.tanggalNota)}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                       <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
                         {r.keterangan}
+                        {r.periodeBulanGaji && (
+                          <span
+                            className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"
+                            title={`Beban Gaji Bulan ${MONTH_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
+                          >
+                            <Calendar size={10} className="text-blue-500 flex-none" />
+                            Akrual: {MONTH_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
+                          </span>
+                        )}
                         {r.project && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
                             {r.project.code}

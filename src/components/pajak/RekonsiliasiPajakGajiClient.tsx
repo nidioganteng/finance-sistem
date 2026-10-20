@@ -11,7 +11,6 @@ import {
   FileSpreadsheet,
   Users,
   Award,
-  Layers,
   Calculator,
   X,
   ExternalLink,
@@ -25,7 +24,7 @@ import {
 import { saveRekonsiliasiGajiPph21Action } from "@/lib/actions/rekonsiliasi-pajak-gaji";
 import { formatRupiah } from "@/lib/dashboard-data";
 
-type ViewMode = "total" | "pegawai" | "tenaga-ahli" | "paralel";
+type ViewMode = "pegawai" | "tenaga-ahli" | "paralel";
 
 export function RekonsiliasiPajakGajiClient({
   data,
@@ -36,7 +35,7 @@ export function RekonsiliasiPajakGajiClient({
   entityKey: string;
   canEdit?: boolean;
 }) {
-  const [viewMode, setViewMode] = useState<ViewMode>("total");
+  const [viewMode, setViewMode] = useState<ViewMode>("pegawai");
 
   const [editingItem, setEditingItem] = useState<RekonsiliasiGajiPph21Item | null>(null);
   const [gajiPegawaiTerlapor, setGajiPegawaiTerlapor] = useState<string>("0");
@@ -208,7 +207,7 @@ export function RekonsiliasiPajakGajiClient({
               </span>
             </div>
             <p className="text-xs text-navy-soft mt-0.5">
-              Komparasi paralel Jurnal Umum (Akun 511 & 612) vs Nilai Terlapor SPT Pajak resmi per bulan.
+              Komparasi Laporan Gaji (Bruto Payroll) vs Nilai Terlapor SPT Pajak Masa (1721) per bulan.
             </p>
           </div>
         </div>
@@ -238,9 +237,9 @@ export function RekonsiliasiPajakGajiClient({
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-navy-text flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-blue-600" />
-              Pegawai Tetap (511)
+              Pegawai Tetap (Bruto)
             </span>
-            <span className="text-[10.5px] font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded">Akun 511</span>
+            <span className="text-[10.5px] font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded">Laporan Gaji</span>
           </div>
           <div>
             <div className="text-lg font-extrabold text-navy-text tabular-nums">
@@ -271,9 +270,9 @@ export function RekonsiliasiPajakGajiClient({
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-navy-text flex items-center gap-1.5">
               <Award className="w-3.5 h-3.5 text-amber-600" />
-              Tenaga Ahli (612)
+              Tenaga Ahli (Bruto)
             </span>
-            <span className="text-[10.5px] font-mono font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">Akun 612</span>
+            <span className="text-[10.5px] font-mono font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">Honorarium</span>
           </div>
           <div>
             <div className="text-lg font-extrabold text-navy-text tabular-nums">
@@ -386,18 +385,6 @@ export function RekonsiliasiPajakGajiClient({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border-soft pb-3">
           <div className="flex items-center gap-1.5 overflow-x-auto">
             <button
-              onClick={() => setViewMode("total")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                viewMode === "total"
-                  ? "bg-navy text-white font-bold shadow-2xs"
-                  : "text-navy-soft hover:text-navy-text hover:bg-surface-subtle"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Total Gabungan</span>
-            </button>
-
-            <button
               onClick={() => setViewMode("pegawai")}
               className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                 viewMode === "pegawai"
@@ -406,7 +393,7 @@ export function RekonsiliasiPajakGajiClient({
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Pegawai Tetap (511)</span>
+              <span>Pegawai Tetap (Bruto)</span>
               {data.summary.pegawai.jumlahBulanSelisih > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white">
                   {data.summary.pegawai.jumlahBulanSelisih}
@@ -423,7 +410,7 @@ export function RekonsiliasiPajakGajiClient({
               }`}
             >
               <Award className="w-3.5 h-3.5" />
-              <span>Tenaga Ahli (612)</span>
+              <span>Tenaga Ahli (Bruto)</span>
               {data.summary.tenagaAhli.jumlahBulanSelisih > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white">
                   {data.summary.tenagaAhli.jumlahBulanSelisih}
@@ -463,10 +450,10 @@ export function RekonsiliasiPajakGajiClient({
                     <th rowSpan={2} className="p-2.5 text-center w-10 border-r border-border-soft">Bulan</th>
                     <th rowSpan={2} className="p-2.5 border-r border-border-soft">Masa</th>
                     <th colSpan={3} className="p-2 text-center bg-blue-50/40 dark:bg-blue-500/10 border-r border-border-soft font-bold text-blue-800 dark:text-blue-300">
-                      1. PEGAWAI TETAP (AKUN 511)
+                      1. PEGAWAI TETAP (BRUTO PAYROLL)
                     </th>
                     <th colSpan={3} className="p-2 text-center bg-amber-50/40 dark:bg-amber-500/10 border-r border-border-soft font-bold text-amber-800 dark:text-amber-300">
-                      2. TENAGA AHLI (AKUN 612)
+                      2. TENAGA AHLI (BRUTO HONOR)
                     </th>
                     <th colSpan={3} className="p-2 text-center bg-purple-50/40 dark:bg-purple-500/10 border-r border-border-soft font-bold text-purple-800 dark:text-purple-300">
                       TOTAL KONSOLIDASI
@@ -477,15 +464,15 @@ export function RekonsiliasiPajakGajiClient({
                     {canEdit && <th rowSpan={2} className="p-2.5 text-center w-12">Aksi</th>}
                   </tr>
                   <tr>
-                    <th className="p-2 text-right bg-blue-50/20">Jurnal</th>
+                    <th className="p-2 text-right bg-blue-50/20">Bruto Payroll</th>
                     <th className="p-2 text-right bg-blue-50/30 text-blue-700">SPT</th>
                     <th className="p-2 text-right bg-blue-50/20 border-r border-border-soft">Selisih</th>
 
-                    <th className="p-2 text-right bg-amber-50/20">Jurnal</th>
+                    <th className="p-2 text-right bg-amber-50/20">Bruto Honor</th>
                     <th className="p-2 text-right bg-amber-50/30 text-amber-700">SPT</th>
                     <th className="p-2 text-right bg-amber-50/20 border-r border-border-soft">Selisih</th>
 
-                    <th className="p-2 text-right bg-purple-50/20">Gaji Jurnal</th>
+                    <th className="p-2 text-right bg-purple-50/20">Total Bruto</th>
                     <th className="p-2 text-right bg-purple-50/30 text-purple-700">Gaji SPT</th>
                     <th className="p-2 text-right bg-purple-50/20 border-r border-border-soft">Selisih</th>
                   </tr>
@@ -496,46 +483,34 @@ export function RekonsiliasiPajakGajiClient({
                   <th className="p-2.5">Masa Pajak</th>
                   <th className="p-2.5 text-right">
                     {viewMode === "pegawai"
-                      ? "Gaji Pegawai Jurnal (511)"
-                      : viewMode === "tenaga-ahli"
-                      ? "Honor Tenaga Ahli Jurnal (612)"
-                      : "Total Beban Gaji Jurnal"}
+                      ? "Gaji Bruto Pegawai (Payroll)"
+                      : "Honor Bruto Tenaga Ahli"}
                   </th>
                   <th className="p-2.5 text-right bg-blue-50/50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-300">
                     {viewMode === "pegawai"
                       ? "Gaji Pegawai Terlapor (SPT)"
-                      : viewMode === "tenaga-ahli"
-                      ? "Honor TA Terlapor (SPT)"
-                      : "Total Gaji Terlapor (SPT 1721)"}
+                      : "Honor TA Terlapor (SPT)"}
                   </th>
                   <th className="p-2.5 text-right">
                     {viewMode === "pegawai"
                       ? "Selisih Gaji Pegawai"
-                      : viewMode === "tenaga-ahli"
-                      ? "Selisih Honor TA"
-                      : "Total Selisih Gaji"}
+                      : "Selisih Honor TA"}
                   </th>
 
                   <th className="p-2.5 text-right text-purple-700 dark:text-purple-400">
                     {viewMode === "pegawai"
                       ? "PPh 21 Pegawai Jurnal"
-                      : viewMode === "tenaga-ahli"
-                      ? "PPh 21 TA Jurnal"
-                      : "Total PPh 21 Jurnal/Payroll"}
+                      : "PPh 21 TA Jurnal"}
                   </th>
                   <th className="p-2.5 text-right bg-blue-50/50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-300">
                     {viewMode === "pegawai"
                       ? "PPh 21 Pegawai Terlapor (SPT)"
-                      : viewMode === "tenaga-ahli"
-                      ? "PPh 21 TA Terlapor (SPT)"
-                      : "Total PPh 21 Terlapor (SPT)"}
+                      : "PPh 21 TA Terlapor (SPT)"}
                   </th>
                   <th className="p-2.5 text-right">
                     {viewMode === "pegawai"
                       ? "Selisih PPh Pegawai"
-                      : viewMode === "tenaga-ahli"
-                      ? "Selisih PPh TA"
-                      : "Total Selisih PPh 21"}
+                      : "Selisih PPh TA"}
                   </th>
 
                   <th className="p-2.5 text-center">Status Audit</th>
@@ -626,15 +601,15 @@ export function RekonsiliasiPajakGajiClient({
                   );
                 }
 
-                const valGajiJurnal = isPeg ? row.gajiPegawaiJurnalFmt : isTa ? row.gajiTaJurnalFmt : row.gajiTotalJurnalFmt;
-                const valGajiSpt = isPeg ? row.gajiPegawaiTerlaporFmt : isTa ? row.gajiTaTerlaporFmt : row.gajiTerlaporFmt;
-                const diffGaji = isPeg ? row.selisihGajiPegawai : isTa ? row.selisihGajiTa : row.selisihGaji;
-                const diffGajiFmt = isPeg ? row.selisihGajiPegawaiFmt : isTa ? row.selisihGajiTaFmt : row.selisihGajiFmt;
+                const valGajiJurnal = isPeg ? row.gajiPegawaiJurnalFmt : row.gajiTaJurnalFmt;
+                const valGajiSpt = isPeg ? row.gajiPegawaiTerlaporFmt : row.gajiTaTerlaporFmt;
+                const diffGaji = isPeg ? row.selisihGajiPegawai : row.selisihGajiTa;
+                const diffGajiFmt = isPeg ? row.selisihGajiPegawaiFmt : row.selisihGajiTaFmt;
 
-                const valPphJurnal = isPeg ? row.pph21PegawaiBasisFmt : isTa ? row.pph21TaBasisFmt : row.pph21BasisFmt;
-                const valPphSpt = isPeg ? row.pph21PegawaiTerlaporFmt : isTa ? row.pph21TaTerlaporFmt : row.pph21TerlaporFmt;
-                const diffPph = isPeg ? row.selisihPph21Pegawai : isTa ? row.selisihPph21Ta : row.selisihPph21;
-                const diffPphFmt = isPeg ? row.selisihPph21PegawaiFmt : isTa ? row.selisihPph21TaFmt : row.selisihPph21Fmt;
+                const valPphJurnal = isPeg ? row.pph21PegawaiBasisFmt : row.pph21TaBasisFmt;
+                const valPphSpt = isPeg ? row.pph21PegawaiTerlaporFmt : row.pph21TaTerlaporFmt;
+                const diffPph = isPeg ? row.selisihPph21Pegawai : row.selisihPph21Ta;
+                const diffPphFmt = isPeg ? row.selisihPph21PegawaiFmt : row.selisihPph21TaFmt;
 
                 return (
                   <tr key={row.month} className={`hover:bg-surface-hover/50 transition-colors ${rowAlertBg}`}>
@@ -696,13 +671,11 @@ export function RekonsiliasiPajakGajiClient({
                           title={
                             isPeg
                               ? "Input / Koreksi SPT Pegawai Tetap"
-                              : isTa
-                              ? "Input / Koreksi SPT Tenaga Ahli"
-                              : "Input / Koreksi SPT Masa 1721"
+                              : "Input / Koreksi SPT Tenaga Ahli"
                           }
                         >
                           <Edit3 className="w-3 h-3" />
-                          <span>{isPeg ? "Input Pegawai" : isTa ? "Input TA" : "Input SPT"}</span>
+                          <span>{isPeg ? "Input Pegawai" : "Input TA"}</span>
                         </button>
                       </td>
                     )}
@@ -738,31 +711,33 @@ export function RekonsiliasiPajakGajiClient({
                 <tr>
                   <td colSpan={2} className="p-2.5 text-center uppercase tracking-wider">Total Tahunan</td>
                   <td className="p-2.5 text-right font-mono text-xs">
-                    {viewMode === "pegawai" ? data.summary.pegawai.totalGajiJurnalFmt : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalGajiJurnalFmt : data.summary.totalGajiJurnalFmt}
+                    {viewMode === "pegawai" ? data.summary.pegawai.totalGajiJurnalFmt : data.summary.tenagaAhli.totalGajiJurnalFmt}
                   </td>
                   <td className="p-2.5 text-right font-mono text-xs bg-blue-50/50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
-                    {viewMode === "pegawai" ? data.summary.pegawai.totalGajiTerlaporFmt : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalGajiTerlaporFmt : data.summary.totalGajiTerlaporFmt}
+                    {viewMode === "pegawai" ? data.summary.pegawai.totalGajiTerlaporFmt : data.summary.tenagaAhli.totalGajiTerlaporFmt}
                   </td>
                   <td className="p-2.5 text-right font-mono text-xs">
-                    <span className={Math.abs(viewMode === "pegawai" ? data.summary.pegawai.totalSelisihGaji : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalSelisihGaji : data.summary.totalSelisihGaji) > 0.01 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
-                      {viewMode === "pegawai" ? data.summary.pegawai.totalSelisihGajiFmt : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalSelisihGajiFmt : data.summary.totalSelisihGajiFmt}
+                    <span className={Math.abs(viewMode === "pegawai" ? data.summary.pegawai.totalSelisihGaji : data.summary.tenagaAhli.totalSelisihGaji) > 0.01 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                      {viewMode === "pegawai" ? data.summary.pegawai.totalSelisihGajiFmt : data.summary.tenagaAhli.totalSelisihGajiFmt}
                     </span>
                   </td>
 
                   <td className="p-2.5 text-right font-mono text-xs text-purple-700 dark:text-purple-400">
-                    {viewMode === "pegawai" ? data.summary.pegawai.totalPphBasisFmt : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalPphBasisFmt : data.summary.totalPph21BasisFmt}
+                    {viewMode === "pegawai" ? data.summary.pegawai.totalPphBasisFmt : data.summary.tenagaAhli.totalPphBasisFmt}
                   </td>
                   <td className="p-2.5 text-right font-mono text-xs bg-blue-50/50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300">
-                    {viewMode === "pegawai" ? data.summary.pegawai.totalPphTerlaporFmt : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalPphTerlaporFmt : data.summary.totalPph21TerlaporFmt}
+                    {viewMode === "pegawai" ? data.summary.pegawai.totalPphTerlaporFmt : data.summary.tenagaAhli.totalPphTerlaporFmt}
                   </td>
                   <td className="p-2.5 text-right font-mono text-xs">
-                    <span className={Math.abs(viewMode === "pegawai" ? data.summary.pegawai.totalSelisihPph : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalSelisihPph : data.summary.totalSelisihPph21) > 0.01 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
-                      {viewMode === "pegawai" ? data.summary.pegawai.totalSelisihPphFmt : viewMode === "tenaga-ahli" ? data.summary.tenagaAhli.totalSelisihPphFmt : data.summary.totalSelisihPph21Fmt}
+                    <span className={Math.abs(viewMode === "pegawai" ? data.summary.pegawai.totalSelisihPph : data.summary.tenagaAhli.totalSelisihPph) > 0.01 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                      {viewMode === "pegawai" ? data.summary.pegawai.totalSelisihPphFmt : data.summary.tenagaAhli.totalSelisihPphFmt}
                     </span>
                   </td>
 
                   <td className="p-2.5 text-center text-[11px]">
-                    {data.summary.overallStatus === "ALL_BALANCED" ? <span className="text-emerald-600 font-bold">MATCH</span> : <span className="text-rose-600 font-bold">{data.summary.jumlahBulanSelisih} SELISIH</span>}
+                    {viewMode === "pegawai"
+                      ? (data.summary.pegawai.jumlahBulanSelisih === 0 ? <span className="text-emerald-600 font-bold">MATCH</span> : <span className="text-rose-600 font-bold">{data.summary.pegawai.jumlahBulanSelisih} SELISIH</span>)
+                      : (data.summary.tenagaAhli.jumlahBulanSelisih === 0 ? <span className="text-emerald-600 font-bold">MATCH</span> : <span className="text-rose-600 font-bold">{data.summary.tenagaAhli.jumlahBulanSelisih} SELISIH</span>)}
                   </td>
                   <td colSpan={canEdit ? 3 : 2} className="p-2.5 text-navy-soft text-right text-[11px] font-normal">
                     Akumulasi Jan - Des {data.year}
@@ -777,7 +752,7 @@ export function RekonsiliasiPajakGajiClient({
       {editingItem && (() => {
         const isModalPegawai = viewMode === "pegawai";
         const isModalTa = viewMode === "tenaga-ahli";
-        const isModalTotal = viewMode === "total" || viewMode === "paralel";
+        const isModalTotal = viewMode === "paralel";
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-text/60 backdrop-blur-xs">
@@ -802,9 +777,9 @@ export function RekonsiliasiPajakGajiClient({
                   <div>
                     <h3 className="text-sm font-bold text-navy-text">
                       {isModalPegawai
-                        ? "Input SPT Masa PPh 21 — Pegawai Tetap (Akun 511)"
+                        ? "Input SPT Masa PPh 21 — Pegawai Tetap (Bruto)"
                         : isModalTa
-                        ? "Input SPT Masa PPh 21 — Tenaga Ahli (Akun 612)"
+                        ? "Input SPT Masa PPh 21 — Tenaga Ahli (Bruto)"
                         : "Input SPT Masa 1721 — Konsolidasi Induk"}
                     </h3>
                     <p className="text-xs text-navy-soft">
@@ -824,15 +799,15 @@ export function RekonsiliasiPajakGajiClient({
                         : handleAutoFillAll
                     }
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-all cursor-pointer shadow-2xs"
-                    title="Salin nilai dari Jurnal Pembukuan internal agar status langsung Balance"
+                    title="Salin nilai dari Laporan Penggajian internal agar status langsung Balance"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                     <span>
                       {isModalPegawai
-                        ? "Salin Jurnal Pegawai"
+                        ? "Salin Payroll Pegawai"
                         : isModalTa
-                        ? "Salin Jurnal Tenaga Ahli"
-                        : "Salin dari Jurnal"}
+                        ? "Salin Honor Tenaga Ahli"
+                        : "Salin dari Laporan Gaji"}
                     </span>
                   </button>
                   <button
@@ -848,9 +823,9 @@ export function RekonsiliasiPajakGajiClient({
                 <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-soft text-navy-soft text-[11px]">
                   <span>
                     {isModalPegawai
-                      ? "💡 Masukkan nilai Bruto & PPh 21 Pegawai Tetap yang dilaporkan pada formulir SPT 1721-I (Bagian A). Gunakan tombol Salin Jurnal Pegawai jika pelaporan sesuai pembukuan internal."
+                      ? "💡 Masukkan nilai Bruto & PPh 21 Pegawai Tetap yang dilaporkan pada formulir SPT 1721-I (Bagian A). Gunakan tombol Salin Payroll Pegawai jika pelaporan sesuai pembukuan internal."
                       : isModalTa
-                      ? "💡 Masukkan nilai Honorarium & PPh 21 Tenaga Ahli yang dilaporkan pada Bukti Potong 1721-VI. Gunakan tombol Salin Jurnal Tenaga Ahli jika pelaporan sesuai pembukuan internal."
+                      ? "💡 Masukkan nilai Honorarium & PPh 21 Tenaga Ahli yang dilaporkan pada Bukti Potong 1721-VI. Gunakan tombol Salin Honor Tenaga Ahli jika pelaporan sesuai pembukuan internal."
                       : "💡 Masukkan nilai SPT Masa 1721 resmi DJP Online untuk masa pajak ini."}
                   </span>
                 </div>
@@ -874,11 +849,11 @@ export function RekonsiliasiPajakGajiClient({
                     <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-800/40 pb-2">
                       <span className="font-bold text-blue-900 dark:text-blue-300 text-xs flex items-center gap-1.5">
                         <Users className="w-4 h-4 text-blue-600" />
-                        Pegawai Tetap (Akun 511)
+                        Pegawai Tetap (Bruto Payroll)
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-navy-soft font-mono">
-                          Jurnal: {editingItem.gajiPegawaiJurnalFmt} | PPh: {editingItem.pph21PegawaiBasisFmt}
+                          Bruto: {editingItem.gajiPegawaiJurnalFmt} | PPh: {editingItem.pph21PegawaiBasisFmt}
                         </span>
                         <button
                           type="button"
@@ -936,18 +911,18 @@ export function RekonsiliasiPajakGajiClient({
                     <div className="flex items-center justify-between border-b border-amber-200/60 dark:border-amber-800/40 pb-2">
                       <span className="font-bold text-amber-900 dark:text-amber-300 text-xs flex items-center gap-1.5">
                         <Award className="w-4 h-4 text-amber-600" />
-                        Tenaga Ahli (Akun 612)
+                        Tenaga Ahli (Bruto Honor)
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-navy-soft font-mono">
-                          Jurnal: {editingItem.gajiTaJurnalFmt} | PPh: {editingItem.pph21TaBasisFmt}
+                          Bruto: {editingItem.gajiTaJurnalFmt} | PPh: {editingItem.pph21TaBasisFmt}
                         </span>
                         <button
                           type="button"
                           onClick={handleAutoFillTa}
                           className="px-2 py-0.5 rounded text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-300 transition-colors cursor-pointer"
                         >
-                          Salin Jurnal
+                          Salin Honor
                         </button>
                       </div>
                     </div>

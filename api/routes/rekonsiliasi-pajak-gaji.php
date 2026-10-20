@@ -59,12 +59,11 @@ if ($method === 'GET' && $sub === '') {
     // 1. Agregasi Transaksi Jurnal Umum (filter akun 511, 612, 533 + name match)
     //    Lewati auto-posted mirror (dari Jurnal Transaksi) agar tidak dobel.
     $tx_sql =
-        "SELECT t.id, t.tanggal, t.debit, t.kredit,
+        "SELECT t.id, t.tanggal, t.debit, t.kredit, t.extraFieldsJson,
                 c.code AS coa_code, c.name AS coa_name
          FROM `Transaction` t
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId IN ($placeholders)
-           AND t.tanggal BETWEEN ? AND ?
            AND (c.code = '511' OR c.code = '612' OR c.code = '533'
                 OR c.name LIKE '%Gaji%'
                 OR c.name LIKE '%Honor%'
@@ -72,14 +71,19 @@ if ($method === 'GET' && $sub === '') {
                 OR c.name LIKE '%PPH 21%'
                 OR c.name LIKE '%PPh 21%')
            AND (JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') IS NULL
-                OR JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') != 'true')";
+                OR JSON_VALUE(t.extraFieldsJson, '\$.autoPostedFromJurnal') != 'true')
+           AND (
+             (t.tanggal BETWEEN ? AND ? AND (t.extraFieldsJson IS NULL OR (JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') IS NULL AND JSON_VALUE(t.extraFieldsJson, '\$.tanggalNota') IS NULL)))
+             OR JSON_VALUE(t.extraFieldsJson, '\$.periodeTahunGaji') = ?
+             OR JSON_VALUE(t.extraFieldsJson, '\$.tanggalNota') LIKE ?
+           )";
     $stmt = $pdo->prepare($tx_sql);
-    $stmt->execute(array_merge($ids, [$date_from, $date_to]));
+    $stmt->execute(array_merge($ids, [$date_from, $date_to, (string)$year, (string)$year . '%']));
     $tx_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Payroll pegawai bulanan
     $gaji_sql =
-        "SELECT bulan, totalGajiKotor, pph21
+        "SELECT bulan, totalGajiKotor, totalGajiTerlaporPajak, pph21
          FROM GajiPegawaiBulanan
          WHERE entityId IN ($placeholders) AND tahun = ?";
     $stmt = $pdo->prepare($gaji_sql);
@@ -133,7 +137,10 @@ if ($method === 'GET' && $sub === '') {
 
     // Agregasi Transaksi
     foreach ($tx_rows as $t) {
-        $m = (int)date('n', strtotime($t['tanggal']));
+        $extra = (!empty($t['extraFieldsJson']) && is_string($t['extraFieldsJson'])) ? json_decode($t['extraFieldsJson'], true) : [];
+        $tgl_nota     = !empty($extra['tanggalNota']) ? substr((string)$extra['tanggalNota'], 0, 10) : null;
+        $akrual_bulan = !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : ($tgl_nota ? (int)date('n', strtotime($tgl_nota)) : null);
+        $m = $akrual_bulan ?: (int)date('n', strtotime($t['tanggal']));
         if ($m < 1 || $m > 12) continue;
         $code  = $t['coa_code'] ?? '';
         $name  = strtolower($t['coa_name'] ?? '');
@@ -150,11 +157,14 @@ if ($method === 'GET' && $sub === '') {
         }
     }
 
-    // Agregasi Payroll Pegawai
+    // Agregasi Payroll Pegawai (Bruto Terlapor Pajak)
     foreach ($gaji_rows as $g) {
         $m = (int)$g['bulan'];
         if ($m < 1 || $m > 12) continue;
-        $buckets[$m]['gajiPegawaiPayroll']  += (float)$g['totalGajiKotor'];
+        $bruto = (float)(!empty($g['totalGajiTerlaporPajak']) && (float)$g['totalGajiTerlaporPajak'] > 0
+            ? $g['totalGajiTerlaporPajak']
+            : ($g['totalGajiKotor'] ?? 0));
+        $buckets[$m]['gajiPegawaiPayroll']  += $bruto;
         $buckets[$m]['pph21PegawaiPayroll'] += (float)$g['pph21'];
     }
 
@@ -224,13 +234,12 @@ if ($method === 'GET' && $sub === '') {
     for ($m = 1; $m <= 12; $m++) {
         $b = $buckets[$m];
 
-        // ── Pegawai Tetap ────────────────────────────────────────────
-        $gaji_peg_jurnal   = (float)$b['gajiPegawaiJurnal'];
+        // ── Pegawai Tetap (Bruto Terlapor Pajak dari Payroll) ───────
         $gaji_peg_payroll  = (float)$b['gajiPegawaiPayroll'];
         $gaji_peg_terlapor = $b['gajiPegawaiTerlapor'] > 0
             ? (float)$b['gajiPegawaiTerlapor']
             : ($b['gajiTerlapor'] > 0 && $b['gajiTaTerlapor'] == 0 ? (float)$b['gajiTerlapor'] : 0.0);
-        $selisih_gaji_peg  = $gaji_peg_jurnal - $gaji_peg_terlapor;
+        $selisih_gaji_peg  = $gaji_peg_payroll - $gaji_peg_terlapor;
 
         $pph_peg_basis     = (float)$b['pph21PegawaiPayroll'];
         $pph_peg_terlapor  = $b['pph21PegawaiTerlapor'] > 0
@@ -239,53 +248,51 @@ if ($method === 'GET' && $sub === '') {
         $selisih_pph_peg   = $pph_peg_basis - $pph_peg_terlapor;
 
         $status_peg = $derive_status(
-            $gaji_peg_jurnal > 0 || $pph_peg_basis > 0,
+            $gaji_peg_payroll > 0 || $pph_peg_basis > 0,
             $gaji_peg_terlapor > 0 || $pph_peg_terlapor > 0,
             $selisih_gaji_peg,
             $selisih_pph_peg
         );
 
-        // ── Tenaga Ahli ──────────────────────────────────────────────
-        $gaji_ta_jurnal   = (float)$b['gajiTaJurnal'];
+        // ── Tenaga Ahli (Bruto Honorarium dari Payroll) ──────────────
         $gaji_ta_payroll  = (float)$b['gajiTaPayroll'];
         $gaji_ta_terlapor = (float)$b['gajiTaTerlapor'];
-        $selisih_gaji_ta  = $gaji_ta_jurnal - $gaji_ta_terlapor;
+        $selisih_gaji_ta  = $gaji_ta_payroll - $gaji_ta_terlapor;
 
         $pph_ta_basis    = (float)$b['pph21TaPayroll'];
         $pph_ta_terlapor = (float)$b['pph21TaTerlapor'];
         $selisih_pph_ta  = $pph_ta_basis - $pph_ta_terlapor;
 
         $status_ta = $derive_status(
-            $gaji_ta_jurnal > 0 || $pph_ta_basis > 0,
+            $gaji_ta_payroll > 0 || $pph_ta_basis > 0,
             $gaji_ta_terlapor > 0 || $pph_ta_terlapor > 0,
             $selisih_gaji_ta,
             $selisih_pph_ta
         );
 
-        // ── Total Gabungan ───────────────────────────────────────────
-        $gaji_total_jurnal  = $gaji_peg_jurnal + $gaji_ta_jurnal;
+        // ── Total Gabungan (Total Bruto Payroll) ──────────────────────
         $gaji_total_payroll = $gaji_peg_payroll + $gaji_ta_payroll;
         $gaji_terlapor      = $b['gajiTerlapor'] > 0
             ? (float)$b['gajiTerlapor']
             : ($gaji_peg_terlapor + $gaji_ta_terlapor);
-        $selisih_gaji = $gaji_total_jurnal - $gaji_terlapor;
+        $selisih_gaji = $gaji_total_payroll - $gaji_terlapor;
 
         $pph21_payroll_total = $pph_peg_basis + $pph_ta_basis;
-        $pph21_basis         = $b['pph21Jurnal'] > 0 ? (float)$b['pph21Jurnal'] : $pph21_payroll_total;
+        $pph21_basis         = $pph21_payroll_total;
         $pph21_terlapor      = $b['pph21Terlapor'] > 0
             ? (float)$b['pph21Terlapor']
             : ($pph_peg_terlapor + $pph_ta_terlapor);
         $selisih_pph21       = $pph21_basis - $pph21_terlapor;
 
         $status_total = $derive_status(
-            $gaji_total_jurnal > 0 || $pph21_basis > 0,
+            $gaji_total_payroll > 0 || $pph21_basis > 0,
             $gaji_terlapor > 0 || $pph21_terlapor > 0,
             $selisih_gaji,
             $selisih_pph21
         );
 
         // Akumulasi
-        $tot_gaji_jurnal   += $gaji_total_jurnal;
+        $tot_gaji_jurnal   += $gaji_total_payroll;
         $tot_gaji_payroll  += $gaji_total_payroll;
         $tot_gaji_terlapor += $gaji_terlapor;
         $tot_selisih_gaji  += $selisih_gaji;
@@ -297,7 +304,7 @@ if ($method === 'GET' && $sub === '') {
         elseif  ($status_total === 'BELUM_DILAPORKAN')  $cnt_belum++;
         else                                            $cnt_nihil++;
 
-        $tot_peg_gaji_jurnal   += $gaji_peg_jurnal;
+        $tot_peg_gaji_jurnal   += $gaji_peg_payroll;
         $tot_peg_gaji_terlapor += $gaji_peg_terlapor;
         $tot_peg_selisih_gaji  += $selisih_gaji_peg;
         $tot_peg_pph_basis     += $pph_peg_basis;
@@ -308,7 +315,7 @@ if ($method === 'GET' && $sub === '') {
         elseif  ($status_peg === 'BELUM_DILAPORKAN')  $cnt_peg_belum++;
         else                                          $cnt_peg_nihil++;
 
-        $tot_ta_gaji_jurnal   += $gaji_ta_jurnal;
+        $tot_ta_gaji_jurnal   += $gaji_ta_payroll;
         $tot_ta_gaji_terlapor += $gaji_ta_terlapor;
         $tot_ta_selisih_gaji  += $selisih_gaji_ta;
         $tot_ta_pph_basis     += $pph_ta_basis;
@@ -324,7 +331,7 @@ if ($method === 'GET' && $sub === '') {
             'namaBulan' => $nama_bulan[$m - 1],
 
             // Pegawai Tetap
-            'gajiPegawaiJurnal'       => $gaji_peg_jurnal,
+            'gajiPegawaiJurnal'       => $gaji_peg_payroll,
             'gajiPegawaiPayroll'      => $gaji_peg_payroll,
             'gajiPegawaiTerlapor'     => $gaji_peg_terlapor,
             'selisihGajiPegawai'      => $selisih_gaji_peg,
@@ -332,7 +339,7 @@ if ($method === 'GET' && $sub === '') {
             'pph21PegawaiTerlapor'    => $pph_peg_terlapor,
             'selisihPph21Pegawai'     => $selisih_pph_peg,
             'statusPegawai'           => $status_peg,
-            'gajiPegawaiJurnalFmt'    => fmt_rp_rekpph($gaji_peg_jurnal),
+            'gajiPegawaiJurnalFmt'    => fmt_rp_rekpph($gaji_peg_payroll),
             'gajiPegawaiPayrollFmt'   => fmt_rp_rekpph($gaji_peg_payroll),
             'gajiPegawaiTerlaporFmt'  => fmt_rp_rekpph($gaji_peg_terlapor),
             'selisihGajiPegawaiFmt'   => fmt_rp_rekpph($selisih_gaji_peg),
@@ -341,7 +348,7 @@ if ($method === 'GET' && $sub === '') {
             'selisihPph21PegawaiFmt'  => fmt_rp_rekpph($selisih_pph_peg),
 
             // Tenaga Ahli
-            'gajiTaJurnal'       => $gaji_ta_jurnal,
+            'gajiTaJurnal'       => $gaji_ta_payroll,
             'gajiTaPayroll'      => $gaji_ta_payroll,
             'gajiTaTerlapor'     => $gaji_ta_terlapor,
             'selisihGajiTa'      => $selisih_gaji_ta,
@@ -349,7 +356,7 @@ if ($method === 'GET' && $sub === '') {
             'pph21TaTerlapor'    => $pph_ta_terlapor,
             'selisihPph21Ta'     => $selisih_pph_ta,
             'statusTa'           => $status_ta,
-            'gajiTaJurnalFmt'    => fmt_rp_rekpph($gaji_ta_jurnal),
+            'gajiTaJurnalFmt'    => fmt_rp_rekpph($gaji_ta_payroll),
             'gajiTaPayrollFmt'   => fmt_rp_rekpph($gaji_ta_payroll),
             'gajiTaTerlaporFmt'  => fmt_rp_rekpph($gaji_ta_terlapor),
             'selisihGajiTaFmt'   => fmt_rp_rekpph($selisih_gaji_ta),
@@ -358,17 +365,17 @@ if ($method === 'GET' && $sub === '') {
             'selisihPph21TaFmt'  => fmt_rp_rekpph($selisih_pph_ta),
 
             // Total Konsolidasi
-            'gajiTotalJurnal'    => $gaji_total_jurnal,
+            'gajiTotalJurnal'    => $gaji_total_payroll,
             'gajiTotalPayroll'   => $gaji_total_payroll,
             'gajiTerlapor'       => $gaji_terlapor,
             'selisihGaji'        => $selisih_gaji,
-            'pph21Jurnal'        => (float)$b['pph21Jurnal'],
+            'pph21Jurnal'        => $pph21_payroll_total,
             'pph21Payroll'       => $pph21_payroll_total,
             'pph21Basis'         => $pph21_basis,
             'pph21Terlapor'      => $pph21_terlapor,
             'selisihPph21'       => $selisih_pph21,
             'status'             => $status_total,
-            'gajiTotalJurnalFmt' => fmt_rp_rekpph($gaji_total_jurnal),
+            'gajiTotalJurnalFmt' => fmt_rp_rekpph($gaji_total_payroll),
             'gajiTotalPayrollFmt'=> fmt_rp_rekpph($gaji_total_payroll),
             'gajiTerlaporFmt'    => fmt_rp_rekpph($gaji_terlapor),
             'selisihGajiFmt'     => fmt_rp_rekpph($selisih_gaji),

@@ -240,6 +240,305 @@ elseif ($method === 'GET' && $sub === 'project') {
     ]);
 }
 
+// ─── POST /api/sync/pegawai — sync master pegawai tetap dari Sistem HR ────────
+elseif ($method === 'POST' && $sub === 'pegawai') {
+    $items = isset($body['items']) && is_array($body['items']) ? $body['items'] : [$body];
+    if (empty($items)) {
+        error_response('Data pegawai tidak boleh kosong.', 400);
+    }
+
+    $entitas_map = [
+        'Gaharu'    => 'gaharu',
+        'Kencana'   => 'kencana',
+        'Tataring'  => 'tataring',
+        'Cipta Asri'=> 'ciptaAsri',
+        'Umum'      => 'umum',
+    ];
+
+    $ptkp_map = [
+        'TK/0' => 54000000, 'TK/1' => 58500000, 'TK/2' => 63000000, 'TK/3' => 67500000,
+        'K/0'  => 58500000, 'K/1'  => 63000000, 'K/2'  => 67500000, 'K/3'  => 72000000,
+        'K/I/0'=> 112500000, 'K/I/1'=> 117000000, 'K/I/2'=> 121500000, 'K/I/3'=> 126000000,
+    ];
+
+    $results = [];
+    $now = date('Y-m-d H:i:s');
+
+    foreach ($items as $item) {
+        $nik = trim($item['nik'] ?? '');
+        $nama = trim($item['nama'] ?? '');
+        $entitas_input = trim($item['entitas'] ?? ($body['entitas'] ?? ''));
+
+        if (!$nik || !$nama || !$entitas_input) {
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'status' => 'error',
+                'message' => 'nik, nama, dan entitas wajib diisi.',
+            ];
+            continue;
+        }
+
+        $entity_key = $entitas_map[$entitas_input] ?? strtolower($entitas_input);
+        $stmt = $pdo->prepare("SELECT id FROM Entity WHERE `key` = ? LIMIT 1");
+        $stmt->execute([$entity_key]);
+        $entity_id = $stmt->fetchColumn();
+        if (!$entity_id) {
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'status' => 'error',
+                'message' => "Entitas '$entitas_input' tidak ditemukan di Simatra.",
+            ];
+            continue;
+        }
+
+        $jabatan = trim($item['jabatan'] ?? 'Staf');
+        $status_kel = strtoupper(trim($item['statusKeluarga'] ?? ($item['ptkpStatus'] ?? 'TK/0')));
+        $ptkp = $ptkp_map[$status_kel] ?? 54000000;
+        $gaji_pokok = (float)($item['gajiPokok'] ?? 0);
+        $tunjangan_jabatan = (float)($item['tunjanganJabatan'] ?? 0);
+        $tarif_transport = (float)($item['tarifTransportHarian'] ?? 15000);
+        if ($tarif_transport <= 0) $tarif_transport = 15000;
+        $tanggal_masuk = !empty($item['tanggalMasuk']) ? trim($item['tanggalMasuk']) : null;
+        $tanggal_resign = !empty($item['tanggalResign']) ? trim($item['tanggalResign']) : null;
+        $status = strtoupper(trim($item['status'] ?? 'AKTIF'));
+        if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) $status = 'AKTIF';
+        $is_active = ($status === 'AKTIF') ? 1 : 0;
+
+        $tunj_bpjs_kes = (float)($item['tunjanganBpjsKes'] ?? 0);
+        $tunj_bpjs_tk  = (float)($item['tunjanganBpjsTk'] ?? 0);
+        $bpjs_kes      = (float)($item['bpjsKesehatan'] ?? 0);
+        $bpjs_tk       = (float)($item['bpjsKetenagakerjaan'] ?? 0);
+        $potongan_bpjs = isset($item['potonganBpjs']) ? (float)$item['potonganBpjs'] : ($bpjs_kes + $bpjs_tk);
+
+        // Cek apakah pegawai sudah ada berdasarkan entityId & nik
+        $stmt = $pdo->prepare("SELECT id FROM Pegawai WHERE entityId = ? AND nik = ? LIMIT 1");
+        $stmt->execute([$entity_id, $nik]);
+        $existing_id = $stmt->fetchColumn();
+
+        if ($existing_id) {
+            $pdo->prepare(
+                "UPDATE Pegawai SET
+                    nama = ?, jabatan = ?, statusKeluarga = ?, ptkp = ?,
+                    gajiPokok = ?, tunjanganJabatan = ?, tarifTransportHarian = ?,
+                    tunjanganBpjsKes = ?, tunjanganBpjsTk = ?, bpjsKesehatan = ?,
+                    bpjsKetenagakerjaan = ?, potonganBpjs = ?,
+                    isActive = ?, status = ?, tanggalResign = ?, tanggalMasuk = ?,
+                    updatedAt = ?
+                 WHERE id = ?"
+            )->execute([
+                $nama, $jabatan, $status_kel, $ptkp,
+                $gaji_pokok, $tunjangan_jabatan, $tarif_transport,
+                $tunj_bpjs_kes, $tunj_bpjs_tk, $bpjs_kes,
+                $bpjs_tk, $potongan_bpjs,
+                $is_active, $status, $tanggal_resign, $tanggal_masuk,
+                $now, $existing_id
+            ]);
+
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'action' => 'updated',
+                'pegawaiId' => $existing_id,
+            ];
+        } else {
+            $new_id = uuid4();
+            $pdo->prepare(
+                "INSERT INTO Pegawai
+                    (id, entityId, nik, nama, jabatan, statusKeluarga, ptkp, gajiPokok,
+                     tunjanganJabatan, tarifTransportHarian, tunjanganBpjsKes, tunjanganBpjsTk,
+                     bpjsKesehatan, bpjsKetenagakerjaan, potonganBpjs, isActive, status,
+                     tanggalResign, tanggalMasuk, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )->execute([
+                $new_id, $entity_id, $nik, $nama, $jabatan, $status_kel, $ptkp, $gaji_pokok,
+                $tunjangan_jabatan, $tarif_transport, $tunj_bpjs_kes, $tunj_bpjs_tk,
+                $bpjs_kes, $bpjs_tk, $potongan_bpjs, $is_active, $status,
+                $tanggal_resign, $tanggal_masuk, $now, $now
+            ]);
+
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'action' => 'created',
+                'pegawaiId' => $new_id,
+            ];
+        }
+    }
+
+    log_activity('system', "Sync Pegawai Tetap dari Sistem HR: " . count($results) . " data diproses", 'USER_ACTIVITY', [
+        'count' => count($results),
+    ]);
+
+    json_response([
+        'success' => true,
+        'syncedCount' => count($results),
+        'results' => $results,
+    ]);
+}
+
+// ─── POST /api/sync/tenaga-ahli — sync tenaga ahli / freelance dari Sidamon ───
+elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
+    $items = isset($body['items']) && is_array($body['items']) ? $body['items'] : [$body];
+    if (empty($items)) {
+        error_response('Data tenaga ahli tidak boleh kosong.', 400);
+    }
+
+    $entitas_map = [
+        'Gaharu'    => 'gaharu',
+        'Kencana'   => 'kencana',
+        'Tataring'  => 'tataring',
+        'Cipta Asri'=> 'ciptaAsri',
+        'Umum'      => 'umum',
+    ];
+
+    $results = [];
+    $now = date('Y-m-d H:i:s');
+
+    foreach ($items as $item) {
+        $nama = trim($item['nama'] ?? '');
+        $nik = preg_replace('/[^0-9]/', '', (string)($item['nik'] ?? ''));
+        $entitas_input = trim($item['entitas'] ?? ($body['entitas'] ?? ''));
+
+        if (!$nama || !$nik || !$entitas_input) {
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'status' => 'error',
+                'message' => 'nama, nik, dan entitas wajib diisi.',
+            ];
+            continue;
+        }
+
+        $entity_key = $entitas_map[$entitas_input] ?? strtolower($entitas_input);
+        $stmt = $pdo->prepare("SELECT id FROM Entity WHERE `key` = ? LIMIT 1");
+        $stmt->execute([$entity_key]);
+        $entity_id = $stmt->fetchColumn();
+        if (!$entity_id) {
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'status' => 'error',
+                'message' => "Entitas '$entitas_input' tidak ditemukan di Simatra.",
+            ];
+            continue;
+        }
+
+        // Resolusi project ID jika ada assignmentId atau projectCode dari Sidamon
+        $project_id = null;
+        $assignment_id = trim($item['assignmentId'] ?? '');
+        $project_code = trim($item['projectCode'] ?? '');
+
+        if ($assignment_id) {
+            $stmt = $pdo->prepare("SELECT id FROM Project WHERE sidamon_assignment_id = ? LIMIT 1");
+            $stmt->execute([$assignment_id]);
+            $project_id = $stmt->fetchColumn() ?: null;
+        }
+        if (!$project_id && $project_code) {
+            $stmt = $pdo->prepare("SELECT id FROM Project WHERE code = ? LIMIT 1");
+            $stmt->execute([$project_code]);
+            $project_id = $stmt->fetchColumn() ?: null;
+        }
+
+        $npwp = trim($item['npwp'] ?? '');
+        $kategori = trim($item['kategori'] ?? ($item['spesialisasi'] ?? 'Tenaga Ahli'));
+        $ptkp = strtoupper(trim($item['ptkp'] ?? 'TK/0'));
+        $start_date = !empty($item['tanggalMulaiTugas']) ? trim($item['tanggalMulaiTugas']) : null;
+        $end_date = !empty($item['tanggalSelesaiTugas']) ? trim($item['tanggalSelesaiTugas']) : null;
+        $is_turun = isset($item['isTurunLapangan'])
+            ? (in_array($item['isTurunLapangan'], [1, '1', true, 'true', 'riil', 'RIIL'], true) ? 1 : 0)
+            : 1;
+        $nominal_honor = (float)($item['nominalHonorBulanan'] ?? 0);
+
+        // Cek apakah sudah ada Rekanan dengan tipe TENAGA_AHLI dan NIK ini di entitas ini
+        $stmt = $pdo->prepare("SELECT id FROM Rekanan WHERE entityId = ? AND nik = ? AND tipe = 'TENAGA_AHLI' LIMIT 1");
+        $stmt->execute([$entity_id, $nik]);
+        $existing_id = $stmt->fetchColumn();
+
+        if ($existing_id) {
+            $pdo->prepare(
+                "UPDATE Rekanan SET
+                    nama = ?, npwp = ?, kategori = ?, ptkp = ?,
+                    projectId = COALESCE(?, projectId),
+                    tanggalMulaiTugas = COALESCE(?, tanggalMulaiTugas),
+                    tanggalSelesaiTugas = COALESCE(?, tanggalSelesaiTugas),
+                    isTurunLapangan = ?, nominalHonorBulanan = ?,
+                    updatedAt = ?
+                 WHERE id = ?"
+            )->execute([
+                $nama, $npwp, $kategori, $ptkp,
+                $project_id,
+                $start_date, $end_date,
+                $is_turun, $nominal_honor,
+                $now, $existing_id
+            ]);
+
+            $target_rekanan_id = $existing_id;
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'action' => 'updated',
+                'rekananId' => $existing_id,
+            ];
+        } else {
+            $new_id = uuid4();
+            $pdo->prepare(
+                "INSERT INTO Rekanan
+                    (id, nama, nik, npwp, tipe, kategori, ptkp, entityId,
+                     projectId, tanggalMulaiTugas, tanggalSelesaiTugas,
+                     isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )->execute([
+                $new_id, $nama, $nik, $npwp, $kategori, $ptkp, $entity_id,
+                $project_id, $start_date, $end_date,
+                $is_turun, $nominal_honor, $now, $now
+            ]);
+
+            $target_rekanan_id = $new_id;
+            $results[] = [
+                'nik' => $nik,
+                'nama' => $nama,
+                'action' => 'created',
+                'rekananId' => $new_id,
+            ];
+        }
+
+        // Upsert ke TenagaAhliProject jika penugasan memiliki projectId
+        if ($project_id && $target_rekanan_id) {
+            $stmt_tap = $pdo->prepare("SELECT id FROM TenagaAhliProject WHERE rekananId = ? AND projectId = ? LIMIT 1");
+            $stmt_tap->execute([$target_rekanan_id, $project_id]);
+            $existing_tap_id = $stmt_tap->fetchColumn();
+
+            if ($existing_tap_id) {
+                $pdo->prepare(
+                    "UPDATE TenagaAhliProject SET
+                        tanggalMulaiTugas = ?, tanggalSelesaiTugas = ?,
+                        isTurunLapangan = ?, nominalHonorBulanan = ?,
+                        updatedAt = ?
+                     WHERE id = ?"
+                )->execute([$start_date, $end_date, $is_turun, $nominal_honor, $now, $existing_tap_id]);
+            } else {
+                $pdo->prepare(
+                    "INSERT INTO TenagaAhliProject
+                        (id, rekananId, projectId, tanggalMulaiTugas, tanggalSelesaiTugas, isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute([uuid4(), $target_rekanan_id, $project_id, $start_date, $end_date, $is_turun, $nominal_honor, $now, $now]);
+            }
+        }
+    }
+
+    log_activity('system', "Sync Tenaga Ahli dari Sidamon: " . count($results) . " data diproses", 'USER_ACTIVITY', [
+        'count' => count($results),
+    ]);
+
+    json_response([
+        'success' => true,
+        'syncedCount' => count($results),
+        'results' => $results,
+    ]);
+}
+
 else {
     error_response('Endpoint sync tidak ditemukan.', 404);
 }

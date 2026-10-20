@@ -72,6 +72,7 @@ if ($method === 'GET' && $sub === '') {
     $nb_ph = implode(',', array_fill(0, count($paged_nbs), '?'));
     $stmt  = $pdo->prepare(
         "SELECT t.id, t.tanggal, t.noBukti, t.keterangan, t.debit, t.kredit, t.projectId, t.fakturId,
+                t.extraFieldsJson,
                 c.id as coa_id, c.code as coa_code, c.name as coa_name,
                 p.id as project_id_val, p.code as project_code, p.name as project_name
          FROM `Transaction` t
@@ -89,17 +90,21 @@ if ($method === 'GET' && $sub === '') {
     $grouped = [];
     foreach ($paged_nbs as $nb) {
         $grouped[$nb] = [
-            'noBukti'     => $nb,
-            'tanggal'     => '',
-            'tanggalRaw'  => '',
-            'keterangan'  => '',
-            'projectId'   => null,
-            'fakturId'    => null,
-            'project'     => null,
-            'rows'        => [],
-            'totalDebit'  => 0.0,
-            'totalKredit' => 0.0,
-            'allTxIds'    => [],
+            'noBukti'          => $nb,
+            'tanggal'          => '',
+            'tanggalRaw'       => '',
+            'keterangan'       => '',
+            'projectId'        => null,
+            'fakturId'         => null,
+            'terminId'         => null,
+            'project'          => null,
+            'periodeBulanGaji' => null,
+            'periodeTahunGaji' => null,
+            'tanggalNota'      => null,
+            'rows'             => [],
+            'totalDebit'       => 0.0,
+            'totalKredit'      => 0.0,
+            'allTxIds'         => [],
         ];
     }
 
@@ -107,6 +112,18 @@ if ($method === 'GET' && $sub === '') {
         $g = &$grouped[$r['noBukti']];
         if (!$g) continue;
         if ($r['fakturId']) $g['fakturId'] = $r['fakturId'];
+
+        $ex = (!empty($r['extraFieldsJson']) && is_string($r['extraFieldsJson'])) ? json_decode($r['extraFieldsJson'], true) : [];
+        if (!empty($ex['periodeBulanGaji']) && empty($g['periodeBulanGaji'])) {
+            $g['periodeBulanGaji'] = (int)$ex['periodeBulanGaji'];
+            $g['periodeTahunGaji'] = !empty($ex['periodeTahunGaji']) ? (int)$ex['periodeTahunGaji'] : (int)date('Y', strtotime($r['tanggal']));
+        }
+        if (!empty($ex['tanggalNota']) && empty($g['tanggalNota'])) {
+            $g['tanggalNota'] = (string)$ex['tanggalNota'];
+        }
+        if (!empty($ex['terminId']) && empty($g['terminId'])) {
+            $g['terminId'] = (string)$ex['terminId'];
+        }
 
         if (!$g['tanggalRaw']) {
             $g['tanggalRaw']  = $r['tanggal'];
@@ -138,6 +155,29 @@ if ($method === 'GET' && $sub === '') {
         unset($g);
     }
 
+    // Urutkan baris jurnal tiap grup: Debit di atas, Kredit di bawah (Pendapatan paling bawah)
+    foreach ($grouped as &$grp) {
+        usort($grp['rows'], function ($a, $b) {
+            $aDebit = (float)($a['debit'] ?? 0) > 0;
+            $bDebit = (float)($b['debit'] ?? 0) > 0;
+            $aKredit = (float)($a['kredit'] ?? 0) > 0;
+            $bKredit = (float)($b['kredit'] ?? 0) > 0;
+
+            if ($aDebit && !$bDebit) return -1;
+            if (!$aDebit && $bDebit) return 1;
+
+            if ($aKredit && $bKredit) {
+                $aPendapatan = str_starts_with((string)($a['coaCode'] ?? ''), '4') || stripos((string)($a['coaName'] ?? ''), 'pendapatan') !== false;
+                $bPendapatan = str_starts_with((string)($b['coaCode'] ?? ''), '4') || stripos((string)($b['coaName'] ?? ''), 'pendapatan') !== false;
+                if (!$aPendapatan && $bPendapatan) return -1;
+                if ($aPendapatan && !$bPendapatan) return 1;
+            }
+
+            return 0;
+        });
+    }
+    unset($grp);
+
     $groups = array_values(array_filter(
         array_map(fn($nb) => $grouped[$nb] ?? null, $paged_nbs)
     ));
@@ -158,6 +198,10 @@ elseif ($method === 'POST' && $sub === '') {
     $edit_no_bukti = trim($body['editNoBukti'] ?? '');
     $project_id  = trim($body['projectId']   ?? '') ?: null;
     $faktur_id   = trim($body['fakturId']    ?? '') ?: null;
+    $termin_id   = trim($body['terminId']    ?? '') ?: null;
+    $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
+    $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
+    $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
 
     if (!$tanggal)    return error_response('Tanggal wajib diisi.', 400);
     if (!$no_bukti)   return error_response('No. Bukti wajib diisi.', 400);
@@ -251,8 +295,12 @@ elseif ($method === 'POST' && $sub === '') {
         } else {
             $pdo->prepare("DELETE FROM FakturPendapatan WHERE noFaktur = ?")->execute([$edit_no_bukti]);
         }
-        // Hapus termin terkait
-        $pdo->prepare("DELETE FROM Termin WHERE name LIKE ?")->execute(["%[$edit_no_bukti]%"]);
+        // Hapus termin terkait — jangan hapus termin yang dipilih pengguna untuk diupdate
+        if ($termin_id && $termin_id !== '__NEW__') {
+            $pdo->prepare("DELETE FROM Termin WHERE name LIKE ? AND id != ?")->execute(["%[$edit_no_bukti]%", $termin_id]);
+        } else {
+            $pdo->prepare("DELETE FROM Termin WHERE name LIKE ?")->execute(["%[$edit_no_bukti]%"]);
+        }
 
     } else {
         // Cek duplikat
@@ -263,10 +311,34 @@ elseif ($method === 'POST' && $sub === '') {
 
     $staff_id  = $user['staffId'] ?? $user['id'];
     $tanggal_dt = $tanggal . ' 00:00:00';
+    // Urutkan baris: Debit di atas, Kredit di bawah (Pendapatan ditaruh paling bawah)
+    usort($valid_rows, function ($a, $b) use ($coa_map) {
+        $aDebit = (float)($a['debit'] ?? 0) > 0;
+        $bDebit = (float)($b['debit'] ?? 0) > 0;
+        $aKredit = (float)($a['kredit'] ?? 0) > 0;
+        $bKredit = (float)($b['kredit'] ?? 0) > 0;
+
+        if ($aDebit && !$bDebit) return -1;
+        if (!$aDebit && $bDebit) return 1;
+
+        if ($aKredit && $bKredit) {
+            $coaA = $coa_map[$a['coaAccountId']] ?? null;
+            $coaB = $coa_map[$b['coaAccountId']] ?? null;
+            $aPendapatan = ($coaA && (str_starts_with((string)$coaA['code'], '4') || stripos((string)$coaA['name'], 'pendapatan') !== false));
+            $bPendapatan = ($coaB && (str_starts_with((string)$coaB['code'], '4') || stripos((string)$coaB['name'], 'pendapatan') !== false));
+            if (!$aPendapatan && $bPendapatan) return -1;
+            if ($aPendapatan && !$bPendapatan) return 1;
+        }
+
+        return 0;
+    });
+
     $first_keterangan = trim($valid_rows[0]['keterangan'] ?? '');
 
     $pdo->beginTransaction();
     try {
+        $assigned_termin_id = ($termin_id && $termin_id !== '__NEW__') ? $termin_id : uuid4();
+
         // ── 1. Insert baris jurnal utama ──────────────────────────────────────
         foreach ($valid_rows as $row) {
             $is_kredit = (float)($row['kredit'] ?? 0) > 0;
@@ -279,6 +351,23 @@ elseif ($method === 'POST' && $sub === '') {
                     $preserved_crossing,
                     ['crossingRole' => $role]
                 );
+            }
+            $row_bulan = !empty($row['periodeBulanGaji']) ? (int)$row['periodeBulanGaji'] : $periode_bulan_gaji;
+            $row_tahun = !empty($row['periodeTahunGaji']) ? (int)$row['periodeTahunGaji'] : ($row_bulan ? $periode_tahun_gaji : null);
+            if ($row_bulan) {
+                if (!$extra) $extra = [];
+                $extra['periodeBulanGaji'] = $row_bulan;
+                if ($row_tahun) {
+                    $extra['periodeTahunGaji'] = $row_tahun;
+                }
+            }
+            if ($tanggal_nota) {
+                if (!$extra) $extra = [];
+                $extra['tanggalNota'] = $tanggal_nota;
+            }
+            if ($project_id && $assigned_termin_id) {
+                if (!$extra) $extra = [];
+                $extra['terminId'] = $assigned_termin_id;
             }
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
@@ -353,6 +442,7 @@ elseif ($method === 'POST' && $sub === '') {
             // Primary kas entry
             $kas_extra = ['isKasEntry' => true, 'autoPostedFromJurnal' => true];
             if ($rekening_nama_post) $kas_extra['rekeningNama'] = $rekening_nama_post;
+            if ($tanggal_nota)       $kas_extra['tanggalNota']  = $tanggal_nota;
             $pdo->prepare(
                 "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                  debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
@@ -367,8 +457,10 @@ elseif ($method === 'POST' && $sub === '') {
                 $staff_id, $project_id, $now,
             ]);
 
-            // Salin baris akun lawan (pendapatan, pajak, beban, dll) ke ledger bank/kas
-            // Logika: 1:1 dengan counterpartRow loop di saveJurnalTransaksi
+            // Salin baris akun lawan (pendapatan, beban, dll) ke ledger bank/kas
+            // 1. Abaikan akun kas/bank lain
+            // 2. Abaikan baris potongan pajak PPN & PPh (tidak masuk ke mutasi kas/bank riil)
+            $counterparts = [];
             foreach ($valid_rows as $cp_row) {
                 if ($cp_row['coaAccountId'] === $row['coaAccountId']) continue;
                 $cp_coa = $coa_map[$cp_row['coaAccountId']] ?? null;
@@ -378,8 +470,43 @@ elseif ($method === 'POST' && $sub === '') {
                     || isset($kas_besar_code_to_ek[$cp_coa['code']])
                 )) continue;
 
+                // Abaikan baris PPN dan PPh (potongan pajak tidak masuk ke ledger buku bank/kas)
+                if ($cp_coa) {
+                    $c_code = (string)($cp_coa['code'] ?? '');
+                    $c_name = (string)($cp_coa['name'] ?? '');
+                    if (
+                        in_array($c_code, ['533', '534', '535', '536', '116', '117', '213'], true)
+                        || preg_match('/\b(pph|ppn)\b/i', $c_name)
+                        || preg_match('/^53[3-6]/', $c_code)
+                        || stripos($c_name, 'pajak') !== false
+                    ) {
+                        continue;
+                    }
+                }
+
+                $counterparts[] = $cp_row;
+            }
+
+            $sum_cp = 0.0;
+            foreach ($counterparts as $cpr) {
+                $sum_cp += (float)($cpr['debit'] > 0 ? $cpr['debit'] : $cpr['kredit']);
+            }
+
+            foreach ($counterparts as $cp_row) {
+                $orig_nom = (float)($cp_row['debit'] > 0 ? $cp_row['debit'] : $cp_row['kredit']);
+                // Sesuaikan nominal agar tepat sesuai dengan nominal mutasi akun bank yang dipilih
+                $has_mismatch = ($sum_cp > 0 && abs($sum_cp - $nominal) > 1);
+                $row_nom = $has_mismatch
+                    ? round(($orig_nom / $sum_cp) * $nominal)
+                    : $orig_nom;
+
+                // Jika nominal akun lawan berbeda dari nominal mutasi bank (misal Pendapatan bruto 300jt vs Bank netto 200.810.811),
+                // gunakan akun bank yang dipilih ($row['coaAccountId']) agar akun dan nominalnya cocok (BPD GS Rp 200.810.811)
+                $cp_coa_id = $has_mismatch ? $row['coaAccountId'] : $cp_row['coaAccountId'];
+
                 $cp_extra = ['autoPostedFromJurnal' => true];
                 if ($rekening_nama_post) $cp_extra['rekeningNama'] = $rekening_nama_post;
+                if ($tanggal_nota)       $cp_extra['tanggalNota']  = $tanggal_nota;
                 $pdo->prepare(
                     "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
                      debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
@@ -387,9 +514,9 @@ elseif ($method === 'POST' && $sub === '') {
                 )->execute([
                     uuid4(), $target_entity_id, $target_jenis_id, $tanggal_dt,
                     $no_bukti, trim($cp_row['keterangan'] ?? '') ?: $first_keterangan,
-                    $cp_row['coaAccountId'],
-                    (float)($cp_row['debit']  ?? 0),
-                    (float)($cp_row['kredit'] ?? 0),
+                    $cp_coa_id,
+                    $arah_masuk ? 0 : $row_nom,
+                    $arah_masuk ? $row_nom : 0,
                     $new_saldo, json_encode($cp_extra),
                     $staff_id, $project_id, $now,
                 ]);
@@ -540,39 +667,72 @@ elseif ($method === 'POST' && $sub === '') {
                 $stmt_tw->execute([$project_id]);
                 $all_termins = $stmt_tw->fetchAll(PDO::FETCH_ASSOC);
 
-                // Hapus termin terkait noBukti ini jika edit
-                $old_termin_id = null;
-                foreach ($all_termins as $t) {
-                    if (
-                        str_contains($t['name'], "[$no_bukti]")
-                        || ($edit_no_bukti && str_contains($t['name'], "[$edit_no_bukti]"))
-                    ) {
-                        $old_termin_id = $t['id'];
-                        break;
+                $contract_val   = (float)($project_obj['contractValue'] ?? 0);
+                $nominal_termin = $nilai_proyek > 0 ? $nilai_proyek : ($dpp > 0 ? $dpp : $nominal_diterima);
+
+                // Cek apakah user memilih termin yang sudah ada
+                $target_termin = null;
+                if ($termin_id && $termin_id !== '__NEW__') {
+                    foreach ($all_termins as $t) {
+                        if ($t['id'] === $termin_id) {
+                            $target_termin = $t;
+                            break;
+                        }
                     }
                 }
-                if ($old_termin_id) {
-                    $pdo->prepare("DELETE FROM Termin WHERE id = ?")->execute([$old_termin_id]);
-                }
 
-                $remaining = array_filter($all_termins, fn($t) => !$old_termin_id || $t['id'] !== $old_termin_id);
-                $remaining = array_values($remaining);
+                if ($target_termin) {
+                    // Update termin yang sudah ada (tambahkan nominal pembayaran/pencairan bertahap)
+                    $cur_nom = (float)($target_termin['nominal'] ?? 0);
+                    $already_has_nb = str_contains($target_termin['name'], "[$no_bukti]") || ($edit_no_bukti && str_contains($target_termin['name'], "[$edit_no_bukti]"));
 
-                $existing_pcts = array_map(fn($t) => (int)$t['percentage'], $remaining);
-                $max_pct_so_far = empty($existing_pcts) ? 0 : max($existing_pcts);
-                $contract_val   = (float)($project_obj['contractValue'] ?? 0);
+                    $new_nominal = $already_has_nb ? $nominal_termin : ($cur_nom + $nominal_termin);
+                    $new_pct = $contract_val > 0 ? min(100, (int)round(($new_nominal / $contract_val) * 100)) : (int)$target_termin['percentage'];
+                    $status_t = $new_pct >= 80 ? 'ON_TRACK' : 'AT_RISK';
 
-                $existing_cumulative = 0.0;
-                foreach ($remaining as $i => $t) {
-                    $prev_pct = $i === 0 ? 0 : $remaining[$i-1]['percentage'];
-                    $nom = ($t['nominal'] && (float)$t['nominal'] > 0)
-                        ? (float)$t['nominal']
-                        : (((int)$t['percentage'] - $prev_pct) / 100) * $contract_val;
-                    $existing_cumulative += $nom;
-                }
+                    $new_name = $target_termin['name'];
+                    if (!$already_has_nb && !str_contains($new_name, "[$no_bukti]")) {
+                        $new_name .= " [$no_bukti]";
+                    }
 
-                $nominal_termin = $nilai_proyek > 0 ? $nilai_proyek : ($dpp > 0 ? $dpp : $nominal_diterima);
-                if ($nominal_termin > 0) {
+                    $pdo->prepare(
+                        "UPDATE Termin SET name = ?, percentage = ?, nominal = ?, status = ? WHERE id = ?"
+                    )->execute([$new_name, $new_pct, $new_nominal, $status_t, $target_termin['id']]);
+
+                    if ($new_pct >= 100) {
+                        $pdo->prepare("UPDATE Project SET status = 'COMPLETED' WHERE id = ?")->execute([$project_id]);
+                    }
+                } else if ($nominal_termin > 0) {
+                    // Hapus termin terkait noBukti ini jika edit
+                    $old_termin_id = null;
+                    foreach ($all_termins as $t) {
+                        if (
+                            str_contains($t['name'], "[$no_bukti]")
+                            || ($edit_no_bukti && str_contains($t['name'], "[$edit_no_bukti]"))
+                        ) {
+                            $old_termin_id = $t['id'];
+                            break;
+                        }
+                    }
+                    if ($old_termin_id) {
+                        $pdo->prepare("DELETE FROM Termin WHERE id = ?")->execute([$old_termin_id]);
+                    }
+
+                    $remaining = array_filter($all_termins, fn($t) => !$old_termin_id || $t['id'] !== $old_termin_id);
+                    $remaining = array_values($remaining);
+
+                    $existing_pcts = array_map(fn($t) => (int)$t['percentage'], $remaining);
+                    $max_pct_so_far = empty($existing_pcts) ? 0 : max($existing_pcts);
+
+                    $existing_cumulative = 0.0;
+                    foreach ($remaining as $i => $t) {
+                        $prev_pct = $i === 0 ? 0 : $remaining[$i-1]['percentage'];
+                        $nom = ($t['nominal'] && (float)$t['nominal'] > 0)
+                            ? (float)$t['nominal']
+                            : (((int)$t['percentage'] - $prev_pct) / 100) * $contract_val;
+                        $existing_cumulative += $nom;
+                    }
+
                     $new_pct    = compute_new_termin_percentage($contract_val, $existing_pcts, $nominal_termin, $existing_cumulative);
                     $termin_ke  = count($remaining) + 1;
                     $delta_pct  = max(0, $new_pct - $max_pct_so_far);
@@ -582,7 +742,7 @@ elseif ($method === 'POST' && $sub === '') {
                         "INSERT INTO Termin (id, projectId, name, percentage, nominal, status, createdAt)
                          VALUES (?, ?, ?, ?, ?, ?, ?)"
                     )->execute([
-                        uuid4(), $project_id,
+                        $assigned_termin_id, $project_id,
                         "Termin $termin_ke ($delta_pct% Kontrak) [$no_bukti]",
                         $new_pct, $nominal_termin, $status_t, $now,
                     ]);
@@ -678,13 +838,21 @@ elseif ($method === 'DELETE' && $sub === '') {
             ->execute([date('Y-m-d H:i:s'), $nb]);
 
         // Hapus termin terkait + revert project status jika perlu
-        $stmt_t = $pdo->prepare("SELECT id, projectId FROM Termin WHERE name LIKE ?");
+        $stmt_t = $pdo->prepare("SELECT id, projectId, name FROM Termin WHERE name LIKE ?");
         $stmt_t->execute(["%[$nb]%"]);
         $termins = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
         if (!empty($termins)) {
-            $termin_ids = array_column($termins, 'id');
-            $t_ph = implode(',', array_fill(0, count($termin_ids), '?'));
-            $pdo->prepare("DELETE FROM Termin WHERE id IN ($t_ph)")->execute($termin_ids);
+            foreach ($termins as $t) {
+                // Jika termin ini punya tag noBukti lain selain $nb, jangan hapus terminnya, cukup hapus tag $nb
+                preg_match_all('/\[(.*?)\]/', $t['name'], $m);
+                $tagged_nbs = $m[1] ?? [];
+                if (count($tagged_nbs) > 1) {
+                    $cleaned_name = trim(str_replace("[$nb]", '', $t['name']));
+                    $pdo->prepare("UPDATE Termin SET name = ? WHERE id = ?")->execute([$cleaned_name, $t['id']]);
+                } else {
+                    $pdo->prepare("DELETE FROM Termin WHERE id = ?")->execute([$t['id']]);
+                }
+            }
 
             foreach ($termins as $t) {
                 $s = $pdo->prepare("SELECT percentage FROM Termin WHERE projectId = ?");

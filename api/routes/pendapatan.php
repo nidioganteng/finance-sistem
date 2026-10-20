@@ -99,15 +99,15 @@ if ($method === 'GET' && $sub_action === 'projects') {
 
     $pdo = get_pdo();
 
-    // Prioritize the requested entity, but include all ACTIVE projects from all entities
+    // Filter proyek khusus entitas yang diminta (via entityId UUID atau entity.key)
     $stmt = $pdo->prepare(
         'SELECT p.*, e.name as entity_name, e.`key` as entity_key
            FROM Project p
            JOIN Entity e ON p.entityId = e.id
-          WHERE p.status = \'ACTIVE\'
-          ORDER BY CASE WHEN p.entityId = ? THEN 0 ELSE 1 END, e.name ASC, p.code ASC'
+          WHERE p.status = \'ACTIVE\' AND (p.entityId = ? OR e.`key` = ?)
+          ORDER BY p.code ASC'
     );
-    $stmt->execute([$entity_id]);
+    $stmt->execute([$entity_id, $entity_id]);
     $projects = $stmt->fetchAll();
 
     // Fetch termins for all projects in one query
@@ -171,11 +171,12 @@ if ($method === 'GET' && $sub_action === 'faktur') {
                 f.dpp, f.dppNilaiLain, f.ppn, f.pph,
                 f.nilaiProyek, f.labaSetelahPajak, f.nominalDiterima,
                 f.bank, f.projectId, f.tahunPajak, f.masaPajak,
+                f.tanggalTerima, f.createdAt,
                 p.code AS project_code, p.name AS project_name
            FROM FakturPendapatan f
            LEFT JOIN Project p ON f.projectId = p.id
           WHERE f.entityId = ?
-          ORDER BY f.tahunPajak DESC, f.masaPajak DESC, f.createdAt DESC'
+          ORDER BY f.tahunPajak DESC, f.masaPajak DESC, f.createdAt ASC'
     );
     $stmt->execute([$entity_id]);
     $rows = $stmt->fetchAll();
@@ -218,13 +219,19 @@ function get_tarif_ppn_aktif(PDO $pdo): float {
 function hitung_pajak_faktur(array $b, float $tarif_ppn_default = 11.0): array {
     $dpp            = (float)($b['dpp']            ?? 0);
     $dpp_nilai_lain = (float)($b['dppNilaiLain']   ?? $b['dpp_nilai_lain'] ?? 0);
+    if ($dpp_nilai_lain <= 0 && $dpp > 0) {
+        $dpp_nilai_lain = (float)round(($dpp * 11) / 12);
+    }
     $tarif_ppn      = (float)($b['tarifPpnPersen'] ?? $b['tarif_ppn_persen'] ?? $tarif_ppn_default);
     $tarif_pph      = (float)($b['tarifPphPersen'] ?? $b['tarif_pph_persen'] ?? 3.50);
     $nilai_kuitansi = (float)($b['nilaiKuitansi']  ?? 0);
 
     $pph = (int)round($dpp * $tarif_pph / 100);
 
-    if ($nilai_kuitansi > 0) {
+    if ($tarif_ppn == 0) {
+        $ppn          = 0;
+        $nilai_proyek = $nilai_kuitansi > 0 ? (int)$nilai_kuitansi : (int)$dpp;
+    } elseif ($nilai_kuitansi > 0) {
         // Kuitansi bruto: nilaiProyek = nilai kuitansi, ppn = 11/111 × nilaiKuitansi
         $ppn          = (int)round($nilai_kuitansi * 11 / 111);
         $nilai_proyek = (int)$nilai_kuitansi;
@@ -271,7 +278,7 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
         $body['namaRekanan'],
         $body['namaJkp'],
         (float)$body['dpp'],
-        (float)$body['dppNilaiLain'],
+        (float)($body['dppNilaiLain'] ?? 0) > 0 ? (float)$body['dppNilaiLain'] : (float)round(((float)$body['dpp'] * 11) / 12),
         (float)$body['tarifPpnPersen'],
         (float)$body['tarifPphPersen'],
         $kalkulasi['ppn'],
@@ -361,6 +368,11 @@ if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
 if ($method === 'DELETE' && $sub_action === 'faktur' && $record_id !== null) {
     $pdo = get_pdo();
 
+    // Ambil info entity, tahun, masa sebelum faktur dihapus
+    $stmt_find = $pdo->prepare('SELECT entityId, tahunPajak, masaPajak FROM FakturPendapatan WHERE id = ?');
+    $stmt_find->execute([$record_id]);
+    $faktur_info = $stmt_find->fetch(PDO::FETCH_ASSOC);
+
     // Lepaskan relasi fakturId dari Transaction sebelum hapus faktur,
     // agar tidak ada baris Transaction yang merujuk ke faktur yang sudah dihapus.
     $pdo->prepare('UPDATE `Transaction` SET fakturId = NULL WHERE fakturId = ?')
@@ -369,6 +381,22 @@ if ($method === 'DELETE' && $sub_action === 'faktur' && $record_id !== null) {
     $stmt = $pdo->prepare('DELETE FROM FakturPendapatan WHERE id = ?');
     $stmt->execute([$record_id]);
     if ($stmt->rowCount() === 0) error_response('Faktur tidak ditemukan.', 404);
+
+    // SINKRONISASI OTOMATIS:
+    // Cek sisa faktur pada masa pajak tersebut. Jika sudah habis, bersihkan data rekonsiliasi
+    // agar tidak muncul selisih semu pada masa pajak yang fakturnya sudah dihapus.
+    if ($faktur_info) {
+        $stmt_check = $pdo->prepare(
+            'SELECT COUNT(*) as cnt FROM FakturPendapatan WHERE entityId = ? AND tahunPajak = ? AND masaPajak = ?'
+        );
+        $stmt_check->execute([$faktur_info['entityId'], $faktur_info['tahunPajak'], $faktur_info['masaPajak']]);
+        $remaining = $stmt_check->fetch(PDO::FETCH_ASSOC);
+
+        if ((int)($remaining['cnt'] ?? 0) === 0) {
+            $pdo->prepare('DELETE FROM RekonsiliasiPajakBulanan WHERE entityId = ? AND year = ? AND month = ?')
+                ->execute([$faktur_info['entityId'], $faktur_info['tahunPajak'], $faktur_info['masaPajak']]);
+        }
+    }
 
     log_activity($user['id'], 'faktur_pendapatan.delete', 'FINANCIAL_CHANGE', ['fakturId' => $record_id]);
 
@@ -402,8 +430,101 @@ if ($method === 'PATCH' && $sub_action === 'faktur' && $record_id !== null) {
     json_response(['message' => 'Status ceklis diperbarui.', 'field' => $col, 'value' => $value]);
 }
 
+// ─── POST /api/pendapatan/rekonsiliasi/sync ──────────────────────────────────
+// Sinkronkan seluruh 12 bulan rekonsiliasi dengan rekap faktur riil di sistem
+if ($method === 'POST' && $sub_action === 'rekonsiliasi' && $record_id === 'sync') {
+    $entity_id = $body['entityId'] ?? null;
+    $year      = isset($body['year']) ? (int)$body['year'] : null;
+
+    if (!$entity_id || !$year) {
+        error_response('entityId dan year diperlukan.', 400);
+    }
+
+    $pdo = get_pdo();
+    $now = date('Y-m-d H:i:s');
+
+    // Ambil rekap faktur per bulan untuk tahun ini
+    $stmt = $pdo->prepare(
+        'SELECT masaPajak,
+                COALESCE(SUM(dpp), 0) AS total_dpp,
+                COALESCE(SUM(ppn), 0) AS total_ppn,
+                COALESCE(SUM(pph), 0) AS total_pph,
+                COUNT(*) AS cnt
+         FROM FakturPendapatan
+         WHERE entityId = ? AND tahunPajak = ?
+         GROUP BY masaPajak'
+    );
+    $stmt->execute([$entity_id, $year]);
+    $rekap_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $rekap_by_month = [];
+    foreach ($rekap_rows as $row) {
+        $rekap_by_month[(int)$row['masaPajak']] = $row;
+    }
+
+    for ($m = 1; $m <= 12; $m++) {
+        $rekap = $rekap_by_month[$m] ?? null;
+        if ($rekap && (int)$rekap['cnt'] > 0) {
+            $pdo->prepare(
+                'INSERT INTO RekonsiliasiPajakBulanan
+                 (id, entityId, year, month, dppTerlapor, pajakTerlapor, pphTerlapor, keterangan, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                   dppTerlapor   = VALUES(dppTerlapor),
+                   pajakTerlapor = VALUES(pajakTerlapor),
+                   pphTerlapor   = VALUES(pphTerlapor),
+                   updatedAt     = VALUES(updatedAt)'
+            )->execute([
+                uuid4(),
+                $entity_id,
+                $year,
+                $m,
+                (float)$rekap['total_dpp'],
+                (float)$rekap['total_ppn'],
+                (float)$rekap['total_pph'],
+                'Disinkronkan dari rekap faktur',
+                $now,
+            ]);
+        } else {
+            // Hapus rekonsiliasi bulan jika tidak ada faktur
+            $pdo->prepare('DELETE FROM RekonsiliasiPajakBulanan WHERE entityId = ? AND year = ? AND month = ?')
+                ->execute([$entity_id, $year, $m]);
+        }
+    }
+
+    log_activity($user['id'], 'rekonsiliasi_pajak.sync_all', 'FINANCIAL_CHANGE', [
+        'entityId' => $entity_id,
+        'year'     => $year,
+    ]);
+
+    json_response(['message' => 'Rekonsiliasi pajak berhasil disinkronkan dengan rekap faktur.']);
+}
+
+// ─── DELETE /api/pendapatan/rekonsiliasi ──────────────────────────────────────
+if ($method === 'DELETE' && $sub_action === 'rekonsiliasi') {
+    $entity_id = $body['entityId'] ?? $_GET['entityId'] ?? null;
+    $year      = isset($body['year'])  ? (int)$body['year']  : (isset($_GET['year'])  ? (int)$_GET['year']  : null);
+    $month     = isset($body['month']) ? (int)$body['month'] : (isset($_GET['month']) ? (int)$_GET['month'] : null);
+
+    if (!$entity_id || !$year || !$month) {
+        error_response('entityId, year, dan month diperlukan.', 400);
+    }
+
+    $pdo = get_pdo();
+    $pdo->prepare('DELETE FROM RekonsiliasiPajakBulanan WHERE entityId = ? AND year = ? AND month = ?')
+        ->execute([$entity_id, $year, $month]);
+
+    log_activity($user['id'], 'rekonsiliasi_pajak.delete', 'FINANCIAL_CHANGE', [
+        'entityId' => $entity_id,
+        'year'     => $year,
+        'month'    => $month,
+    ]);
+
+    json_response(['message' => 'Data rekonsiliasi pajak berhasil direset.']);
+}
+
 // ─── POST /api/pendapatan/rekonsiliasi ───────────────────────────────────────
-if ($method === 'POST' && $sub_action === 'rekonsiliasi') {
+if ($method === 'POST' && $sub_action === 'rekonsiliasi' && $record_id === null) {
     $required = ['entityId','year','month','dppTerlapor','pajakTerlapor'];
     foreach ($required as $field) {
         if (!isset($body[$field]) || $body[$field] === '') {

@@ -202,7 +202,7 @@ if ($method === 'GET' && $sub === '') {
         'kasKecil'       => ['bg' => '#fef3c7', 'color' => '#92400e', 'label' => 'Kas Kecil'],
         'kasBesar'       => ['bg' => '#dbeafe', 'color' => '#1e40af', 'label' => 'Kas Besar'],
         'bankBuku'       => ['bg' => '#dcfce7', 'color' => '#166534', 'label' => 'Buku Bank'],
-        'jurnalTransaksi'=> ['bg' => '#ede9fe', 'color' => '#6d28d9', 'label' => 'Jurnal Transaksi'],
+        'jurnalTransaksi'=> ['bg' => '#ede9fe', 'color' => '#6d28d9', 'label' => 'Entry Jurnal'],
     ];
     $entity_label_map = [
         'kencana' => 'Kencana', 'gaharu' => 'Gaharu', 'tataring' => 'Tataring',
@@ -286,6 +286,9 @@ if ($method === 'GET' && $sub === '') {
             'staffName'       => $staff_name,
             'staffInitial'    => $initials,
             'arahLaporan'     => is_array($extra['arahLaporan'] ?? null) ? $extra['arahLaporan'] : [],
+            'periodeBulanGaji' => !empty($extra['periodeBulanGaji']) ? (int)$extra['periodeBulanGaji'] : null,
+            'periodeTahunGaji' => !empty($extra['periodeTahunGaji']) ? (int)$extra['periodeTahunGaji'] : (!empty($extra['periodeBulanGaji']) ? (int)date('Y', strtotime($r['tanggal'])) : null),
+            'tanggalNota'     => !empty($extra['tanggalNota']) ? (string)$extra['tanggalNota'] : null,
         ];
     }
 
@@ -421,6 +424,55 @@ elseif ($method === 'PATCH' && $sub === 'proyek') {
     log_activity($user['id'], "Update proyek transaksi {$tx['noBukti']} ({$entity['name']}): $proj_label", 'FINANCIAL_CHANGE', [
         'noBukti' => $tx['noBukti'], 'entityId' => $entity_id,
         'oldProjectId' => $tx['projectId'], 'newProjectId' => $new_project_id,
+    ]);
+
+    json_response(['success' => true]);
+}
+
+// ─── PATCH /api/jurnal/akrual ────────────────────────────────────────────────
+// Logika: update periode akrual beban gaji (periodeBulanGaji & periodeTahunGaji)
+elseif ($method === 'PATCH' && $sub === 'akrual') {
+    $user = require_auth();
+    $pdo  = get_pdo();
+
+    $transaction_id = $body['transactionId'] ?? '';
+    $entity_id      = $body['entityId']      ?? '';
+    $bulan          = !empty($body['bulan']) ? (int)$body['bulan'] : null;
+    $tahun          = !empty($body['tahun']) ? (int)$body['tahun'] : null;
+
+    if (!$transaction_id || !$entity_id) return error_response('transactionId dan entityId wajib diisi.', 400);
+
+    // Validasi akses entity
+    $stmt = $pdo->prepare("SELECT id, `key`, name FROM Entity WHERE id = ?");
+    $stmt->execute([$entity_id]);
+    $entity = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$entity || !in_array($entity['key'], $user['entityKeys'] ?? [])) {
+        return error_response('Kamu tidak punya akses ke entitas ini.', 403);
+    }
+
+    // Cari transaksi
+    $stmt = $pdo->prepare("SELECT id, noBukti, extraFieldsJson FROM `Transaction` WHERE id = ? AND entityId = ? LIMIT 1");
+    $stmt->execute([$transaction_id, $entity_id]);
+    $tx = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$tx) return error_response('Transaksi tidak ditemukan.', 404);
+
+    $extra = $tx['extraFieldsJson'] ? json_decode($tx['extraFieldsJson'], true) : [];
+    if (!is_array($extra)) $extra = [];
+
+    if ($bulan) {
+        $extra['periodeBulanGaji'] = $bulan;
+        $extra['periodeTahunGaji'] = $tahun ?: (int)date('Y');
+    } else {
+        unset($extra['periodeBulanGaji'], $extra['periodeTahunGaji']);
+    }
+
+    $pdo->prepare("UPDATE `Transaction` SET extraFieldsJson = ? WHERE id = ? AND entityId = ?")
+        ->execute([empty($extra) ? null : json_encode($extra), $transaction_id, $entity_id]);
+
+    $bulan_str = $bulan ? "Bulan $bulan Tahun " . ($tahun ?: (int)date('Y')) : "Dihapus (Sesuai tanggal)";
+    log_activity($user['id'], "Update periode akrual gaji {$tx['noBukti']} ({$entity['name']}): $bulan_str", 'FINANCIAL_CHANGE', [
+        'transactionId' => $transaction_id, 'entityId' => $entity_id,
+        'bulan' => $bulan, 'tahun' => $tahun,
     ]);
 
     json_response(['success' => true]);

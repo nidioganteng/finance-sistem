@@ -110,3 +110,31 @@ export async function upsertRekonsiliasiPajakAction(data: RekonsiliasiPajakInput
     return { error: "Terjadi kesalahan." };
   }
 }
+
+export async function deleteRekonsiliasiPajakAction(data: { entityId: string; year: number; month: number }) {
+  const token = await getPhpToken();
+  try {
+    await phpFetch("/api/pendapatan/rekonsiliasi", token, {
+      method: "DELETE",
+      body: JSON.stringify(data),
+    });
+    return { success: true };
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    return { error: "Terjadi kesalahan saat mereset data rekonsiliasi." };
+  }
+}
+
+export async function syncAllRekonsiliasiPajakAction(data: { entityId: string; year: number }) {
+  const token = await getPhpToken();
+  try {
+    await phpFetch("/api/pendapatan/rekonsiliasi/sync", token, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return { success: true };
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    return { error: "Terjadi kesalahan saat menyinkronkan rekonsiliasi." };
+  }
+}

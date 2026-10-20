@@ -2137,7 +2137,7 @@ export function PayrollClient({
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
                               <div className="flex flex-col gap-1 items-start">
                                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
-                                  {tx.jenisInputNama}
+                                  {tx.jenisInputNama === "Entry Jurnal" ? "Jurnal Umum" : tx.jenisInputNama}
                                 </span>
                                 {tx.isCrossingEntry && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
@@ -4159,7 +4159,7 @@ export function PayrollClient({
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
                               <div className="flex flex-col gap-1 items-start">
                                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
-                                  {tx.jenisInputNama}
+                                  {tx.jenisInputNama === "Entry Jurnal" ? "Jurnal Umum" : tx.jenisInputNama}
                                 </span>
                                 {tx.isCrossingEntry && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
@@ -5158,7 +5158,7 @@ export function PayrollClient({
                           <td className="py-2.5 px-3 whitespace-nowrap border-b border-r border-border">
                             <div className="flex flex-col gap-1 items-start">
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-subtle border border-border text-navy-text">
-                                {tx.jenisInputNama}
+                                {tx.jenisInputNama === "Entry Jurnal" ? "Jurnal Umum" : tx.jenisInputNama}
                               </span>
                               {tx.isCrossingEntry && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">

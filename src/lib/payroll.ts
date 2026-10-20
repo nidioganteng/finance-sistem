@@ -332,6 +332,11 @@ export type HonorTenagaAhliItem = {
   isTurunLapangan?: boolean;
   tanggalMulaiTugas?: string | null;
   tanggalSelesaiTugas?: string | null;
+  isPegawaiTetap?: boolean;
+  isPegawaiTetapLain?: boolean;
+  pegawaiHomeEntityId?: string | null;
+  pegawaiHomeEntityName?: string | null;
+  pegawaiHomeEntityKey?: string | null;
 };
 
 export type TenagaAhliProjectAssignment = {
@@ -402,6 +407,10 @@ export type RekananTenagaAhliItem = {
   isTurunLapangan?: boolean;
   nominalHonorBulanan?: number;
   nominalHonorBulananFmt?: string;
+  isPegawaiTetap?: boolean;
+  pegawaiHomeEntityId?: string | null;
+  pegawaiHomeEntityName?: string | null;
+  pegawaiHomeEntityKey?: string | null;
   proyekList?: TenagaAhliProjectAssignment[];
   riwayatGaji?: RiwayatGajiTenagaAhliItem[];
 };

@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } fr
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
 import { saveGajiTenagaAhliKontrakAction } from "@/lib/actions/payroll";
 import {
-  bulanBerikutnya, bulanDariSpmk, penugasanPadaEntitas, ringkasanGajiTenagaAhli,
+  bulanBerikutnya, bulanDariSpmk, penugasanPadaEntitas, ringkasanGajiTenagaAhli, pphGajiTenagaAhli,
   type GajiTenagaAhliBulan, type ReferensiGajiTenagaAhli, type GajiTenagaAhliKontrak,
 } from "@/lib/tenaga-ahli-gaji";
 
@@ -75,7 +75,7 @@ function jadwalPenugasan(person: RekananTenagaAhliItem, project: TenagaAhliProje
     const month = `${item.tahun}-${String(item.bulan).padStart(2, "0")}`;
     if (!byMonth.has(month)) byMonth.set(month, { bulan: month, nominal: null, catatan: "" });
   }
-  return [...byMonth.values()].sort((a, b) => a.bulan.localeCompare(b.bulan));
+  return [...byMonth.values()].map(row => row.pph21 === undefined ? { ...row, pph21: pphGajiTenagaAhli(row, (person.riwayatGaji || []).filter(payment => payment.projectId === project.projectId && `${payment.tahun}-${String(payment.bulan).padStart(2, "0")}` === row.bulan)) } : row).sort((a, b) => a.bulan.localeCompare(b.bulan));
 }
 
 export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual }: {
@@ -150,6 +150,8 @@ function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNaviga
     if (!nominal || nominal <= 0) { setError("Isi gaji negosiasi lebih dari nol."); return; }
     if (!rows.length) { setError("Lengkapi tanggal kontrak terlebih dahulu."); return; }
     if (rows.reduce((total, row) => total + (row.nominal || 0), 0) > nominal + 0.001) { setError("Total gaji bulanan melebihi total negosiasi kontrak."); return; }
+    const missingTax = rows.find(row => (row.nominal || 0) > 0 && row.pph21 == null);
+    if (missingTax) { setError(`Isi PPh ${monthLabel(missingTax.bulan)} secara manual (isi 0 bila tanpa potongan).`); return; }
     startTransition(async () => {
       try {
         const result = await saveGajiTenagaAhliKontrakAction({ rekananId: person.id, projectId: project.projectId,
@@ -221,6 +223,8 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
     if (!negosiasi || negosiasi <= 0) { setError("Isi gaji negosiasi lebih dari nol terlebih dahulu."); return; }
     if (!rows.length) { setError("Isi periode SPMK atau tambahkan minimal satu bulan gaji."); return; }
     if (rows.reduce((total, row) => total + (row.nominal || 0), 0) > negosiasi + 0.001) { setError("Total gaji bulanan melebihi total negosiasi kontrak."); return; }
+    const missingTax = rows.find(row => (row.nominal || 0) > 0 && row.pph21 == null);
+    if (missingTax) { setError(`Isi PPh ${monthLabel(missingTax.bulan)} secara manual (isi 0 bila tanpa potongan).`); return; }
     startTransition(async () => {
       try {
         const result = await saveGajiTenagaAhliKontrakAction({ rekananId: person.id, projectId: project.projectId,
@@ -290,15 +294,17 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
             </select>
             <button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />Tambahkan ke jadwal</button>
       </div>}
-      <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
+      <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[160px]">PPh (Rp) / netto</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
         {visibleRows.filter(row => !onlyNotes || row.catatan.trim()).map(row => {
           const history = person.riwayatGaji?.filter(item => item.projectId === project.projectId && `${item.tahun}-${String(item.bulan).padStart(2, "0")}` === row.bulan) || [];
           const hasManualPayment = history.some(item => !item.id.startsWith("gaji-"));
+          const tax = pphGajiTenagaAhli(row, history);
           const paid = history.reduce((sum, item) => sum + item.nominalHonor, 0);
           const remaining = row.nominal === null ? null : row.nominal - paid;
           return <tr key={row.bulan} className={`border-t border-border ${row.catatan.trim() ? "bg-amber-50/50 dark:bg-amber-950/10" : ""}`}>
             <td className="px-3 py-2 align-middle font-semibold whitespace-nowrap">{monthLabel(row.bulan)}{(ref.spmkMulai && row.bulan < ref.spmkMulai.slice(0, 7)) || (ref.spmkSelesai && row.bulan > ref.spmkSelesai.slice(0, 7)) ? <div className="text-xs text-muted-faint font-normal mt-1">Di luar periode SPMK</div> : null}</td>
-            <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value } : item)); changed(); }} /></td>
+            <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value, ...(value === null ? { pph21: null } : value === 0 ? { pph21: 0 } : {}) } : item)); changed(); }} /></td>
+            <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`PPh ${monthLabel(row.bulan)}`} disabled={!canEdit || pending || row.nominal === null} placeholder="PPh" value={tax} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, pph21: value } : item)); changed(); }} /><div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-faint"><span>Netto {row.nominal === null || tax === null ? "—" : rp(row.nominal - tax)}</span></div></td>
             <td className="px-3 py-2 align-middle"><div className="relative">
               <textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={`${inputClass} block resize-none overflow-hidden !py-1 !pr-9`} rows={1} maxLength={1000} disabled={!canEdit || pending} placeholder="Catatan kendala…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />
               {row.catatan.trim() && <button type="button" className="absolute right-0 top-0 inline-flex h-8 w-8 items-center justify-center rounded-r-lg text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-950/50" aria-label={`Ada kendala ${monthLabel(row.bulan)}: lihat catatan lengkap`} title="Ada kendala · lihat catatan lengkap" onClick={() => setActiveNoteMonth(row.bulan)}><AlertTriangle size={14} /></button>}
@@ -309,9 +315,9 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
             {canEdit && <td className="px-3 py-2 align-middle"><button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-faint hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" disabled={pending || hasManualPayment} title={hasManualPayment ? "Bulan dengan pembayaran manual tidak dapat dihapus dari jadwal" : `Hapus ${monthLabel(row.bulan)}`} aria-label={`Hapus ${monthLabel(row.bulan)}`} onClick={() => setDeleteMonth(row.bulan)}><Trash2 size={14} /></button></td>}
           </tr>;
         })}
-        {visibleRows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-muted-faint text-center">Belum ada jadwal untuk {monthLabel(activePeriod)}. Pilih Semua bulan kontrak atau tambahkan bulan.</td></tr>}
+        {visibleRows.length === 0 && <tr><td colSpan={canEdit ? 6 : 5} className="p-6 text-muted-faint text-center">Belum ada jadwal untuk {monthLabel(activePeriod)}. Pilih Semua bulan kontrak atau tambahkan bulan.</td></tr>}
       </tbody></table></div>
-      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}<span className="block mt-0.5">Menyimpan gaji sekaligus mencatat pembayaran otomatis untuk semua bulan terisi.</span></p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji & pembayaran"}</button>}</div>
+      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}<span className="block mt-0.5">Gaji dan PPh tersimpan untuk proyek {project.projectCode || project.projectName}. Bruto masuk pengeluaran proyek; PPh mengurangi netto.</span></p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji & pembayaran"}</button>}</div>
     </div>}
     <dialog ref={deleteDialog} onClose={() => setDeleteMonth(null)} aria-labelledby="delete-salary-month-title" aria-describedby="delete-salary-month-description" className="fixed inset-auto left-1/2 top-1/2 !m-0 w-[calc(100%_-_2rem)] max-w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border-soft bg-surface-card p-0 text-foreground shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
       {deleteRow && <>

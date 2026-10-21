@@ -15,6 +15,11 @@ export async function markAllNotifikasiRead() {
   }
 }
 
+export async function deleteNotifikasiAction(id: string) {
+  const token = await getPhpToken();
+  await phpFetch(`/api/notifikasi/${id}`, token, { method: "DELETE" });
+}
+
 export async function markNotifikasiRead(id: string) {
   try {
     const token = await getPhpToken();

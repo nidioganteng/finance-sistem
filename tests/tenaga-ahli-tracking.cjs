@@ -156,4 +156,18 @@ const expandedHtml = renderToStaticMarkup(React.createElement(expandedReport, en
 assert.match(expandedHtml, /entity=kencana[^" ]*proyekAhliId=kn-001/);
 assert.match(expandedHtml, /entity=gaharu[^" ]*proyekAhliId=gh-001/);
 assert.equal(tracking.groupTenagaAhliPeople([], multiPeople, undefined, 'tidak cocok').length, 0);
+const negotiatedPeople = [{ ...people[0], proyekList: [{ ...project('project-1', [salary('2026-02', 10000000), salary('2026-03', 10000000), salary('2026-04', null)]), gajiKontrak: { gajiNegosiasi: 35000000, gajiRab: 50000000, jadwal: [salary('2026-02', 10000000), salary('2026-03', 10000000), salary('2026-04', null)] } }] }];
+const negotiatedRows = build(negotiatedPeople, [feb, payment('mar-full', 3, 10000000)]);
+assert.deepEqual([sum(negotiatedRows).totalNegosiasi, sum(negotiatedRows).dibayarKontrak, sum(negotiatedRows).balanceNegosiasi], [35000000, 20000000, 15000000]);
+const februaryOnly = filter(negotiatedRows, { entityId: 'A', year: 2026, month: 2 });
+assert.deepEqual([sum(februaryOnly).dibayar, sum(februaryOnly).balanceNegosiasi], [10000000, 15000000]);
+const emptyApril = filter(negotiatedRows, { entityId: 'A', year: 2026, month: 4 });
+assert.equal(sum(emptyApril).gajiTerisi, null);
+assert.equal(sum(emptyApril).balanceNegosiasi, 15000000);
+const completedRows = build(negotiatedPeople, [feb, payment('mar-full', 3, 10000000), payment('rest', 4, 15000000)]);
+assert.equal(sum(completedRows).balanceNegosiasi, 0);
+for (const dimension of ['nama', 'proyek', 'bulan', 'holding']) {
+  const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows: negotiatedRows, people: negotiatedPeople, group: dimension, entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' }));
+  assert.match(html, /Balance negosiasi/); assert.match(html, /35\.000\.000/); assert.match(html, /15\.000\.000/);
+}
 console.log('Lulus: total semua rekap konsisten, dua bulan/parsial, edit gaji terbaru, entitas/tahun, gaji belum dibayar, deduplikasi, dan tracking Oktober hanya Oktober.');

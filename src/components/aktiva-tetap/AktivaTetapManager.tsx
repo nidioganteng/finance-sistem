@@ -389,11 +389,6 @@ export function AktivaTetapManager({
                           <span className={`${isSelected ? "text-[16px]" : "text-[12px]"} font-semibold tabular-nums break-words ${metric.tone}`}>{metric.value}</span>
                         </span>
                       ))}
-                      {rekap.kategori === "TANAH" && (
-                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium text-brand ${isSelected ? "sm:col-span-3" : "pt-1"}`}>
-                          <CheckCircle2 size={12} /> Tanah tidak disusutkan
-                        </span>
-                      )}
                     </div>
                   </button>
                 );

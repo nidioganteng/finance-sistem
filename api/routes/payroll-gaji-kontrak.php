@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__ . '/../helpers/kas-helpers.php';
 
 $user = require_auth();
 if (!in_array($user['role'] ?? '', ['SUPER_ADMIN', 'MANAJER_KEUANGAN', 'STAF_KEUANGAN'], true)) {
@@ -65,6 +66,7 @@ try {
     $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET gajiNegosiasi = ?, basisNegosiasi = ?, jadwalJson = ?, revision = revision + 1 WHERE id = ?')
         ->execute([$nominal, $basis, json_encode($jadwal, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), $existing['id']]);
     tenaga_ahli_sync_pembayaran($pdo, $person, $rekanan_id, $project_id, $jadwal, $old_rows, $nominal);
+    sync_project_spend($pdo, $project_id);
     $stmt->execute([$rekanan_id, $project_id]);
     $saved = tenaga_ahli_gaji_format($stmt->fetch(PDO::FETCH_ASSOC));
     log_activity($user['id'], "Simpan negosiasi, gaji dan pembayaran otomatis tenaga ahli: {$person['nama']}", 'FINANCIAL_CHANGE', [

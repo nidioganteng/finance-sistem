@@ -100,6 +100,8 @@ function is_pegawai_eligible_for_month(array $p, int $year, int $month, bool $ha
 function ensure_tenaga_ahli_tables(PDO $pdo): void {
     static $done = false;
     if ($done) return;
+
+    // TenagaAhliProject: tabel multi-proyek per freelance
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS `TenagaAhliProject` (
           `id` VARCHAR(36) NOT NULL PRIMARY KEY,
@@ -115,6 +117,33 @@ function ensure_tenaga_ahli_tables(PDO $pdo): void {
           INDEX `idx_tap_project` (`projectId`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+
+    // Rekanan.ptkp: status PTKP untuk tenaga ahli lintas entitas
+    $col = $pdo->query("SHOW COLUMNS FROM `Rekanan` LIKE 'ptkp'")->fetch();
+    if (!$col) {
+        $pdo->exec("ALTER TABLE `Rekanan` ADD COLUMN `ptkp` VARCHAR(20) NOT NULL DEFAULT 'TK/0' AFTER `entityId`");
+    }
+
+    // Rekanan: kolom masa tugas & penugasan tenaga ahli
+    $cols_rekanan = [
+        'tanggalMulaiTugas'    => "ALTER TABLE `Rekanan` ADD COLUMN `tanggalMulaiTugas` DATE NULL AFTER `ptkp`",
+        'tanggalSelesaiTugas'  => "ALTER TABLE `Rekanan` ADD COLUMN `tanggalSelesaiTugas` DATE NULL AFTER `tanggalMulaiTugas`",
+        'projectId'            => "ALTER TABLE `Rekanan` ADD COLUMN `projectId` VARCHAR(191) NULL AFTER `tanggalSelesaiTugas`",
+        'isTurunLapangan'      => "ALTER TABLE `Rekanan` ADD COLUMN `isTurunLapangan` TINYINT(1) NOT NULL DEFAULT 1 AFTER `projectId`",
+        'nominalHonorBulanan'  => "ALTER TABLE `Rekanan` ADD COLUMN `nominalHonorBulanan` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `isTurunLapangan`",
+    ];
+    foreach ($cols_rekanan as $col_name => $ddl) {
+        $exists = $pdo->query("SHOW COLUMNS FROM `Rekanan` LIKE '$col_name'")->fetch();
+        if (!$exists) $pdo->exec($ddl);
+    }
+
+    // GajiPegawaiBulanan.totalGajiTerlaporPajak: basis PPh 21 terlapor ke SPT
+    $col2 = $pdo->query("SHOW COLUMNS FROM `GajiPegawaiBulanan` LIKE 'totalGajiTerlaporPajak'")->fetch();
+    if (!$col2) {
+        $pdo->exec("ALTER TABLE `GajiPegawaiBulanan` ADD COLUMN `totalGajiTerlaporPajak` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `totalGajiKotor`");
+        $pdo->exec("UPDATE `GajiPegawaiBulanan` SET `totalGajiTerlaporPajak` = `totalGajiKotor` WHERE `totalGajiTerlaporPajak` = 0.00");
+    }
+
     $done = true;
 }
 

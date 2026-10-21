@@ -5,45 +5,32 @@ project + konvensi yang sudah dipakai, supaya kerjaan lanjutannya konsisten deng
 bukan mulai dari gaya/asumsi baru.
 
 > [!IMPORTANT]
-> **Panduan Blueprint Lengkap & Alur Kerja Bisnis End-to-End**:
-> Seluruh alur bisnis, aturan akuntansi, alur E-Faktur tagihan kuitansi bruto, multi-termin amrahan, realisasi kas masuk dari Jurnal Umum, perhitungan PPh 21 & Payroll, serta struktur inter-company crossing entry terdokumentasi lengkap di **`WORKFLOW.md`**. Baca file tersebut untuk pemahaman menyeluruh tentang alur sistem.
+> **Status project saat ini**: Semua fitur dan alur bisnis sudah dibangun lengkap.
+> Fokus pengerjaan sekarang adalah **perbaikan & peningkatan UI** — bukan menambah fitur baru.
 
 ---
 
 ## Tentang project ini
 
 Sistem Data Keuangan internal untuk **Gaharu Sempana Group**, holding dengan 4 anak perusahaan
-konstruksi/properti (Gaharu, Kencana, Tataring, Cipta Asri) + 1 entitas "Umum" (ruang transit untuk
-transaksi KSO / pinjam bendera antar entitas). Awalnya dibuat sebagai Kerja Praktek oleh tim 2
-mahasiswa Undiknas.
+konstruksi/properti (Gaharu, Kencana, Tataring, Cipta Asri) + 1 entitas "Umum/KP" (ruang transit
+untuk transaksi KSO / pinjam bendera antar entitas).
 
-Project ini adalah hasil konversi dari mockup desain (dibuat di Claude Design) ke aplikasi
-full-stack sungguhan. **File mockup asli ada di `design-reference/`** (kalau belum ada, minta user
-taruh `Sistem_Data_Keuangan_Gaharu_Sempana_dc.html` dan `support.js` di situ) — file itu HTML/CSS/JS
-statis dengan custom template syntax (`{{ }}`, `<sc-if>`, `<sc-for>`) yang dirender oleh `support.js`,
-BUKAN React beneran. Isinya cuma referensi visual & struktur data dummy, jangan pernah disalin
-mentah-mentah.
-
-**Cara pakai mockup itu untuk halaman yang belum dibangun:**
-1. Buka file mockup, cari blok `<sc-if value="{{ isXxxScreen }}">...</sc-if>` yang sesuai nama layar.
-2. Baca struktur visual (warna, spacing, tabel/card apa aja) dan bentuk data yang dipakai (lihat
-   `renderVals()` di `<script type="text/x-dc" data-dc-script>` untuk tau field-field apa yang
-   dibutuhkan layar itu).
-3. Bangun ulang pakai komponen React/Tailwind asli mengikuti pola yang sudah ada di halaman lain
-   (lihat "Konvensi" di bawah), JANGAN import atau jalankan `support.js`.
-4. Ganti semua data dummy dengan fetch ke PHP backend via `phpFetch()`.
+File mockup asli ada di `design-reference/` (`Sistem_Data_Keuangan_Gaharu_Sempana_dc.html` +
+`support.js`) — HTML/CSS/JS statis dengan custom template syntax (`{{ }}`, `<sc-if>`, `<sc-for>`)
+yang dirender `support.js`. Dipakai sebagai **referensi visual saja**, JANGAN dijalankan atau
+disalin mentah-mentah.
 
 ---
 
 ## Tech stack
 
-Branch ini (`feat/php-conversion`) adalah versi yang ditargetkan ke **Hostinger shared hosting**
-yang tidak support Node.js sebagai runtime. Arsitekturnya:
+Branch ini (`feat/php-conversion`) ditargetkan ke **Hostinger shared hosting** (tanpa Node.js
+runtime). Arsitekturnya:
 
-- **Frontend**: Next.js 14 (App Router, TypeScript) — di-deploy sebagai static export atau Node.js
-  edge (bergantung konfigurasi Hostinger)
-- **Backend**: PHP murni (`api/` folder di root) — plain PHP + PDO, tanpa framework. Berjalan di
-  Apache/PHP Hostinger. 26+ route files, satu entry point `api/index.php`.
+- **Frontend**: Next.js 14 (App Router, TypeScript) — static export atau Node.js edge
+- **Backend**: PHP murni (`api/` folder di root) — plain PHP + PDO, tanpa framework. Apache/PHP
+  Hostinger. 26+ route files, satu entry point `api/index.php`.
 - **Database**: MySQL — diakses langsung via PDO dari PHP, **bukan** dari Next.js
 - **Auth**: NextAuth v4 (Credentials provider, JWT session). Credentials di-validate ke
   `POST /api/auth/login` PHP. Token PHP (JWT) disimpan di session sebagai `session.user.phpToken`
@@ -52,16 +39,12 @@ yang tidak support Node.js sebagai runtime. Arsitekturnya:
 - Tailwind CSS dengan token warna custom di `tailwind.config.ts`
 - recharts untuk chart, lucide-react untuk icon
 
-**Perbedaan kunci dari branch `develop` (Next.js full-stack + Prisma):**
-- Tidak ada Prisma, tidak ada `lib/prisma.ts`, tidak ada `prisma/` folder
-- Enum TypeScript (Role, TerminStatus, dll) didefinisikan lokal di `src/types/app-enums.ts`
-  (bukan import dari `@prisma/client`)
-- Semua query DB ada di PHP (`api/routes/*.php`), bukan di `lib/*.ts`
-- `lib/*.ts` tetap ada tapi isinya `phpFetch()` ke endpoint PHP, bukan query Prisma langsung
+**Tidak ada Prisma** di branch ini — enum TypeScript didefinisikan lokal di
+`src/types/app-enums.ts`, semua query DB ada di PHP (`api/routes/*.php`).
 
 ---
 
-## Struktur & konvensi yang SUDAH dipakai — ikuti pola ini untuk halaman baru
+## Struktur & konvensi yang SUDAH dipakai — ikuti pola ini
 
 ```
 src/
@@ -138,7 +121,7 @@ Enum-enum TypeScript yang masih dipakai di frontend ada di `src/types/app-enums.
 - **JenisInputTransaksi** (Kas Kecil/Besar/Bank Buku bawaan + custom buatan Staf)
 - **Transaction** — satu baris = satu leg akun. Beberapa baris berbagi `noBukti` untuk satu
   transaksi multi-akun. `debit`/`kredit` merepresentasikan arah dana (bukan double-entry murni).
-- **LoadingDockTransaksi** — transaksi KSO/pinjam bendera di entitas Umum.
+- **LoadingDockTransaksi** — transaksi KSO/pinjam bendera di entitas Umum/KP.
 - **FakturPendapatan** — faktur pajak (e-faktur), sumber data Laporan Pendapatan.
 - **RekonsiliasiPajakBulanan** — input DPP/PPN/PPh yang dilaporkan ke kantor pajak per bulan.
 - **Rekanan** (VENDOR/KLIEN/TENAGA_AHLI/SUBKONTRAKTOR/LAINNYA), **Pegawai**, **GajiPegawaiBulanan**,
@@ -146,7 +129,7 @@ Enum-enum TypeScript yang masih dipakai di frontend ada di `src/types/app-enums.
 
 ---
 
-## Sudah dibangun
+## Fitur yang sudah dibangun (semua lengkap)
 
 - **Auth & akun**: Login, Register (alur approval), Manajemen Pengguna.
 - **Overview**: Dashboard, Notifikasi, Log Aktivitas.
@@ -156,6 +139,43 @@ Enum-enum TypeScript yang masih dipakai di frontend ada di `src/types/app-enums.
   Laporan Pajak (Rekap E-Faktur + Rekonsiliasi), Aktiva Tetap, Payroll.
 - **Pengaturan**: Bagan Akun, Dokumen & SOP, Kelola Jenis Input, Rekanan, Validasi Pajak 3 Arah.
 - **Dark mode**: aktif di semua halaman.
+
+---
+
+## Aturan akuntansi & kalkulasi penting
+
+**Saldo akun:**
+- Debet-normal (ASET, BEBAN): `saldo_akhir = saldo_awal + debit - kredit`
+- Kredit-normal (KEWAJIBAN, MODAL, PENDAPATAN): `saldo_akhir = saldo_awal + kredit - debit`
+- Kontra-aset (akun 210, 1001 Akumulasi Penyusutan): **kredit-normal** meski kategorinya ASET
+
+**E-Faktur pendapatan (input berbasis nilai kuitansi bruto 111%):**
+- `DPP = round(100/111 × bruto)`
+- `PPN = round(11/111 × bruto)`
+- `PPh = round(DPP × tarif)` — default 3.5%, jangan hardcode, ikuti tarif aktif
+- `Laba = DPP - PPh`
+- Tarif PPN tidak konsisten historis (ada 11%, ada 12%) — selalu pakai parameter, bukan konstanta
+
+**Jurnal transaksi pencairan bank (4-leg otomatis):**
+- Debit: Kas/Bank (netto cair)
+- Debit: PPN Dipungut (akun 535)
+- Debit: Potongan PPh (akun 534)
+- Kredit: Pendapatan (akun 4xx, nilai bruto)
+
+**`autoPostedFromJurnal=true`** pada Transaction = mirror row dari jurnal transaksi, di-exclude
+dari laporan Laba Rugi agar tidak double-count.
+
+**Crossing entry antar entitas:**
+- Entitas A bayar untuk B → A: Debit Piutang ke B (11x) | Kredit Kas
+- Otomatis: B: Debit Kas | Kredit Hutang ke A (31x)
+- Linked via `extraFieldsJson.crossingGroupId`
+
+**PPh 21 TER Payroll:** 39-bracket tarif efektif, PTKP-aware (TK/0 s.d K/3). Lihat
+`src/lib/payroll.ts` untuk tabel bracket lengkap.
+
+**Penyusutan aset garis lurus:**
+- `beban/bulan = (harga - residu) / umur_bulan`
+- Tanah: tidak disusutkan (PSAK 16)
 
 ---
 
@@ -180,131 +200,6 @@ npm run dev
 - `NEXT_PUBLIC_PHP_API_URL` — sama, untuk client-side (kalau perlu)
 - `NEXTAUTH_SECRET` — random secret untuk NextAuth JWT
 - `NEXTAUTH_URL` — URL Next.js app
-
----
-
-## Kontrol Piutang & Termin — konteks bisnis
-
-Halaman `/piutang` adalah **gabungan dua fungsi**: (A) Loading Dock untuk pengeluaran proyek yang
-belum resmi berkontrak, dan (B) audit/pelacakan termin untuk proyek yang sudah berkontrak.
-
-⚠️ **Ini bagian paling kompleks di sistem** (integrasi sistem eksternal + audit trail + status periode).
-
-### A. Loading Dock
-
-Loading Dock adalah wadah sementara di bawah **Entitas "Umum"**, mencatat pengeluaran proyek yang
-belum jelas bendera entitasnya atau belum ada kontrak resmi.
-
-⚠️ **Temuan (perlu konfirmasi klien)**: "Umum" kemungkinan bukan area staging virtual, tapi nama
-informal untuk entitas kelima yang nama resminya **Kardi Pratama (kode: KP)**, entitas nyata sejajar
-dengan Gaharu/Kencana/Tataring/Cipta Asri. Kalau benar, transaksi Loading Dock tercatat sebagai
-transaksi resmi milik KP, bukan entitas placeholder. Jangan bangun "Umum" sebagai entitas virtual
-sebelum dikonfirmasi ke klien.
-
-**Mekanisme akhir bulan** — Manajer Keuangan review Loading Dock, 3 kemungkinan aksi:
-1. Proyek resmi berkontrak → reklasifikasi ke entitas penerima (tanpa input ulang)
-2. Proyek batal → alihkan jadi Biaya Marketing
-3. Masih menggantung → biarkan, tinjau bulan depan
-
-### B. Audit Termin
-
-⚠️ **Integrasi Sidamon** (sistem eksternal, BUKAN bagian codebase ini):
-1. Admin Sidamon input nama proyek + nilai kontrak di Sidamon
-2. Data sinkron ke sistem keuangan sebagai Piutang awal
-3. Staf Keuangan input pembayaran termin di sistem keuangan **setelah dana masuk rekening**
-4. Data pembayaran sinkron balik ke Sidamon
-
-**Belum bisa diimplementasi** sebelum ada dokumentasi API Sidamon. Untuk sementara, nilai kontrak
-diinput manual sebagai placeholder.
-
-**Notifikasi 80%**: begitu total termin yang dibayar ≥ 80% Nilai Kontrak, sistem kirim notifikasi
-in-app ke CEO/Super Admin (ini tidak bergantung integrasi Sidamon, sudah bisa dibangun).
-
-### C. Backdate Alert & Close Book
-
-Kalau reklasifikasi Loading Dock mengubah data di bulan yang sudah ditutup (Close Book), sistem
-harus mencatatnya sebagai "transaksi backdate" dan kirim notifikasi ke CEO.
-
-**Prasyarat belum ada**: sistem belum punya konsep eksplisit status periode per bulan
-(terbuka/ditutup). Perlu dikonfirmasi ke tim: siapa yang berwenang tutup buku bulanan, kapan
-waktunya, apakah bisa dibuka lagi untuk koreksi.
-
----
-
-## Laporan Pendapatan (Rekap E-Faktur) — konteks bisnis
-
-Halaman `/pajak` mencakup Laporan Pendapatan. Ini **beda alur** dari Neraca/Laba Rugi/Arus Kas —
-sumber datanya adalah **faktur pajak per transaksi**, bukan Buku Besar.
-
-*Disusun dari hasil membaca sheet `PENDAPATAN` di file Excel asli klien (`LAPORAN_KEUANGAN_TB_2026.xlsx`).*
-
-### Input: Data per Faktur Pajak
-
-Satu baris = satu transaksi penjualan yang sudah terbit faktur pajaknya.
-
-| Field | Wajib | Catatan |
-|---|---|---|
-| NPWP | ya | NPWP klien/rekanan |
-| No. Faktur | ya | Nomor e-faktur resmi |
-| Masa Pajak | ya | Bulan pajak |
-| Nama Rekanan | ya | Nama klien (sering instansi pemerintah) |
-| Nama JKP | ya | Deskripsi jasa yang difakturkan |
-| DPP | ya | Dasar Pengenaan Pajak |
-| DPP Nilai Lain | ya | Varian DPP, basis hitung PPN |
-| Kode Jenis Proyek | ya | 1 = Perencanaan, 2 = Pengawasan |
-| Pekerjaan Perusahaan | tidak | Porsi nilai pekerjaan milik entitas sendiri |
-| Pekerjaan yang Dipinjam | tidak | Porsi pakai bendera/lisensi entitas lain dalam grup |
-| Tanggal Terima | ya | Tanggal uang benar-benar diterima di bank |
-| Bank | ya | Rekening tujuan (BRI/BPD/MDR/BNI dst) |
-| Nominal Diterima | ya | Nominal yang cair ke rekening |
-| Kode Proyek | tidak | Dari daftar proyek Kontrol Piutang, kalau terkait proyek berkontrak |
-
-⚠️ Field Tanggal Terima/Bank/Nominal Diterima idealnya terhubung ke transaksi Bank Buku yang sudah
-ada (pilih transaksi penerimaan), bukan diketik ulang manual, supaya tidak dobel pencatatan.
-
-### Proses Otomatis: Perhitungan Pajak
-
-| Field | Formula |
-|---|---|
-| PPN | `DPP Nilai Lain × tarif PPN` |
-| PPh | `DPP × 3.5%` |
-| Nilai Proyek | `DPP × 111/100` |
-| Laba Setelah Pajak | `Nilai Proyek − PPN − PPh` |
-
-⚠️ Tarif PPN **tidak konsisten** di data asli (ada 12%, ada 11%) karena mengikuti perubahan tarif
-pemerintah. **Jangan hardcode satu tarif.** Tarif PPN harus parameter yang bisa diatur per periode.
-
-### Output: Tiga Lapis Rekap
-
-1. **Total Periode** — jumlah semua faktur (DPP, PPN, PPh, Nilai Proyek, Laba)
-2. **Rekap Bulanan** — agregasi otomatis per bulan, pemantauan tren
-3. **Rekonsiliasi vs Dilaporkan ke Pajak** — input terpisah "DPP Terlapor" dan "Pajak Terlapor"
-   per bulan (nilai yang benar-benar dilaporkan ke kantor pajak). Sistem hitung Selisih = rekap
-   faktur − terlapor. Selisih ≠ 0 = indikasi faktur belum/salah dilaporkan, perlu visual merah/kuning.
-
-### Aliran ke Laba Rugi
-
-**Total Nilai Proyek** dari rekap = angka Pendapatan di Laba Rugi.
-
-⚠️ **Bug di Excel asli**: Laba Rugi tidak menarik dari sheet Pendapatan, melainkan dari Daftar Akun
-lewat link yang putus → hasilnya Rp0, padahal nilai asli Rp160.938.123. Di sistem baru, pastikan
-baris Pendapatan di Laba Rugi menarik dari total Laporan Pendapatan (atau akumulasi Buku Besar
-kalau tiap faktur otomatis digenerate jadi baris Jurnal Umum).
-
-### Konsep Pekerjaan Perusahaan vs Pekerjaan yang Dipinjam
-
-Terkait praktik "pinjam bendera" (satu entitas mengerjakan proyek pakai lisensi entitas lain dalam
-grup). **Perlu dikonfirmasi ke klien**: kalau ada porsi "Pekerjaan yang Dipinjam", apakah otomatis
-menghasilkan entri Hutang/Piutang antar entitas? Jangan bangun otomatisasi ini sebelum dikonfirmasi.
-
-### Bug Excel yang Tidak Boleh Direplikasi
-
-| Temuan | Masalah | Rekomendasi |
-|---|---|---|
-| Formula `#REF!` di baris rekap tahunan | Referensi ke baris/sheet yang sudah dihapus | Validasi tiap kali struktur data berubah |
-| Dua nilai hardcode manual tanpa formula | Tidak bisa ditelusuri asalnya | Buat field input resmi dengan jejak (siapa, kapan) |
-| Rentang SUMIF rekap bulanan tidak konsisten | Berpotensi salah hitung saat data bertambah | Agregasi harus query dinamis berdasarkan field Masa Pajak |
-| Total rekap bulanan PPN melewatkan Januari | Kemungkinan salah ketik rentang SUM | Uji dengan data 12 bulan penuh |
 
 ---
 

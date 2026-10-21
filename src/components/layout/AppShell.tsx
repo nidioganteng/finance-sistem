@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Role } from "@/types/app-enums";
 import { Sidebar } from "./Sidebar";
+import { NavigationLoader } from "./NavigationLoader";
 
 export function AppShell({
   role,
@@ -57,6 +58,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-surface-page">
+      <Suspense><NavigationLoader /></Suspense>
       {/* ── Desktop sidebar ─────────────────────────────────────── */}
       <div className="hidden lg:block print:hidden flex-none">
         <Sidebar role={role} customInputs={customInputs} collapsed={collapsed} onToggleCollapse={() => setCollapsed((v) => !v)} unreadCount={unreadCount} />

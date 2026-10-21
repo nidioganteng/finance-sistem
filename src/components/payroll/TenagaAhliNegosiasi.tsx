@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type InputHTMLAttributes } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
@@ -15,6 +15,38 @@ const buttonClass = "inline-flex items-center justify-center gap-2 rounded-lg bo
 const rp = (value: number | null | undefined) => value == null ? "Belum tersedia" : new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 const monthLabel = (value: string) => new Date(`${value}-01T12:00:00`).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 const dateLabel = (value: string | null) => value ? value.split("-").reverse().join("/") : "Belum tersedia";
+
+function formatNominalInput(value: number | null): string {
+  return value === null ? "" : value.toLocaleString("id-ID", { maximumFractionDigits: 2 });
+}
+
+function parseNominalInput(value: string): number | null {
+  return value === "" ? null : Number(value.replace(/\./g, "").replace(",", "."));
+}
+
+function RupiahInput({ value, onValueChange, min = 0, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "min" | "max"> & {
+  value: number | null; onValueChange: (value: number | null) => void; min?: number;
+}) {
+  const [display, setDisplay] = useState(() => formatNominalInput(value));
+  useEffect(() => {
+    setDisplay(current => parseNominalInput(current) === value ? current : formatNominalInput(value));
+  }, [value]);
+  return <span className="relative block">
+    <span aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-faint pointer-events-none">Rp</span>
+    <input {...props} type="text" inputMode="decimal" className={`${inputClass} !pl-10 font-mono`} value={display}
+      onChange={event => {
+        const input = event.currentTarget;
+        const raw = input.value.replace(/[^0-9,]/g, "");
+        const [whole, ...fraction] = raw.split(",");
+        const integer = whole.replace(/^0+(?=\d)/, "") || (fraction.length ? "0" : "");
+        const formatted = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + (fraction.length ? `,${fraction.join("").slice(0, 2)}` : "");
+        const amount = parseNominalInput(formatted);
+        input.setCustomValidity(amount !== null && (amount < min || amount > 999999999999.99) ? `Nominal harus antara ${formatNominalInput(min)} dan 999.999.999.999,99.` : "");
+        setDisplay(formatted);
+        onValueChange(amount);
+      }} onBlur={event => { setDisplay(formatNominalInput(value)); props.onBlur?.(event); }} />
+  </span>;
+}
 
 function assignments(person: RekananTenagaAhliItem): TenagaAhliProjectAssignment[] {
   if (person.proyekList?.length) return person.proyekList;
@@ -128,7 +160,7 @@ function NegosiasiRow({ person, project, canEdit, onSaved, onNavigate }: {
     <td className="p-4"><div className="font-medium">{ref.namaPekerjaan || "Belum diisi"}</div><div className="text-xs text-muted-faint mt-1">{project.projectCode} · {project.projectName}</div><div className="text-xs mt-1">Entitas proyek: {project.projectEntityName || "—"}</div><span className="text-xs text-muted-faint">{contract?.sumber === "SIDAMON" ? "Sidamon" : "Input manual"}</span></td>
     <td className="p-4 whitespace-nowrap"><div>{ref.manMonth === null ? "Menman belum diisi" : `${ref.manMonth} MM`}</div><div className="font-mono mt-2">{rp(ref.gajiRab)}</div><div className="text-xs text-muted-faint">Gaji RAB</div></td>
     <td className="p-4">{canEdit && editing ? <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-2">
-      <input aria-label={`Gaji negosiasi ${person.nama}`} className={inputClass} type="number" min="0.01" max="999999999999.99" step="0.01" required disabled={pending} placeholder="Isi nominal negosiasi" value={nominal ?? ""} onChange={e => setNominal(e.target.value === "" ? null : Number(e.target.value))} />
+      <RupiahInput aria-label={`Gaji negosiasi ${person.nama}`} min={0.01} required disabled={pending} placeholder="Isi nominal negosiasi" value={nominal} onValueChange={setNominal} />
       <select aria-label={`Basis negosiasi ${person.nama}`} className={inputClass} value={basis} disabled={pending} onChange={e => setBasis(e.target.value as "BULAN" | "KONTRAK")}><option value="BULAN">Per bulan</option><option value="KONTRAK">Total kontrak</option></select>
       <button disabled={pending} type="submit" className={`${buttonClass} bg-navy text-white hover:bg-navy-light`}><Save size={13} />{pending ? "Menyimpan…" : "Simpan negosiasi"}</button>
     </form> : <div><div className="font-semibold font-mono whitespace-nowrap">{contract?.gajiNegosiasi ? rp(contract.gajiNegosiasi) : "Belum diisi"}</div>{contract?.gajiNegosiasi && <div className="text-xs text-muted-faint">{contract.basisNegosiasi === "BULAN" ? "per bulan" : "total kontrak"}</div>}{canEdit && <button className="text-xs mt-2 underline" onClick={() => { setNominal(contract?.gajiNegosiasi ?? null); setBasis(contract?.basisNegosiasi || "BULAN"); setEditing(true); }}>Ubah negosiasi</button>}</div>}
@@ -210,12 +242,12 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
       <fieldset disabled={!canEdit || pending || !manual} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <label className="text-xs space-y-1"><span>Nama pekerjaan</span><input className={inputClass} maxLength={255} value={ref.namaPekerjaan || ""} onChange={e => changeRef("namaPekerjaan", e.target.value || null)} /></label>
         <label className="text-xs space-y-1"><span>Menman (MM)</span><input className={inputClass} type="number" min="0" max="99999999.99" step="0.01" value={ref.manMonth ?? ""} onChange={e => changeRef("manMonth", e.target.value === "" ? null : Number(e.target.value))} /></label>
-        <label className="text-xs space-y-1"><span>Gaji RAB (Rp)</span><input className={inputClass} type="number" min="0" max="999999999999.99" step="0.01" value={ref.gajiRab ?? ""} onChange={e => changeRef("gajiRab", e.target.value === "" ? null : Number(e.target.value))} /></label>
+        <label className="text-xs space-y-1"><span>Gaji RAB (Rp)</span><RupiahInput aria-label="Gaji RAB" value={ref.gajiRab} onValueChange={value => changeRef("gajiRab", value)} /></label>
         <label className="text-xs space-y-1"><span>Mulai SPMK</span><input className={inputClass} type="date" min="2000-01-01" max="2199-12-31" value={ref.spmkMulai || ""} onChange={e => changeRef("spmkMulai", e.target.value || null)} /></label>
         <label className="text-xs space-y-1"><span>Selesai SPMK</span><input className={inputClass} type="date" min="2000-01-01" max="2199-12-31" value={ref.spmkSelesai || ""} onChange={e => changeRef("spmkSelesai", e.target.value || null)} /></label>
       </fieldset>
       <div className="border-t border-border pt-4 grid sm:grid-cols-2 gap-4">
-        <label className="text-xs space-y-1"><span className="font-semibold">Gaji negosiasi (Rp)</span><input className={inputClass} required type="number" min="0.01" max="999999999999.99" step="0.01" disabled={!canEdit || pending} value={negosiasi ?? ""} onChange={e => { setNegosiasi(e.target.value === "" ? null : Number(e.target.value)); changed(); }} /></label>
+        <label className="text-xs space-y-1"><span className="font-semibold">Gaji negosiasi (Rp)</span><RupiahInput aria-label="Gaji negosiasi" required min={0.01} disabled={!canEdit || pending} value={negosiasi} onValueChange={value => { setNegosiasi(value); changed(); }} /></label>
         <label className="text-xs space-y-1"><span>Basis gaji negosiasi</span><select className={inputClass} disabled={!canEdit || pending} value={basis} onChange={e => { setBasis(e.target.value as "BULAN" | "KONTRAK"); changed(); }}><option value="BULAN">Per bulan</option><option value="KONTRAK">Total kontrak</option></select></label>
       </div>
       {!ready && <p className="text-xs text-muted-faint">{rows.length} bulan mengikuti SPMK. Nominal bulanan tetap kosong dan diisi manual setelah negosiasi disimpan. Isi periode mulai dan selesai agar daftar bulan terbentuk.</p>}
@@ -234,7 +266,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
           const remaining = row.nominal === null ? null : row.nominal - paid;
           return <tr key={row.bulan} className={`border-t border-border ${row.catatan.trim() ? "bg-amber-50/50 dark:bg-amber-950/10" : ""}`}>
             <td className="p-4 align-top font-semibold whitespace-nowrap">{monthLabel(row.bulan)}{(ref.spmkMulai && row.bulan < ref.spmkMulai.slice(0, 7)) || (ref.spmkSelesai && row.bulan > ref.spmkSelesai.slice(0, 7)) ? <div className="text-xs text-muted-faint font-normal mt-1">Di luar periode SPMK</div> : null}</td>
-            <td className="p-4 align-top"><input aria-label={`Gaji ${monthLabel(row.bulan)}`} className={inputClass} type="number" min="0" max="999999999999.99" step="0.01" disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal ?? ""} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: e.target.value === "" ? null : Number(e.target.value) } : item)); changed(); }} /></td>
+            <td className="p-4 align-top"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value } : item)); changed(); }} /></td>
             <td className="p-4 align-top"><textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={inputClass} rows={2} maxLength={1000} disabled={!canEdit || pending} placeholder="Alasan penyesuaian / kendala gaji…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />{row.catatan.trim() && <details className="mt-1 text-xs text-amber-800 dark:text-amber-200"><summary className="cursor-pointer font-semibold"><AlertTriangle size={13} className="inline mr-1" />Ada kendala · lihat catatan</summary><p className="mt-2 whitespace-pre-wrap break-words">{row.catatan}</p></details>}</td>
             <td className="p-4 align-top text-xs"><div className="space-y-2">
               {history.length ? <div><span className="text-emerald-700 dark:text-emerald-300">Sudah dibayar / tercatat di payroll</span><div className="mt-1 font-mono">{rp(paid)}</div></div> : <span className="text-muted-faint">Belum ada pembayaran</span>}

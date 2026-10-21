@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type InputHTMLAttributes } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, Pencil, Plus, Save, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
 import { saveGajiTenagaAhliKontrakAction } from "@/lib/actions/payroll";
 import {
@@ -78,7 +78,7 @@ function jadwalPenugasan(person: RekananTenagaAhliItem, project: TenagaAhliProje
   return [...byMonth.values()].sort((a, b) => a.bulan.localeCompare(b.bulan));
 }
 
-export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual, onEdit }: {
+export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual }: {
   people: RekananTenagaAhliItem[];
   entityId?: string;
   year: number;
@@ -86,7 +86,6 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
   canEdit: boolean;
   search: string;
   onAddManual: () => void;
-  onEdit: (person: RekananTenagaAhliItem) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -112,7 +111,7 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
   }
   if (personId) {
     if (!selected) return <div className="rounded-xl border border-border bg-surface-card p-6 space-y-3"><p>Penugasan tenaga ahli tidak ditemukan pada entitas ini.</p><button className={buttonClass} onClick={() => navigate()}>Kembali ke daftar</button></div>;
-    return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} onEdit={() => onEdit(selected.person)} />;
+    return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} />;
   }
   const filtered = available.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
   const warningCount = available.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
@@ -124,16 +123,16 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
     {warningCount > 0 && <div role="status" className="m-5 flex gap-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 p-3 text-sm"><AlertTriangle size={18} className="shrink-0" />{warningCount} bulan memiliki catatan kendala. Buka rincian tenaga ahli untuk memeriksa alasannya.</div>}
     <div className="overflow-x-auto"><table className="w-full text-sm text-left">
       <thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Tenaga ahli / data diri</th><th className="p-4">Nama pekerjaan / proyek</th><th className="p-4">Menman / Gaji RAB</th><th className="p-4 min-w-[180px]">Gaji negosiasi</th><th className="p-4">Gaji & pembayaran (bruto)</th><th className="p-4">Tindak lanjut</th></tr></thead>
-      <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} onEdit={() => onEdit(person)} />)}
+      <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
         {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan tenaga ahli secara manual beserta penugasan proyeknya."}</td></tr>}
       </tbody>
     </table></div>
   </section>;
 }
 
-function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNavigate, onEdit }: {
+function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNavigate }: {
   person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; year: number; month?: number; canEdit: boolean;
-  onSaved: (contract: GajiTenagaAhliKontrak) => void; onNavigate: () => void; onEdit: () => void;
+  onSaved: (contract: GajiTenagaAhliKontrak) => void; onNavigate: () => void;
 }) {
   const router = useRouter();
   const contract = project.gajiKontrak;
@@ -160,7 +159,7 @@ function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNaviga
     });
   }
   return <tr className="border-t border-border align-top">
-    <td className="p-4"><div className="font-semibold text-navy-text">{person.nama}</div><div className="text-xs text-muted-faint mt-1">NIK: {person.nik || "—"}<br />NPWP: {person.npwp || "—"}</div><div className="mt-1 text-xs text-muted-faint">Terdaftar: {person.entityName || "—"}</div>{canEdit && <button className={`${buttonClass} mt-2 text-xs`} disabled={pending} onClick={onEdit}><Pencil size={12} />Edit data & proyek</button>}</td>
+    <td className="p-4"><div className="font-semibold text-navy-text">{person.nama}</div><div className="text-xs text-muted-faint mt-1">NIK: {person.nik || "—"}<br />NPWP: {person.npwp || "—"}</div><div className="mt-1 text-xs text-muted-faint">Terdaftar: {person.entityName || "—"}</div></td>
     <td className="p-4"><div className="font-medium">{ref.namaPekerjaan || "Belum diisi"}</div><div className="text-xs text-muted-faint mt-1">{project.projectCode} · {project.projectName}</div><div className="text-xs mt-1">Entitas proyek: {project.projectEntityName || "—"}</div><span className="text-xs text-muted-faint">{contract?.sumber === "SIDAMON" ? "Sidamon" : "Input manual"}</span></td>
     <td className="p-4 whitespace-nowrap"><div>{ref.manMonth === null ? "Menman belum diisi" : `${ref.manMonth} MM`}</div><div className="font-mono mt-2">{rp(ref.gajiRab)}</div><div className="text-xs text-muted-faint">Gaji RAB</div></td>
     <td className="p-4">{canEdit && editing ? <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-2">
@@ -175,14 +174,14 @@ function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNaviga
   </tr>;
 }
 
-function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved, onEdit }: {
+function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: {
   person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; year: number; month: number; canEdit: boolean;
-  onBack: () => void; onSaved: (contract: GajiTenagaAhliKontrak) => void; onEdit: () => void;
+  onBack: () => void; onSaved: (contract: GajiTenagaAhliKontrak) => void;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState(project.gajiKontrak);
-  const [ref, setRef] = useState<ReferensiGajiTenagaAhli>(() => referensiPenugasan(person, project));
-  const [negosiasi, setNegosiasi] = useState<number | null>(saved?.gajiNegosiasi ?? null);
+  const ref = referensiPenugasan(person, project);
+  const negosiasi = saved?.gajiNegosiasi ?? null;
   const [rows, setRows] = useState<GajiTenagaAhliBulan[]>(() => jadwalPenugasan(person, project));
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
@@ -217,12 +216,6 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved, on
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
   function changed() { setDirty(true); setSuccess(""); setError(""); }
-  function changeRef<K extends keyof ReferensiGajiTenagaAhli>(key: K, value: ReferensiGajiTenagaAhli[K]) {
-    const next = { ...ref, [key]: value };
-    setRef(next);
-    if (!ready && (key === "spmkMulai" || key === "spmkSelesai")) setRows(bulanDariSpmk(next.spmkMulai, next.spmkSelesai));
-    changed();
-  }
   function save() {
     setError(""); setSuccess("");
     if (!negosiasi || negosiasi <= 0) { setError("Isi gaji negosiasi lebih dari nol terlebih dahulu."); return; }
@@ -250,7 +243,6 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved, on
     <div className="flex flex-wrap items-center gap-3">
       <button className={buttonClass} disabled={pending} onClick={() => { if (!dirty || window.confirm("Ada perubahan belum disimpan. Kembali dan abaikan perubahan?")) onBack(); }}><ArrowLeft size={13} />Daftar tenaga ahli</button>
       <span className="text-xs text-muted-faint">Pengisian Gaji & Negosiasi / Tindak lanjut</span>
-      {canEdit && <button className={`${buttonClass} ml-auto`} disabled={pending} onClick={onEdit}><Pencil size={13} />Edit data & proyek</button>}
     </div>
     <header className="rounded-xl border border-border bg-surface-card px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h2 className="text-base font-bold text-navy-text">{person.nama}</h2><p className="text-xs text-muted-faint">{project.projectCode} · {project.projectName}</p></div>
@@ -267,21 +259,17 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved, on
       <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-navy-text">
         Kontrak & negosiasi <span className="ml-2 font-normal text-muted-faint">{manual ? "Manual" : "Sidamon"} · {ref.manMonth ?? "—"} MM · RAB {rp(ref.gajiRab)} · Negosiasi {rp(negosiasi)} / kontrak</span>
       </summary>
-      <form onSubmit={event => { event.preventDefault(); save(); }} className="border-t border-border px-4 py-3 space-y-3">
-      <fieldset disabled={!canEdit || pending || !manual} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <label className="text-xs space-y-1"><span>Nama pekerjaan</span><input className={inputClass} maxLength={255} value={ref.namaPekerjaan || ""} onChange={e => changeRef("namaPekerjaan", e.target.value || null)} /></label>
-        <label className="text-xs space-y-1"><span>Menman (MM)</span><input className={inputClass} type="number" min="0" max="99999999.99" step="0.01" value={ref.manMonth ?? ""} onChange={e => changeRef("manMonth", e.target.value === "" ? null : Number(e.target.value))} /></label>
-        <label className="text-xs space-y-1"><span>Gaji RAB (Rp)</span><RupiahInput aria-label="Gaji RAB" value={ref.gajiRab} onValueChange={value => changeRef("gajiRab", value)} /></label>
-        <label className="text-xs space-y-1"><span>Mulai SPMK</span><input className={inputClass} type="date" min="2000-01-01" max="2199-12-31" value={ref.spmkMulai || ""} onChange={e => changeRef("spmkMulai", e.target.value || null)} /></label>
-        <label className="text-xs space-y-1"><span>Selesai SPMK</span><input className={inputClass} type="date" min="2000-01-01" max="2199-12-31" value={ref.spmkSelesai || ""} onChange={e => changeRef("spmkSelesai", e.target.value || null)} /></label>
-      </fieldset>
-      <div className="border-t border-border pt-3 grid sm:grid-cols-2 gap-3">
-        <label className="text-xs space-y-1"><span className="font-semibold">Gaji negosiasi (Rp)</span><RupiahInput aria-label="Gaji negosiasi" required min={0.01} disabled={!canEdit || pending} value={negosiasi} onValueChange={value => { setNegosiasi(value); changed(); }} /></label>
-        <p className="self-center text-xs text-muted-faint">Total kontrak menjadi batas pembayaran. RAB tetap sebagai referensi.</p>
+      <div className="border-t border-border px-4 py-3">
+        <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+          <div><dt className="text-muted-faint">Nama pekerjaan</dt><dd className="mt-1 font-medium">{ref.namaPekerjaan || "—"}</dd></div>
+          <div><dt className="text-muted-faint">Menman (MM)</dt><dd className="mt-1 font-medium">{ref.manMonth ?? "—"}</dd></div>
+          <div><dt className="text-muted-faint">Gaji RAB</dt><dd className="mt-1 font-medium">{rp(ref.gajiRab)}</dd></div>
+          <div><dt className="text-muted-faint">Mulai SPMK</dt><dd className="mt-1 font-medium">{dateLabel(ref.spmkMulai)}</dd></div>
+          <div><dt className="text-muted-faint">Selesai SPMK</dt><dd className="mt-1 font-medium">{dateLabel(ref.spmkSelesai)}</dd></div>
+          <div><dt className="text-muted-faint">Gaji negosiasi · total kontrak</dt><dd className="mt-1 font-medium">{rp(negosiasi)}</dd></div>
+        </dl>
+        <p className="mt-3 text-[11px] text-muted-faint">Referensi kontrak diubah melalui Database Tenaga Ahli{manual ? "." : "; data Sidamon mengikuti sumber sinkronisasi."} Negosiasi dikelola dari daftar Pengisian Gaji & Negosiasi.</p>
       </div>
-      {!ready && <p className="text-xs text-muted-faint">{rows.length} bulan mengikuti SPMK. Nominal bulanan tetap kosong dan diisi manual setelah negosiasi disimpan. Isi periode mulai dan selesai agar daftar bulan terbentuk.</p>}
-      {canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} type="submit"><Save size={14} />{pending ? "Menyimpan…" : ready ? "Simpan perubahan" : "Simpan negosiasi & lanjut"}</button>}
-      </form>
     </details>
     {(ready || !canEdit) && <div className="rounded-xl border border-border bg-surface-card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">

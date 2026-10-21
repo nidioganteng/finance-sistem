@@ -191,6 +191,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onRecord, o
   const [success, setSuccess] = useState("");
   const [pending, startTransition] = useTransition();
   const [newMonth, setNewMonth] = useState("");
+  const [addingMonth, setAddingMonth] = useState(false);
   const [onlyNotes, setOnlyNotes] = useState(false);
   const [detailScope, setDetailScope] = useState<"bulan" | "kontrak">("bulan");
   const activePeriod = `${year}-${String(month).padStart(2, "0")}`;
@@ -238,7 +239,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onRecord, o
     if (!/^(20\d{2}|21\d{2})-(0[1-9]|1[0-2])$/.test(month)) { setError("Pilih bulan yang valid (tahun 2000–2199)."); return; }
     if (rows.some(row => row.bulan === month)) { setError("Bulan tersebut sudah ada."); return; }
     if (rows.length >= 600) { setError("Maksimal 600 bulan."); return; }
-    setRows([...rows, { bulan: month, nominal: null, catatan: "" }].sort((a, b) => a.bulan.localeCompare(b.bulan))); setNewMonth(""); setDetailScope("kontrak"); changed();
+    setRows([...rows, { bulan: month, nominal: null, catatan: "" }].sort((a, b) => a.bulan.localeCompare(b.bulan))); setNewMonth(""); setAddingMonth(false); setDetailScope("kontrak"); changed();
   }
   return <section className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
@@ -282,17 +283,19 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onRecord, o
         <div className="flex flex-wrap items-center gap-2">
           <select aria-label="Periode tracking gaji" value={detailScope} onChange={event => { setDetailScope(event.target.value as "bulan" | "kontrak"); setOnlyNotes(false); }} className={`${inputClass} !w-auto`}><option value="bulan">{monthLabel(activePeriod)}</option><option value="kontrak">Semua bulan kontrak</option></select>
           {noteCount > 0 && <button onClick={() => setOnlyNotes(!onlyNotes)} className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" aria-pressed={onlyNotes}><AlertTriangle size={13} />{noteCount} kendala · {onlyNotes ? "Semua bulan" : "Filter catatan"}</button>}
-          {canEdit && <>
+          {canEdit && <button disabled={pending} className={buttonClass} aria-expanded={addingMonth} aria-controls="salary-add-month" onClick={() => setAddingMonth(!addingMonth)}><Plus size={13} />{addingMonth ? "Batal tambah bulan" : "Tambah bulan"}</button>}
+        </div>
+      </div>
+      {canEdit && addingMonth && <div id="salary-add-month" className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-3 py-2">
+            <span className="text-xs text-muted-faint">Tambahkan bulan ke jadwal gaji:</span>
             <select aria-label="Bulan tambahan" disabled={pending} value={selectedNewMonth.slice(5, 7)} onChange={event => setNewMonth(`${selectedNewMonth.slice(0, 4)}-${event.target.value}`)} className={`${inputClass} !w-auto`}>
               {Array.from({ length: 12 }, (_, index) => <option key={index} value={String(index + 1).padStart(2, "0")}>{new Date(2026, index, 1).toLocaleDateString("id-ID", { month: "long" })}</option>)}
             </select>
             <select aria-label="Tahun tambahan" disabled={pending} value={selectedNewMonth.slice(0, 4)} onChange={event => setNewMonth(`${event.target.value}-${selectedNewMonth.slice(5, 7)}`)} className={`${inputClass} !w-auto`}>
               {Array.from({ length: 200 }, (_, index) => <option key={index} value={2000 + index}>{2000 + index}</option>)}
             </select>
-            <button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />Tambah bulan</button>
-          </>}
-        </div>
-      </div>
+            <button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />Tambahkan ke jadwal</button>
+      </div>}
       <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
         {visibleRows.filter(row => !onlyNotes || row.catatan.trim()).map(row => {
           const history = person.riwayatGaji?.filter(item => item.projectId === project.projectId && `${item.tahun}-${String(item.bulan).padStart(2, "0")}` === row.bulan) || [];

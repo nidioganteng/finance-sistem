@@ -666,6 +666,7 @@ export async function getPayrollData(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return phpFetch<any>(
     `/api/payroll?entityId=${encodeURIComponent(entityId)}&year=${year}&month=${month}`,
-    token
+    token,
+    { cache: "no-store" }
   );
 }

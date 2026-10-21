@@ -55,7 +55,7 @@ assert.match(html, /Ada kendala/);
 assert.match(html, /Freelance Uji/);
 assert.match(html, /Tindak lanjut/);
 assert.match(html, /Sudah dibayar/);
-assert.match(html, /Balance gaji terisi/);
+assert.match(html, /Balance negosiasi/);
 assert.match(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, entityId: 'entity-project' })), /Freelance Uji/);
 assert.doesNotMatch(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, entityId: 'other' })), /Freelance Uji/);
 const paid = { id: 'paid-old', projectId: 'test-project', nominalHonor: 1000000, nominalBersih: 975000, tahun: 2025, bulan: 11 };
@@ -78,7 +78,7 @@ assert.match(gaharuList, /Freelance Uji/); assert.match(gaharuList, /GH-001/); a
 assert.match(projectList, /Freelance Uji/); assert.match(projectList, /TEST/); assert.doesNotMatch(projectList, /GH-001/);
 const paidProps = { ...props, people: [{ ...props.people[0], riwayatGaji: [paid] }] };
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps));
-assert.doesNotMatch(html, /1\.000\.000/); // Pembayaran November 2025 tidak masuk Desember 2026.
+assert.match(html, /1\.000\.000/); // Monitoring negosiasi memakai pembayaran seluruh kontrak lintas tahun.
 assert.match(html, /5\.000\.000/);
 const draftProps = { ...props, people: [{ ...props.people[0], proyekList: [{ ...props.people[0].proyekList[0], gajiKontrak: null }] }] };
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, draftProps));
@@ -91,12 +91,24 @@ const partialProps = { ...props, people: [{ ...props.people[0], riwayatGaji: [{ 
 const partialHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, partialProps));
 assert.doesNotMatch(partialHtml, /Catat sisa pembayaran/);
 assert.match(partialHtml, /3\.000\.000/);
-assert.doesNotMatch(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps)), /November 2025/);
+assert.doesNotMatch(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps)), /aria-label="Gaji November 2025"/);
 assert.doesNotMatch(html, /Januari 2027/);
 assert.match(html, /Semua bulan kontrak/);
 const octoberHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, month: 10 }));
 assert.doesNotMatch(octoberHtml, /aria-label="Gaji Desember 2026"/);
 assert.match(octoberHtml, /Belum ada jadwal untuk Oktober 2026/);
+const contractPayments = [2, 3].map(month => ({ id: `gaji-${month}`, projectId: 'test-project', nominalHonor: 10000000, nominalBersih: 9700000, tahun: 2026, bulan: month }));
+const negotiatedProps = { ...props, month: 2, people: [{ ...props.people[0], riwayatGaji: contractPayments, proyekList: [{ ...props.people[0].proyekList[0], gajiKontrak: { ...contract, gajiRab: 50000000, gajiNegosiasi: 35000000, jadwal: [{ bulan: '2026-02', nominal: 10000000, catatan: '' }, { bulan: '2026-03', nominal: 10000000, catatan: '' }] } }] }] };
+const negotiationHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, negotiatedProps));
+assert.match(negotiationHtml, /35\.000\.000/); assert.match(negotiationHtml, /20\.000\.000/); assert.match(negotiationHtml, /15\.000\.000/);
+assert.match(negotiationHtml, /Belum balance/); assert.doesNotMatch(negotiationHtml, /Basis gaji negosiasi|\/ bulan|>Per bulan</);
+assert.equal(helpers.ringkasanGajiTenagaAhli([], contractPayments, 'test-project', 35000000).balance, 15000000);
+const fullProps = structuredClone(negotiatedProps.people);
+fullProps[0].riwayatGaji.push({ ...contractPayments[0], id: 'gaji-rest', nominalHonor: 15000000 });
+const fullHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...negotiatedProps, people: fullProps }));
+assert.match(fullHtml, /Balance · total negosiasi terpenuhi/);
+assert.match(fullHtml, /<button[^>]*disabled=""[^>]*title="Pembayaran sudah mencapai total negosiasi"/);
+assert.equal(helpers.ringkasanGajiTenagaAhli([], fullProps[0].riwayatGaji, 'test-project', 35000000).lunas, true);
 assert.match(html, /placeholder="Belum diisi"/);
 assert.match(html, /Dokumen &lt;belum&gt; lengkap/);
 assert.doesNotMatch(html, /Catat pembayaran/);

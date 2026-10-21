@@ -2720,6 +2720,11 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
         $pl_selesai = trim($pl['tanggalSelesaiTugas'] ?? '');
         $pl_turun   = isset($pl['isTurunLapangan']) ? ($pl['isTurunLapangan'] ? 1 : 0) : 1;
         $pl_honor   = parse_rupiah_num($pl['nominalHonorBulanan'] ?? null, 0.0);
+        $pl_work = $pl['namaPekerjaan'] ?? null;
+        $pl_mm = $pl['manMonth'] ?? null;
+        if ($pl_work !== null && (!is_string($pl_work) || strlen($pl_work) > 255)) return error_response('Nama pekerjaan maksimal 255 byte.', 400);
+        if ($pl_mm !== null && (!is_numeric($pl_mm) || !is_finite((float)$pl_mm) || (float)$pl_mm < 0 || (float)$pl_mm > 99999999.99)) return error_response('Menman harus berupa angka antara 0 dan 99999999,99.', 400);
+        if (!is_finite($pl_honor) || $pl_honor < 0 || $pl_honor > 999999999999.99) return error_response('Gaji RAB tidak valid.', 400);
 
         if (!$pl_proj_id) {
             return error_response('Kode Proyek Penugasan wajib dipilih.', 400);
@@ -2747,6 +2752,10 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
             'tanggalSelesaiTugas' => date('Y-m-d', $ts_s),
             'isTurunLapangan'     => $pl_turun,
             'nominalHonorBulanan' => $pl_honor,
+            'namaPekerjaan'       => $pl_work,
+            'manMonth'            => $pl_mm === null ? null : (float)$pl_mm,
+            'hasNamaPekerjaan'    => array_key_exists('namaPekerjaan', $pl),
+            'hasManMonth'         => array_key_exists('manMonth', $pl),
         ];
     }
 
@@ -2848,6 +2857,19 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
                 $pl_item['isTurunLapangan'], $pl_item['nominalHonorBulanan'],
                 $now, $now
             ]);
+            $stmt_ref = $pdo->prepare('SELECT * FROM TenagaAhliGajiKontrak WHERE rekananId = ? AND projectId = ?');
+            $stmt_ref->execute([$record_id, $pl_item['projectId']]);
+            $contract_ref = $stmt_ref->fetch(PDO::FETCH_ASSOC);
+            if ($contract_ref && $contract_ref['sumber'] !== 'MANUAL') continue;
+            $work = $pl_item['hasNamaPekerjaan'] ? $pl_item['namaPekerjaan'] : ($contract_ref['namaPekerjaan'] ?? null);
+            $mm = $pl_item['hasManMonth'] ? $pl_item['manMonth'] : ($contract_ref['manMonth'] ?? null);
+            if ($contract_ref) {
+                $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ?, revision = revision + 1 WHERE id = ?')
+                    ->execute([$work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'], $contract_ref['id']]);
+            } else {
+                $pdo->prepare('INSERT INTO TenagaAhliGajiKontrak (id, rekananId, projectId, namaPekerjaan, manMonth, gajiRab, spmkMulai, spmkSelesai) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                    ->execute([uuid4(), $record_id, $pl_item['projectId'], $work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas']]);
+            }
         }
 
         $stmt = $pdo->prepare(

@@ -15,7 +15,7 @@ Satu orang dapat memiliki beberapa proyek. Negosiasi, jadwal, dan catatan dipisa
 
 ## Data dan deployment
 
-Jalankan `database/migrations/2026-10-21-tenaga-ahli-gaji-negosiasi.sql` pada database target sebelum deployment. Backend juga menyediakan `CREATE TABLE IF NOT EXISTS` mengikuti pola tabel tenaga ahli yang sudah ada; sertakan folder `database/migrations` saat deploy. Tabel `TenagaAhliProject` dan kolom proyek Sidamon dari instalasi sebelumnya tetap diperlukan.
+Jalankan `database/migrations/2026-10-21-tenaga-ahli-gaji-negosiasi.sql` pada database target sebelum deployment. Backend juga menyediakan `CREATE TABLE IF NOT EXISTS` mengikuti pola tabel tenaga ahli yang sudah ada; sertakan folder `database/migrations` saat deploy. Tabel `TenagaAhliProject` tetap diperlukan. Input manual payroll tidak membutuhkan kolom integrasi Sidamon pada tabel `Project`: acuan tanggal berasal dari referensi kontrak gaji atau tanggal penugasan manual.
 
 `TenagaAhliGajiKontrak` menyimpan referensi, gaji negosiasi, basis negosiasi, daftar bulan eksplisit (`jadwalJson`), serta revision. Jadwal eksplisit memastikan pengurangan/perpanjangan bulan dan catatan tidak direset oleh sync. Tidak ada backfill nominal ke data honor lama. Profil/penugasan dengan negosiasi tersimpan dilindungi dari penghapusan yang membuat data gaji tidak terjangkau.
 

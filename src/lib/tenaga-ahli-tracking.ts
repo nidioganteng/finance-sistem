@@ -33,27 +33,36 @@ export type TenagaAhliTrackingRow = {
   gajiTerisi: number | null;
   catatan: string;
   payments: TenagaAhliPayment[];
+  contractKey?: string;
+  gajiNegosiasi?: number | null;
+  dibayarKontrak?: number;
 };
 
 export function buildTenagaAhliTracking(people: RekananTenagaAhliItem[], payments: TenagaAhliPayment[]) {
   const map = new Map<string, TenagaAhliTrackingRow>();
   const identity = (person: string, project: string | null, period: string, entity: string) => JSON.stringify([person, project, period, entity]);
+  const uniquePayments = [...new Map(payments.map(item => [item.id, item])).values()];
+  const contracts = new Map<string, { contractKey: string; gajiNegosiasi: number | null; dibayarKontrak: number }>();
   for (const person of people) {
     for (const project of person.proyekList || []) {
+      const contractKey = JSON.stringify([person.nik || person.id, project.projectId]);
+      const contract = { contractKey, gajiNegosiasi: project.gajiKontrak?.gajiNegosiasi ?? null,
+        dibayarKontrak: uniquePayments.filter(payment => payment.projectId === project.projectId && (payment.rekananId === person.id || (!!person.nik && payment.nik === person.nik))).reduce((sum, payment) => sum + payment.nominalHonor, 0) };
+      contracts.set(JSON.stringify([person.id, project.projectId]), contract);
       for (const row of project.gajiKontrak?.jadwal || []) {
-        if (row.nominal === null && !row.catatan.trim()) continue;
+        if (row.nominal === null && !row.catatan.trim() && !contract.gajiNegosiasi) continue;
         // Gaji penugasan dibebankan pada entitas proyek, termasuk profil lintas entitas.
         const entityId = project.projectEntityId || person.entityId || "";
         const id = identity(person.id, project.projectId, row.bulan, entityId);
         map.set(id, { id, personId: person.id, personKey: person.nik || person.id, nama: person.nama, nik: person.nik,
           projectId: project.projectId, projectCode: project.projectCode || null, projectName: project.projectName || "Proyek",
           entityId, entityName: project.projectEntityId ? (project.projectEntityName || (entityId === person.entityId ? person.entityName : null) || "Entitas") : (person.entityName || "Entitas"),
-          periode: row.bulan, gajiTerisi: row.nominal, catatan: row.catatan, payments: [] });
+          periode: row.bulan, gajiTerisi: row.nominal, catatan: row.catatan, payments: [], ...contract });
       }
     }
   }
   // Satu pembayaran hanya dihitung sekali, termasuk riwayat lama yang juga ditemukan lewat NIK.
-  for (const payment of new Map(payments.map(item => [item.id, item])).values()) {
+  for (const payment of uniquePayments) {
     const person = people.find(item => item.id === payment.rekananId)
       || people.find(item => item.nik && item.nik === payment.nik && item.proyekList?.some(project => project.projectId === payment.projectId))
       || people.find(item => item.nik && item.nik === payment.nik);
@@ -68,6 +77,10 @@ export function buildTenagaAhliTracking(people: RekananTenagaAhliItem[], payment
         projectName: payment.projectName || "Non-proyek", entityId: payment.entityId, entityName: payment.entityName,
         periode: period, gajiTerisi: null, catatan: "", payments: [] };
       map.set(id, row);
+      const project = person?.proyekList?.find(item => item.projectId === payment.projectId);
+      if (project && (project.projectEntityId || person?.entityId) === payment.entityId) {
+        Object.assign(row, contracts.get(JSON.stringify([personId, payment.projectId])));
+      }
     }
     row.payments.push(payment);
   }
@@ -89,7 +102,11 @@ export function summarizeTenagaAhliTracking(rows: TenagaAhliTrackingRow[]) {
   const gajiTerisi = inputs.length ? inputs.reduce((total, row) => total + (row.gajiTerisi || 0), 0) : null;
   const payments = [...new Map(rows.flatMap(row => row.payments).map(item => [item.id, item])).values()];
   const dibayar = payments.reduce((total, item) => total + item.nominalHonor, 0);
+  const contracts = [...new Map(rows.filter(row => row.contractKey && row.gajiNegosiasi != null).map(row => [row.contractKey, row])).values()];
+  const totalNegosiasi = contracts.length ? contracts.reduce((total, row) => total + (row.gajiNegosiasi || 0), 0) : null;
+  const dibayarKontrak = contracts.reduce((total, row) => total + (row.dibayarKontrak || 0), 0);
   return { gajiTerisi, dibayar, pph: payments.reduce((total, item) => total + item.pph21, 0),
+    totalNegosiasi, dibayarKontrak, balanceNegosiasi: totalNegosiasi === null ? null : Math.round((totalNegosiasi - dibayarKontrak) * 100) / 100,
     netto: payments.reduce((total, item) => total + item.nominalBersih, 0),
     balance: gajiTerisi === null ? null : gajiTerisi - dibayar,
     jumlahInput: inputs.length, jumlahPembayaran: payments.length,

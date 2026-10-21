@@ -63,7 +63,7 @@ export function penugasanPadaEntitas(
   project: { projectEntityId?: string | null },
   entityId?: string,
 ): boolean {
-  return !!entityId && (person.entityId === entityId || project.projectEntityId === entityId);
+  return !!entityId && (project.projectEntityId || person.entityId) === entityId;
 }
 
 export function ringkasanGajiTenagaAhli(

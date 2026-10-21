@@ -3251,6 +3251,8 @@ export function PayrollClient({
             key={tenagaAhliSubTab}
             onTracking={() => setTenagaAhliSubTab("negosiasi")}
             rows={trackingRows}
+            people={data.rekananTenagaAhli}
+            entities={data.allEntities}
             group={tenagaAhliSubTab === "rekap-proyek" ? "proyek" : tenagaAhliSubTab === "rekap-bulan" ? "bulan" : tenagaAhliSubTab === "konsolidasi" ? "holding" : "nama"}
             entityId={data.entity?.id} entityName={data.entity?.name}
             year={selectedYear} month={selectedMonth} search={searchQuery}

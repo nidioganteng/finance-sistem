@@ -37,6 +37,6 @@ define('JWT_EXPIRES_IN', env('JWT_EXPIRES_IN', '30d'));
 define('FRONTEND_URL', env('FRONTEND_URL', 'http://localhost:3000'));
 define('UPLOAD_DIR',   env('UPLOAD_DIR',   __DIR__ . '/../../uploads'));
 
-// ── Integrasi KOSHA ────────────────────────────────────────────────────────
+// ── Integrasi Sidamon ────────────────────────────────────────────────────────
 define('INTERNAL_SECRET', env('INTERNAL_SECRET', 'gaharu-internal-2026'));
-define('KOSHA_URL',     env('KOSHA_URL',     'http://localhost:8001'));
+define('SIDAMON_URL',     env('SIDAMON_URL',     'http://localhost:8001'));

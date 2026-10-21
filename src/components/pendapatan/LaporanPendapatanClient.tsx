@@ -1822,12 +1822,12 @@ export function LaporanPendapatanClient({
                 </div>
               )}
 
-              {/* Form Section 1: Kode Proyek dari KOSHA */}
+              {/* Form Section 1: Kode Proyek dari Sidamon */}
               <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-navy-text flex items-center gap-1.5">
                     <Building2 className="w-4 h-4 text-blue-600" />
-                    Pilih Kode Proyek (Master Proyek KOSHA)
+                    Pilih Kode Proyek (Master Proyek Sidamon)
                   </label>
                   {formFaktur.projectId && (
                     <button
@@ -1951,7 +1951,7 @@ export function LaporanPendapatanClient({
                             <div>
                               <span className="font-bold">Belum ada termin pembayaran tercatat di Finance untuk proyek ini.</span>
                               <p className="text-amber-700 dark:text-amber-400 text-[11px] mt-0.5">
-                                Proyek telah didaftarkan KOSHA. Anda dapat menginput nilai DPP secara manual pada bagian perhitungan pajak di bawah.
+                                Proyek telah didaftarkan Sidamon. Anda dapat menginput nilai DPP secara manual pada bagian perhitungan pajak di bawah.
                               </p>
                             </div>
                           </div>
@@ -1961,7 +1961,7 @@ export function LaporanPendapatanClient({
                   })()
                 ) : (
                   <p className="text-[11px] text-navy-soft">
-                    Pilih proyek dari daftar proyek yang sudah diinput oleh Admin KOSHA untuk entitas ini.
+                    Pilih proyek dari daftar proyek yang sudah diinput oleh Admin Sidamon untuk entitas ini.
                   </p>
                 )}
               </div>

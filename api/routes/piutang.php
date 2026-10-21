@@ -1589,7 +1589,7 @@ if ($method === 'POST' && $sub_action === 'termin' && $sub_sub === 'audit') {
         'UPDATE Termin SET status = \'ON_TRACK\', auditedAt = NOW(), auditedById = ? WHERE id = ?'
     )->execute([$user['id'], $termin_id]);
 
-    // Sync progress ke KOSHA
+    // Sync progress ke Sidamon
     $stmt = $pdo->prepare('SELECT projectId FROM Termin WHERE id = ? LIMIT 1');
     $stmt->execute([$termin_id]);
     $t = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1617,7 +1617,7 @@ if ($method === 'PATCH' && $sub_action === 'termin' && $sub_sub === 'status') {
 
     $pdo->prepare('UPDATE Termin SET status = ? WHERE id = ?')->execute([$status, $termin_id]);
 
-    // Sync progress ke KOSHA
+    // Sync progress ke Sidamon
     $stmt = $pdo->prepare('SELECT projectId FROM Termin WHERE id = ? LIMIT 1');
     $stmt->execute([$termin_id]);
     $t = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1643,7 +1643,7 @@ if ($method === 'POST' && $sub_action === 'proyek' && $sub_sub === 'complete') {
 
     $pdo->prepare('UPDATE Project SET status = \'COMPLETED\' WHERE id = ?')->execute([$project_id]);
 
-    // Beritahu KOSHA bahwa proyek ini selesai
+    // Beritahu Sidamon bahwa proyek ini selesai
     sync_termin_to_sidamon($project_id);
 
     log_activity($user['id'], 'proyek.complete', 'FINANCIAL_CHANGE', ['projectId' => $project_id]);

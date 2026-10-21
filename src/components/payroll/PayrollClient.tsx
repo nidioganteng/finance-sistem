@@ -7363,7 +7363,7 @@ export function PayrollClient({
                           <input type="number" min="0" max="99999999.99" step="0.01" disabled={pl.sumber === "SIDAMON"} value={pl.manMonth ?? ""} onChange={event => handleUpdateProyekAssignment(idx, "manMonth", event.target.value === "" ? null : Number(event.target.value))} className="mt-1 h-8 w-full rounded-lg border border-border bg-surface-card px-3 text-xs text-foreground disabled:opacity-60" />
                         </label>
                       </div>
-                      {pl.sumber === "SIDAMON" && <p className="text-[10px] text-muted-faint">Referensi kontrak mengikuti data KOSHA.</p>}
+                      {pl.sumber === "SIDAMON" && <p className="text-[10px] text-muted-faint">Referensi kontrak mengikuti data Sidamon.</p>}
                       {/* Masa Tugas Mulai & Selesai */}
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">

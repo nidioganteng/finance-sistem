@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Plus, Trash2, X, Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { DokumenFilterTabs } from "./DokumenFilterTabs";

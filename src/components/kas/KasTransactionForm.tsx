@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { createKasTransaction, replaceKasTransaction, generateNoBukti } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";

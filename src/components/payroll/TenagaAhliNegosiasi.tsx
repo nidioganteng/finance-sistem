@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type InputHTMLAttributes } from "react";
+import { useEffect, useRef, useState, useTransition, type InputHTMLAttributes } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
@@ -187,6 +187,12 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
   const [pending, startTransition] = useTransition();
   const [newMonth, setNewMonth] = useState("");
   const [onlyNotes, setOnlyNotes] = useState(false);
+  const [activeNoteMonth, setActiveNoteMonth] = useState<string | null>(null);
+  const noteDialog = useRef<HTMLDialogElement>(null);
+  const activeNote = rows.find(row => row.bulan === activeNoteMonth);
+  useEffect(() => {
+    if (activeNoteMonth && noteDialog.current && !noteDialog.current.open) noteDialog.current.showModal();
+  }, [activeNoteMonth]);
   const manual = saved?.sumber !== "SIDAMON";
   const ready = (saved?.gajiNegosiasi ?? 0) > 0;
   const noteCount = rows.filter(row => row.catatan.trim()).length;
@@ -276,8 +282,11 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
           return <tr key={row.bulan} className={`border-t border-border ${row.catatan.trim() ? "bg-amber-50/50 dark:bg-amber-950/10" : ""}`}>
             <td className="px-3 py-2 align-middle font-semibold whitespace-nowrap">{monthLabel(row.bulan)}{(ref.spmkMulai && row.bulan < ref.spmkMulai.slice(0, 7)) || (ref.spmkSelesai && row.bulan > ref.spmkSelesai.slice(0, 7)) ? <div className="text-xs text-muted-faint font-normal mt-1">Di luar periode SPMK</div> : null}</td>
             <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value } : item)); changed(); }} /></td>
-            <td className="px-3 py-2 align-middle"><textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={`${inputClass} resize-y !py-1 focus:h-16`} rows={1} maxLength={1000} disabled={!canEdit || pending} placeholder="Catatan kendala…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />{row.catatan.trim() && <details className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200"><summary className="cursor-pointer font-semibold"><AlertTriangle size={13} className="inline mr-1" />Ada kendala</summary><p className="mt-2 whitespace-pre-wrap break-words">{row.catatan}</p></details>}</td>
-            <td className="px-3 py-2 align-middle text-xs"><div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <td className="px-3 py-2 align-middle"><div className="relative">
+              <textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={`${inputClass} block resize-none overflow-hidden !py-1 !pr-9`} rows={1} maxLength={1000} disabled={!canEdit || pending} placeholder="Catatan kendala…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />
+              {row.catatan.trim() && <button type="button" className="absolute right-0 top-0 inline-flex h-8 w-8 items-center justify-center rounded-r-lg text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-950/50" aria-label={`Ada kendala ${monthLabel(row.bulan)}: lihat catatan lengkap`} title="Ada kendala · lihat catatan lengkap" onClick={() => setActiveNoteMonth(row.bulan)}><AlertTriangle size={14} /></button>}
+            </div></td>
+            <td className="px-3 py-2 align-middle text-xs"><div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
               <span className={history.length ? "font-medium tabular-nums text-emerald-700 dark:text-emerald-300" : "text-muted-faint"}>{history.length ? `${rp(paid)} dibayar` : "Belum dibayar"}</span>
               {canEdit && remaining !== null && remaining > 0 && <button className={buttonClass} disabled={pending || dirty} title={dirty ? "Simpan perubahan terlebih dahulu" : "Buka form pembayaran dan pajak"} onClick={() => onRecord({ ...row, nominal: remaining })}>{history.length ? "Catat sisa pembayaran" : "Catat pembayaran"}</button>}
             </div>{history.length > 0 && remaining !== null && <div className={`mt-0.5 text-[11px] ${remaining < 0 ? "text-rose-600" : "text-muted-faint"}`}>Sisa {rp(remaining)}</div>}</td>
@@ -288,5 +297,11 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
       </tbody></table></div>
       <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{rows.length} bulan · Total gaji diisi: {rp(rows.reduce((sum, row) => sum + (row.nominal || 0), 0))}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}</p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending || !dirty} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji bulanan"}</button>}</div>
     </div>}
+    <dialog ref={noteDialog} onClose={() => setActiveNoteMonth(null)} aria-labelledby="salary-note-title" className="m-auto w-full max-w-md rounded-xl border border-border bg-surface-card p-0 text-foreground shadow-xl backdrop:bg-slate-900/40">
+      {activeNote && <>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3"><h3 id="salary-note-title" className="text-sm font-semibold">Catatan kendala · {monthLabel(activeNote.bulan)}</h3><button type="button" className={buttonClass} onClick={() => noteDialog.current?.close()}>Tutup</button></div>
+        <div className="space-y-2 p-4"><textarea aria-label="Catatan kendala lengkap" className="w-full resize-y rounded-lg border border-border bg-surface-card px-3 py-2 text-sm text-foreground" rows={5} maxLength={1000} disabled={!canEdit || pending} value={activeNote.catatan} onChange={event => { setRows(rows.map(row => row.bulan === activeNote.bulan ? { ...row, catatan: event.target.value } : row)); changed(); }} />{canEdit && <p className="text-xs text-muted-faint">Simpan gaji bulanan setelah selesai mengubah catatan.</p>}</div>
+      </>}
+    </dialog>
   </section>;
 }

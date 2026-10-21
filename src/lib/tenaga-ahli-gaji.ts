@@ -57,3 +57,25 @@ export function bulanBerikutnya(bulan: string): string {
   const [year, month] = bulan.split("-").map(Number);
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
 }
+
+export function penugasanPadaEntitas(
+  person: { entityId?: string | null },
+  project: { projectEntityId?: string | null },
+  entityId?: string,
+): boolean {
+  return !!entityId && (person.entityId === entityId || project.projectEntityId === entityId);
+}
+
+export function ringkasanGajiTenagaAhli(
+  rows: GajiTenagaAhliBulan[],
+  history: { id: string; projectId?: string | null; nominalHonor: number; nominalBersih: number }[],
+  projectId: string,
+) {
+  const unique = new Map(history.filter(item => item.projectId === projectId).map(item => [item.id, item]));
+  const dibayar = [...unique.values()].reduce((sum, item) => sum + item.nominalHonor, 0);
+  const dibayarNetto = [...unique.values()].reduce((sum, item) => sum + item.nominalBersih, 0);
+  const terisi = rows.filter(row => row.nominal !== null).length;
+  const totalGaji = terisi ? rows.reduce((sum, row) => sum + (row.nominal ?? 0), 0) : null;
+  return { dibayar, dibayarNetto, totalGaji, balance: totalGaji === null ? null : totalGaji - dibayar,
+    terisi, jumlahBulan: rows.length, lengkap: rows.length > 0 && terisi === rows.length };
+}

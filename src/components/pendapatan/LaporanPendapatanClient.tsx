@@ -1072,36 +1072,25 @@ export function LaporanPendapatanClient({
           {/* Data Table */}
           <div className="overflow-x-auto rounded-[16px] border border-border-soft shadow-xs">
             <table className="w-full text-left text-[12px] whitespace-nowrap border-separate border-spacing-0">
-              {/* ── Group header row ── */}
               <thead>
-                <tr className="bg-navy/90 dark:bg-navy text-white/80 text-[10px] font-bold uppercase tracking-widest">
-                  <th colSpan={2} className="px-3 py-2 border-b border-white/10 rounded-tl-[16px]">Identitas Faktur</th>
-                  <th colSpan={2} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10">Klien &amp; Proyek</th>
-                  <th colSpan={1} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center">Masa</th>
-                  <th colSpan={5} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center bg-blue-600/30">Nilai Perpajakan</th>
-                  <th colSpan={3} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center bg-emerald-600/20">Penerimaan</th>
-                  <th colSpan={1} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center">Dok. Fisik</th>
-                  <th colSpan={canEdit ? 2 : 1} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center rounded-tr-[16px]">Info</th>
-                </tr>
-                {/* ── Column header row ── */}
-                <tr className="bg-navy/80 dark:bg-navy/95 text-white/70 text-[10.5px] font-semibold">
-                  <th className="px-3 py-2.5 text-center w-8">#</th>
-                  <th className="px-3 py-2.5 min-w-[140px]">No. Faktur / NPWP</th>
-                  <th className="px-3 py-2.5 min-w-[180px] border-l border-l-white/10">Rekanan &amp; JKP</th>
-                  <th className="px-3 py-2.5 min-w-[140px]">Proyek</th>
-                  <th className="px-3 py-2.5 text-center border-l border-l-white/10 w-[80px]">Bulan</th>
-                  <th className="px-3 py-2.5 text-right border-l border-l-white/10 bg-blue-600/20">DPP</th>
-                  <th className="px-3 py-2.5 text-right bg-blue-600/20">DPP Nilai Lain</th>
-                  <th className="px-3 py-2.5 text-right bg-blue-600/20 text-purple-200">PPN</th>
-                  <th className="px-3 py-2.5 text-right bg-blue-600/20 text-amber-200">PPh</th>
-                  <th className="px-3 py-2.5 text-right bg-blue-600/20 font-bold text-white">Bruto 111%</th>
-                  <th className="px-3 py-2.5 text-right border-l border-l-white/10 bg-emerald-600/15 text-emerald-200">Netto</th>
-                  <th className="px-3 py-2.5 text-right bg-emerald-600/15">Dana Cair</th>
-                  <th className="px-3 py-2.5 text-center bg-emerald-600/15">Balance</th>
-                  <th className="px-3 py-2.5 border-l border-l-white/10 min-w-[110px]">Tgl &amp; Bank</th>
-                  <th className="px-3 py-2.5 text-center border-l border-l-white/10 min-w-[120px]">PPN · PPh · Bupot</th>
-                  <th className="px-3 py-2.5 text-center border-l border-l-white/10">Jenis</th>
-                  {canEdit && <th className="px-3 py-2.5 text-center w-16">Aksi</th>}
+                <tr className="bg-surface-subtle text-muted-stronger text-[11px] font-semibold">
+                  <th className="px-3 py-3 text-center w-8 border-b border-border-soft rounded-tl-[16px]">#</th>
+                  <th className="px-3 py-3 min-w-[140px] border-b border-border-soft">No. Faktur / NPWP</th>
+                  <th className="px-3 py-3 min-w-[180px] border-b border-border-soft">Rekanan &amp; JKP</th>
+                  <th className="px-3 py-3 min-w-[140px] border-b border-border-soft">Proyek</th>
+                  <th className="px-3 py-3 text-center w-[90px] border-b border-border-soft">Bulan</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft">DPP</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft">DPP Nilai Lain</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft">PPN</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft">PPh</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft font-bold text-navy-text">Bruto 111%</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft">Netto</th>
+                  <th className="px-3 py-3 text-right border-b border-border-soft">Dana Cair</th>
+                  <th className="px-3 py-3 text-center border-b border-border-soft">Balance</th>
+                  <th className="px-3 py-3 min-w-[110px] border-b border-border-soft">Tgl &amp; Bank</th>
+                  <th className="px-3 py-3 text-center min-w-[130px] border-b border-border-soft">Dok. Fisik</th>
+                  <th className="px-3 py-3 text-center border-b border-border-soft">Jenis</th>
+                  {canEdit && <th className="px-3 py-3 text-center w-16 border-b border-border-soft rounded-tr-[16px]">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="text-navy-text">
@@ -1118,35 +1107,30 @@ export function LaporanPendapatanClient({
                   filteredFaktur.map((f, idx) => (
                     <tr
                       key={f.id}
-                      className={`group transition-colors hover:bg-brand/5 ${idx % 2 === 1 ? "bg-surface-subtle/40" : ""}`}
+                      className={`group transition-colors hover:bg-surface-hover ${idx % 2 === 1 ? "bg-surface-subtle/30" : ""}`}
                     >
                       {/* # */}
-                      <td className="px-3 py-3 text-center text-muted-faint font-semibold text-[11px] border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-center text-muted-faint text-[11px] border-b border-border-soft/50">
                         {idx + 1}
                       </td>
 
                       {/* No. Faktur / NPWP */}
-                      <td className="px-3 py-3 border-b border-border-soft/60">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center flex-none">
-                            <Receipt size={11} className="text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <span className="font-bold text-navy-text text-[12px]">{f.noFaktur}</span>
-                        </div>
-                        <div className="text-[10.5px] text-muted-faint font-mono mt-0.5 pl-6.5">{f.npwp}</div>
+                      <td className="px-3 py-3 border-b border-border-soft/50">
+                        <div className="font-bold text-navy-text">{f.noFaktur}</div>
+                        <div className="text-[10.5px] text-muted-faint font-mono mt-0.5">{f.npwp}</div>
                       </td>
 
                       {/* Rekanan & JKP */}
-                      <td className="px-3 py-3 border-b border-border-soft/60">
+                      <td className="px-3 py-3 border-b border-border-soft/50">
                         <div className="font-semibold text-navy-text max-w-[200px] truncate" title={f.namaRekanan}>{f.namaRekanan}</div>
-                        <div className="text-[10.5px] text-muted max-w-[200px] truncate mt-0.5 italic" title={f.namaJkp}>{f.namaJkp}</div>
+                        <div className="text-[10.5px] text-muted max-w-[200px] truncate mt-0.5" title={f.namaJkp}>{f.namaJkp}</div>
                       </td>
 
                       {/* Proyek */}
-                      <td className="px-3 py-3 border-b border-border-soft/60">
+                      <td className="px-3 py-3 border-b border-border-soft/50">
                         {f.projectCode ? (
                           <div>
-                            <span className="inline-block px-2 py-0.5 text-[10.5px] font-mono font-bold rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/50">
+                            <span className="inline-block px-2 py-0.5 text-[10.5px] font-mono font-bold rounded-md bg-surface-subtle text-muted-stronger border border-border-soft">
                               {f.projectCode}
                             </span>
                             {f.projectName && (
@@ -1156,69 +1140,69 @@ export function LaporanPendapatanClient({
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted-faintest text-[11px]">—</span>
+                          <span className="text-muted-faint text-[11px]">—</span>
                         )}
                       </td>
 
-                      {/* Masa/Bulan */}
-                      <td className="px-3 py-3 text-center border-b border-border-soft/60">
-                        <span className="inline-block px-2.5 py-1 text-[11px] font-semibold rounded-full bg-surface-hover text-muted-stronger border border-border-soft/60">
+                      {/* Bulan */}
+                      <td className="px-3 py-3 text-center border-b border-border-soft/50">
+                        <span className="inline-block px-2.5 py-1 text-[11px] font-medium rounded-full bg-surface-subtle text-muted-stronger border border-border-soft/70">
                           {f.namaBulan}
                         </span>
                       </td>
 
                       {/* DPP */}
-                      <td className="px-3 py-3 text-right font-mono bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-right font-mono text-navy-text border-b border-border-soft/50">
                         {f.dppFmt}
                       </td>
 
                       {/* DPP Nilai Lain */}
-                      <td className="px-3 py-3 text-right font-mono text-muted bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-right font-mono text-muted border-b border-border-soft/50">
                         {f.dppNilaiLainFmt}
                       </td>
 
                       {/* PPN */}
-                      <td className="px-3 py-3 text-right font-mono bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
-                        <span className="text-purple-700 dark:text-purple-400">{f.ppnRealisasiFmt}</span>
+                      <td className="px-3 py-3 text-right font-mono text-navy-text border-b border-border-soft/50" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
+                        {f.ppnRealisasiFmt}
                         {f.isRealized && f.tarifPpnPersen !== 12 && (
                           <span className="ml-1 text-[9.5px] text-muted-faint font-sans">({f.tarifPpnPersen}%)</span>
                         )}
                       </td>
 
                       {/* PPh */}
-                      <td className="px-3 py-3 text-right font-mono bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
-                        <span className="text-amber-700 dark:text-amber-400">{f.pphRealisasiFmt}</span>
+                      <td className="px-3 py-3 text-right font-mono text-navy-text border-b border-border-soft/50" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
+                        {f.pphRealisasiFmt}
                         {f.isRealized && f.tarifPphPersen !== 3.5 && (
                           <span className="ml-1 text-[9.5px] text-muted-faint font-sans">({f.tarifPphPersen}%)</span>
                         )}
                       </td>
 
                       {/* Bruto 111% */}
-                      <td className="px-3 py-3 text-right font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-100/30 dark:bg-blue-500/10 border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-right font-mono font-bold text-navy-text border-b border-border-soft/50">
                         {f.nilaiProyekFmt}
                       </td>
 
                       {/* Netto */}
-                      <td className="px-3 py-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/5 border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-right font-mono font-semibold text-status-green border-b border-border-soft/50">
                         {f.labaSetelahPajakFmt}
                       </td>
 
                       {/* Dana Cair */}
-                      <td className="px-3 py-3 text-right font-mono bg-emerald-50/30 dark:bg-emerald-500/5 border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-right font-mono border-b border-border-soft/50">
                         {f.isRealized ? (
-                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{f.nominalDiterimaFmt}</span>
+                          <span className="text-status-green font-semibold">{f.nominalDiterimaFmt}</span>
                         ) : (
-                          <span className="text-muted-faintest text-[11px] italic">Belum Cair</span>
+                          <span className="text-muted-faint text-[11px]">Belum Cair</span>
                         )}
                       </td>
 
                       {/* Balance */}
-                      <td className="px-3 py-3 text-center bg-emerald-50/30 dark:bg-emerald-500/5 border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-center border-b border-border-soft/50">
                         {f.balanceStatus === "BALANCE" ? (
                           <button
                             type="button"
                             onClick={() => openDetailSelisihModal(f)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 hover:bg-green-200 dark:bg-green-950/50 dark:hover:bg-green-900/60 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/60 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-status-green/10 hover:bg-status-green/20 text-status-green border border-status-green/25 transition-colors cursor-pointer"
                             title="Klik untuk melihat rincian rekonsiliasi tagihan"
                           >
                             <CheckCircle2 size={10} /> Balance
@@ -1227,10 +1211,10 @@ export function LaporanPendapatanClient({
                           <button
                             type="button"
                             onClick={() => openDetailSelisihModal(f)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-status-red/10 hover:bg-status-red/20 text-status-red border border-status-red/25 transition-colors cursor-pointer"
                             title="Klik untuk melihat rincian bagian mana yang selisih"
                           >
-                            <AlertTriangle size={10} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                            <AlertTriangle size={10} className="shrink-0" />
                             <span>
                               {f.selisihBank !== 0
                                 ? `Bank: ${f.selisihBankFmt}`
@@ -1254,29 +1238,29 @@ export function LaporanPendapatanClient({
                       </td>
 
                       {/* Tgl & Bank */}
-                      <td className="px-3 py-3 border-b border-border-soft/60">
+                      <td className="px-3 py-3 border-b border-border-soft/50">
                         {f.tanggalTerima ? (
                           <>
                             <div className="font-mono text-[11px] text-muted-stronger">{f.tanggalTerima}</div>
-                            <div className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{f.bank || "—"}</div>
+                            <div className="text-[11px] font-semibold text-muted-stronger mt-0.5">{f.bank || "—"}</div>
                           </>
                         ) : (
-                          <span className="text-muted-faintest text-[11px] italic">—</span>
+                          <span className="text-muted-faint text-[11px]">—</span>
                         )}
                       </td>
 
                       {/* Ceklis Fisik */}
-                      <td className="px-3 py-3 text-center border-b border-border-soft/60">
+                      <td className="px-3 py-3 text-center border-b border-border-soft/50">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => handleToggleCeklis(f.id, "ppn", f.ceklisPpn)}
                             disabled={!canEdit || isPending}
                             title={f.ceklisPpn ? "Fisik PPN: Diterima — klik untuk ubah" : "Fisik PPN: Belum — klik untuk ceklis"}
-                            className={`w-[46px] py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                            className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
                               f.ceklisPpn
-                                ? "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/50"
-                                : "bg-surface-subtle text-muted-faintest border-border hover:bg-surface-hover"
+                                ? "bg-muted-stronger/15 text-navy-text border-muted-stronger/30"
+                                : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
                             }`}
                           >
                             PPN
@@ -1286,10 +1270,10 @@ export function LaporanPendapatanClient({
                             onClick={() => handleToggleCeklis(f.id, "pph", f.ceklisPph)}
                             disabled={!canEdit || isPending}
                             title={f.ceklisPph ? "Fisik PPh: Diterima — klik untuk ubah" : "Fisik PPh: Belum — klik untuk ceklis"}
-                            className={`w-[46px] py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                            className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
                               f.ceklisPph
-                                ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700/50"
-                                : "bg-surface-subtle text-muted-faintest border-border hover:bg-surface-hover"
+                                ? "bg-muted-stronger/15 text-navy-text border-muted-stronger/30"
+                                : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
                             }`}
                           >
                             PPh
@@ -1299,10 +1283,10 @@ export function LaporanPendapatanClient({
                             onClick={() => handleToggleCeklis(f.id, "buktiPotong", f.ceklisBuktiPotong)}
                             disabled={!canEdit || isPending}
                             title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima — klik untuk ubah" : "Bukti Potong: Belum — klik untuk ceklis"}
-                            className={`w-[46px] py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                            className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
                               f.ceklisBuktiPotong
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700/50"
-                                : "bg-surface-subtle text-muted-faintest border-border hover:bg-surface-hover"
+                                ? "bg-muted-stronger/15 text-navy-text border-muted-stronger/30"
+                                : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
                             }`}
                           >
                             Bupot
@@ -1311,16 +1295,12 @@ export function LaporanPendapatanClient({
                       </td>
 
                       {/* Jenis */}
-                      <td className="px-3 py-3 text-center border-b border-border-soft/60">
-                        <span className={`inline-block px-2.5 py-1 text-[10px] font-bold rounded-full border ${
-                          f.kodeJenisProyek === 2
-                            ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/70 dark:border-purple-800/50"
-                            : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/70 dark:border-blue-800/50"
-                        }`}>
+                      <td className="px-3 py-3 text-center border-b border-border-soft/50">
+                        <span className="inline-block px-2.5 py-1 text-[10px] font-semibold rounded-full bg-surface-subtle text-muted-stronger border border-border-soft">
                           {f.jenisProyekLabel}
                         </span>
                         {f.pekerjaanYangDipinjam > 0 && (
-                          <div className="text-[9.5px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium">
+                          <div className="text-[9.5px] text-muted mt-0.5 font-medium">
                             ↑ {f.pekerjaanYangDipinjamFmt}
                           </div>
                         )}
@@ -1328,19 +1308,19 @@ export function LaporanPendapatanClient({
 
                       {/* Aksi */}
                       {canEdit && (
-                        <td className="px-3 py-3 text-center border-b border-border-soft/60">
+                        <td className="px-3 py-3 text-center border-b border-border-soft/50">
                           <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => openEditFakturModal(f)}
                               title="Edit Faktur"
-                              className="p-1.5 text-muted-faint hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-muted-faint hover:text-muted-stronger hover:bg-surface-hover rounded-lg transition-colors cursor-pointer"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => { setDeletingFaktur(f); setIsDeleteModalOpen(true); }}
                               title="Hapus Faktur"
-                              className="p-1.5 text-muted-faint hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-muted-faint hover:text-status-red hover:bg-status-red/10 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1354,22 +1334,22 @@ export function LaporanPendapatanClient({
 
               {/* Footer Total */}
               <tfoot>
-                <tr className="bg-navy/8 dark:bg-navy/30 border-t-2 border-navy/20 dark:border-navy/60 font-bold text-navy-text">
+                <tr className="bg-surface-subtle font-bold text-navy-text border-t-2 border-border-soft">
                   <td colSpan={5} className="px-4 py-3 rounded-bl-[16px]">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] uppercase tracking-wider text-muted font-bold">Total Periode</span>
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-navy/10 dark:bg-white/10 text-navy-text">
+                      <span className="text-[12px] font-bold text-navy-text">Total Periode</span>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-surface-hover text-muted-stronger border border-border-soft">
                         {data.totalPeriod.jumlahFaktur} Faktur
                       </span>
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right font-mono">{data.totalPeriod.dppFmt}</td>
                   <td className="px-3 py-3 text-right font-mono text-muted">{data.totalPeriod.dppNilaiLainFmt}</td>
-                  <td className="px-3 py-3 text-right font-mono text-purple-700 dark:text-purple-400">{data.totalPeriod.ppnRealisasiFmt}</td>
-                  <td className="px-3 py-3 text-right font-mono text-amber-700 dark:text-amber-400">{data.totalPeriod.pphRealisasiFmt}</td>
-                  <td className="px-3 py-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/40 dark:bg-blue-500/15">{data.totalPeriod.nilaiProyekFmt}</td>
-                  <td className="px-3 py-3 text-right font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-500/15">{data.totalPeriod.labaSetelahPajakFmt}</td>
-                  <td className="px-3 py-3 text-right font-mono bg-emerald-100/40 dark:bg-emerald-500/15">{data.totalPeriod.nominalDiterimaFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono">{data.totalPeriod.ppnRealisasiFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono">{data.totalPeriod.pphRealisasiFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono">{data.totalPeriod.nilaiProyekFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono text-status-green">{data.totalPeriod.labaSetelahPajakFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono">{data.totalPeriod.nominalDiterimaFmt}</td>
                   <td colSpan={canEdit ? 5 : 4} className="rounded-br-[16px]"></td>
                 </tr>
               </tfoot>

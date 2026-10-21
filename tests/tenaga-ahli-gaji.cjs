@@ -88,6 +88,8 @@ assert.match(html, /Simpan negosiasi/);
 query = new URLSearchParams('ahliId=test-person&proyekAhliId=test-project');
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, props));
 assert.match(html, /Desember 2026/);
+assert.match(html, /aria-label="PPh Desember 2026"/);
+assert.match(html, /PPh \(Rp\) \/ netto/);
 const contractSection = html.match(/<details[^>]*>(.*?)<\/details>/s)[1];
 assert.doesNotMatch(contractSection, /<input|<select|<form|Simpan perubahan/);
 assert.match(contractSection, /Database Tenaga Ahli/);
@@ -127,3 +129,8 @@ assert.doesNotMatch(html, /Simpan perubahan/);
 assert.doesNotMatch(html, /Kurangi bulan/);
 assert.doesNotMatch(html, /Edit data &amp; proyek/);
 console.log('Pengujian periode SPMK, tenaga ahli lintas entitas, negosiasi di daftar, balance, riwayat lintas tahun, catatan, dan read-only lulus.');
+
+assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '' }, []), null);
+assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '', pph21: 500000 }, []), 500000);
+assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '', pph21: 0 }, []), 0);
+assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '' }, [{id:'old',nominalHonor:10000000,pph21:750000}]),750000);

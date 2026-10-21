@@ -33,20 +33,6 @@ try {
     if (empty($jadwal)) throw new InvalidArgumentException('Isi minimal satu bulan gaji.');
     $revision = $body['revision'] ?? 0;
     if (!is_int($revision) || $revision < 0) throw new InvalidArgumentException('Versi data tidak valid.');
-    $ref = $body['referensi'] ?? [];
-    if (!is_array($ref)) throw new InvalidArgumentException('Data referensi tidak valid.');
-    $nama_pekerjaan = $ref['namaPekerjaan'] ?? null;
-    if ($nama_pekerjaan !== null && (!is_string($nama_pekerjaan) || strlen($nama_pekerjaan) > 255)) {
-        throw new InvalidArgumentException('Nama pekerjaan maksimal 255 byte.');
-    }
-    $mm = tenaga_ahli_nominal($ref['manMonth'] ?? null);
-    if ($mm !== null && $mm > 99999999.99) throw new InvalidArgumentException('Menman terlalu besar.');
-    $rab = tenaga_ahli_nominal($ref['gajiRab'] ?? null);
-    $mulai = tenaga_ahli_valid_date($ref['spmkMulai'] ?? null);
-    $selesai = tenaga_ahli_valid_date($ref['spmkSelesai'] ?? null);
-    if (($mulai === null) !== ($selesai === null) || ($mulai && $selesai < $mulai)) {
-        throw new InvalidArgumentException('Isi tanggal mulai dan selesai SPMK dengan urutan yang benar.');
-    }
 } catch (InvalidArgumentException $e) {
     error_response($e->getMessage(), 400);
 }
@@ -78,10 +64,6 @@ try {
     }
     $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET gajiNegosiasi = ?, basisNegosiasi = ?, jadwalJson = ?, revision = revision + 1 WHERE id = ?')
         ->execute([$nominal, $basis, json_encode($jadwal, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), $existing['id']]);
-    if ($existing['sumber'] === 'MANUAL') {
-        $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ? WHERE id = ?')
-            ->execute([$nama_pekerjaan, $mm, $rab, $mulai, $selesai, $existing['id']]);
-    }
     tenaga_ahli_sync_pembayaran($pdo, $person, $rekanan_id, $project_id, $jadwal, $old_rows, $nominal);
     $stmt->execute([$rekanan_id, $project_id]);
     $saved = tenaga_ahli_gaji_format($stmt->fetch(PDO::FETCH_ASSOC));

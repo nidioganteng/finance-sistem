@@ -4,8 +4,8 @@ import { SessionProvider } from "@/components/SessionProvider";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Sistem Data Keuangan - Gaharu Sempana Group",
-  description: "Sistem data keuangan internal Gaharu Sempana Group",
+  title: "SIMATRA — Sistem Data Keuangan",
+  description: "Sistem data keuangan internal SIMATRA",
   icons: {
     icon: "/logo-entitas/logo-simatra-dark.png",
   },

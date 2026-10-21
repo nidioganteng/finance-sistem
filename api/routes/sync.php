@@ -13,7 +13,7 @@ $sub2 = $segments[2] ?? '';
 
 $pdo = get_pdo();
 
-// ─── POST /api/sync/assignment — terima penugasan baru/update dari Sidamon ───
+// ─── POST /api/sync/assignment — terima penugasan baru/update dari KOSHA ───
 if ($method === 'POST' && $sub === 'assignment') {
     $assignment_id  = trim($body['assignmentId'] ?? '');
     $job_name       = trim($body['jobName'] ?? '');
@@ -28,7 +28,7 @@ if ($method === 'POST' && $sub === 'assignment') {
         error_response('assignmentId, jobName, dan entitas wajib diisi.', 400);
     }
 
-    // Map entitas Sidamon → entity key Simatra
+    // Map entitas KOSHA → entity key Simatra
     $entitas_map = [
         'Gaharu'    => 'gaharu',
         'Kencana'   => 'kencana',
@@ -68,7 +68,7 @@ if ($method === 'POST' && $sub === 'assignment') {
         ]);
 
         try {
-            $notif_text  = "Penugasan diperbarui dari Sidamon: [{$existing['code']}] $job_name" . ($client_name ? " — $client_name" : '');
+            $notif_text  = "Penugasan diperbarui dari KOSHA: [{$existing['code']}] $job_name" . ($client_name ? " — $client_name" : '');
             $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
             foreach ($notif_roles as $role) {
                 $pdo->prepare(
@@ -133,14 +133,14 @@ if ($method === 'POST' && $sub === 'assignment') {
 
     log_activity(
         'system',
-        "Sync Sidamon: Project '$code' dibuat dari penugasan '$job_name'",
+        "Sync KOSHA: Project '$code' dibuat dari penugasan '$job_name'",
         'FINANCIAL_CHANGE',
         ['projectId' => $project_id, 'assignmentId' => $assignment_id]
     );
 
     // Kirim notifikasi ke Manajer Keuangan dan Staf Keuangan
     try {
-        $notif_text  = "Penugasan baru dari Sidamon: [$code] $job_name" . ($client_name ? " — $client_name" : '');
+        $notif_text  = "Penugasan baru dari KOSHA: [$code] $job_name" . ($client_name ? " — $client_name" : '');
         $notif_roles = ['MANAJER_KEUANGAN', 'STAF_KEUANGAN'];
         foreach ($notif_roles as $role) {
             $pdo->prepare(
@@ -152,14 +152,14 @@ if ($method === 'POST' && $sub === 'assignment') {
         error_log('Sync notif gagal (create): ' . $e->getMessage());
     }
 
-    // Sync-back ke Sidamon: reset termin lama, set persenTerbayar = 0
+    // Sync-back ke KOSHA: reset termin lama, set persenTerbayar = 0
     $cb_payload = json_encode([
         'projectId'      => $project_id,
         'projectCode'    => $code,
         'persenTerbayar' => 0,
         'termins'        => [],
     ]);
-    $ch = curl_init(SIDAMON_URL . '/api/sync/termin/' . urlencode($assignment_id));
+    $ch = curl_init(KOSHA_URL . '/api/sync/termin/' . urlencode($assignment_id));
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST  => 'PUT',
@@ -179,8 +179,8 @@ if ($method === 'POST' && $sub === 'assignment') {
     if (!$sync_back_ok) {
         $sync_err = $cb_errno !== 0
             ? 'curl error ' . $cb_errno . ': ' . curl_strerror($cb_errno)
-            : "HTTP $cb_http_code dari Sidamon";
-        log_activity('system', "Sync-back ke Sidamon GAGAL untuk project $code: $sync_err",
+            : "HTTP $cb_http_code dari KOSHA";
+        log_activity('system', "Sync-back ke KOSHA GAGAL untuk project $code: $sync_err",
             'USER_ACTIVITY', ['projectId' => $project_id, 'assignmentId' => $assignment_id]);
     }
 
@@ -396,7 +396,7 @@ elseif ($method === 'POST' && $sub === 'pegawai') {
     ]);
 }
 
-// ─── POST /api/sync/tenaga-ahli — sync tenaga ahli / freelance dari Sidamon ───
+// ─── POST /api/sync/tenaga-ahli — sync tenaga ahli / freelance dari KOSHA ───
 elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
     ensure_tenaga_ahli_gaji_table($pdo);
     $items = isset($body['items']) && is_array($body['items']) ? $body['items'] : [$body];
@@ -444,7 +444,7 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
             continue;
         }
 
-        // Resolusi project ID jika ada assignmentId atau projectCode dari Sidamon
+        // Resolusi project ID jika ada assignmentId atau projectCode dari KOSHA
         $project_id = null;
         $assignment_id = trim($item['assignmentId'] ?? '');
         $project_code = trim($item['projectCode'] ?? '');
@@ -469,7 +469,7 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
             ? (in_array($item['isTurunLapangan'], [1, '1', true, 'true', 'riil', 'RIIL'], true) ? 1 : 0)
             : 1;
         $nominal_honor = (float)($item['nominalHonorBulanan'] ?? 0);
-        // Referensi kontrak boleh diperbarui Sidamon; input finance disimpan terpisah.
+        // Referensi kontrak boleh diperbarui KOSHA; input finance disimpan terpisah.
         try {
             $spmk_mulai = tenaga_ahli_valid_date($item['spmkMulai'] ?? $start_date);
             $spmk_selesai = tenaga_ahli_valid_date($item['spmkSelesai'] ?? $end_date);
@@ -590,7 +590,7 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
         }
     }
 
-    log_activity('system', "Sync Tenaga Ahli dari Sidamon: " . count($results) . " data diproses", 'USER_ACTIVITY', [
+    log_activity('system', "Sync Tenaga Ahli dari KOSHA: " . count($results) . " data diproses", 'USER_ACTIVITY', [
         'count' => count($results),
     ]);
 

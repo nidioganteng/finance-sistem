@@ -89,6 +89,7 @@ for (const dimension of ['proyek', 'nama', 'bulan', 'holding']) {
   assert.match(html, /10\.000\.000/);
   assert.match(html, /0 transaksi tercatat/);
   assert.doesNotMatch(html, /Belum ada gaji terisi atau pembayaran tercatat/);
+  assert.doesNotMatch(html, /catatan kendala pada periode ini/);
 }
 for (const dimension of ['proyek', 'nama', 'holding']) {
   const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
@@ -137,17 +138,27 @@ const globalHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { 
 assert.match(globalHtml, /Semua entitas/); assert.match(globalHtml, /Ahli Belum Digaji/);
 assert.doesNotMatch(globalHtml, /GH-001|KN-001|Tracking bulan ini/); assert.match(globalHtml, /25\.000\.000/);
 assert.match(globalHtml, /2 proyek · 2 input/);
-assert.match(globalHtml, /value="B">Kencana/);
+const entitySelect = globalHtml.match(/<select aria-label="Entitas akumulasi tenaga ahli"[^>]*>(.*?)<\/select>/)[1];
+assert.match(entitySelect, /value="all"[^>]*>Semua entitas/);
+assert.match(entitySelect, /value="current">Gaharu/);
+assert.equal((entitySelect.match(/<option/g) || []).length, 2);
+assert.doesNotMatch(entitySelect, /Kencana/);
 const navigationMocks = { usePathname: () => '/payroll', useSearchParams: () => new URLSearchParams('entity=gaharu') };
 const entityProps = { rows: multiRows, people: multiPeople, entities: [{ id: 'A', key: 'gaharu', name: 'Gaharu' }, { id: 'B', key: 'kencana', name: 'Kencana' }], group: 'nama', entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' };
 const scopedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
-  react: { ...React, useState: initial => React.useState(initial === '' ? 'B' : initial) },
+  react: { ...React, useState: initial => React.useState(initial === 'all' ? 'current' : initial) },
   '@/lib/tenaga-ahli-tracking': tracking, 'next/navigation': navigationMocks,
   'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
 }).TenagaAhliReport;
 const scopedHtml = renderToStaticMarkup(React.createElement(scopedReport, entityProps));
-assert.match(scopedHtml, /15\.000\.000/); assert.match(scopedHtml, /1 proyek · 1 input/);
-assert.doesNotMatch(scopedHtml, /GH-001|Ahli Belum Digaji/);
+assert.match(scopedHtml, /10\.000\.000/); assert.match(scopedHtml, /1 proyek · 1 input/);
+assert.match(scopedHtml, /Ahli Belum Digaji/);
+assert.doesNotMatch(scopedHtml, /15\.000\.000/);
+const switchedHtml = renderToStaticMarkup(React.createElement(scopedReport, { ...entityProps, entityId: 'B', entityName: 'Kencana' }));
+assert.match(switchedHtml, /15\.000\.000/);
+assert.doesNotMatch(switchedHtml, /Ahli Belum Digaji/);
+const switchedSelect = switchedHtml.match(/<select aria-label="Entitas akumulasi tenaga ahli"[^>]*>(.*?)<\/select>/)[1];
+assert.match(switchedSelect, /value="current"[^>]*>Kencana/); assert.doesNotMatch(switchedSelect, /Gaharu/);
 const expandedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
   react: { ...React, useState: initial => React.useState(initial === null ? 'multi-nik' : initial) },
   '@/lib/tenaga-ahli-tracking': tracking, 'next/navigation': navigationMocks,

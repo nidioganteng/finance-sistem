@@ -22,7 +22,7 @@ const people = [
     project('project-1', [salary('2026-02', 10000000), salary('2026-03', 10000000), salary('2026-10', 15000000), salary('2026-11', null, 'Dokumen belum lengkap'), salary('2027-01', 99000000)]),
     project('project-2', [salary('2026-10', 12000000)]),
   ] },
-  { id: 'p2', nik: 'nik-2', nama: 'Ahli Kedua', entityId: 'B', entityName: 'Entitas B', proyekList: [project('project-3', [salary('2026-10', 20000000)])] },
+  { id: 'p2', nik: 'nik-2', nama: 'Ahli Kedua', entityId: 'B', entityName: 'Entitas B', proyekList: [{ ...project('project-3', [salary('2026-10', 20000000)]), projectEntityId: 'B', projectEntityName: 'Entitas B' }] },
 ];
 function payment(id, bulan, nominalHonor, extra = {}) {
   return { id, rekananId: 'p1', nik: 'nik-1', nama: 'Ahli Uji', entityId: 'A', entityName: 'Entitas A', projectId: 'project-1', projectCode: 'PROJECT-1', projectName: 'Proyek project-1', tahun: 2026, bulan, tanggal: '2026-10-21', nominalHonor, pph21: 0, nominalBersih: nominalHonor, ...extra };
@@ -68,6 +68,28 @@ const { TenagaAhliReport } = compile('src/components/payroll/TenagaAhliReport.ts
   'next/navigation': { usePathname: () => '/payroll', useSearchParams: () => new URLSearchParams() },
   'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
 });
+// Screenshot regression: profile in Gaharu, assignment and salary in Cipta Asri.
+const crossEntityPeople = [{ id: 'cross', nama: 'Ahli Lintas Entitas', nik: 'cross-nik', entityId: 'gaharu', entityName: 'Gaharu',
+  proyekList: [{ ...project('cad-001', [salary('2026-02', 10000000, 'Belum diterima uangnya')]), projectEntityId: 'ciptaAsri', projectEntityName: 'Cipta Asri' }] }];
+const crossRows = build(crossEntityPeople, []);
+const cipta = filter(crossRows, { entityId: 'ciptaAsri', year: 2026, month: 2 });
+assert.deepEqual([sum(cipta).gajiTerisi, sum(cipta).dibayar, sum(cipta).balance, sum(cipta).jumlahKendala], [10000000, 0, 10000000, 1]);
+assert.equal(cipta[0].entityName, 'Cipta Asri');
+assert.equal(filter(crossRows, { entityId: 'gaharu', year: 2026 }).length, 0);
+assert.equal(sum(crossRows).gajiTerisi, 10000000); // Holding counts the assignment only once.
+assert.equal(filter(crossRows, { entityId: 'ciptaAsri', year: 2026, month: 10 }).length, 0);
+const crossPaid = build(crossEntityPeople, [payment('cross-paid', 2, 4000000, { rekananId: 'cross', nik: 'cross-nik', entityId: 'ciptaAsri', entityName: 'Cipta Asri', projectId: 'cad-001' })]);
+assert.equal(crossPaid.length, 1);
+assert.deepEqual([sum(crossPaid).gajiTerisi, sum(crossPaid).dibayar, sum(crossPaid).balance], [10000000, 4000000, 6000000]);
+const fallbackPeople = structuredClone(crossEntityPeople);
+fallbackPeople[0].proyekList[0].projectEntityId = null;
+assert.equal(sum(filter(build(fallbackPeople, []), { entityId: 'gaharu', year: 2026 })).gajiTerisi, 10000000);
+for (const dimension of ['proyek', 'nama', 'bulan', 'holding']) {
+  const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows: crossRows, group: dimension, entityId: 'ciptaAsri', entityName: 'Cipta Asri', year: 2026, month: 2, search: '' }));
+  assert.match(html, /10\.000\.000/);
+  assert.match(html, /0 transaksi tercatat/);
+  assert.doesNotMatch(html, /Belum ada gaji terisi atau pembayaran tercatat/);
+}
 for (const dimension of ['proyek', 'nama', 'holding']) {
   const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
   assert.match(html, /Tahun 2026/);

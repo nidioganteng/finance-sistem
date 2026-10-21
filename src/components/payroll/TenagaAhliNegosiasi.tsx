@@ -190,6 +190,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
   const [activeNoteMonth, setActiveNoteMonth] = useState<string | null>(null);
   const noteDialog = useRef<HTMLDialogElement>(null);
   const activeNote = rows.find(row => row.bulan === activeNoteMonth);
+  const selectedNewMonth = newMonth || (rows.length ? bulanBerikutnya(rows[rows.length - 1].bulan) : ref.spmkMulai?.slice(0, 7)) || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   useEffect(() => {
     if (activeNoteMonth && noteDialog.current && !noteDialog.current.open) noteDialog.current.showModal();
   }, [activeNoteMonth]);
@@ -224,7 +225,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
     });
   }
   function addMonth() {
-    const month = newMonth || (rows.length ? bulanBerikutnya(rows[rows.length - 1].bulan) : ref.spmkMulai?.slice(0, 7) || "");
+    const month = selectedNewMonth;
     if (!/^(20\d{2}|21\d{2})-(0[1-9]|1[0-2])$/.test(month)) { setError("Pilih bulan yang valid (tahun 2000–2199)."); return; }
     if (rows.some(row => row.bulan === month)) { setError("Bulan tersebut sudah ada."); return; }
     if (rows.length >= 600) { setError("Maksimal 600 bulan."); return; }
@@ -271,7 +272,15 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
         <div><h3 className="text-sm font-semibold text-navy-text">Gaji per bulan <span className="ml-2 text-[11px] font-normal text-muted-faint">SPMK {dateLabel(ref.spmkMulai)} – {dateLabel(ref.spmkSelesai)}</span></h3></div>
         <div className="flex flex-wrap items-center gap-2">
           {noteCount > 0 && <button onClick={() => setOnlyNotes(!onlyNotes)} className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" aria-pressed={onlyNotes}><AlertTriangle size={13} />{noteCount} kendala · {onlyNotes ? "Semua bulan" : "Filter catatan"}</button>}
-          {canEdit && <><input aria-label="Bulan tambahan" type="month" min="2000-01" max="2199-12" disabled={pending} value={newMonth} onChange={e => setNewMonth(e.target.value)} className={`${inputClass} !w-auto`} /><button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />{newMonth ? "Tambah bulan" : "Bulan berikutnya"}</button></>}
+          {canEdit && <>
+            <select aria-label="Bulan tambahan" disabled={pending} value={selectedNewMonth.slice(5, 7)} onChange={event => setNewMonth(`${selectedNewMonth.slice(0, 4)}-${event.target.value}`)} className={`${inputClass} !w-auto`}>
+              {Array.from({ length: 12 }, (_, index) => <option key={index} value={String(index + 1).padStart(2, "0")}>{new Date(2026, index, 1).toLocaleDateString("id-ID", { month: "long" })}</option>)}
+            </select>
+            <select aria-label="Tahun tambahan" disabled={pending} value={selectedNewMonth.slice(0, 4)} onChange={event => setNewMonth(`${event.target.value}-${selectedNewMonth.slice(5, 7)}`)} className={`${inputClass} !w-auto`}>
+              {Array.from({ length: 200 }, (_, index) => <option key={index} value={2000 + index}>{2000 + index}</option>)}
+            </select>
+            <button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />Tambah bulan</button>
+          </>}
         </div>
       </div>
       <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>

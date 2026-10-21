@@ -70,9 +70,24 @@ const { TenagaAhliReport } = compile('src/components/payroll/TenagaAhliReport.ts
 });
 for (const dimension of ['proyek', 'nama', 'holding']) {
   const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
-  assert.match(html, /Oktober 2026/);
-  assert.doesNotMatch(html, /Februari 2026|Maret 2026|Januari 2027/);
+  assert.match(html, /Tahun 2026/);
+  assert.match(html, dimension === 'holding' ? /42\.000\.000/ : /34\.000\.000/);
   assert.match(html, /Gaji terisi/); assert.match(html, /Sudah dibayar/);
+  const monthlyHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '', periodScope: 'bulan' }));
+  assert.match(monthlyHtml, /Oktober 2026/);
+  assert.doesNotMatch(monthlyHtml, /Februari 2026|Maret 2026|Januari 2027/);
+  assert.match(monthlyHtml, dimension === 'holding' ? /22\.000\.000/ : /14\.000\.000/);
+}
+// A February payment remains in both accumulations when the page month is October.
+const februaryRows = build(people, [feb]).filter(row => row.periode === '2026-02');
+for (const dimension of ['proyek', 'nama']) {
+  const props = { rows: februaryRows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' };
+  const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, props));
+  assert.match(html, /10\.000\.000/);
+  assert.match(html, /1 transaksi tercatat/);
+  const monthlyHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { ...props, periodScope: 'bulan' }));
+  assert.doesNotMatch(monthlyHtml, /10\.000\.000/);
+  assert.match(monthlyHtml, /0 transaksi tercatat/);
 }
 const yearlyHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: 'bulan', entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
 assert.match(yearlyHtml, /Februari 2026/); assert.match(yearlyHtml, /Maret 2026/); assert.match(yearlyHtml, /Oktober 2026/);

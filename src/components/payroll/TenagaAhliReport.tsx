@@ -15,7 +15,7 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
   rows: TenagaAhliTrackingRow[]; group: keyof typeof titles; entityId?: string; entityName?: string;
   year: number; month: number; search: string; summaryOnly?: boolean; periodScope?: "bulan" | "tahun"; onTracking?: () => void;
 }) {
-  const [scope, setScope] = useState<"bulan" | "tahun">(group === "bulan" ? "tahun" : "bulan");
+  const [scope, setScope] = useState<"bulan" | "tahun">("tahun");
   const [expanded, setExpanded] = useState<string | null>(null);
   const pathname = usePathname();
   const params = useSearchParams();

@@ -397,11 +397,6 @@ export function AktivaTetapManager({
         </section>
       )}
 
-      <div className="flex items-start gap-3 rounded-[16px] border border-border-soft bg-surface-subtle px-5 py-3.5 text-[12px] text-muted-strong leading-relaxed">
-        <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-brand" />
-        <p><span className="font-semibold text-navy-text">Laporan tersinkron otomatis.</span> Beban penyusutan masuk ke Laba Rugi dan akumulasi penyusutan ke Neraca, tanpa input jurnal manual.</p>
-      </div>
-
       {/* ── Filter Bar & Actions ── */}
       <div className="bg-surface-card rounded-[22px] border border-border-soft p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto flex-1">

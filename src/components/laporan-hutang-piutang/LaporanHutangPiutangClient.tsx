@@ -332,7 +332,7 @@ export function LaporanHutangPiutangClient({
                             ) : (
                               <Minus size={13} />
                             )}
-                            {row.status}
+                            {row.status === "NIHIL" ? "Seimbang" : row.status}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 font-bold text-navy-text text-[13px] whitespace-nowrap">
@@ -467,7 +467,7 @@ export function LaporanHutangPiutangClient({
                             : "bg-surface-hover text-muted"
                         }`}
                       >
-                        {row.status}
+                        {row.status === "NIHIL" ? "Seimbang" : row.status}
                       </span>
                       <span className="text-[11.5px] font-extrabold text-navy-text uppercase">
                         {row.fullName} ({row.shortName})
@@ -1663,7 +1663,7 @@ export function LaporanHutangPiutangClient({
                             ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                             : "bg-surface-subtle text-muted"
                         }`}>
-                          {ps.status}
+                          {ps.status === "NIHIL" ? "Seimbang" : ps.status}
                         </span>
                       </td>
                     </tr>
@@ -1682,7 +1682,7 @@ export function LaporanHutangPiutangClient({
                       {grupData.pemegangSahamSummary?.netGlobalFmt ?? "Rp 0"}
                     </td>
                     <td className="py-3.5 px-6 text-center text-[11px] text-muted font-normal">
-                      {(grupData.pemegangSahamSummary?.netGlobal ?? 0) > 0 ? "Hak Tagih Bersih" : (grupData.pemegangSahamSummary?.netGlobal ?? 0) < 0 ? "Kewajiban Bersih" : "Nihil"}
+                      {(grupData.pemegangSahamSummary?.netGlobal ?? 0) > 0 ? "Hak Tagih Bersih" : (grupData.pemegangSahamSummary?.netGlobal ?? 0) < 0 ? "Kewajiban Bersih" : "Seimbang"}
                     </td>
                   </tr>
                 </tbody>

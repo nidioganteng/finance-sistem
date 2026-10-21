@@ -42,11 +42,12 @@ export function buildTenagaAhliTracking(people: RekananTenagaAhliItem[], payment
     for (const project of person.proyekList || []) {
       for (const row of project.gajiKontrak?.jadwal || []) {
         if (row.nominal === null && !row.catatan.trim()) continue;
-        const entityId = person.entityId || project.projectEntityId || "";
+        // Gaji penugasan dibebankan pada entitas proyek, termasuk profil lintas entitas.
+        const entityId = project.projectEntityId || person.entityId || "";
         const id = identity(person.id, project.projectId, row.bulan, entityId);
         map.set(id, { id, personId: person.id, personKey: person.nik || person.id, nama: person.nama, nik: person.nik,
           projectId: project.projectId, projectCode: project.projectCode || null, projectName: project.projectName || "Proyek",
-          entityId, entityName: person.entityName || project.projectEntityName || "Entitas",
+          entityId, entityName: project.projectEntityId ? (project.projectEntityName || (entityId === person.entityId ? person.entityName : null) || "Entitas") : (person.entityName || "Entitas"),
           periode: row.bulan, gajiTerisi: row.nominal, catatan: row.catatan, payments: [] });
       }
     }

@@ -806,89 +806,65 @@ export function LaporanPendapatanClient({
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* TOOLBAR: FILTERS & ACTIONS */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-surface-card p-3.5 sm:p-4 rounded-2xl border border-border-soft shadow-xs">
-        {/* Left: Filter Controls & Audit Status Badge */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Filter Pill: Tahun */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-subtle/80 border border-border-soft text-xs text-navy-text">
-            <Calendar className="w-3.5 h-3.5 text-navy-soft" />
-            <span className="font-medium text-navy-soft">Tahun:</span>
-            <select
-              value={data.year}
-              onChange={(e) => handleFilterChange(undefined, Number(e.target.value))}
-              className="bg-transparent font-bold text-navy-text focus:outline-none cursor-pointer pr-1"
-            >
-              {[2024, 2025, 2026, 2027].map((yr) => (
-                <option key={yr} value={yr} className="bg-surface-card text-navy-text">
-                  {yr}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="bg-surface-card rounded-[22px] border border-border-soft shadow-xs px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Left: Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={data.year}
+            onChange={(e) => handleFilterChange(undefined, Number(e.target.value))}
+            className="h-9 pl-3 pr-8 rounded-pill bg-surface-subtle border border-border-soft text-[13px] font-bold text-navy-text focus:outline-none focus:border-brand cursor-pointer"
+          >
+            {[2024, 2025, 2026, 2027].map((yr) => (
+              <option key={yr} value={yr}>{yr}</option>
+            ))}
+          </select>
 
-          {/* Filter Pill: Masa Pajak */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-subtle/80 border border-border-soft text-xs text-navy-text">
-            <Filter className="w-3.5 h-3.5 text-navy-soft" />
-            <span className="font-medium text-navy-soft">Masa Pajak:</span>
-            <select
-              value={data.masaPajak ?? ""}
-              onChange={(e) =>
-                handleFilterChange(
-                  undefined,
-                  undefined,
-                  e.target.value ? Number(e.target.value) : null
-                )
-              }
-              className="bg-transparent font-bold text-navy-text focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="" className="bg-surface-card text-navy-text">Semua Masa (12 Bulan)</option>
-              {NAMA_BULAN.map((m, idx) => (
-                <option key={idx + 1} value={idx + 1} className="bg-surface-card text-navy-text">
-                  Bulan {idx + 1} ({m})
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={data.masaPajak ?? ""}
+            onChange={(e) =>
+              handleFilterChange(undefined, undefined, e.target.value ? Number(e.target.value) : null)
+            }
+            className="h-9 pl-3 pr-8 rounded-pill bg-surface-subtle border border-border-soft text-[13px] font-semibold text-navy-text focus:outline-none focus:border-brand cursor-pointer"
+          >
+            <option value="">Semua Masa (12 Bulan)</option>
+            {NAMA_BULAN.map((m, idx) => (
+              <option key={idx + 1} value={idx + 1}>Bulan {idx + 1} — {m}</option>
+            ))}
+          </select>
 
-          <div className="h-5 w-px bg-border-soft hidden sm:block" />
-
-          {/* Audit SPT Status Badge */}
+          {/* Audit SPT Status */}
           {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>
-                <strong className="font-semibold text-navy-soft">Audit SPT:</strong> Match 100% Sesuai
-              </span>
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 rounded-pill bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 text-[12.5px] font-semibold text-green-700 dark:text-green-400">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              Audit SPT: Match 100% Sesuai
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs">
-              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-              <span>
-                <strong className="font-semibold text-navy-soft">Audit SPT:</strong> {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih
-              </span>
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 rounded-pill bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-[12.5px] font-semibold text-status-red">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {data.kpiSummary.jumlahBulanSelisih} Bulan Selisih
             </div>
           )}
         </div>
 
         {/* Right: Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <a
             href={exportUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-xs"
+            className="h-9 inline-flex items-center gap-2 px-4 rounded-pill border border-border-soft bg-surface-card text-[13px] font-semibold text-muted-stronger hover:bg-surface-hover transition-colors shadow-xs"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Ekspor Excel</span>
+            <FileSpreadsheet className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
+            Ekspor Excel
           </a>
 
           {canEdit && (
             <button
               onClick={openCreateFakturModal}
-              className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-xl bg-navy text-white hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
+              className="h-9 inline-flex items-center gap-2 px-4 rounded-pill bg-navy text-white text-[13px] font-bold hover:bg-navy-strong transition-colors shadow-xs"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Input E-Faktur</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              Input E-Faktur
             </button>
           )}
         </div>
@@ -897,162 +873,167 @@ export function LaporanPendapatanClient({
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 6 KPI SUMMARY METRICS */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {/* KPI 1 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Nilai Proyek (111%)
-            </span>
-            <TrendingUp className="w-4 h-4 text-blue-500 shrink-0 ml-1" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        {/* KPI 1 — Nilai Proyek */}
+        <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xs p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Nilai Proyek</span>
+            <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center flex-none">
+              <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            </div>
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalNilaiProyekFmt}>
+          <div className="text-[18px] font-extrabold text-navy-text leading-tight truncate" title={data.kpiSummary.totalNilaiProyekFmt}>
             {data.kpiSummary.totalNilaiProyekFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            Diakui sebagai Pendapatan di Laba Rugi
-          </p>
+          <p className="text-[11px] text-muted-faint truncate">Bruto 111% incl. PPN</p>
         </div>
 
-        {/* KPI 2 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Total DPP
-            </span>
-            <FileText className="w-4 h-4 text-indigo-500 shrink-0 ml-1" />
+        {/* KPI 2 — Total DPP */}
+        <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xs p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Total DPP</span>
+            <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center flex-none">
+              <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            </div>
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalDppFmt}>
+          <div className="text-[18px] font-extrabold text-navy-text leading-tight truncate" title={data.kpiSummary.totalDppFmt}>
             {data.kpiSummary.totalDppFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            DPP Nilai Lain: {data.totalPeriod.dppNilaiLainFmt}
-          </p>
+          <p className="text-[11px] text-muted-faint truncate">DPP Lain: {data.totalPeriod.dppNilaiLainFmt}</p>
         </div>
 
-        {/* KPI 3 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Kewajiban Pajak
-            </span>
-            <Receipt className="w-4 h-4 text-purple-500 shrink-0 ml-1" />
+        {/* KPI 3 — Kewajiban Pajak */}
+        <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xs p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Kewajiban Pajak</span>
+            <div className="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center flex-none">
+              <Receipt className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            </div>
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalPajakFmt}>
+          <div className="text-[18px] font-extrabold text-navy-text leading-tight truncate" title={data.kpiSummary.totalPajakFmt}>
             {data.kpiSummary.totalPajakFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            PPN: {data.totalPeriod.ppnFmt} | PPh: {data.totalPeriod.pphFmt}
-          </p>
+          <p className="text-[11px] text-muted-faint truncate">PPN + PPh dipungut</p>
         </div>
 
-        {/* KPI 4 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Laba Stlh Pajak
-            </span>
-            <Wallet className="w-4 h-4 text-emerald-500 shrink-0 ml-1" />
+        {/* KPI 4 — Laba Bersih */}
+        <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xs p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Laba Bersih</span>
+            <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-none">
+              <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </div>
-          <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate" title={data.kpiSummary.totalLabaSetelahPajakFmt}>
+          <div className="text-[18px] font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight truncate" title={data.kpiSummary.totalLabaSetelahPajakFmt}>
             {data.kpiSummary.totalLabaSetelahPajakFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            Margin bersih setelah PPN & PPh
-          </p>
+          <p className="text-[11px] text-muted-faint truncate">Setelah PPN &amp; PPh</p>
         </div>
 
-        {/* KPI 5 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Total Dana Cair
-            </span>
-            <Building2 className="w-4 h-4 text-sky-500 shrink-0 ml-1" />
+        {/* KPI 5 — Dana Cair */}
+        <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xs p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Dana Cair</span>
+            <div className="w-7 h-7 rounded-full bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center flex-none">
+              <Building2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            </div>
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.totalNominalDiterimaFmt}>
+          <div className="text-[18px] font-extrabold text-navy-text leading-tight truncate" title={data.kpiSummary.totalNominalDiterimaFmt}>
             {data.kpiSummary.totalNominalDiterimaFmt}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            {data.totalPeriod.jumlahFaktur} faktur tercatat
-          </p>
+          <p className="text-[11px] text-muted-faint truncate">{data.totalPeriod.jumlahFaktur} faktur</p>
         </div>
 
-        {/* KPI 6 */}
-        <div className="bg-surface-card p-4 rounded-xl border border-border-soft shadow-xs min-w-0">
-          <div className="flex items-center justify-between text-navy-soft mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider truncate">
-              Audit SPT Pajak
-            </span>
-            <Scale className="w-4 h-4 text-amber-500 shrink-0 ml-1" />
+        {/* KPI 6 — Audit SPT */}
+        <div className={`rounded-[20px] border shadow-xs p-4 flex flex-col gap-3 min-w-0 ${
+          data.kpiSummary.statusAudit === "SEMUA_SESUAI"
+            ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30"
+            : "bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30"
+        }`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Audit SPT</span>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-none ${
+              data.kpiSummary.statusAudit === "SEMUA_SESUAI"
+                ? "bg-emerald-100 dark:bg-emerald-500/20"
+                : "bg-rose-100 dark:bg-rose-500/20"
+            }`}>
+              <Scale className={`w-3.5 h-3.5 ${
+                data.kpiSummary.statusAudit === "SEMUA_SESUAI"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400"
+              }`} />
+            </div>
           </div>
-          <div className="text-lg font-bold text-navy-text truncate" title={data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? "Match 100%" : `${data.kpiSummary.jumlahBulanSelisih} Bulan Beda`}>
+          <div className="text-[18px] font-extrabold leading-tight truncate">
             {data.kpiSummary.statusAudit === "SEMUA_SESUAI" ? (
               <span className="text-emerald-600 dark:text-emerald-400">Match 100%</span>
             ) : (
-              <span className="text-rose-600 dark:text-rose-400">{data.kpiSummary.jumlahBulanSelisih} Bulan Beda</span>
+              <span className="text-rose-600 dark:text-rose-400">{data.kpiSummary.jumlahBulanSelisih} Bln Beda</span>
             )}
           </div>
-          <p className="text-[11px] text-navy-soft mt-1 truncate">
-            Selisih Pajak: {data.kpiSummary.totalSelisihPajakFmt}
-          </p>
+          <p className="text-[11px] text-muted-faint truncate">Selisih: {data.kpiSummary.totalSelisihPajakFmt}</p>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 3 LAYER TABS NAVIGATION */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex border-b border-border-soft bg-surface-card rounded-t-2xl px-4 pt-2">
-        <button
-          onClick={() => setActiveTab("faktur")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === "faktur"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-navy-soft hover:text-navy-text"
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          <span>Lapis 1: Daftar E-Faktur & Total Periode</span>
-          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
-            {filteredFaktur.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("rekap-bulanan")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === "rekap-bulanan"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-navy-soft hover:text-navy-text"
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Lapis 2: Rekap Bulanan (Jan - Des)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("rekonsiliasi")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === "rekonsiliasi"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-navy-soft hover:text-navy-text"
-          }`}
-        >
-          <Scale className="w-4 h-4" />
-          <span>Lapis 3: Rekonsiliasi Audit Pajak (Faktur vs SPT)</span>
-          {data.kpiSummary.jumlahBulanSelisih > 0 && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold">
-              {data.kpiSummary.jumlahBulanSelisih}
+      <div className="bg-surface-card rounded-[20px] border border-border-soft shadow-xs overflow-hidden">
+        <div className="flex gap-1 px-3 pt-3 pb-0 border-b border-border-soft">
+          <button
+            onClick={() => setActiveTab("faktur")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-[13px] font-semibold transition-colors border-b-2 -mb-px ${
+              activeTab === "faktur"
+                ? "border-brand text-brand bg-brand/5"
+                : "border-transparent text-muted hover:text-muted-stronger hover:bg-surface-hover"
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5 shrink-0" />
+            <span>Daftar E-Faktur</span>
+            <span className={`px-1.5 py-0.5 text-[11px] rounded-full font-bold ${
+              activeTab === "faktur"
+                ? "bg-brand/15 text-brand"
+                : "bg-surface-subtle text-muted"
+            }`}>
+              {filteredFaktur.length}
             </span>
-          )}
-        </button>
-      </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("rekap-bulanan")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-[13px] font-semibold transition-colors border-b-2 -mb-px ${
+              activeTab === "rekap-bulanan"
+                ? "border-brand text-brand bg-brand/5"
+                : "border-transparent text-muted hover:text-muted-stronger hover:bg-surface-hover"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            <span>Rekap Bulanan</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("rekonsiliasi")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-[13px] font-semibold transition-colors border-b-2 -mb-px ${
+              activeTab === "rekonsiliasi"
+                ? "border-brand text-brand bg-brand/5"
+                : "border-transparent text-muted hover:text-muted-stronger hover:bg-surface-hover"
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5 shrink-0" />
+            <span>Rekonsiliasi Pajak</span>
+            {data.kpiSummary.jumlahBulanSelisih > 0 && (
+              <span className="px-1.5 py-0.5 text-[11px] rounded-full font-bold bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400">
+                {data.kpiSummary.jumlahBulanSelisih}
+              </span>
+            )}
+          </button>
+        </div>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* TAB 1: LAPIS 1 - DAFTAR E-FAKTUR & TOTAL PERIODE */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "faktur" && (
-        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+        <div className="p-5 space-y-4">
           {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-80">
@@ -1380,7 +1361,7 @@ export function LaporanPendapatanClient({
       {/* TAB 2: LAPIS 2 - REKAP BULANAN */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "rekap-bulanan" && (
-        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+        <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-navy-text">
@@ -1520,7 +1501,7 @@ export function LaporanPendapatanClient({
       {/* TAB 3: LAPIS 3 - REKONSILIASI AUDIT PAJAK (FAKTUR VS SPT) */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === "rekonsiliasi" && (
-        <div className="bg-surface-card rounded-b-2xl border border-border-soft p-5 shadow-xs space-y-4">
+        <div className="p-5 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 p-4 rounded-xl bg-surface-subtle border border-border-soft">
             <div className="flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
@@ -1798,6 +1779,7 @@ export function LaporanPendapatanClient({
           </div>
         </div>
       )}
+      </div>{/* end tabs card container */}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* MODAL: INPUT / EDIT FAKTUR PENDAPATAN */}

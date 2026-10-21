@@ -14,7 +14,7 @@ const LABELS_MANAJER: Partial<Record<NotifikasiType, string>> = {
   LOADING_DOCK: "Loading Dock",
   TERMIN_AUDIT: "Termin Perlu Diaudit",
   JENIS_INPUT_BARU: "Jenis Input Baru",
-  PENUGASAN_BARU: "Penugasan Baru dari Sidamon",
+  PENUGASAN_BARU: "Penugasan Baru dari KOSHA",
 };
 
 export function getNotifTypeLabels(role: Role) {

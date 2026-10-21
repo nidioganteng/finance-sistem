@@ -643,7 +643,7 @@ export function JurnalTransaksiClient({
               </div>
             </div>
 
-            {/* Integrasi E-Faktur & Proyek Sidamon */}
+            {/* Integrasi E-Faktur & Proyek KOSHA */}
             <div className="mb-5 flex flex-col gap-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {/* 1. E-Faktur Terkait */}
@@ -708,12 +708,12 @@ export function JurnalTransaksiClient({
                   </p>
                 </div>
 
-                {/* 2. Proyek Terkait (Sidamon) */}
+                {/* 2. Proyek Terkait (KOSHA) */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
                       <Briefcase size={12} className="text-muted-faint" />
-                      Proyek Terkait (Sidamon)
+                      Proyek Terkait (KOSHA)
                       {isOtherEntity && (
                         <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
                           Lintas Entitas

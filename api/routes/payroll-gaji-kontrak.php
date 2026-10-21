@@ -28,6 +28,7 @@ try {
     if ($nominal <= 0) throw new InvalidArgumentException('Gaji negosiasi wajib lebih dari nol.');
     $basis = $body['basisNegosiasi'] ?? 'BULAN';
     if (!in_array($basis, ['BULAN', 'KONTRAK'], true)) throw new InvalidArgumentException('Basis negosiasi tidak valid.');
+    $basis = 'KONTRAK'; // Negosiasi menjadi plafon total kontrak, bukan tarif per bulan.
     $jadwal = tenaga_ahli_validate_jadwal($body['jadwal'] ?? null);
     if (empty($jadwal)) throw new InvalidArgumentException('Isi minimal satu bulan gaji.');
     $revision = $body['revision'] ?? 0;
@@ -81,7 +82,7 @@ try {
         $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ? WHERE id = ?')
             ->execute([$nama_pekerjaan, $mm, $rab, $mulai, $selesai, $existing['id']]);
     }
-    tenaga_ahli_sync_pembayaran($pdo, $person, $rekanan_id, $project_id, $jadwal, $old_rows);
+    tenaga_ahli_sync_pembayaran($pdo, $person, $rekanan_id, $project_id, $jadwal, $old_rows, $nominal);
     $stmt->execute([$rekanan_id, $project_id]);
     $saved = tenaga_ahli_gaji_format($stmt->fetch(PDO::FETCH_ASSOC));
     log_activity($user['id'], "Simpan negosiasi, gaji dan pembayaran otomatis tenaga ahli: {$person['nama']}", 'FINANCIAL_CHANGE', [

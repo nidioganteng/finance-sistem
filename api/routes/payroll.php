@@ -1,6 +1,8 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
 require_once __DIR__ . '/../helpers/tenaga-ahli-gaji.php';
+require_once __DIR__ . '/../helpers/kas-helpers.php';
+require_once __DIR__ . '/../helpers/payroll-ptkp.php';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 // $segments[0] = 'payroll'
@@ -1788,8 +1790,11 @@ if ($method === 'GET' && $sub === '') {
         'jurnalSemuaRows'          => $tx_semua_bulan,
     ];
 
+    ensure_payroll_ptkp_table($pdo);
+    $ptkp_rates = payroll_ptkp_rates($pdo, $entity_id);
     json_response([
         'entity'                => $entity,
+        'ptkpRates'             => $ptkp_rates,
         'allEntities'           => $all_entities,
         'projects'              => $projects,
         'allProjects'           => $all_projects,
@@ -1845,7 +1850,10 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
     $nama           = trim($body['nama'] ?? '');
     $jabatan        = trim($body['jabatan'] ?? '') ?: 'Karyawan';
     $status_kel     = trim($body['statusKeluarga'] ?? '') ?: 'TK/0';
-    $ptkp           = parse_rupiah_num($body['ptkp'] ?? null, 54000000.0);
+    ensure_payroll_ptkp_table($pdo);
+    $ptkp_rates = payroll_ptkp_rates($pdo, $entity_id);
+    if (!array_key_exists($status_kel, $ptkp_rates)) return error_response('Status PTKP tidak valid.', 400);
+    $ptkp = $ptkp_rates[$status_kel];
     $gaji_pokok     = parse_rupiah_num($body['gajiPokok'] ?? null, 0.0);
     $status         = strtoupper(trim($body['status'] ?? 'AKTIF'));
     if (!in_array($status, ['AKTIF', 'RESIGN', 'PENSIUN'])) {
@@ -1902,6 +1910,9 @@ elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === '') {
 }
 
 // ─── POST /api/payroll/pegawai/batch-transport ──────────────────────────────
+elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === 'ptkp-settings') {
+    require __DIR__ . '/payroll-ptkp.php';
+}
 elseif ($method === 'POST' && $sub === 'pegawai' && $sub2 === 'batch-transport') {
     $user = require_auth();
     $pdo  = get_pdo();
@@ -1978,7 +1989,10 @@ elseif ($method === 'PUT' && $sub === 'pegawai' && $sub2 !== '') {
     $nama               = trim($body['nama'] ?? $existing['nama']);
     $jabatan            = trim($body['jabatan'] ?? $existing['jabatan']) ?: 'Karyawan';
     $status_kel         = trim($body['statusKeluarga'] ?? $existing['statusKeluarga']) ?: 'TK/0';
-    $ptkp               = isset($body['ptkp']) ? parse_rupiah_num($body['ptkp'], (float)$existing['ptkp']) : (float)$existing['ptkp'];
+    ensure_payroll_ptkp_table($pdo);
+    $ptkp_rates = payroll_ptkp_rates($pdo, $existing['entityId']);
+    if (!array_key_exists($status_kel, $ptkp_rates)) return error_response('Status PTKP tidak valid.', 400);
+    $ptkp = $ptkp_rates[$status_kel];
     $gaji_pokok         = isset($body['gajiPokok']) ? parse_rupiah_num($body['gajiPokok'], (float)$existing['gajiPokok']) : (float)$existing['gajiPokok'];
     $tunjangan_jabatan  = isset($body['tunjanganJabatan']) ? parse_rupiah_num($body['tunjanganJabatan'], (float)$existing['tunjanganJabatan']) : (float)$existing['tunjanganJabatan'];
     $tarif_transport    = isset($body['tarifTransportHarian']) ? parse_rupiah_num($body['tarifTransportHarian'], (float)($existing['tarifTransportHarian'] ?? 15000.0)) : (float)($existing['tarifTransportHarian'] ?? 15000.0);
@@ -2443,9 +2457,25 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
         if ($matched) $final_rekanan_id = $matched;
     }
 
+    if ($pph21 < 0 || $pph21 > $nominal_honor) return error_response('PPh harus antara nol dan gaji bruto.', 400);
+    if ($project_id) {
+        $assigned = $pdo->prepare("SELECT p.entityId, p.code, p.name FROM Project p
+            JOIN Rekanan r ON r.id = ? AND r.tipe = 'TENAGA_AHLI'
+            LEFT JOIN TenagaAhliProject tap ON tap.rekananId = r.id AND tap.projectId = p.id
+            WHERE p.id = ? AND (tap.id IS NOT NULL OR r.projectId = p.id) LIMIT 1");
+        $assigned->execute([$final_rekanan_id, $project_id]);
+        $assigned_project = $assigned->fetch(PDO::FETCH_ASSOC);
+        if (!$assigned_project) return error_response('Pembayaran hanya dapat dialokasikan ke proyek penugasan tenaga ahli ini.', 400);
+        $entity_id = $assigned_project['entityId'];
+        $nama_proyek = $assigned_project['code'] . ' - ' . $assigned_project['name'];
+    }
     $now = date('Y-m-d H:i:s');
     if ($id) {
         // UPDATE
+        $stmt_old = $pdo->prepare('SELECT projectId FROM HonorTenagaAhli WHERE id = ?');
+        $stmt_old->execute([$id]);
+        $old_honor = $stmt_old->fetch(PDO::FETCH_ASSOC);
+        if (!$old_honor) return error_response('Pembayaran tenaga ahli tidak ditemukan.', 404);
         $pdo->prepare(
             "UPDATE HonorTenagaAhli
              SET entityId=?, rekananId=?, nik=?, nama=?, npwp=?, uraian=?, tanggal=?,
@@ -2480,6 +2510,8 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
         );
     }
 
+    if (!empty($old_honor['projectId']) && $old_honor['projectId'] !== $project_id) sync_project_spend($pdo, $old_honor['projectId']);
+    if ($project_id) sync_project_spend($pdo, $project_id);
     $stmt = $pdo->prepare("SELECT * FROM HonorTenagaAhli WHERE id = ?");
     $stmt->execute([$honor_id]);
     $honor = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -2492,12 +2524,13 @@ elseif ($method === 'DELETE' && $sub === 'honor' && $sub2 !== '') {
     $pdo  = get_pdo();
     $id   = $sub2;
 
-    $stmt = $pdo->prepare("SELECT id, nama, nominalHonor, entityId FROM HonorTenagaAhli WHERE id = ? LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, nama, nominalHonor, entityId, projectId FROM HonorTenagaAhli WHERE id = ? LIMIT 1");
     $stmt->execute([$id]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$existing) return error_response('Data honorarium tidak ditemukan.', 404);
 
     $pdo->prepare("DELETE FROM HonorTenagaAhli WHERE id = ?")->execute([$id]);
+    if ($existing['projectId']) sync_project_spend($pdo, $existing['projectId']);
 
     log_activity($user['id'],
         "Hapus Honorarium Tenaga Ahli: {$existing['nama']} - Rp " . number_format((int)$existing['nominalHonor'], 0, ',', '.'),

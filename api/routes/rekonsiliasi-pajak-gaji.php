@@ -19,9 +19,21 @@ $sub = $segments[1] ?? '';
 // ───────────────────────────────────────────────────────────────────────────
 // GET /api/rekonsiliasi-pajak-gaji?entityId=...&year=...
 // ───────────────────────────────────────────────────────────────────────────
+function ensure_rekonsiliasi_columns(PDO $pdo): void {
+    static $done = false;
+    if ($done) return;
+    $col = $pdo->query("SHOW COLUMNS FROM `GajiPegawaiBulanan` LIKE 'totalGajiTerlaporPajak'")->fetch();
+    if (!$col) {
+        $pdo->exec("ALTER TABLE `GajiPegawaiBulanan` ADD COLUMN `totalGajiTerlaporPajak` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `totalGajiKotor`");
+        $pdo->exec("UPDATE `GajiPegawaiBulanan` SET `totalGajiTerlaporPajak` = `totalGajiKotor` WHERE `totalGajiTerlaporPajak` = 0.00");
+    }
+    $done = true;
+}
+
 if ($method === 'GET' && $sub === '') {
     $user = require_auth();
     $pdo  = get_pdo();
+    ensure_rekonsiliasi_columns($pdo);
 
     $entity_id_param  = trim($_GET['entityId']  ?? '');
     $entity_ids_param = trim($_GET['entityIds'] ?? '');

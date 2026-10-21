@@ -51,12 +51,28 @@ if ($method === 'GET') {
         $coa_spend_map[$sr['projectId']] = (float)$sr['coa_spend'];
     }
 
+    // Honor sudah merupakan biaya bruto proyek; tambahkan hanya yang belum dijurnal.
+    $honor_sql = "SELECT h.projectId, SUM(h.nominalHonor) AS honor_spend
+        FROM HonorTenagaAhli h JOIN Project p ON p.id = h.projectId
+        WHERE p.entityId = ?";
+    $honor_params = [$entity_id];
+    if ($year !== null) { $honor_sql .= ' AND h.tahun = ?'; $honor_params[] = $year; }
+    $honor_sql .= " AND NOT EXISTS (SELECT 1 FROM `Transaction` t JOIN CoaAccount c ON c.id = t.coaAccountId
+        WHERE t.projectId = h.projectId AND t.entityId = p.entityId AND c.kategori = 'BEBAN'
+        AND h.noBukti IS NOT NULL AND h.noBukti <> '' AND t.noBukti = h.noBukti";
+    if ($year !== null) { $honor_sql .= ' AND YEAR(t.tanggal) = ?'; $honor_params[] = $year; }
+    $honor_sql .= ') GROUP BY h.projectId';
+    $stmt_honor = $pdo->prepare($honor_sql);
+    $stmt_honor->execute($honor_params);
+    $honor_spend_map = [];
+    foreach ($stmt_honor->fetchAll(PDO::FETCH_ASSOC) as $honor) $honor_spend_map[$honor['projectId']] = (float)$honor['honor_spend'];
+
     $result = [];
     foreach ($projects as $p) {
         $contract_value = (float)$p['contractValue'];
         // Gunakan COA BEBAN sebagai sumber utama; fallback ke Project.spend
         $spend  = isset($coa_spend_map[$p['id']])
-            ? max(0.0, $coa_spend_map[$p['id']])
+            ? max(0.0, $coa_spend_map[$p['id']]) + ($honor_spend_map[$p['id']] ?? 0.0)
             : (float)$p['spend'];
         $profit = $contract_value - $spend;
         $margin = $contract_value > 0 ? round($profit / $contract_value * 100, 2) : 0.0;

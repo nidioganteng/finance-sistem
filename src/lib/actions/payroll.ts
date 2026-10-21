@@ -1,6 +1,26 @@
 "use server";
 
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
+import type { GajiTenagaAhliKontrak, SaveGajiTenagaAhliKontrak } from "@/lib/tenaga-ahli-gaji";
+
+export async function saveGajiTenagaAhliKontrakAction(body: SaveGajiTenagaAhliKontrak) {
+  const token = await getPhpToken();
+  try {
+    return await phpFetch<{ success: boolean; data: GajiTenagaAhliKontrak }>("/api/payroll/gaji-kontrak", token, {
+      method: "POST", body: JSON.stringify(body),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw new Error("Gagal menyimpan gaji tenaga ahli.");
+  }
+}
+
+export async function savePtkpSettingsAction(entityId: string, rates: Record<string, number>) {
+  const token = await getPhpToken();
+  try {
+    return await phpFetch<{ success: boolean; rates: Record<string, number>; message: string }>("/api/payroll/pegawai/ptkp-settings", token, { method: "POST", body: JSON.stringify({ entityId, rates }) });
+  } catch (e) { throw new Error(e instanceof ApiError ? e.message : "Gagal menyimpan nominal PTKP."); }
+}
 
 // ----------------------------------------------------
 // HELPER: PARSE ANGKA NOMINAL RUPIAH

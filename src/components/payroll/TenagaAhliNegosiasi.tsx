@@ -78,9 +78,11 @@ function jadwalPenugasan(person: RekananTenagaAhliItem, project: TenagaAhliProje
   return [...byMonth.values()].sort((a, b) => a.bulan.localeCompare(b.bulan));
 }
 
-export function TenagaAhliNegosiasi({ people, entityId, canEdit, search, onAddManual, onRecord }: {
+export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual, onRecord }: {
   people: RekananTenagaAhliItem[];
   entityId?: string;
+  year: number;
+  month: number;
   canEdit: boolean;
   search: string;
   onAddManual: () => void;
@@ -90,6 +92,7 @@ export function TenagaAhliNegosiasi({ people, entityId, canEdit, search, onAddMa
   const pathname = usePathname();
   const params = useSearchParams();
   const [overrides, setOverrides] = useState<Record<string, GajiTenagaAhliKontrak>>({});
+  const [listScope, setListScope] = useState<"bulan" | "tahun">("bulan");
   function onSaved(contract: GajiTenagaAhliKontrak) {
     setOverrides(previous => ({ ...previous, [`${contract.rekananId}:${contract.projectId}`]: contract }));
   }
@@ -109,27 +112,27 @@ export function TenagaAhliNegosiasi({ people, entityId, canEdit, search, onAddMa
   }
   if (personId) {
     if (!selected) return <div className="rounded-xl border border-border bg-surface-card p-6 space-y-3"><p>Penugasan tenaga ahli tidak ditemukan pada entitas ini.</p><button className={buttonClass} onClick={() => navigate()}>Kembali ke daftar</button></div>;
-    return <DetailGaji key={`${personId}:${projectId}`} {...selected} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} onRecord={row => onRecord(selected.person, selected.project, row)} />;
+    return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} onRecord={row => onRecord(selected.person, selected.project, row)} />;
   }
   const filtered = available.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
-  const warningCount = available.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim()).length || 0), 0);
+  const warningCount = available.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
   return <section className="rounded-2xl border border-border bg-surface-card overflow-hidden">
     <div className="p-5 border-b border-border flex flex-wrap gap-4 items-start justify-between">
       <div><h2 className="font-bold text-navy-text">Pengisian Gaji & Negosiasi</h2><p className="text-xs text-muted-faint mt-1">Pilih tenaga ahli, isi gaji negosiasi, lalu kelola gaji bulanan pada halaman pribadinya.</p></div>
-      {canEdit && <button className={buttonClass} onClick={onAddManual}><UserPlus size={14} />Tambah tenaga ahli manual</button>}
+      <div className="flex flex-wrap items-center gap-2"><select aria-label="Periode tracking daftar" className={`${inputClass} !w-auto`} value={listScope} onChange={event => setListScope(event.target.value as "bulan" | "tahun")}><option value="bulan">{monthLabel(`${year}-${String(month).padStart(2, "0")}`)}</option><option value="tahun">Tahun {year}</option></select>{canEdit && <button className={buttonClass} onClick={onAddManual}><UserPlus size={14} />Tambah tenaga ahli manual</button>}</div>
     </div>
     {warningCount > 0 && <div role="status" className="m-5 flex gap-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 p-3 text-sm"><AlertTriangle size={18} className="shrink-0" />{warningCount} bulan memiliki catatan kendala. Buka rincian tenaga ahli untuk memeriksa alasannya.</div>}
     <div className="overflow-x-auto"><table className="w-full text-sm text-left">
       <thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Tenaga ahli / data diri</th><th className="p-4">Nama pekerjaan / proyek</th><th className="p-4">Menman / Gaji RAB</th><th className="p-4 min-w-[180px]">Gaji negosiasi</th><th className="p-4">Gaji & pembayaran (bruto)</th><th className="p-4">Tindak lanjut</th></tr></thead>
-      <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
+      <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
         {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan tenaga ahli secara manual beserta penugasan proyeknya."}</td></tr>}
       </tbody>
     </table></div>
   </section>;
 }
 
-function NegosiasiRow({ person, project, canEdit, onSaved, onNavigate }: {
-  person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; canEdit: boolean;
+function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNavigate }: {
+  person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; year: number; month?: number; canEdit: boolean;
   onSaved: (contract: GajiTenagaAhliKontrak) => void; onNavigate: () => void;
 }) {
   const router = useRouter();
@@ -141,8 +144,10 @@ function NegosiasiRow({ person, project, canEdit, onSaved, onNavigate }: {
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const rows = jadwalPenugasan(person, project);
-  const summary = ringkasanGajiTenagaAhli(rows, person.riwayatGaji || [], project.projectId);
-  const notes = rows.filter(row => row.catatan.trim()).length;
+  const visibleRows = rows.filter(row => month ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`));
+  const visiblePayments = (person.riwayatGaji || []).filter(payment => payment.tahun === year && (!month || payment.bulan === month));
+  const summary = ringkasanGajiTenagaAhli(visibleRows, visiblePayments, project.projectId);
+  const notes = visibleRows.filter(row => row.catatan.trim()).length;
   function save() {
     setError("");
     if (!nominal || nominal <= 0) { setError("Isi gaji negosiasi lebih dari nol."); return; }
@@ -166,13 +171,13 @@ function NegosiasiRow({ person, project, canEdit, onSaved, onNavigate }: {
     </form> : <div><div className="font-semibold font-mono whitespace-nowrap">{contract?.gajiNegosiasi ? rp(contract.gajiNegosiasi) : "Belum diisi"}</div>{contract?.gajiNegosiasi && <div className="text-xs text-muted-faint">{contract.basisNegosiasi === "BULAN" ? "per bulan" : "total kontrak"}</div>}{canEdit && <button className="text-xs mt-2 underline" onClick={() => { setNominal(contract?.gajiNegosiasi ?? null); setBasis(contract?.basisNegosiasi || "BULAN"); setEditing(true); }}>Ubah negosiasi</button>}</div>}
       {error && <p role="alert" className="mt-2 text-xs text-rose-600">{error}</p>}
     </td>
-    <td className="p-4 text-xs space-y-2"><div><span className="text-muted-faint">Gaji terisi: </span><span className="font-mono whitespace-nowrap">{summary.totalGaji === null ? "Belum diisi" : rp(summary.totalGaji)}</span></div><div><span className="text-muted-faint">Sudah dibayar: </span><span className="font-mono whitespace-nowrap text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</span></div><div><span className="text-muted-faint">Balance gaji terisi: </span><span className={`font-mono whitespace-nowrap ${summary.balance !== null && summary.balance < 0 ? "text-rose-600" : ""}`}>{summary.balance === null ? "Menunggu input gaji" : rp(summary.balance)}</span></div><p className="text-muted-faint">{summary.terisi}/{summary.jumlahBulan} bulan diisi · pembayaran seluruh riwayat proyek</p>{!summary.lengkap && summary.totalGaji !== null && <p className="text-amber-700">Balance sementara; belum semua bulan diisi</p>}</td>
+    <td className="p-4 text-xs space-y-2"><div><span className="text-muted-faint">Gaji terisi: </span><span className="font-mono whitespace-nowrap">{summary.totalGaji === null ? "Belum diisi" : rp(summary.totalGaji)}</span></div><div><span className="text-muted-faint">Sudah dibayar: </span><span className="font-mono whitespace-nowrap text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</span></div><div><span className="text-muted-faint">Balance gaji terisi: </span><span className={`font-mono whitespace-nowrap ${summary.balance !== null && summary.balance < 0 ? "text-rose-600" : ""}`}>{summary.balance === null ? "Menunggu input gaji" : rp(summary.balance)}</span></div><p className="text-muted-faint">{summary.terisi}/{summary.jumlahBulan} bulan diisi · pembayaran periode dipilih</p>{!summary.lengkap && summary.totalGaji !== null && <p className="text-amber-700">Balance sementara; belum semua bulan diisi</p>}</td>
     <td className="p-4 space-y-2"><button className={buttonClass} disabled={pending || !contract?.gajiNegosiasi} onClick={onNavigate}>Tindak lanjut<ArrowRight size={14} /></button>{canEdit && <button className="block text-xs underline text-muted-faint" disabled={pending} onClick={onNavigate}>Data kontrak</button>}{notes > 0 && <button className="flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300" onClick={onNavigate}><AlertTriangle size={14} />Ada kendala · {notes} bulan</button>}</td>
   </tr>;
 }
 
-function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
-  person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; canEdit: boolean;
+function DetailGaji({ person, project, year, month, canEdit, onBack, onRecord, onSaved }: {
+  person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; year: number; month: number; canEdit: boolean;
   onBack: () => void; onRecord: (row: GajiTenagaAhliBulan) => void; onSaved: (contract: GajiTenagaAhliKontrak) => void;
 }) {
   const router = useRouter();
@@ -187,6 +192,10 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
   const [pending, startTransition] = useTransition();
   const [newMonth, setNewMonth] = useState("");
   const [onlyNotes, setOnlyNotes] = useState(false);
+  const [detailScope, setDetailScope] = useState<"bulan" | "kontrak">("bulan");
+  const activePeriod = `${year}-${String(month).padStart(2, "0")}`;
+  const visibleRows = detailScope === "kontrak" ? rows : rows.filter(row => row.bulan === activePeriod);
+  const visiblePayments = detailScope === "kontrak" ? person.riwayatGaji || [] : (person.riwayatGaji || []).filter(payment => payment.tahun === year && payment.bulan === month);
   const [activeNoteMonth, setActiveNoteMonth] = useState<string | null>(null);
   const noteDialog = useRef<HTMLDialogElement>(null);
   const activeNote = rows.find(row => row.bulan === activeNoteMonth);
@@ -196,8 +205,8 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
   }, [activeNoteMonth]);
   const manual = saved?.sumber !== "SIDAMON";
   const ready = (saved?.gajiNegosiasi ?? 0) > 0;
-  const noteCount = rows.filter(row => row.catatan.trim()).length;
-  const summary = ringkasanGajiTenagaAhli(rows, person.riwayatGaji || [], project.projectId);
+  const noteCount = visibleRows.filter(row => row.catatan.trim()).length;
+  const summary = ringkasanGajiTenagaAhli(visibleRows, visiblePayments, project.projectId);
   useEffect(() => {
     function warn(event: BeforeUnloadEvent) { if (dirty) { event.preventDefault(); event.returnValue = ""; } }
     window.addEventListener("beforeunload", warn);
@@ -229,7 +238,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
     if (!/^(20\d{2}|21\d{2})-(0[1-9]|1[0-2])$/.test(month)) { setError("Pilih bulan yang valid (tahun 2000–2199)."); return; }
     if (rows.some(row => row.bulan === month)) { setError("Bulan tersebut sudah ada."); return; }
     if (rows.length >= 600) { setError("Maksimal 600 bulan."); return; }
-    setRows([...rows, { bulan: month, nominal: null, catatan: "" }].sort((a, b) => a.bulan.localeCompare(b.bulan))); setNewMonth(""); changed();
+    setRows([...rows, { bulan: month, nominal: null, catatan: "" }].sort((a, b) => a.bulan.localeCompare(b.bulan))); setNewMonth(""); setDetailScope("kontrak"); changed();
   }
   return <section className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
@@ -241,7 +250,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
       <p className="mt-1 text-[11px] text-muted-faint">NIK: {person.nik || "—"} · NPWP: {person.npwp || "—"} · PTKP: {person.ptkp || "—"}</p>
       <dl className="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-3 sm:divide-x sm:divide-border">
         <div><dt className="text-[11px] text-muted-faint">Gaji terisi (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{summary.totalGaji === null ? "Belum diisi" : rp(summary.totalGaji)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">{summary.terisi}/{summary.jumlahBulan} bulan diisi</p></div>
-        <div className="sm:pl-4"><dt className="text-[11px] text-muted-faint">Sudah dibayar (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">Netto {rp(summary.dibayarNetto)} · seluruh riwayat proyek</p></div>
+        <div className="sm:pl-4"><dt className="text-[11px] text-muted-faint">Sudah dibayar (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">Netto {rp(summary.dibayarNetto)} · {detailScope === "kontrak" ? "seluruh kontrak" : monthLabel(activePeriod)}</p></div>
         <div className="sm:pl-4"><dt title="Gaji terisi dikurangi pembayaran bruto" className="text-[11px] text-muted-faint">Balance gaji terisi</dt><dd className={`mt-0.5 text-base font-bold tabular-nums ${summary.balance !== null && summary.balance < 0 ? "text-rose-600" : ""}`}>{summary.balance === null ? "Menunggu input gaji" : rp(summary.balance)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">{summary.lengkap ? "Semua bulan terisi" : "Sementara · belum semua bulan terisi"}{dirty ? " · Belum disimpan" : ""}</p></div>
       </dl>
     </header>
@@ -271,6 +280,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
         <div><h3 className="text-sm font-semibold text-navy-text">Gaji per bulan <span className="ml-2 text-[11px] font-normal text-muted-faint">SPMK {dateLabel(ref.spmkMulai)} – {dateLabel(ref.spmkSelesai)}</span></h3></div>
         <div className="flex flex-wrap items-center gap-2">
+          <select aria-label="Periode tracking gaji" value={detailScope} onChange={event => { setDetailScope(event.target.value as "bulan" | "kontrak"); setOnlyNotes(false); }} className={`${inputClass} !w-auto`}><option value="bulan">{monthLabel(activePeriod)}</option><option value="kontrak">Semua bulan kontrak</option></select>
           {noteCount > 0 && <button onClick={() => setOnlyNotes(!onlyNotes)} className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" aria-pressed={onlyNotes}><AlertTriangle size={13} />{noteCount} kendala · {onlyNotes ? "Semua bulan" : "Filter catatan"}</button>}
           {canEdit && <>
             <select aria-label="Bulan tambahan" disabled={pending} value={selectedNewMonth.slice(5, 7)} onChange={event => setNewMonth(`${selectedNewMonth.slice(0, 4)}-${event.target.value}`)} className={`${inputClass} !w-auto`}>
@@ -284,7 +294,7 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
         </div>
       </div>
       <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
-        {rows.filter(row => !onlyNotes || row.catatan.trim()).map(row => {
+        {visibleRows.filter(row => !onlyNotes || row.catatan.trim()).map(row => {
           const history = person.riwayatGaji?.filter(item => item.projectId === project.projectId && `${item.tahun}-${String(item.bulan).padStart(2, "0")}` === row.bulan) || [];
           const paid = history.reduce((sum, item) => sum + item.nominalHonor, 0);
           const remaining = row.nominal === null ? null : row.nominal - paid;
@@ -302,9 +312,9 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
             {canEdit && <td className="px-3 py-2 align-middle"><button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-faint hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" disabled={pending || history.length > 0} title={history.length ? "Bulan dengan riwayat pembayaran tidak dapat dihapus dari jadwal" : `Hapus ${monthLabel(row.bulan)}`} aria-label={`Hapus ${monthLabel(row.bulan)}`} onClick={() => { if (window.confirm(`Hapus ${monthLabel(row.bulan)} dari jadwal?${row.nominal !== null || row.catatan ? " Nominal dan catatan bulan ini akan dihapus saat disimpan." : ""}`)) { setRows(rows.filter(item => item.bulan !== row.bulan)); changed(); } }}><Trash2 size={14} /></button></td>}
           </tr>;
         })}
-        {rows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-muted-faint text-center">Belum ada bulan. Tambahkan bulan sesuai periode kerja.</td></tr>}
+        {visibleRows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-muted-faint text-center">Belum ada jadwal untuk {monthLabel(activePeriod)}. Pilih Semua bulan kontrak atau tambahkan bulan.</td></tr>}
       </tbody></table></div>
-      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{rows.length} bulan · Total gaji diisi: {rp(rows.reduce((sum, row) => sum + (row.nominal || 0), 0))}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}</p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending || !dirty} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji bulanan"}</button>}</div>
+      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}</p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending || !dirty} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji bulanan"}</button>}</div>
     </div>}
     <dialog ref={noteDialog} onClose={() => setActiveNoteMonth(null)} aria-labelledby="salary-note-title" className="m-auto w-full max-w-md rounded-xl border border-border bg-surface-card p-0 text-foreground shadow-xl backdrop:bg-slate-900/40">
       {activeNote && <>

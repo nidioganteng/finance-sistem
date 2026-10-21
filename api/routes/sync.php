@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__ . '/../helpers/tenaga-ahli-gaji.php';
 
 // ── Validasi internal secret ──────────────────────────────────────────────────
 $incoming_secret = $_SERVER['HTTP_X_INTERNAL_SECRET'] ?? '';
@@ -397,6 +398,7 @@ elseif ($method === 'POST' && $sub === 'pegawai') {
 
 // ─── POST /api/sync/tenaga-ahli — sync tenaga ahli / freelance dari Sidamon ───
 elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
+    ensure_tenaga_ahli_gaji_table($pdo);
     $items = isset($body['items']) && is_array($body['items']) ? $body['items'] : [$body];
     if (empty($items)) {
         error_response('Data tenaga ahli tidak boleh kosong.', 400);
@@ -467,81 +469,124 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
             ? (in_array($item['isTurunLapangan'], [1, '1', true, 'true', 'riil', 'RIIL'], true) ? 1 : 0)
             : 1;
         $nominal_honor = (float)($item['nominalHonorBulanan'] ?? 0);
-
-        // Cek apakah sudah ada Rekanan dengan tipe TENAGA_AHLI dan NIK ini di entitas ini
-        $stmt = $pdo->prepare("SELECT id FROM Rekanan WHERE entityId = ? AND nik = ? AND tipe = 'TENAGA_AHLI' LIMIT 1");
-        $stmt->execute([$entity_id, $nik]);
-        $existing_id = $stmt->fetchColumn();
-
-        if ($existing_id) {
-            $pdo->prepare(
-                "UPDATE Rekanan SET
-                    nama = ?, npwp = ?, kategori = ?, ptkp = ?,
-                    projectId = COALESCE(?, projectId),
-                    tanggalMulaiTugas = COALESCE(?, tanggalMulaiTugas),
-                    tanggalSelesaiTugas = COALESCE(?, tanggalSelesaiTugas),
-                    isTurunLapangan = ?, nominalHonorBulanan = ?,
-                    updatedAt = ?
-                 WHERE id = ?"
-            )->execute([
-                $nama, $npwp, $kategori, $ptkp,
-                $project_id,
-                $start_date, $end_date,
-                $is_turun, $nominal_honor,
-                $now, $existing_id
-            ]);
-
-            $target_rekanan_id = $existing_id;
-            $results[] = [
-                'nik' => $nik,
-                'nama' => $nama,
-                'action' => 'updated',
-                'rekananId' => $existing_id,
-            ];
-        } else {
-            $new_id = uuid4();
-            $pdo->prepare(
-                "INSERT INTO Rekanan
-                    (id, nama, nik, npwp, tipe, kategori, ptkp, entityId,
-                     projectId, tanggalMulaiTugas, tanggalSelesaiTugas,
-                     isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            )->execute([
-                $new_id, $nama, $nik, $npwp, $kategori, $ptkp, $entity_id,
-                $project_id, $start_date, $end_date,
-                $is_turun, $nominal_honor, $now, $now
-            ]);
-
-            $target_rekanan_id = $new_id;
-            $results[] = [
-                'nik' => $nik,
-                'nama' => $nama,
-                'action' => 'created',
-                'rekananId' => $new_id,
-            ];
+        // Referensi kontrak boleh diperbarui Sidamon; input finance disimpan terpisah.
+        try {
+            $spmk_mulai = tenaga_ahli_valid_date($item['spmkMulai'] ?? $start_date);
+            $spmk_selesai = tenaga_ahli_valid_date($item['spmkSelesai'] ?? $end_date);
+            if ($spmk_mulai && $spmk_selesai && $spmk_selesai < $spmk_mulai) {
+                throw new InvalidArgumentException('Tanggal selesai SPMK mendahului tanggal mulai.');
+            }
+            $man_month = tenaga_ahli_nominal($item['manMonth'] ?? $item['menman'] ?? null);
+            if ($man_month !== null && $man_month > 99999999.99) throw new InvalidArgumentException('Menman terlalu besar.');
+            $gaji_rab = tenaga_ahli_nominal($item['gajiRab'] ?? $item['nominalHonorBulanan'] ?? null);
+            $nama_pekerjaan = $item['namaPekerjaan'] ?? $item['jobName'] ?? null;
+            if ($nama_pekerjaan !== null && (!is_string($nama_pekerjaan) || strlen($nama_pekerjaan) > 255)) {
+                throw new InvalidArgumentException('Nama pekerjaan maksimal 255 byte.');
+            }
+        } catch (InvalidArgumentException $e) {
+            $results[] = ['nik' => $nik, 'nama' => $nama, 'status' => 'error', 'message' => $e->getMessage()];
+            continue;
         }
 
-        // Upsert ke TenagaAhliProject jika penugasan memiliki projectId
-        if ($project_id && $target_rekanan_id) {
-            $stmt_tap = $pdo->prepare("SELECT id FROM TenagaAhliProject WHERE rekananId = ? AND projectId = ? LIMIT 1");
-            $stmt_tap->execute([$target_rekanan_id, $project_id]);
-            $existing_tap_id = $stmt_tap->fetchColumn();
 
-            if ($existing_tap_id) {
+        $pdo->beginTransaction();
+        try {
+            // Cek apakah sudah ada Rekanan dengan tipe TENAGA_AHLI dan NIK ini di entitas ini
+            $stmt = $pdo->prepare("SELECT id FROM Rekanan WHERE entityId = ? AND nik = ? AND tipe = 'TENAGA_AHLI' LIMIT 1");
+            $stmt->execute([$entity_id, $nik]);
+            $existing_id = $stmt->fetchColumn();
+
+            if ($existing_id) {
                 $pdo->prepare(
-                    "UPDATE TenagaAhliProject SET
-                        tanggalMulaiTugas = ?, tanggalSelesaiTugas = ?,
+                    "UPDATE Rekanan SET
+                        nama = ?, npwp = ?, kategori = ?, ptkp = ?,
+                        projectId = COALESCE(?, projectId),
+                        tanggalMulaiTugas = COALESCE(?, tanggalMulaiTugas),
+                        tanggalSelesaiTugas = COALESCE(?, tanggalSelesaiTugas),
                         isTurunLapangan = ?, nominalHonorBulanan = ?,
                         updatedAt = ?
                      WHERE id = ?"
-                )->execute([$start_date, $end_date, $is_turun, $nominal_honor, $now, $existing_tap_id]);
+                )->execute([
+                    $nama, $npwp, $kategori, $ptkp,
+                    $project_id,
+                    $start_date, $end_date,
+                    $is_turun, $nominal_honor,
+                    $now, $existing_id
+                ]);
+
+                $target_rekanan_id = $existing_id;
+                $item_result = [
+                    'nik' => $nik,
+                    'nama' => $nama,
+                    'action' => 'updated',
+                    'rekananId' => $existing_id,
+                ];
             } else {
+                $new_id = uuid4();
                 $pdo->prepare(
-                    "INSERT INTO TenagaAhliProject
-                        (id, rekananId, projectId, tanggalMulaiTugas, tanggalSelesaiTugas, isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                )->execute([uuid4(), $target_rekanan_id, $project_id, $start_date, $end_date, $is_turun, $nominal_honor, $now, $now]);
+                    "INSERT INTO Rekanan
+                        (id, nama, nik, npwp, tipe, kategori, ptkp, entityId,
+                         projectId, tanggalMulaiTugas, tanggalSelesaiTugas,
+                         isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+                     VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute([
+                    $new_id, $nama, $nik, $npwp, $kategori, $ptkp, $entity_id,
+                    $project_id, $start_date, $end_date,
+                    $is_turun, $nominal_honor, $now, $now
+                ]);
+
+                $target_rekanan_id = $new_id;
+                $item_result = [
+                    'nik' => $nik,
+                    'nama' => $nama,
+                    'action' => 'created',
+                    'rekananId' => $new_id,
+                ];
             }
+
+            if ($project_id && $target_rekanan_id) {
+                $pdo->prepare("INSERT INTO TenagaAhliGajiKontrak
+                    (id, rekananId, projectId, sumber, namaPekerjaan, manMonth, gajiRab, spmkMulai, spmkSelesai, revision)
+                    VALUES (?, ?, ?, 'SIDAMON', ?, ?, ?, ?, ?, 1)
+                    ON DUPLICATE KEY UPDATE sumber = 'SIDAMON',
+                        namaPekerjaan = COALESCE(VALUES(namaPekerjaan), namaPekerjaan),
+                        manMonth = COALESCE(VALUES(manMonth), manMonth),
+                        gajiRab = COALESCE(VALUES(gajiRab), gajiRab),
+                        spmkMulai = COALESCE(VALUES(spmkMulai), spmkMulai),
+                        spmkSelesai = COALESCE(VALUES(spmkSelesai), spmkSelesai),
+                        revision = revision + 1")
+                    ->execute([uuid4(), $target_rekanan_id, $project_id, $nama_pekerjaan,
+                        $man_month, $gaji_rab, $spmk_mulai, $spmk_selesai]);
+            }
+
+            // Upsert ke TenagaAhliProject jika penugasan memiliki projectId
+            if ($project_id && $target_rekanan_id) {
+                $stmt_tap = $pdo->prepare("SELECT id FROM TenagaAhliProject WHERE rekananId = ? AND projectId = ? LIMIT 1");
+                $stmt_tap->execute([$target_rekanan_id, $project_id]);
+                $existing_tap_id = $stmt_tap->fetchColumn();
+
+                if ($existing_tap_id) {
+                    $pdo->prepare(
+                        "UPDATE TenagaAhliProject SET
+                            tanggalMulaiTugas = ?, tanggalSelesaiTugas = ?,
+                            isTurunLapangan = ?, nominalHonorBulanan = ?,
+                            updatedAt = ?
+                         WHERE id = ?"
+                    )->execute([$start_date, $end_date, $is_turun, $nominal_honor, $now, $existing_tap_id]);
+                } else {
+                    $pdo->prepare(
+                        "INSERT INTO TenagaAhliProject
+                            (id, rekananId, projectId, tanggalMulaiTugas, tanggalSelesaiTugas, isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    )->execute([uuid4(), $target_rekanan_id, $project_id, $start_date, $end_date, $is_turun, $nominal_honor, $now, $now]);
+                }
+            }
+            $pdo->commit();
+            $results[] = $item_result;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('Sync tenaga ahli gagal: ' . $e->getMessage());
+            $results[] = ['nik' => $nik, 'nama' => $nama, 'status' => 'error', 'message' => 'Penyimpanan tenaga ahli gagal. Silakan ulangi sinkronisasi.'];
         }
     }
 

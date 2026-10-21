@@ -19,9 +19,9 @@ $person = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$person) error_response('Penugasan tenaga ahli tidak ditemukan.', 404);
 // Gunakan akses entitas terkini dari database, bukan hanya klaim token lama.
 if (($user['role'] ?? '') === 'STAF_KEUANGAN') {
-    $stmt = $pdo->prepare('SELECT 1 FROM UserEntityAccess WHERE userId = ? AND entityId = ? LIMIT 1');
-    $stmt->execute([$user['id'], $person['projectEntityId']]);
-    if (!$stmt->fetchColumn()) error_response('Anda tidak memiliki akses ke entitas proyek ini.', 403);
+    $stmt = $pdo->prepare('SELECT 1 FROM UserEntityAccess WHERE userId = ? AND entityId IN (?, ?) LIMIT 1');
+    $stmt->execute([$user['id'], $person['entityId'], $person['projectEntityId']]);
+    if (!$stmt->fetchColumn()) error_response('Anda tidak memiliki akses ke entitas tenaga ahli atau proyek ini.', 403);
 }
 try {
     $nominal = tenaga_ahli_nominal($body['gajiNegosiasi'] ?? null, false);

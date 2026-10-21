@@ -20,16 +20,15 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
   const [scope, setScope] = useState<"bulan" | "tahun">("tahun");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
-  const [reportEntity, setReportEntity] = useState("");
+  const [reportEntity, setReportEntity] = useState<"all" | "current">("all");
   const pathname = usePathname();
   const params = useSearchParams();
   const activeScope = periodScope || scope;
   const activePeriod = `${year}-${String(month).padStart(2, "0")}`;
   const period = activeScope === "bulan" ? periodName(activePeriod) : `Tahun ${year}`;
   const canSelectEntity = group === "nama" && !summaryOnly;
-  const filterEntity = group === "holding" ? undefined : canSelectEntity ? reportEntity || undefined : entityId;
-  const scopeName = group === "holding" ? "Seluruh holding" : canSelectEntity ? (reportEntity ? entities.find(item => item.id === reportEntity)?.name || entityName : "Semua entitas") : entityName;
-  const entityOptions = entities.length ? entities : entityId ? [{ id: entityId, name: entityName || "Entitas", key: "" }] : [];
+  const filterEntity = group === "holding" ? undefined : canSelectEntity && reportEntity === "all" ? undefined : entityId;
+  const scopeName = group === "holding" ? "Seluruh holding" : canSelectEntity && reportEntity === "all" ? "Semua entitas" : entityName;
   const visible = filterTenagaAhliTracking(rows, { year, month: activeScope === "bulan" ? month : undefined, entityId: filterEntity, search });
   const summary = summarizeTenagaAhliTracking(visible);
   const groups = canSelectEntity ? groupTenagaAhliPeople(visible, people, filterEntity, search)
@@ -49,7 +48,7 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
       <div><h3 className="text-sm font-semibold text-navy-text">{summaryOnly ? "Gaji terisi & pembayaran" : titles[group]}</h3><p className="mt-0.5 text-xs text-muted-faint">{period} · {scopeName}</p></div>
       <div className="flex flex-wrap items-center gap-2">
-        {canSelectEntity && <select aria-label="Entitas akumulasi tenaga ahli" className={selectClass} value={reportEntity} onChange={event => { setReportEntity(event.target.value); setExpanded(null); }}><option value="">Semua entitas</option>{entityOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
+        {canSelectEntity && <select aria-label="Entitas akumulasi tenaga ahli" className={selectClass} value={reportEntity} onChange={event => { setReportEntity(event.target.value as "all" | "current"); setExpanded(null); }}><option value="all">Semua entitas</option>{entityId && <option value="current">{entityName || "Entitas dipilih"}</option>}</select>}
         {!periodScope && <select aria-label="Periode rekap tenaga ahli" className={selectClass} value={scope} onChange={event => { setScope(event.target.value as "bulan" | "tahun"); setExpanded(null); }}><option value="bulan">Bulan dipilih</option><option value="tahun">Setahun</option></select>}
       </div>
     </header>
@@ -59,7 +58,6 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
       <div><dt className="text-[11px] text-muted-faint">PPh / netto dibayar</dt><dd className="mt-1 text-sm tabular-nums">{money(summary.pph)} / {money(summary.netto)}</dd></div>
       <div><dt className="text-[11px] text-muted-faint">Balance negosiasi</dt><dd className={`mt-1 text-base font-semibold tabular-nums ${summary.balanceNegosiasi !== null && summary.balanceNegosiasi < 0 ? "text-rose-600" : ""}`}>{summary.balanceNegosiasi === null ? "Menunggu negosiasi" : money(summary.balanceNegosiasi)}</dd><p className="text-[11px] text-muted-faint">Negosiasi {money(summary.totalNegosiasi)} − dibayar seluruh kontrak {money(summary.dibayarKontrak)}</p></div>
     </dl>
-    {summary.jumlahKendala > 0 && <p className="flex items-center gap-1 border-t border-border px-4 py-2 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle size={13} />{summary.jumlahKendala} catatan kendala pada periode ini</p>}
     {!summaryOnly && <div className="overflow-x-auto border-t border-border"><table className="w-full min-w-[750px] text-left text-xs">
       <thead className="bg-surface-subtle text-muted-faint"><tr><th className="px-3 py-2">{group === "proyek" ? "Proyek" : group === "bulan" ? "Bulan" : group === "holding" ? "Entitas" : "Tenaga ahli"}</th><th className="px-3 py-2 text-right">Gaji terisi</th><th className="px-3 py-2 text-right">Sudah dibayar</th><th className="px-3 py-2 text-right">PPh</th><th className="px-3 py-2 text-right">Netto</th><th className="px-3 py-2 text-right">Balance negosiasi</th></tr></thead>
       <tbody>{groups.map(item => <Group key={item.key} item={item} />)}{groups.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-faint">Belum ada gaji terisi atau pembayaran tercatat untuk {period}.</td></tr>}</tbody>

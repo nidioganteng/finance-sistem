@@ -340,7 +340,6 @@ if ($method === 'GET' && $sub === '') {
         $placeholders = implode(',', array_fill(0, count($rekanan_ids), '?'));
         $stmt_tap = $pdo->prepare(
             "SELECT tap.*, p.code AS projectCode, p.name AS projectName, p.entityId AS projectEntityId,
-                    p.sidamon_start_date AS spmkMulai, p.sidamon_end_date AS spmkSelesai,
                     COALESCE(e.name, 'Holding / Lainnya') AS projectEntityName
              FROM TenagaAhliProject tap
              JOIN Project p ON tap.projectId = p.id

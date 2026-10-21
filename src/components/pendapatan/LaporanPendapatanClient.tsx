@@ -1070,127 +1070,155 @@ export function LaporanPendapatanClient({
           </div>
 
           {/* Data Table */}
-          <div className="overflow-x-auto rounded-xl border border-border-soft">
-            <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="bg-surface-subtle text-navy-text border-b border-border-soft font-semibold">
-                <tr>
-                  <th className="p-3 text-center w-10">No</th>
-                  <th className="p-3">No. Faktur / NPWP</th>
-                  <th className="p-3">Rekanan & Uraian JKP</th>
-                  <th className="p-3 text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">Proyek Terkait</th>
-                  <th className="p-3 text-center">Masa</th>
-                  <th className="p-3 text-right">DPP</th>
-                  <th className="p-3 text-right">DPP Nilai Lain</th>
-                  <th className="p-3 text-right">PPN Realisasi</th>
-                  <th className="p-3 text-right">PPh Realisasi</th>
-                  <th className="p-3 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10">
-                    Nilai Kuitansi Bruto (111%)
-                  </th>
-                  <th className="p-3 text-right text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10">
-                    Netto Tagihan
-                  </th>
-                  <th className="p-3 text-right">Dana Cair Bank</th>
-                  <th className="p-3 text-center">Balance Control</th>
-                  <th className="p-3">Tgl & Rekening Bank</th>
-                  <th className="p-3 text-center">Ceklis Fisik</th>
-                  <th className="p-3 text-center">Jenis</th>
-                  {canEdit && <th className="p-3 text-center w-20">Aksi</th>}
+          <div className="overflow-x-auto rounded-[16px] border border-border-soft shadow-xs">
+            <table className="w-full text-left text-[12px] whitespace-nowrap border-separate border-spacing-0">
+              {/* ── Group header row ── */}
+              <thead>
+                <tr className="bg-navy/90 dark:bg-navy text-white/80 text-[10px] font-bold uppercase tracking-widest">
+                  <th colSpan={2} className="px-3 py-2 border-b border-white/10 rounded-tl-[16px]">Identitas Faktur</th>
+                  <th colSpan={2} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10">Klien &amp; Proyek</th>
+                  <th colSpan={1} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center">Masa</th>
+                  <th colSpan={5} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center bg-blue-600/30">Nilai Perpajakan</th>
+                  <th colSpan={3} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center bg-emerald-600/20">Penerimaan</th>
+                  <th colSpan={1} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center">Dok. Fisik</th>
+                  <th colSpan={canEdit ? 2 : 1} className="px-3 py-2 border-b border-white/10 border-l border-l-white/10 text-center rounded-tr-[16px]">Info</th>
+                </tr>
+                {/* ── Column header row ── */}
+                <tr className="bg-navy/80 dark:bg-navy/95 text-white/70 text-[10.5px] font-semibold">
+                  <th className="px-3 py-2.5 text-center w-8">#</th>
+                  <th className="px-3 py-2.5 min-w-[140px]">No. Faktur / NPWP</th>
+                  <th className="px-3 py-2.5 min-w-[180px] border-l border-l-white/10">Rekanan &amp; JKP</th>
+                  <th className="px-3 py-2.5 min-w-[140px]">Proyek</th>
+                  <th className="px-3 py-2.5 text-center border-l border-l-white/10 w-[80px]">Bulan</th>
+                  <th className="px-3 py-2.5 text-right border-l border-l-white/10 bg-blue-600/20">DPP</th>
+                  <th className="px-3 py-2.5 text-right bg-blue-600/20">DPP Nilai Lain</th>
+                  <th className="px-3 py-2.5 text-right bg-blue-600/20 text-purple-200">PPN</th>
+                  <th className="px-3 py-2.5 text-right bg-blue-600/20 text-amber-200">PPh</th>
+                  <th className="px-3 py-2.5 text-right bg-blue-600/20 font-bold text-white">Bruto 111%</th>
+                  <th className="px-3 py-2.5 text-right border-l border-l-white/10 bg-emerald-600/15 text-emerald-200">Netto</th>
+                  <th className="px-3 py-2.5 text-right bg-emerald-600/15">Dana Cair</th>
+                  <th className="px-3 py-2.5 text-center bg-emerald-600/15">Balance</th>
+                  <th className="px-3 py-2.5 border-l border-l-white/10 min-w-[110px]">Tgl &amp; Bank</th>
+                  <th className="px-3 py-2.5 text-center border-l border-l-white/10 min-w-[120px]">PPN · PPh · Bupot</th>
+                  <th className="px-3 py-2.5 text-center border-l border-l-white/10">Jenis</th>
+                  {canEdit && <th className="px-3 py-2.5 text-center w-16">Aksi</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-soft text-navy-text">
+              <tbody className="text-navy-text">
                 {filteredFaktur.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={canEdit ? 17 : 16}
-                      className="p-8 text-center text-navy-soft"
-                    >
-                      <Receipt className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      Tidak ada data e-faktur untuk periode ini.
+                    <td colSpan={canEdit ? 17 : 16} className="py-14 text-center">
+                      <div className="flex flex-col items-center gap-2 text-muted">
+                        <Receipt className="w-9 h-9 opacity-25" />
+                        <span className="text-[13px]">Tidak ada data e-faktur untuk periode ini.</span>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   filteredFaktur.map((f, idx) => (
                     <tr
                       key={f.id}
-                      className="hover:bg-surface-hover/50 transition-colors"
+                      className={`group transition-colors hover:bg-brand/5 ${idx % 2 === 1 ? "bg-surface-subtle/40" : ""}`}
                     >
-                      <td className="p-3 text-center text-navy-soft">{idx + 1}</td>
-                      <td className="p-3">
-                        <div className="font-bold text-navy-text flex items-center gap-1.5">
-                          <Receipt size={13} className="text-blue-600 shrink-0" />
-                          <span>{f.noFaktur}</span>
-                        </div>
-                        <div className="text-[11px] text-navy-soft font-mono mt-0.5">
-                          NPWP: {f.npwp}
-                        </div>
+                      {/* # */}
+                      <td className="px-3 py-3 text-center text-muted-faint font-semibold text-[11px] border-b border-border-soft/60">
+                        {idx + 1}
                       </td>
-                      <td className="p-3">
-                        <div className="font-medium text-navy-text max-w-xs truncate" title={f.namaRekanan}>
-                          {f.namaRekanan}
+
+                      {/* No. Faktur / NPWP */}
+                      <td className="px-3 py-3 border-b border-border-soft/60">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center flex-none">
+                            <Receipt size={11} className="text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <span className="font-bold text-navy-text text-[12px]">{f.noFaktur}</span>
                         </div>
-                        <div className="text-[11px] text-navy-soft max-w-xs truncate" title={f.namaJkp}>
-                          {f.namaJkp}
-                        </div>
+                        <div className="text-[10.5px] text-muted-faint font-mono mt-0.5 pl-6.5">{f.npwp}</div>
                       </td>
-                      <td className="p-3">
+
+                      {/* Rekanan & JKP */}
+                      <td className="px-3 py-3 border-b border-border-soft/60">
+                        <div className="font-semibold text-navy-text max-w-[200px] truncate" title={f.namaRekanan}>{f.namaRekanan}</div>
+                        <div className="text-[10.5px] text-muted max-w-[200px] truncate mt-0.5 italic" title={f.namaJkp}>{f.namaJkp}</div>
+                      </td>
+
+                      {/* Proyek */}
+                      <td className="px-3 py-3 border-b border-border-soft/60">
                         {f.projectCode ? (
                           <div>
-                            <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                            <span className="inline-block px-2 py-0.5 text-[10.5px] font-mono font-bold rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/50">
                               {f.projectCode}
                             </span>
                             {f.projectName && (
-                              <div
-                                className="text-[10px] text-navy-soft max-w-[130px] truncate mt-0.5"
-                                title={f.projectName}
-                              >
+                              <div className="text-[10.5px] text-muted max-w-[140px] truncate mt-0.5" title={f.projectName}>
                                 {f.projectName}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-slate-400 font-mono text-xs">-</span>
+                          <span className="text-muted-faintest text-[11px]">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-center">
-                        <span className="px-2 py-1 text-[11px] font-medium rounded-full bg-surface-hover text-muted-stronger">
+
+                      {/* Masa/Bulan */}
+                      <td className="px-3 py-3 text-center border-b border-border-soft/60">
+                        <span className="inline-block px-2.5 py-1 text-[11px] font-semibold rounded-full bg-surface-hover text-muted-stronger border border-border-soft/60">
                           {f.namaBulan}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono">{f.dppFmt}</td>
-                      <td className="p-3 text-right font-mono text-navy-soft">
+
+                      {/* DPP */}
+                      <td className="px-3 py-3 text-right font-mono bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60">
+                        {f.dppFmt}
+                      </td>
+
+                      {/* DPP Nilai Lain */}
+                      <td className="px-3 py-3 text-right font-mono text-muted bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60">
                         {f.dppNilaiLainFmt}
                       </td>
-                      <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
-                        {f.ppnRealisasiFmt}
+
+                      {/* PPN */}
+                      <td className="px-3 py-3 text-right font-mono bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60" title={`Tarif PPN: ${f.tarifPpnPersen}%`}>
+                        <span className="text-purple-700 dark:text-purple-400">{f.ppnRealisasiFmt}</span>
                         {f.isRealized && f.tarifPpnPersen !== 12 && (
-                          <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPpnPersen}%)</span>
+                          <span className="ml-1 text-[9.5px] text-muted-faint font-sans">({f.tarifPpnPersen}%)</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
-                        {f.pphRealisasiFmt}
+
+                      {/* PPh */}
+                      <td className="px-3 py-3 text-right font-mono bg-blue-50/20 dark:bg-blue-500/5 border-b border-border-soft/60" title={`Tarif PPh: ${f.tarifPphPersen}%`}>
+                        <span className="text-amber-700 dark:text-amber-400">{f.pphRealisasiFmt}</span>
                         {f.isRealized && f.tarifPphPersen !== 3.5 && (
-                          <span className="ml-1 text-[10px] text-navy-soft font-sans">({f.tarifPphPersen}%)</span>
+                          <span className="ml-1 text-[9.5px] text-muted-faint font-sans">({f.tarifPphPersen}%)</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-500/10">
+
+                      {/* Bruto 111% */}
+                      <td className="px-3 py-3 text-right font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-100/30 dark:bg-blue-500/10 border-b border-border-soft/60">
                         {f.nilaiProyekFmt}
                       </td>
-                      <td className="p-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/10">
+
+                      {/* Netto */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/5 border-b border-border-soft/60">
                         {f.labaSetelahPajakFmt}
                       </td>
-                      <td className="p-3 text-right font-mono font-medium">
+
+                      {/* Dana Cair */}
+                      <td className="px-3 py-3 text-right font-mono bg-emerald-50/30 dark:bg-emerald-500/5 border-b border-border-soft/60">
                         {f.isRealized ? (
                           <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{f.nominalDiterimaFmt}</span>
                         ) : (
-                          <span className="text-muted-faint text-[11px] italic">Belum Cair</span>
+                          <span className="text-muted-faintest text-[11px] italic">Belum Cair</span>
                         )}
                       </td>
-                      <td className="p-3 text-center">
+
+                      {/* Balance */}
+                      <td className="px-3 py-3 text-center bg-emerald-50/30 dark:bg-emerald-500/5 border-b border-border-soft/60">
                         {f.balanceStatus === "BALANCE" ? (
                           <button
                             type="button"
                             onClick={() => openDetailSelisihModal(f)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 hover:bg-green-200 dark:bg-green-950/50 dark:hover:bg-green-900/60 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/60 transition-all cursor-pointer shadow-2xs hover:scale-102"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 hover:bg-green-200 dark:bg-green-950/50 dark:hover:bg-green-900/60 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/60 transition-all cursor-pointer"
                             title="Klik untuk melihat rincian rekonsiliasi tagihan"
                           >
                             <CheckCircle2 size={10} /> Balance
@@ -1199,119 +1227,120 @@ export function LaporanPendapatanClient({
                           <button
                             type="button"
                             onClick={() => openDetailSelisihModal(f)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition-all cursor-pointer shadow-2xs hover:scale-102"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 transition-all cursor-pointer"
                             title="Klik untuk melihat rincian bagian mana yang selisih"
                           >
-                            <AlertTriangle size={11} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                            <AlertTriangle size={10} className="text-rose-600 dark:text-rose-400 shrink-0" />
                             <span>
                               {f.selisihBank !== 0
-                                ? `Selisih Bank: ${f.selisihBankFmt}`
+                                ? `Bank: ${f.selisihBankFmt}`
                                 : Math.abs(f.selisihPpn) > 0.01
-                                ? `Selisih PPN: ${formatRupiah(f.selisihPpn)}`
+                                ? `PPN: ${formatRupiah(f.selisihPpn)}`
                                 : Math.abs(f.selisihPph) > 0.01
-                                ? `Selisih PPh: ${formatRupiah(f.selisihPph)}`
-                                : `Selisih: ${f.selisihTotalFmt || formatRupiah(f.selisihTotal)}`}
+                                ? `PPh: ${formatRupiah(f.selisihPph)}`
+                                : `${f.selisihTotalFmt || formatRupiah(f.selisihTotal)}`}
                             </span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => openDetailSelisihModal(f)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-subtle hover:bg-surface-hover text-muted-faint border border-border cursor-pointer transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-surface-subtle hover:bg-surface-hover text-muted-faint border border-border cursor-pointer transition-colors"
                             title="Klik untuk melihat estimasi tagihan & status pencairan"
                           >
                             Belum Cair
                           </button>
                         )}
                       </td>
-                      <td className="p-3">
+
+                      {/* Tgl & Bank */}
+                      <td className="px-3 py-3 border-b border-border-soft/60">
                         {f.tanggalTerima ? (
                           <>
-                            <div className="font-mono text-xs">{f.tanggalTerima}</div>
-                            <div className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                              {f.bank || "-"}
-                            </div>
+                            <div className="font-mono text-[11px] text-muted-stronger">{f.tanggalTerima}</div>
+                            <div className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{f.bank || "—"}</div>
                           </>
                         ) : (
-                          <span className="text-muted-faint text-[11px] italic">Belum Diterima</span>
+                          <span className="text-muted-faintest text-[11px] italic">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-center">
+
+                      {/* Ceklis Fisik */}
+                      <td className="px-3 py-3 text-center border-b border-border-soft/60">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => handleToggleCeklis(f.id, "ppn", f.ceklisPpn)}
                             disabled={!canEdit || isPending}
-                            title={f.ceklisPpn ? "Fisik PPN: Diterima (Klik untuk ubah)" : "Fisik PPN: Belum Diterima (Klik untuk ceklis)"}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                            title={f.ceklisPpn ? "Fisik PPN: Diterima — klik untuk ubah" : "Fisik PPN: Belum — klik untuk ceklis"}
+                            className={`w-[46px] py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
                               f.ceklisPpn
-                                ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800/60"
-                                : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
+                                ? "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/50"
+                                : "bg-surface-subtle text-muted-faintest border-border hover:bg-surface-hover"
                             }`}
                           >
-                            PPN {f.ceklisPpn ? "Ada" : "Belum"}
+                            PPN
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleCeklis(f.id, "pph", f.ceklisPph)}
                             disabled={!canEdit || isPending}
-                            title={f.ceklisPph ? "Fisik PPh: Diterima (Klik untuk ubah)" : "Fisik PPh: Belum Diterima (Klik untuk ceklis)"}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                            title={f.ceklisPph ? "Fisik PPh: Diterima — klik untuk ubah" : "Fisik PPh: Belum — klik untuk ceklis"}
+                            className={`w-[46px] py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
                               f.ceklisPph
-                                ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800/60"
-                                : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
+                                ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700/50"
+                                : "bg-surface-subtle text-muted-faintest border-border hover:bg-surface-hover"
                             }`}
                           >
-                            PPh {f.ceklisPph ? "Ada" : "Belum"}
+                            PPh
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleCeklis(f.id, "buktiPotong", f.ceklisBuktiPotong)}
                             disabled={!canEdit || isPending}
-                            title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima (Klik untuk ubah)" : "Bukti Potong: Belum Diterima (Klik untuk ceklis)"}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                            title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima — klik untuk ubah" : "Bukti Potong: Belum — klik untuk ceklis"}
+                            className={`w-[46px] py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
                               f.ceklisBuktiPotong
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800/60"
-                                : "bg-surface-subtle text-muted-faint border-border hover:bg-surface-hover"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700/50"
+                                : "bg-surface-subtle text-muted-faintest border-border hover:bg-surface-hover"
                             }`}
                           >
-                            Bupot {f.ceklisBuktiPotong ? "Ada" : "Belum"}
+                            Bupot
                           </button>
                         </div>
                       </td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-                            f.kodeJenisProyek === 2
-                              ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60"
-                              : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60"
-                          }`}
-                        >
+
+                      {/* Jenis */}
+                      <td className="px-3 py-3 text-center border-b border-border-soft/60">
+                        <span className={`inline-block px-2.5 py-1 text-[10px] font-bold rounded-full border ${
+                          f.kodeJenisProyek === 2
+                            ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/70 dark:border-purple-800/50"
+                            : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/70 dark:border-blue-800/50"
+                        }`}>
                           {f.jenisProyekLabel}
                         </span>
                         {f.pekerjaanYangDipinjam > 0 && (
-                          <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
-                            Dipinjam: {f.pekerjaanYangDipinjamFmt}
+                          <div className="text-[9.5px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium">
+                            ↑ {f.pekerjaanYangDipinjamFmt}
                           </div>
                         )}
                       </td>
+
+                      {/* Aksi */}
                       {canEdit && (
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                        <td className="px-3 py-3 text-center border-b border-border-soft/60">
+                          <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => openEditFakturModal(f)}
                               title="Edit Faktur"
-                              className="p-1.5 text-navy-soft hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-muted-faint hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => {
-                                setDeletingFaktur(f);
-                                setIsDeleteModalOpen(true);
-                              }}
+                              onClick={() => { setDeletingFaktur(f); setIsDeleteModalOpen(true); }}
                               title="Hapus Faktur"
-                              className="p-1.5 text-navy-soft hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-muted-faint hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1322,34 +1351,26 @@ export function LaporanPendapatanClient({
                   ))
                 )}
               </tbody>
+
               {/* Footer Total */}
-              <tfoot className="bg-surface-subtle font-bold text-navy-text border-t-2 border-border-soft">
-                <tr>
-                  <td colSpan={5} className="p-3 text-center uppercase tracking-wider">
-                    Total Periode ({data.totalPeriod.jumlahFaktur} Faktur)
+              <tfoot>
+                <tr className="bg-navy/8 dark:bg-navy/30 border-t-2 border-navy/20 dark:border-navy/60 font-bold text-navy-text">
+                  <td colSpan={5} className="px-4 py-3 rounded-bl-[16px]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] uppercase tracking-wider text-muted font-bold">Total Periode</span>
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-navy/10 dark:bg-white/10 text-navy-text">
+                        {data.totalPeriod.jumlahFaktur} Faktur
+                      </span>
+                    </div>
                   </td>
-                  <td className="p-3 text-right font-mono">
-                    {data.totalPeriod.dppFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-navy-soft">
-                    {data.totalPeriod.dppNilaiLainFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-purple-700 dark:text-purple-400">
-                    {data.totalPeriod.ppnRealisasiFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-amber-700 dark:text-amber-400">
-                    {data.totalPeriod.pphRealisasiFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/15">
-                    {data.totalPeriod.nilaiProyekFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-500/15">
-                    {data.totalPeriod.labaSetelahPajakFmt}
-                  </td>
-                  <td className="p-3 text-right font-mono">
-                    {data.totalPeriod.nominalDiterimaFmt}
-                  </td>
-                  <td colSpan={canEdit ? 5 : 4}></td>
+                  <td className="px-3 py-3 text-right font-mono">{data.totalPeriod.dppFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono text-muted">{data.totalPeriod.dppNilaiLainFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono text-purple-700 dark:text-purple-400">{data.totalPeriod.ppnRealisasiFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono text-amber-700 dark:text-amber-400">{data.totalPeriod.pphRealisasiFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono text-blue-700 dark:text-blue-400 bg-blue-100/40 dark:bg-blue-500/15">{data.totalPeriod.nilaiProyekFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-500/15">{data.totalPeriod.labaSetelahPajakFmt}</td>
+                  <td className="px-3 py-3 text-right font-mono bg-emerald-100/40 dark:bg-emerald-500/15">{data.totalPeriod.nominalDiterimaFmt}</td>
+                  <td colSpan={canEdit ? 5 : 4} className="rounded-br-[16px]"></td>
                 </tr>
               </tfoot>
             </table>

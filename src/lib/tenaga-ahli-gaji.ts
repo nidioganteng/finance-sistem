@@ -2,7 +2,16 @@ export type GajiTenagaAhliBulan = {
   bulan: string;
   nominal: number | null;
   catatan: string;
+  pph21?: number | null;
 };
+
+export function pphGajiTenagaAhli(row: GajiTenagaAhliBulan, history: { id: string; nominalHonor: number; pph21?: number }[]): number | null {
+  if (row.nominal === null) return null;
+  if (row.pph21 !== undefined) return row.pph21;
+  const payments = [...new Map(history.map(item => [item.id, item])).values()];
+  const gross = payments.reduce((sum, item) => sum + item.nominalHonor, 0);
+  return payments.length && Math.abs(gross - row.nominal) < 0.001 ? payments.reduce((sum, item) => sum + (item.pph21 || 0), 0) : null;
+}
 
 export type ReferensiGajiTenagaAhli = {
   namaPekerjaan: string | null;

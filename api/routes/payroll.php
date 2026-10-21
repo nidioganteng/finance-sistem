@@ -2678,6 +2678,16 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
     ensure_tenaga_ahli_tables($pdo);
 
     // Parse daftar penugasan multi-proyek
+    $editing_person = null;
+    if ($id) {
+        $stmt = $pdo->prepare("SELECT id, nik FROM Rekanan WHERE id = ? AND tipe = 'TENAGA_AHLI'");
+        $stmt->execute([$id]);
+        $editing_person = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$editing_person) return error_response('Tenaga ahli tidak ditemukan.', 404);
+        $stmt = $pdo->prepare("SELECT id FROM Rekanan WHERE tipe = 'TENAGA_AHLI' AND nik = ? AND id <> ? LIMIT 1");
+        $stmt->execute([$clean_nik, $id]);
+        if ($stmt->fetchColumn()) return error_response('NIK sudah digunakan tenaga ahli lain. Periksa kembali data diri.', 409);
+    }
     $proyek_list_raw = $body['proyekList'] ?? null;
     if (is_string($proyek_list_raw)) {
         $proyek_list = json_decode($proyek_list_raw, true) ?: [];
@@ -2703,6 +2713,7 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
     }
 
     $validated_proyek_list = [];
+    $seen_projects = [];
     foreach ($proyek_list as $pl) {
         $pl_proj_id = trim($pl['projectId'] ?? '');
         $pl_mulai   = trim($pl['tanggalMulaiTugas'] ?? '');
@@ -2713,6 +2724,11 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
         if (!$pl_proj_id) {
             return error_response('Kode Proyek Penugasan wajib dipilih.', 400);
         }
+        if (isset($seen_projects[$pl_proj_id])) return error_response('Proyek yang sama tidak boleh ditambahkan lebih dari sekali.', 400);
+        $seen_projects[$pl_proj_id] = true;
+        $stmt = $pdo->prepare('SELECT id FROM Project WHERE id = ?');
+        $stmt->execute([$pl_proj_id]);
+        if (!$stmt->fetchColumn()) return error_response('Proyek penugasan tidak ditemukan.', 404);
         if (!$pl_mulai || !$pl_selesai) {
             return error_response('Masa Tugas (Tanggal Mulai dan Tanggal Selesai) wajib diisi untuk tiap proyek.', 400);
         }
@@ -2736,8 +2752,8 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
 
     ensure_tenaga_ahli_gaji_table($pdo);
     // Jangan membuat jadwal dan catatan yang sudah disimpan menjadi tak terjangkau.
-    $stmt_gaji_owner = $pdo->prepare("SELECT id FROM Rekanan WHERE tipe = 'TENAGA_AHLI' AND (id = ? OR nik = ?) LIMIT 1");
-    $stmt_gaji_owner->execute([$id ?? '', $clean_nik]);
+    $stmt_gaji_owner = $pdo->prepare("SELECT id FROM Rekanan WHERE tipe = 'TENAGA_AHLI' AND (id = ? OR (? = '' AND nik = ?)) LIMIT 1");
+    $stmt_gaji_owner->execute([$id ?? '', $id ?? '', $clean_nik]);
     $gaji_owner = $stmt_gaji_owner->fetchColumn();
     if ($gaji_owner) {
         $stmt_protected = $pdo->prepare('SELECT projectId FROM TenagaAhliGajiKontrak WHERE rekananId = ? AND gajiNegosiasi IS NOT NULL');
@@ -2750,116 +2766,129 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
         }
     }
 
-    // Ambil penugasan pertama untuk backward compatibility pada tabel Rekanan
-    $primary_pl = $validated_proyek_list[0];
-    $project_id            = $primary_pl['projectId'];
-    $tanggal_mulai_db      = $primary_pl['tanggalMulaiTugas'];
-    $tanggal_selesai_db    = $primary_pl['tanggalSelesaiTugas'];
-    $is_turun_lapangan     = $primary_pl['isTurunLapangan'];
-    $nominal_honor_bulanan = $primary_pl['nominalHonorBulanan'];
-    $now = date('Y-m-d H:i:s');
+    $pdo->beginTransaction();
+    try {
+        // Ambil penugasan pertama untuk backward compatibility pada tabel Rekanan
+        $primary_pl = $validated_proyek_list[0];
+        $project_id            = $primary_pl['projectId'];
+        $tanggal_mulai_db      = $primary_pl['tanggalMulaiTugas'];
+        $tanggal_selesai_db    = $primary_pl['tanggalSelesaiTugas'];
+        $is_turun_lapangan     = $primary_pl['isTurunLapangan'];
+        $nominal_honor_bulanan = $primary_pl['nominalHonorBulanan'];
+        $now = date('Y-m-d H:i:s');
 
-    if ($id) {
-        $pdo->prepare(
-            "UPDATE Rekanan
-             SET nama=?, nik=?, npwp=?, kategori=?, ptkp=?, entityId=?,
-                 tanggalMulaiTugas=?, tanggalSelesaiTugas=?, projectId=?,
-                 isTurunLapangan=?, nominalHonorBulanan=?, updatedAt=?
-             WHERE id=?"
-        )->execute([
-            $nama, $clean_nik, $npwp, $kategori, $ptkp, $entity_id,
-            $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
-            $is_turun_lapangan, $nominal_honor_bulanan, $now, $id
-        ]);
-
-        log_activity($user['id'], "Update Database Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $id]);
-        $record_id = $id;
-    } else {
-        // Cek apakah NIK sudah terdaftar
-        $stmt = $pdo->prepare("SELECT id, nama FROM Rekanan WHERE tipe = 'TENAGA_AHLI' AND nik = ? LIMIT 1");
-        $stmt->execute([$clean_nik]);
-        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($existing) {
-            // Perbarui data profil dan tambahkan penugasan proyek
-            $record_id = $existing['id'];
+        if ($id) {
+            // Pertahankan riwayat lama yang sebelumnya hanya terhubung lewat NIK.
+            if (!empty($editing_person['nik']) && $editing_person['nik'] !== $clean_nik) {
+                $pdo->prepare("UPDATE HonorTenagaAhli SET rekananId = ? WHERE (rekananId IS NULL OR rekananId = '') AND nik = ?")
+                    ->execute([$id, $editing_person['nik']]);
+            }
             $pdo->prepare(
                 "UPDATE Rekanan
-                 SET nama=?, npwp=?, kategori=?, ptkp=?, entityId=?,
+                 SET nama=?, nik=?, npwp=?, kategori=?, ptkp=?, entityId=?,
                      tanggalMulaiTugas=?, tanggalSelesaiTugas=?, projectId=?,
                      isTurunLapangan=?, nominalHonorBulanan=?, updatedAt=?
                  WHERE id=?"
             )->execute([
-                $nama, $npwp, $kategori, $ptkp, $entity_id,
+                $nama, $clean_nik, $npwp, $kategori, $ptkp, $entity_id,
                 $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
-                $is_turun_lapangan, $nominal_honor_bulanan, $now, $record_id
+                $is_turun_lapangan, $nominal_honor_bulanan, $now, $id
             ]);
-            log_activity($user['id'], "Update Penugasan Proyek Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $record_id]);
+
+            log_activity($user['id'], "Update Database Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $id]);
+            $record_id = $id;
         } else {
-            $record_id = uuid4();
-            $pdo->prepare(
-                "INSERT INTO Rekanan
-                 (id, nama, nik, npwp, tipe, kategori, ptkp, entityId,
-                  tanggalMulaiTugas, tanggalSelesaiTugas, projectId,
-                  isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            )->execute([
-                $record_id, $nama, $clean_nik, $npwp, $kategori, $ptkp, $entity_id,
-                $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
-                $is_turun_lapangan, $nominal_honor_bulanan, $now, $now
-            ]);
-            log_activity($user['id'], "Tambah Database Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $record_id]);
+            // Cek apakah NIK sudah terdaftar
+            $stmt = $pdo->prepare("SELECT id, nama FROM Rekanan WHERE tipe = 'TENAGA_AHLI' AND nik = ? LIMIT 1");
+            $stmt->execute([$clean_nik]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($existing) {
+                // Perbarui data profil dan tambahkan penugasan proyek
+                $record_id = $existing['id'];
+                $pdo->prepare(
+                    "UPDATE Rekanan
+                     SET nama=?, npwp=?, kategori=?, ptkp=?, entityId=?,
+                         tanggalMulaiTugas=?, tanggalSelesaiTugas=?, projectId=?,
+                         isTurunLapangan=?, nominalHonorBulanan=?, updatedAt=?
+                     WHERE id=?"
+                )->execute([
+                    $nama, $npwp, $kategori, $ptkp, $entity_id,
+                    $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
+                    $is_turun_lapangan, $nominal_honor_bulanan, $now, $record_id
+                ]);
+                log_activity($user['id'], "Update Penugasan Proyek Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $record_id]);
+            } else {
+                $record_id = uuid4();
+                $pdo->prepare(
+                    "INSERT INTO Rekanan
+                     (id, nama, nik, npwp, tipe, kategori, ptkp, entityId,
+                      tanggalMulaiTugas, tanggalSelesaiTugas, projectId,
+                      isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+                     VALUES (?, ?, ?, ?, 'TENAGA_AHLI', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute([
+                    $record_id, $nama, $clean_nik, $npwp, $kategori, $ptkp, $entity_id,
+                    $tanggal_mulai_db, $tanggal_selesai_db, $project_id,
+                    $is_turun_lapangan, $nominal_honor_bulanan, $now, $now
+                ]);
+                log_activity($user['id'], "Tambah Database Tenaga Ahli: $nama ($clean_nik)", 'FINANCIAL_CHANGE', ['rekananId' => $record_id]);
+            }
         }
-    }
 
-    // Sinkronisasikan tabel TenagaAhliProject
-    $pdo->prepare("DELETE FROM TenagaAhliProject WHERE rekananId = ?")->execute([$record_id]);
-    $stmt_insert_tap = $pdo->prepare(
-        "INSERT INTO TenagaAhliProject
-            (id, rekananId, projectId, tanggalMulaiTugas, tanggalSelesaiTugas, isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    );
-    foreach ($validated_proyek_list as $pl_item) {
-        $stmt_insert_tap->execute([
-            uuid4(), $record_id, $pl_item['projectId'],
-            $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'],
-            $pl_item['isTurunLapangan'], $pl_item['nominalHonorBulanan'],
-            $now, $now
-        ]);
-    }
-
-    $stmt = $pdo->prepare(
-        "SELECT r.id, r.nama, r.nik, r.npwp, r.kategori, r.ptkp, r.entityId,
-                r.tanggalMulaiTugas, r.tanggalSelesaiTugas, r.projectId,
-                r.isTurunLapangan, r.nominalHonorBulanan,
-                p.code AS projectCode, p.name AS projectName
-         FROM Rekanan r
-         LEFT JOIN Project p ON r.projectId = p.id
-         WHERE r.id = ?"
-    );
-    $stmt->execute([$record_id]);
-    $record = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($record) {
-        $record['isTurunLapangan']       = ((int)($record['isTurunLapangan'] ?? 1) === 1);
-        $record['nominalHonorBulanan']    = (float)($record['nominalHonorBulanan'] ?? 0.0);
-        $record['nominalHonorBulananFmt'] = fmt_rp_payroll($record['nominalHonorBulanan']);
-
-        // Ambil penugasan proyek
-        $stmt_tap = $pdo->prepare(
-            "SELECT tap.*, p.code AS projectCode, p.name AS projectName
-             FROM TenagaAhliProject tap
-             JOIN Project p ON tap.projectId = p.id
-             WHERE tap.rekananId = ?
-             ORDER BY tap.createdAt ASC"
+        // Sinkronisasikan tabel TenagaAhliProject
+        $pdo->prepare("DELETE FROM TenagaAhliProject WHERE rekananId = ?")->execute([$record_id]);
+        $stmt_insert_tap = $pdo->prepare(
+            "INSERT INTO TenagaAhliProject
+                (id, rekananId, projectId, tanggalMulaiTugas, tanggalSelesaiTugas, isTurunLapangan, nominalHonorBulanan, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt_tap->execute([$record_id]);
-        $record['proyekList'] = array_map(function($tap_row) {
-            $tap_row['isTurunLapangan'] = ((int)($tap_row['isTurunLapangan'] ?? 1) === 1);
-            $tap_row['nominalHonorBulanan'] = (float)($tap_row['nominalHonorBulanan'] ?? 0);
-            $tap_row['nominalHonorBulananFmt'] = fmt_rp_payroll($tap_row['nominalHonorBulanan']);
-            $tap_row['tanggalMulaiTugasFmt'] = !empty($tap_row['tanggalMulaiTugas']) ? fmt_tanggal_id($tap_row['tanggalMulaiTugas']) : null;
-            $tap_row['tanggalSelesaiTugasFmt'] = !empty($tap_row['tanggalSelesaiTugas']) ? fmt_tanggal_id($tap_row['tanggalSelesaiTugas']) : null;
-            return $tap_row;
-        }, $stmt_tap->fetchAll(PDO::FETCH_ASSOC));
+        foreach ($validated_proyek_list as $pl_item) {
+            $stmt_insert_tap->execute([
+                uuid4(), $record_id, $pl_item['projectId'],
+                $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'],
+                $pl_item['isTurunLapangan'], $pl_item['nominalHonorBulanan'],
+                $now, $now
+            ]);
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT r.id, r.nama, r.nik, r.npwp, r.kategori, r.ptkp, r.entityId,
+                    r.tanggalMulaiTugas, r.tanggalSelesaiTugas, r.projectId,
+                    r.isTurunLapangan, r.nominalHonorBulanan,
+                    p.code AS projectCode, p.name AS projectName
+             FROM Rekanan r
+             LEFT JOIN Project p ON r.projectId = p.id
+             WHERE r.id = ?"
+        );
+        $stmt->execute([$record_id]);
+        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($record) {
+            $record['isTurunLapangan']       = ((int)($record['isTurunLapangan'] ?? 1) === 1);
+            $record['nominalHonorBulanan']    = (float)($record['nominalHonorBulanan'] ?? 0.0);
+            $record['nominalHonorBulananFmt'] = fmt_rp_payroll($record['nominalHonorBulanan']);
+
+            // Ambil penugasan proyek
+            $stmt_tap = $pdo->prepare(
+                "SELECT tap.*, p.code AS projectCode, p.name AS projectName
+                 FROM TenagaAhliProject tap
+                 JOIN Project p ON tap.projectId = p.id
+                 WHERE tap.rekananId = ?
+                 ORDER BY tap.createdAt ASC"
+            );
+            $stmt_tap->execute([$record_id]);
+            $record['proyekList'] = array_map(function($tap_row) {
+                $tap_row['isTurunLapangan'] = ((int)($tap_row['isTurunLapangan'] ?? 1) === 1);
+                $tap_row['nominalHonorBulanan'] = (float)($tap_row['nominalHonorBulanan'] ?? 0);
+                $tap_row['nominalHonorBulananFmt'] = fmt_rp_payroll($tap_row['nominalHonorBulanan']);
+                $tap_row['tanggalMulaiTugasFmt'] = !empty($tap_row['tanggalMulaiTugas']) ? fmt_tanggal_id($tap_row['tanggalMulaiTugas']) : null;
+                $tap_row['tanggalSelesaiTugasFmt'] = !empty($tap_row['tanggalSelesaiTugas']) ? fmt_tanggal_id($tap_row['tanggalSelesaiTugas']) : null;
+                return $tap_row;
+            }, $stmt_tap->fetchAll(PDO::FETCH_ASSOC));
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     }
 
     json_response([

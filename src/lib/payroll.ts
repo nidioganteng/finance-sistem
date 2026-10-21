@@ -1,4 +1,5 @@
 import { phpFetch, getPhpToken } from "./api-client";
+import type { GajiTenagaAhliKontrak } from "./tenaga-ahli-gaji";
 
 export const PTKP_RATES: Record<string, number> = {
   "TK/0": 54000000,
@@ -342,6 +343,9 @@ export type HonorTenagaAhliItem = {
 };
 
 export type TenagaAhliProjectAssignment = {
+  spmkMulai?: string | null;
+  spmkSelesai?: string | null;
+  gajiKontrak?: GajiTenagaAhliKontrak | null;
   id?: string | null;
   projectId: string;
   projectCode?: string | null;

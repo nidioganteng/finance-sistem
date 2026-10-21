@@ -46,6 +46,11 @@ function tenaga_ahli_validate_jadwal($rows): array {
         }
         $seen[$bulan] = true;
         $result[] = ['bulan' => $bulan, 'nominal' => tenaga_ahli_nominal($row['nominal'] ?? null), 'catatan' => trim($catatan)];
+        if (array_key_exists('pph21', $row)) {
+            $tax = tenaga_ahli_nominal($row['pph21']);
+            if ($tax !== null && $tax > (float)($row['nominal'] ?? 0)) throw new InvalidArgumentException('PPh tidak boleh melebihi gaji bruto bulan tersebut.');
+            $result[count($result) - 1]['pph21'] = $tax;
+        }
     }
     usort($result, fn($a, $b) => strcmp($a['bulan'], $b['bulan']));
     return $result;
@@ -139,35 +144,46 @@ function tenaga_ahli_sync_pembayaran(PDO $pdo, array $person, string $person_id,
         $id = tenaga_ahli_auto_payment_id($person_id, $project_id, $row['bulan']);
         $automatic = null;
         $manual = 0.0;
+        $manual_tax = 0.0;
         foreach ($history as $payment) {
             if ((int)$payment['tahun'] !== $year || (int)$payment['bulan'] !== $month) continue;
             if ($payment['id'] === $id) $automatic = $payment;
-            else $manual += (float)$payment['nominalHonor'];
+            else { $manual += (float)$payment['nominalHonor']; $manual_tax += (float)$payment['pph21']; }
         }
         if ($manual > (float)($row['nominal'] ?? 0) + 0.001) {
             throw new InvalidArgumentException("Gaji {$row['bulan']} tidak boleh kurang dari pembayaran manual yang sudah tercatat.");
         }
         $amount = round(max(0, (float)($row['nominal'] ?? 0) - $manual), 2);
+        $explicit_tax = $row['pph21'] ?? null;
+        if ($explicit_tax !== null && ($explicit_tax < $manual_tax - 0.001 || $explicit_tax > (float)($row['nominal'] ?? 0) + 0.001)) throw new InvalidArgumentException("PPh {$row['bulan']} harus mencakup pajak pembayaran manual dan tidak melebihi gaji bruto.");
         if ($amount <= 0) {
+            if ($explicit_tax !== null && abs($explicit_tax - $manual_tax) > 0.001) throw new InvalidArgumentException('PPh pembayaran manual diubah melalui rekonsiliasi, bukan dengan menimpa riwayat.');
             if ($automatic) $pdo->prepare('DELETE FROM HonorTenagaAhli WHERE id = ?')->execute([$id]);
             continue;
         }
         if (!trim($person['nik'] ?? '')) throw new InvalidArgumentException('Lengkapi NIK tenaga ahli sebelum menyimpan gaji dan pembayaran.');
         $entity = $person['projectEntityId'] ?: $person['entityId'];
         if (!$entity) throw new InvalidArgumentException('Entitas proyek wajib tersedia untuk pembayaran gaji.');
-        // Ikuti tarif default form honor yang sudah dipakai aplikasi.
-        $rate = $automatic ? (float)$automatic['tarifPph21Persen'] : (!empty($person['npwp']) ? 2.5 : 3.0);
-        $tax = $automatic && abs((float)$automatic['nominalHonor'] - $amount) < 0.001
-            ? (float)$automatic['pph21'] : round($amount * $rate / 100);
+        if ($explicit_tax !== null) $tax = round($explicit_tax - $manual_tax, 2);
+        elseif (!array_key_exists('pph21', $row) && $automatic && abs((float)$automatic['nominalHonor'] - $amount) < 0.001) $tax = (float)$automatic['pph21'];
+        else throw new InvalidArgumentException("Isi PPh {$row['bulan']} secara manual (isi 0 bila tanpa potongan).");
+        $rate = round($tax / $amount * 100, 2);
+        $description = tenaga_ahli_honor_description($person['nama'], $year, $month);
         $now = date('Y-m-d H:i:s');
         if ($automatic) {
-            $pdo->prepare('UPDATE HonorTenagaAhli SET entityId = ?, nominalHonor = ?, tarifPph21Persen = ?, pph21 = ?, nominalBersih = ?, updatedAt = ? WHERE id = ?')
-                ->execute([$entity, $amount, $rate, $tax, $amount - $tax, $now, $id]);
+            $pdo->prepare('UPDATE HonorTenagaAhli SET uraian = ?, entityId = ?, nominalHonor = ?, tarifPph21Persen = ?, pph21 = ?, nominalBersih = ?, updatedAt = ? WHERE id = ?')
+                ->execute([$description, $entity, $amount, $rate, $tax, $amount - $tax, $now, $id]);
         } else {
             $pdo->prepare('INSERT INTO HonorTenagaAhli (id, entityId, rekananId, nik, nama, npwp, uraian, tanggal, bulan, tahun, nominalHonor, tarifPph21Persen, pph21, nominalBersih, projectId, namaProyek, noBukti, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
                 ->execute([$id, $entity, $person_id, $person['nik'], $person['nama'], $person['npwp'] ?? null,
-                    "Gaji tenaga ahli otomatis: {$person['nama']} - {$row['bulan']}", date('Y-m-d') . ' 00:00:00', $month, $year,
+                    $description, date('Y-m-d') . ' 00:00:00', $month, $year,
                     $amount, $rate, $tax, $amount - $tax, $project_id, $person['projectName'] ?? null, null, $now, $now]);
         }
     }
+}
+
+function tenaga_ahli_honor_description(string $name, int $year, int $month): string {
+    $months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    if ($month < 1 || $month > 12) throw new InvalidArgumentException('Bulan pembayaran tidak valid.');
+    return "Honorarium Tenaga Ahli: $name - Bulan {$months[$month-1]} $year";
 }

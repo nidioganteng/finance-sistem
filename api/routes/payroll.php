@@ -1236,7 +1236,10 @@ if ($method === 'GET' && $sub === '') {
     foreach ($rekanan_tenaga_ahli as &$rta_item) {
         $rta_nik = trim($rta_item['nik'] ?? '');
         $rta_id  = trim($rta_item['id'] ?? '');
-        $rta_item['riwayatGaji'] = $rincian_by_rek_id[$rta_id] ?? ($rincian_by_nik[$rta_nik] ?? []);
+        $rta_item['riwayatGaji'] = tenaga_ahli_merge_riwayat(
+            $rincian_by_nik[$rta_nik] ?? [],
+            $rincian_by_rek_id[$rta_id] ?? []
+        );
     }
     unset($rta_item);
 

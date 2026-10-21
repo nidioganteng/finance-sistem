@@ -1,6 +1,19 @@
 "use server";
 
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
+import type { GajiTenagaAhliKontrak, SaveGajiTenagaAhliKontrak } from "@/lib/tenaga-ahli-gaji";
+
+export async function saveGajiTenagaAhliKontrakAction(body: SaveGajiTenagaAhliKontrak) {
+  const token = await getPhpToken();
+  try {
+    return await phpFetch<{ success: boolean; data: GajiTenagaAhliKontrak }>("/api/payroll/gaji-kontrak", token, {
+      method: "POST", body: JSON.stringify(body),
+    });
+  } catch (e) {
+    if (e instanceof ApiError) throw new Error(e.message);
+    throw new Error("Gagal menyimpan gaji tenaga ahli.");
+  }
+}
 
 // ----------------------------------------------------
 // HELPER: PARSE ANGKA NOMINAL RUPIAH

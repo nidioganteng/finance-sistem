@@ -3245,17 +3245,6 @@ export function PayrollClient({
             canEdit={isManager}
             search={searchQuery}
             onAddManual={() => { setEditingMasterAhli(null); setIsMasterAhliModalOpen(true); }}
-            onRecord={(person, project, row) => {
-              openHonorModal(null, person.id, project.projectId);
-              const [year, month] = row.bulan.split("-").map(Number);
-              setModalHonorBulan(month);
-              setModalHonorTahun(year);
-              setModalHonorTanggal(`${row.bulan}-01`);
-              setModalHonorNominal(row.nominal || 0);
-              const rate = person.npwp ? 2.5 : 3;
-              setModalHonorNominalPph(Math.round(((row.nominal || 0) * rate) / 100));
-              setModalHonorUraian(`Honorarium Tenaga Ahli: ${person.nama} - Bulan ${BULAN_NAMES[month - 1]} ${year}`);
-            }}
           />}
 
           {(["rekap-proyek", "rekap-bulan", "rekap-nama", "konsolidasi"] as string[]).includes(tenagaAhliSubTab) && <TenagaAhliReport

@@ -600,7 +600,7 @@ if ($method === 'GET' && $sub_action === 'laporan-afiliasi') {
     $end_year   = "$year-12-31 23:59:59";
 
     $fmt_acct = function(float $n): string {
-        if (abs($n) < 0.01) return "Rp -";
+        if (abs($n) < 0.01) return "Rp 0";
         $abs = number_format(abs($n), 0, ',', '.');
         return $n < 0 ? "Rp ($abs)" : "Rp $abs";
     };

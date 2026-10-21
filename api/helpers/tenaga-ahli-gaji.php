@@ -104,13 +104,27 @@ function tenaga_ahli_auto_payment_id(string $person_id, string $project_id, stri
     return 'gaji-' . substr(hash('sha256', json_encode([$person_id, $project_id, $period])), 0, 31);
 }
 
-function tenaga_ahli_sync_pembayaran(PDO $pdo, array $person, string $person_id, string $project_id, array $jadwal, array $old_jadwal = []): void {
+function tenaga_ahli_sync_pembayaran(PDO $pdo, array $person, string $person_id, string $project_id, array $jadwal, array $old_jadwal = [], ?float $budget = null): void {
     if (!$pdo->inTransaction()) throw new LogicException('Sinkronisasi pembayaran wajib dalam transaksi gaji.');
     $stmt = $pdo->prepare('SELECT * FROM HonorTenagaAhli WHERE projectId = ? AND (rekananId = ? OR (nik = ? AND nik <> \'\'))');
     $stmt->execute([$project_id, $person_id, $person['nik'] ?? '']);
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $periods = array_column($jadwal, 'bulan');
     $old_periods = array_column($old_jadwal, 'bulan');
+    if ($budget !== null) {
+        $total = array_sum(array_map(fn($row) => (float)($row['nominal'] ?? 0), $jadwal));
+        $paid_total = array_sum(array_column($history, 'nominalHonor'));
+        foreach ($history as $payment) {
+            $period = sprintf('%04d-%02d', $payment['tahun'], $payment['bulan']);
+            if (!in_array($period, $periods, true) && $payment['id'] !== tenaga_ahli_auto_payment_id($person_id, $project_id, $period)) {
+                $total += (float)$payment['nominalHonor'];
+            }
+        }
+        if ($total > $budget + 0.001) throw new InvalidArgumentException('Total gaji dan pembayaran tidak boleh melebihi total gaji negosiasi kontrak.');
+        if (array_diff($periods, $old_periods) && $paid_total >= $budget - 0.001) {
+            throw new InvalidArgumentException('Gaji sudah balance dengan total negosiasi. Bulan tidak dapat ditambah.');
+        }
+    }
     foreach ($history as $payment) {
         $period = sprintf('%04d-%02d', $payment['tahun'], $payment['bulan']);
         if (in_array($period, $periods, true)) continue;

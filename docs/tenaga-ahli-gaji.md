@@ -4,12 +4,12 @@
 
 1. Buka **Payroll → Tenaga Ahli → Pengisian Gaji & Negosiasi** (halaman awal Tenaga Ahli).
 2. Klik **Tambah tenaga ahli manual**. Isi profil, NIK 16 digit, NPWP/PTKP, entitas, dan penugasan pada proyek yang sudah terdaftar. Gunakan data sintetis untuk testing. Jika belum ada proyek, buat melalui modul proyek terlebih dahulu.
-3. Pada daftar, klik **Isi gaji negosiasi** untuk tenaga ahli dan proyek yang dipilih. Isi nama pekerjaan, menman, gaji RAB, tanggal SPMK, serta gaji negosiasi. Pilih basis **per bulan** atau **total kontrak**, lalu simpan.
+3. Pada daftar, isi nominal gaji negosiasi langsung di baris tenaga ahli/proyek. Pilih basis **per bulan** atau **total kontrak**, lalu **Simpan negosiasi**. Klik **Data kontrak** jika nama pekerjaan, menman, gaji RAB, atau tanggal SPMK perlu dilengkapi. Setelah nominal disimpan, klik **Tindak lanjut** untuk membuka rincian bulanan orang tersebut.
 4. Sistem membuat daftar bulan inklusif dari tanggal SPMK, termasuk pergantian tahun. Nominal gaji dan catatan bulan-bulan tersebut tetap kosong. Gaji negosiasi tidak disalin otomatis ke setiap bulan.
 5. Isi nominal gaji per bulan dan catatan kendala di sebelahnya, lalu **Simpan gaji bulanan**. Nilai kosong dibedakan dari nol.
 6. Tambahkan bulan untuk perpanjangan, atau hapus bulan saat pekerjaan selesai lebih cepat. Acuan SPMK tetap tersimpan. Bulan yang memiliki riwayat pembayaran tidak bisa dihapus dari jadwal.
-7. Catatan ditandai **Ada kendala**, warna amber, dan rincian yang bisa dibuka. Penanda juga tampil di daftar utama serta daftar pembayaran gaji bulanan. Tombol ringkasan catatan memfilter baris kendala pada halaman orang tersebut.
-8. Setelah jadwal disimpan, **Catat pembayaran** membuka form honor yang sudah ada dengan orang, proyek, bulan, dan nominal terpilih. Periksa tanggal, nominal, dan pajak sebelum menyimpan. Pencatatan jadwal tidak mengubah transaksi honor/jurnal secara otomatis. Riwayat pembayaran yang sudah ada ditampilkan untuk bulan tersebut.
+7. Catatan ditandai **Ada kendala**, warna amber, dan rincian yang bisa dibuka. Penanda juga tampil di daftar utama dan halaman tindak lanjut. Tombol ringkasan catatan memfilter baris kendala pada halaman orang tersebut.
+8. Setelah jadwal disimpan, **Catat pembayaran** membuka form honor yang sudah ada dengan orang, proyek, bulan, dan nominal terpilih. Periksa tanggal, nominal, dan pajak sebelum menyimpan. Pencatatan jadwal tidak mengubah transaksi honor/jurnal secara otomatis. Riwayat pembayaran yang sudah ada ditampilkan untuk bulan tersebut. Jika baru dibayar sebagian, **Catat sisa pembayaran** mengisi form dengan sisa nominal bulan itu.
 
 Satu orang dapat memiliki beberapa proyek. Negosiasi, jadwal, dan catatan dipisahkan per `(rekananId, projectId)`. Halaman rincian dapat dibuka melalui URL `/payroll?entity=...&tab=tenaga-ahli&ahliId=...&proyekAhliId=...`.
 
@@ -19,7 +19,7 @@ Jalankan `database/migrations/2026-10-21-tenaga-ahli-gaji-negosiasi.sql` pada da
 
 `TenagaAhliGajiKontrak` menyimpan referensi, gaji negosiasi, basis negosiasi, daftar bulan eksplisit (`jadwalJson`), serta revision. Jadwal eksplisit memastikan pengurangan/perpanjangan bulan dan catatan tidak direset oleh sync. Tidak ada backfill nominal ke data honor lama. Profil/penugasan dengan negosiasi tersimpan dilindungi dari penghapusan yang membuat data gaji tidak terjangkau.
 
-`POST /api/payroll/gaji-kontrak` memerlukan autentikasi dan role finance/admin. Staf hanya dapat menulis untuk entitas proyek yang ditugaskan kepadanya. Penyimpanan menggunakan transaksi dan pemeriksaan revision; halaman lama mendapat HTTP 409 untuk mencegah menimpa edit lain atau sync. Perubahan dicatat di ActivityLog melalui mekanisme audit yang sudah ada.
+`POST /api/payroll/gaji-kontrak` memerlukan autentikasi dan role finance/admin. Staf dapat menulis jika memiliki akses ke entitas profil tenaga ahli atau entitas proyek penugasannya. Penyimpanan menggunakan transaksi dan pemeriksaan revision; halaman lama mendapat HTTP 409 untuk mencegah menimpa edit lain atau sync. Perubahan dicatat di ActivityLog melalui mekanisme audit yang sudah ada.
 
 ## Kontrak penerimaan Sidamon
 
@@ -45,4 +45,14 @@ Selain field profil/penugasan yang sudah ada, setiap item dapat membawa:
 - `npm run build`
 - PHP lint pada helper dan route yang berubah.
 
-Tes otomatis memakai data sintetis dan tidak menulis ke database. Tes mencakup periode lintas tahun, akhir bulan/kabisat, input nominal kosong/nol, catatan kendala, escaping, pemisahan entitas, serta render akses read-only. Uji browser dengan database dan pengiriman Sidamon sungguhan tetap perlu dilakukan pada lingkungan testing.
+Tes otomatis memakai data sintetis dan tidak menulis ke database. Tes mencakup periode lintas tahun, akhir bulan/kabisat, input nominal kosong/nol, catatan kendala, escaping, pemisahan entitas, serta render akses read-only. Respons payroll dan penyimpanan negosiasi juga diuji terhadap MySQL lokal; pengujian penyimpanan di-rollback agar negosiasi testing tetap kosong. Uji browser interaktif dan pengiriman Sidamon sungguhan tetap perlu dilakukan pada lingkungan testing.
+
+## Pembaruan alur negosiasi dan balance
+
+Menu Gaji Bulanan lama dikeluarkan dari navigasi Tenaga Ahli. Pengisian berpusat pada daftar **Pengisian Gaji & Negosiasi**: isi nominal dan basis negosiasi langsung di baris orang/proyek, simpan, lalu klik **Tindak lanjut** untuk mengisi gaji per bulan pada halaman khusus di dalam menu yang sama. **Data kontrak** menyediakan akses untuk melengkapi referensi manual.
+
+Tenaga ahli muncul di entitas tempat profilnya terdaftar maupun entitas proyek penugasannya. Contoh: profil di Gaharu dengan proyek Cipta Asri tetap tampil pada Gaharu; entitas profil dan proyek ditampilkan terpisah. Hak tulis staf menerima akses ke salah satu dari kedua entitas tersebut. Tidak ada profil duplikat yang dibuat untuk lintas entitas.
+
+Daftar awal dan halaman tindak lanjut menampilkan gaji yang telah diisi, pembayaran bruto dari seluruh riwayat proyek (termasuk tahun sebelumnya), dan **balance = total gaji terisi − sudah dibayar bruto**. Gaji yang masih kosong tidak dihitung sebagai nol: balance belum tersedia jika belum ada nominal yang diisi, dan diberi tanda **sementara** jika baru sebagian bulan terisi. Kelebihan bayar tetap ditampilkan sebagai balance negatif. Pembayaran lama berdasarkan NIK digabung dengan pembayaran berdasarkan rekananId tanpa menghitung transaksi yang sama dua kali. Bulan yang sudah pernah dibayar di luar rentang SPMK tetap ditampilkan pada tindak lanjut.
+
+Untuk fixture lokal sesuai screenshot, jalankan `php scripts/seed-tenaga-ahli-testing.php` sebagai preview, lalu tambahkan `--apply` untuk melengkapi referensi kosong pada profil **kevinnn / CAD-001** yang sudah ada: nama pekerjaan Landscape Taman Kota Palangka Raya, RAB Rp50.000.000, menman contoh 8, dan periode 21 Februari–21 Oktober 2026. Script tidak membuat profil/pembayaran baru, tidak menimpa referensi terisi atau data Sidamon, dan mempertahankan negosiasi/jadwal yang sudah disimpan. Gunakan input negosiasi di daftar untuk mencoba alur selanjutnya.

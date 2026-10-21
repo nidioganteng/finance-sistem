@@ -651,6 +651,9 @@ export function PayrollClient({
       tanggalSelesaiTugas: string;
       isTurunLapangan: boolean;
       nominalHonorBulanan: number;
+      namaPekerjaan?: string;
+      manMonth?: number | null;
+      sumber?: "MANUAL" | "SIDAMON";
     }>
   >([
     {
@@ -685,10 +688,13 @@ export function PayrollClient({
             projectId: p.projectId || "",
             projectCode: p.projectCode || null,
             projectName: p.projectName || null,
-            tanggalMulaiTugas: p.tanggalMulaiTugas ? p.tanggalMulaiTugas.substring(0, 10) : "",
-            tanggalSelesaiTugas: p.tanggalSelesaiTugas ? p.tanggalSelesaiTugas.substring(0, 10) : "",
+            tanggalMulaiTugas: p.gajiKontrak?.spmkMulai ?? p.tanggalMulaiTugas?.substring(0, 10) ?? "",
+            tanggalSelesaiTugas: p.gajiKontrak?.spmkSelesai ?? p.tanggalSelesaiTugas?.substring(0, 10) ?? "",
             isTurunLapangan: p.isTurunLapangan !== false && (p.isTurunLapangan as unknown) !== 0,
-            nominalHonorBulanan: p.nominalHonorBulanan || 0,
+            nominalHonorBulanan: p.gajiKontrak?.gajiRab ?? p.nominalHonorBulanan ?? 0,
+            namaPekerjaan: p.gajiKontrak?.namaPekerjaan ?? p.projectName ?? "",
+            manMonth: p.gajiKontrak?.manMonth ?? null,
+            sumber: p.gajiKontrak?.sumber,
           }))
         );
       } else if (editingMasterAhli?.projectId) {
@@ -3247,7 +3253,6 @@ export function PayrollClient({
             canEdit={isManager}
             search={searchQuery}
             onAddManual={() => { setEditingMasterAhli(null); setIsMasterAhliModalOpen(true); }}
-            onEdit={person => { setEditingMasterAhli(person); setIsMasterAhliModalOpen(true); }}
           />}
 
           {(["rekap-proyek", "rekap-bulan", "rekap-nama", "konsolidasi"] as string[]).includes(tenagaAhliSubTab) && <TenagaAhliReport
@@ -7317,6 +7322,9 @@ export function PayrollClient({
                                       projectId: val,
                                       projectCode: matched?.code ?? item.projectCode,
                                       projectName: matched?.name ?? item.projectName,
+                                      namaPekerjaan: matched?.name || "",
+                                      manMonth: null,
+                                      sumber: undefined,
                                     }
                                   : item
                               )
@@ -7350,6 +7358,15 @@ export function PayrollClient({
                         </select>
                       </div>
 
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="block font-semibold text-navy-text">Nama pekerjaan
+                          <input type="text" maxLength={255} disabled={pl.sumber === "SIDAMON"} value={pl.namaPekerjaan ?? pl.projectName ?? ""} onChange={event => handleUpdateProyekAssignment(idx, "namaPekerjaan", event.target.value)} className="mt-1 h-8 w-full rounded-lg border border-border bg-surface-card px-3 text-xs text-foreground disabled:opacity-60" />
+                        </label>
+                        <label className="block font-semibold text-navy-text">Menman (MM)
+                          <input type="number" min="0" max="99999999.99" step="0.01" disabled={pl.sumber === "SIDAMON"} value={pl.manMonth ?? ""} onChange={event => handleUpdateProyekAssignment(idx, "manMonth", event.target.value === "" ? null : Number(event.target.value))} className="mt-1 h-8 w-full rounded-lg border border-border bg-surface-card px-3 text-xs text-foreground disabled:opacity-60" />
+                        </label>
+                      </div>
+                      {pl.sumber === "SIDAMON" && <p className="text-[10px] text-muted-faint">Referensi kontrak mengikuti data Sidamon.</p>}
                       {/* Masa Tugas Mulai & Selesai */}
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">
@@ -7361,6 +7378,7 @@ export function PayrollClient({
                             <input
                               type="date"
                               required
+                              disabled={pl.sumber === "SIDAMON"}
                               value={pl.tanggalMulaiTugas}
                               onChange={(e) => handleUpdateProyekAssignment(idx, "tanggalMulaiTugas", e.target.value)}
                               className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
@@ -7371,6 +7389,7 @@ export function PayrollClient({
                             <input
                               type="date"
                               required
+                              disabled={pl.sumber === "SIDAMON"}
                               value={pl.tanggalSelesaiTugas}
                               onChange={(e) => handleUpdateProyekAssignment(idx, "tanggalSelesaiTugas", e.target.value)}
                               className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-semibold text-xs"
@@ -7439,11 +7458,12 @@ export function PayrollClient({
                       {/* Nominal Honor Bulanan Standar */}
                       <div>
                         <label className="font-semibold text-navy-text block mb-1">
-                          Nominal Honor Bulanan Standar (Rp)
+                          Gaji RAB (Rp)
                         </label>
                         <input
                           type="text"
                           inputMode="numeric"
+                          disabled={pl.sumber === "SIDAMON"}
                           value={formatRupiahInput(pl.nominalHonorBulanan ? pl.nominalHonorBulanan : "")}
                           onChange={(e) => {
                             const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
@@ -7453,7 +7473,7 @@ export function PayrollClient({
                           className="w-full h-8 px-3 rounded-lg border border-border bg-surface-card text-foreground font-mono font-semibold"
                         />
                         <span className="text-[10px] text-muted-faint mt-0.5 block">
-                          Honorarium standar bulanan untuk alokasi proyek ini.
+                          Referensi RAB kontrak; pembayaran mengikuti gaji bulanan yang diisi.
                         </span>
                       </div>
                     </div>

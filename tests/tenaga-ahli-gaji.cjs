@@ -44,7 +44,7 @@ const contract = { id: 'c', rekananId: 'test-person', projectId: 'test-project',
   gajiNegosiasi: 5000000, basisNegosiasi: 'BULAN', jadwal: [
     { bulan: '2026-12', nominal: 5000000, catatan: 'Dokumen <belum> lengkap' }, { bulan: '2027-01', nominal: null, catatan: '' },
   ] };
-const props = { entityId: 'entity-test', canEdit: true, search: '', onAddManual() {}, onRecord() {}, people: [
+const props = { entityId: 'entity-test', year: 2026, month: 12, canEdit: true, search: '', onAddManual() {}, onRecord() {}, people: [
   { id: 'test-person', nama: 'Freelance Uji', nik: null, npwp: null, kategori: 'Ahli struktur', entityId: 'entity-test', proyekList: [
     { projectId: 'test-project', projectEntityId: 'entity-project', projectCode: 'TEST', projectName: 'Proyek Uji', nominalHonorBulanan: 0, isTurunLapangan: true, gajiKontrak: contract },
   ] },
@@ -71,8 +71,8 @@ assert.equal(helpers.penugasanPadaEntitas(props.people[0], props.people[0].proye
 assert.equal(helpers.penugasanPadaEntitas(props.people[0], props.people[0].proyekList[0], 'other'), false);
 const paidProps = { ...props, people: [{ ...props.people[0], riwayatGaji: [paid] }] };
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps));
-assert.match(html, /1\.000\.000/); // Riwayat dibayar sudah tampil sebelum membuka tindak lanjut.
-assert.match(html, /4\.000\.000/);
+assert.doesNotMatch(html, /1\.000\.000/); // Pembayaran November 2025 tidak masuk Desember 2026.
+assert.match(html, /5\.000\.000/);
 const draftProps = { ...props, people: [{ ...props.people[0], proyekList: [{ ...props.people[0].proyekList[0], gajiKontrak: null }] }] };
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, draftProps));
 assert.match(html, /aria-label="Gaji negosiasi Freelance Uji"/);
@@ -84,8 +84,12 @@ const partialProps = { ...props, people: [{ ...props.people[0], riwayatGaji: [{ 
 const partialHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, partialProps));
 assert.match(partialHtml, /Catat sisa pembayaran/);
 assert.match(partialHtml, /3\.000\.000/);
-assert.match(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps)), /November 2025/);
-assert.match(html, /Januari 2027/);
+assert.doesNotMatch(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps)), /November 2025/);
+assert.doesNotMatch(html, /Januari 2027/);
+assert.match(html, /Semua bulan kontrak/);
+const octoberHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, month: 10 }));
+assert.doesNotMatch(octoberHtml, /aria-label="Gaji Desember 2026"/);
+assert.match(octoberHtml, /Belum ada jadwal untuk Oktober 2026/);
 assert.match(html, /placeholder="Belum diisi"/);
 assert.match(html, /Dokumen &lt;belum&gt; lengkap/);
 assert.match(html, /Catat pembayaran/);

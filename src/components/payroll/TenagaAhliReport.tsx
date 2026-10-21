@@ -49,7 +49,7 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
       <tbody>{groups.map(item => <Group key={item.key} item={item} />)}{groups.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-faint">Belum ada gaji terisi atau pembayaran tercatat untuk {period}.</td></tr>}</tbody>
       {groups.length > 0 && <tfoot className="border-t border-border bg-surface-subtle font-semibold"><tr><td className="px-3 py-2">Total · {period}</td><td className="px-3 py-2 text-right tabular-nums">{money(summary.gajiTerisi)}</td><td className="px-3 py-2 text-right tabular-nums">{money(summary.dibayar)}</td><td className="px-3 py-2 text-right tabular-nums">{money(summary.pph)}</td><td className="px-3 py-2 text-right tabular-nums">{money(summary.netto)}</td><td className="px-3 py-2 text-right tabular-nums">{summary.balance === null ? "—" : money(summary.balance)}</td></tr></tfoot>}
     </table></div>}
-    <p className="border-t border-border px-4 py-2 text-[11px] text-muted-faint">Gaji terisi mengikuti entitas profil; pembayaran mengikuti entitas pembayar. Angka RAB dan negosiasi tidak dihitung sebagai pembayaran.</p>
+    <p className="border-t border-border px-4 py-2 text-[11px] text-muted-faint">Gaji terisi mengikuti entitas proyek; pembayaran mengikuti entitas pembayar. Angka RAB dan negosiasi tidak dihitung sebagai pembayaran.</p>
   </section>;
 
   function Group({ item }: { item: (typeof groups)[number] }) {

@@ -636,6 +636,7 @@ export function PayrollClient({
   // Master Tenaga Ahli Modal
   const [isMasterAhliModalOpen, setIsMasterAhliModalOpen] = useState(false);
   const [editingMasterAhli, setEditingMasterAhli] = useState<RekananTenagaAhliItem | null>(null);
+  const [masterAhliError, setMasterAhliError] = useState("");
   const [masterAhliNama, setMasterAhliNama] = useState("");
   const [masterAhliNik, setMasterAhliNik] = useState("");
   const [masterAhliPtkp, setMasterAhliPtkp] = useState("TK/0");
@@ -665,6 +666,7 @@ export function PayrollClient({
 
   useEffect(() => {
     if (isMasterAhliModalOpen) {
+      setMasterAhliError("");
       if (editingMasterAhli) {
         setMasterAhliNama(editingMasterAhli.nama || "");
         setMasterAhliNik(editingMasterAhli.nik || "");
@@ -3245,6 +3247,7 @@ export function PayrollClient({
             canEdit={isManager}
             search={searchQuery}
             onAddManual={() => { setEditingMasterAhli(null); setIsMasterAhliModalOpen(true); }}
+            onEdit={person => { setEditingMasterAhli(person); setIsMasterAhliModalOpen(true); }}
           />}
 
           {(["rekap-proyek", "rekap-bulan", "rekap-nama", "konsolidasi"] as string[]).includes(tenagaAhliSubTab) && <TenagaAhliReport
@@ -7084,22 +7087,27 @@ export function PayrollClient({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                setMasterAhliError("");
                 if (masterProyekList.length === 0) {
-                  setErrorMsg("Minimal 1 penugasan proyek wajib diisi.");
+                  setMasterAhliError("Minimal 1 penugasan proyek wajib diisi.");
+                  return;
+                }
+                if (new Set(masterProyekList.map(project => project.projectId)).size !== masterProyekList.length) {
+                  setMasterAhliError("Proyek yang sama tidak boleh ditambahkan lebih dari sekali.");
                   return;
                 }
                 for (let i = 0; i < masterProyekList.length; i++) {
                   const item = masterProyekList[i];
                   if (!item.projectId) {
-                    setErrorMsg(`Kode Proyek pada penugasan #${i + 1} wajib dipilih.`);
+                    setMasterAhliError(`Kode Proyek pada penugasan #${i + 1} wajib dipilih.`);
                     return;
                   }
                   if (!item.tanggalMulaiTugas || !item.tanggalSelesaiTugas) {
-                    setErrorMsg(`Masa tugas (mulai & selesai) pada penugasan #${i + 1} wajib diisi.`);
+                    setMasterAhliError(`Masa tugas (mulai & selesai) pada penugasan #${i + 1} wajib diisi.`);
                     return;
                   }
                   if (item.tanggalSelesaiTugas < item.tanggalMulaiTugas) {
-                    setErrorMsg(`Tanggal selesai tidak boleh lebih awal dari tanggal mulai pada penugasan #${i + 1}.`);
+                    setMasterAhliError(`Tanggal selesai tidak boleh lebih awal dari tanggal mulai pada penugasan #${i + 1}.`);
                     return;
                   }
                 }
@@ -7123,16 +7131,17 @@ export function PayrollClient({
                     }
                     router.refresh();
                   } catch (err: unknown) {
-                    setErrorMsg((err as Error).message);
+                    setMasterAhliError((err as Error).message);
                   }
                 });
               }}
               className="p-5 space-y-4 text-xs overflow-y-auto max-h-[82vh]"
             >
+              {masterAhliError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{masterAhliError}</div>}
               {editingMasterAhli?.id && (
                 <input type="hidden" name="id" value={editingMasterAhli.id} />
               )}
-              <input type="hidden" name="entityId" value={data.entity?.id ?? ""} />
+              <input type="hidden" name="entityId" value={editingMasterAhli ? editingMasterAhli.entityId ?? "" : data.entity?.id ?? ""} />
 
               {!editingMasterAhli?.id && data.allHoldingPegawaiMaster && data.allHoldingPegawaiMaster.length > 0 && (
                 <div>

@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__ . '/../helpers/tenaga-ahli-gaji.php';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 // $segments[0] = 'payroll'
@@ -310,6 +311,11 @@ if ($method === 'GET' && $sub === '') {
 
     // 4. Tenaga Ahli master (rekanan tipe TENAGA_AHLI)
     ensure_tenaga_ahli_tables($pdo);
+    ensure_tenaga_ahli_gaji_table($pdo);
+    $gaji_kontrak_map = [];
+    foreach ($pdo->query('SELECT * FROM TenagaAhliGajiKontrak')->fetchAll(PDO::FETCH_ASSOC) as $kontrak) {
+        $gaji_kontrak_map[$kontrak['rekananId']][$kontrak['projectId']] = tenaga_ahli_gaji_format($kontrak);
+    }
     $stmt = $pdo->prepare(
         "SELECT r.id, r.nama, r.nik, r.npwp, r.kategori, r.ptkp, r.entityId,
                 r.tanggalMulaiTugas, r.tanggalSelesaiTugas, r.projectId,
@@ -334,6 +340,7 @@ if ($method === 'GET' && $sub === '') {
         $placeholders = implode(',', array_fill(0, count($rekanan_ids), '?'));
         $stmt_tap = $pdo->prepare(
             "SELECT tap.*, p.code AS projectCode, p.name AS projectName, p.entityId AS projectEntityId,
+                    p.sidamon_start_date AS spmkMulai, p.sidamon_end_date AS spmkSelesai,
                     COALESCE(e.name, 'Holding / Lainnya') AS projectEntityName
              FROM TenagaAhliProject tap
              JOIN Project p ON tap.projectId = p.id
@@ -382,6 +389,11 @@ if ($method === 'GET' && $sub === '') {
         } else {
             $r['proyekList'] = [];
         }
+
+        foreach ($r['proyekList'] as &$pl_gaji) {
+            $pl_gaji['gajiKontrak'] = $gaji_kontrak_map[$r['id']][$pl_gaji['projectId']] ?? null;
+        }
+        unset($pl_gaji);
 
         // Cek status apakah personil ini adalah Pegawai Tetap di entitas tertentu
         $pgw_info = get_pegawai_tetap_info($r, $pegawai_by_nik, $pegawai_by_name);
@@ -2611,6 +2623,10 @@ elseif ($method === 'POST' && $sub === 'copy-gaji') {
     ]);
 }
 
+elseif ($method === 'POST' && $sub === 'gaji-kontrak' && $sub2 === '') {
+    require __DIR__ . '/payroll-gaji-kontrak.php';
+}
+
 // ─── POST /api/payroll/tenaga-ahli ────────────────────────────────────────────
 elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
     $user = require_auth();
@@ -2695,6 +2711,22 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
             'isTurunLapangan'     => $pl_turun,
             'nominalHonorBulanan' => $pl_honor,
         ];
+    }
+
+    ensure_tenaga_ahli_gaji_table($pdo);
+    // Jangan membuat jadwal dan catatan yang sudah disimpan menjadi tak terjangkau.
+    $stmt_gaji_owner = $pdo->prepare("SELECT id FROM Rekanan WHERE tipe = 'TENAGA_AHLI' AND (id = ? OR nik = ?) LIMIT 1");
+    $stmt_gaji_owner->execute([$id ?? '', $clean_nik]);
+    $gaji_owner = $stmt_gaji_owner->fetchColumn();
+    if ($gaji_owner) {
+        $stmt_protected = $pdo->prepare('SELECT projectId FROM TenagaAhliGajiKontrak WHERE rekananId = ? AND gajiNegosiasi IS NOT NULL');
+        $stmt_protected->execute([$gaji_owner]);
+        $submitted_projects = array_column($validated_proyek_list, 'projectId');
+        foreach ($stmt_protected->fetchAll(PDO::FETCH_COLUMN) as $protected_project) {
+            if (!in_array($protected_project, $submitted_projects, true)) {
+                return error_response('Penugasan dengan gaji negosiasi tersimpan tidak dapat dihapus. Sesuaikan bulan pada halaman gaji tenaga ahli.', 409);
+            }
+        }
     }
 
     // Ambil penugasan pertama untuk backward compatibility pada tabel Rekanan
@@ -2830,6 +2862,13 @@ elseif ($method === 'DELETE' && $sub === 'tenaga-ahli' && $sub2 !== '') {
         return error_response("Tenaga Ahli tidak dapat dihapus karena memiliki $honor_count riwayat pembayaran honor.", 409);
     }
 
+    ensure_tenaga_ahli_gaji_table($pdo);
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM TenagaAhliGajiKontrak WHERE rekananId = ? AND gajiNegosiasi IS NOT NULL');
+    $stmt->execute([$id]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        return error_response('Tenaga ahli memiliki gaji negosiasi dan jadwal bulanan tersimpan sehingga tidak dapat dihapus.', 409);
+    }
+    $pdo->prepare('DELETE FROM TenagaAhliGajiKontrak WHERE rekananId = ?')->execute([$id]);
     $pdo->prepare("DELETE FROM Rekanan WHERE id = ?")->execute([$id]);
     json_response(['success' => true, 'message' => 'Tenaga Ahli berhasil dihapus dari database.']);
 }

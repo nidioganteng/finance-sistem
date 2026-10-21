@@ -93,12 +93,12 @@ for (const dimension of ['proyek', 'nama', 'bulan', 'holding']) {
 for (const dimension of ['proyek', 'nama', 'holding']) {
   const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
   assert.match(html, /Tahun 2026/);
-  assert.match(html, dimension === 'holding' ? /42\.000\.000/ : /34\.000\.000/);
+  assert.match(html, dimension === 'proyek' ? /34\.000\.000/ : /42\.000\.000/);
   assert.match(html, /Gaji terisi/); assert.match(html, /Sudah dibayar/);
   const monthlyHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '', periodScope: 'bulan' }));
   assert.match(monthlyHtml, /Oktober 2026/);
   assert.doesNotMatch(monthlyHtml, /Februari 2026|Maret 2026|Januari 2027/);
-  assert.match(monthlyHtml, dimension === 'holding' ? /22\.000\.000/ : /14\.000\.000/);
+  assert.match(monthlyHtml, dimension === 'proyek' ? /14\.000\.000/ : /22\.000\.000/);
 }
 // A February payment remains in both accumulations when the page month is October.
 const februaryRows = build(people, [feb]).filter(row => row.periode === '2026-02');
@@ -114,4 +114,46 @@ for (const dimension of ['proyek', 'nama']) {
 const yearlyHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: 'bulan', entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
 assert.match(yearlyHtml, /Februari 2026/); assert.match(yearlyHtml, /Maret 2026/); assert.match(yearlyHtml, /Oktober 2026/);
 assert.doesNotMatch(yearlyHtml, /Januari 2027/);
+const multiPeople = [{ id: 'multi', nik: 'multi-nik', nama: 'Ahli Dua Entitas', entityId: 'A', entityName: 'Gaharu', proyekList: [
+  { ...project('gh-001', [salary('2026-02', 10000000)]), projectEntityId: 'A', projectEntityName: 'Gaharu' },
+  { ...project('kn-001', [salary('2026-02', 15000000)]), projectEntityId: 'B', projectEntityName: 'Kencana' },
+] }, { id: 'new', nik: 'new-nik', nama: 'Ahli Belum Digaji', entityId: 'A', proyekList: [
+  { ...project('gh-002', []), projectEntityName: 'Gaharu' },
+] }];
+const multiRows = build(multiPeople, []);
+const allPeople = tracking.groupTenagaAhliPeople(multiRows, multiPeople);
+assert.equal(allPeople.length, 2);
+assert.equal(allPeople.find(item => item.key === 'multi-nik').assignments.length, 2);
+assert.equal(allPeople.find(item => item.key === 'multi-nik').summary.gajiTerisi, 25000000);
+assert.equal(allPeople.find(item => item.key === 'new-nik').summary.gajiTerisi, null);
+for (const [entityId, code, amount] of [['A', 'gh-001', 10000000], ['B', 'kn-001', 15000000]]) {
+  const scoped = tracking.groupTenagaAhliPeople(filter(multiRows, { entityId, year: 2026 }), multiPeople, entityId);
+  const person = scoped.find(item => item.key === 'multi-nik');
+  assert.equal(person.assignments.length, 1);
+  assert.equal(person.assignments[0].projectId, code);
+  assert.equal(person.summary.gajiTerisi, amount);
+}
+const globalHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows: multiRows, people: multiPeople, entities: [{ id: 'A', key: 'gaharu', name: 'Gaharu' }, { id: 'B', key: 'kencana', name: 'Kencana' }], group: 'nama', entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' }));
+assert.match(globalHtml, /Semua entitas/); assert.match(globalHtml, /Ahli Belum Digaji/);
+assert.match(globalHtml, /GH-001/); assert.match(globalHtml, /KN-001/); assert.match(globalHtml, /25\.000\.000/);
+assert.match(globalHtml, /value="B">Kencana/);
+const navigationMocks = { usePathname: () => '/payroll', useSearchParams: () => new URLSearchParams('entity=gaharu') };
+const entityProps = { rows: multiRows, people: multiPeople, entities: [{ id: 'A', key: 'gaharu', name: 'Gaharu' }, { id: 'B', key: 'kencana', name: 'Kencana' }], group: 'nama', entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' };
+const scopedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
+  react: { ...React, useState: initial => React.useState(initial === '' ? 'B' : initial) },
+  '@/lib/tenaga-ahli-tracking': tracking, 'next/navigation': navigationMocks,
+  'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
+}).TenagaAhliReport;
+const scopedHtml = renderToStaticMarkup(React.createElement(scopedReport, entityProps));
+assert.match(scopedHtml, /15\.000\.000/); assert.match(scopedHtml, /KN-001/);
+assert.doesNotMatch(scopedHtml, /GH-001|Ahli Belum Digaji/);
+const expandedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
+  react: { ...React, useState: initial => React.useState(initial === null ? 'multi-nik' : initial) },
+  '@/lib/tenaga-ahli-tracking': tracking, 'next/navigation': navigationMocks,
+  'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
+}).TenagaAhliReport;
+const expandedHtml = renderToStaticMarkup(React.createElement(expandedReport, entityProps));
+assert.match(expandedHtml, /entity=kencana[^" ]*proyekAhliId=kn-001/);
+assert.match(expandedHtml, /entity=gaharu[^" ]*proyekAhliId=gh-001/);
+assert.equal(tracking.groupTenagaAhliPeople([], multiPeople, undefined, 'tidak cocok').length, 0);
 console.log('Lulus: total semua rekap konsisten, dua bulan/parsial, edit gaji terbaru, entitas/tahun, gaji belum dibayar, deduplikasi, dan tracking Oktober hanya Oktober.');

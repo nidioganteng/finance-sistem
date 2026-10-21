@@ -10,8 +10,8 @@ import {
   type GajiTenagaAhliBulan, type ReferensiGajiTenagaAhli, type GajiTenagaAhliKontrak,
 } from "@/lib/tenaga-ahli-gaji";
 
-const inputClass = "w-full rounded-lg border border-border bg-surface-card px-3 py-2 text-sm text-foreground disabled:opacity-60";
-const buttonClass = "inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50 hover:bg-surface-hover";
+const inputClass = "h-8 w-full rounded-lg border border-border bg-surface-card px-2.5 py-1.5 text-xs leading-5 text-foreground disabled:opacity-60";
+const buttonClass = "inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50 hover:bg-surface-hover";
 const rp = (value: number | null | undefined) => value == null ? "Belum tersedia" : new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 const monthLabel = (value: string) => new Date(`${value}-01T12:00:00`).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 const dateLabel = (value: string | null) => value ? value.split("-").reverse().join("/") : "Belum tersedia";
@@ -224,62 +224,69 @@ function DetailGaji({ person, project, canEdit, onBack, onRecord, onSaved }: {
     if (rows.length >= 600) { setError("Maksimal 600 bulan."); return; }
     setRows([...rows, { bulan: month, nominal: null, catatan: "" }].sort((a, b) => a.bulan.localeCompare(b.bulan))); setNewMonth(""); changed();
   }
-  return <section className="space-y-5">
-    <button className={buttonClass} disabled={pending} onClick={() => { if (!dirty || window.confirm("Ada perubahan belum disimpan. Kembali dan abaikan perubahan?")) onBack(); }}><ArrowLeft size={14} />Daftar tenaga ahli</button>
-    <header className="rounded-2xl border border-border bg-surface-card p-5">
-      <p className="text-xs text-muted-faint mb-1">Pengisian Gaji & Negosiasi / Tindak lanjut</p><h2 className="text-lg font-bold text-navy-text">{person.nama}</h2><p className="text-sm text-muted-faint mt-1">{project.projectCode} · {project.projectName}</p><p className="text-xs text-muted-faint mt-2">NIK: {person.nik || "—"} · NPWP: {person.npwp || "—"} · PTKP: {person.ptkp || "—"}</p>
-    </header>
-    <div className="grid sm:grid-cols-3 gap-3">
-      <div className="rounded-xl border border-border bg-surface-card p-4"><p className="text-xs text-muted-faint">Total gaji terisi (bruto)</p><p className="font-bold text-lg mt-2">{summary.totalGaji === null ? "Belum diisi" : rp(summary.totalGaji)}</p><p className="text-xs text-muted-faint mt-1">{summary.terisi}/{summary.jumlahBulan} bulan diisi</p></div>
-      <div className="rounded-xl border border-border bg-surface-card p-4"><p className="text-xs text-muted-faint">Sudah dibayar (bruto)</p><p className="font-bold text-lg text-emerald-700 dark:text-emerald-300 mt-2">{rp(summary.dibayar)}</p><p className="text-xs text-muted-faint mt-1">Netto: {rp(summary.dibayarNetto)} · seluruh riwayat proyek</p></div>
-      <div className="rounded-xl border border-border bg-surface-card p-4"><p className="text-xs text-muted-faint">Balance = gaji terisi − sudah dibayar</p><p className={`font-bold text-lg mt-2 ${summary.balance !== null && summary.balance < 0 ? "text-rose-600" : ""}`}>{summary.balance === null ? "Menunggu input gaji" : rp(summary.balance)}</p><p className="text-xs text-muted-faint mt-1">{summary.lengkap ? "Semua bulan sudah diisi" : "Balance sementara sampai semua bulan diisi"}{dirty ? " · Perubahan belum disimpan" : ""}</p></div>
+  return <section className="space-y-3">
+    <div className="flex flex-wrap items-center gap-3">
+      <button className={buttonClass} disabled={pending} onClick={() => { if (!dirty || window.confirm("Ada perubahan belum disimpan. Kembali dan abaikan perubahan?")) onBack(); }}><ArrowLeft size={13} />Daftar tenaga ahli</button>
+      <span className="text-xs text-muted-faint">Pengisian Gaji & Negosiasi / Tindak lanjut</span>
     </div>
-    {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 text-rose-800 p-3 text-sm">{error}{error.includes("Muat ulang") && <button className="ml-2 underline" onClick={() => { if (!dirty || window.confirm("Muat ulang dan abaikan perubahan yang belum tersimpan?")) window.location.reload(); }}>Muat ulang data</button>}</div>}
-    {success && <div role="status" className="rounded-lg bg-emerald-50 text-emerald-800 p-3 text-sm">{success}</div>}
-    <form onSubmit={event => { event.preventDefault(); save(); }} className="rounded-2xl border border-border bg-surface-card p-5 space-y-4">
-      <h3 className="font-bold text-navy-text">{manual ? "Referensi kontrak manual" : "Referensi kontrak dari Sidamon"}</h3>
-      <p className="text-xs text-muted-faint">{manual ? "Untuk testing sebelum sinkronisasi, isi referensi pekerjaan, RAB, dan SPMK di sini." : "Referensi mengikuti Sidamon. Penyesuaian bulan dan nominal gaji disimpan di Simatra."}</p>
-      <fieldset disabled={!canEdit || pending || !manual} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <header className="rounded-xl border border-border bg-surface-card px-4 py-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h2 className="text-base font-bold text-navy-text">{person.nama}</h2><p className="text-xs text-muted-faint">{project.projectCode} · {project.projectName}</p></div>
+      <p className="mt-1 text-[11px] text-muted-faint">NIK: {person.nik || "—"} · NPWP: {person.npwp || "—"} · PTKP: {person.ptkp || "—"}</p>
+      <dl className="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-3 sm:divide-x sm:divide-border">
+        <div><dt className="text-[11px] text-muted-faint">Gaji terisi (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{summary.totalGaji === null ? "Belum diisi" : rp(summary.totalGaji)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">{summary.terisi}/{summary.jumlahBulan} bulan diisi</p></div>
+        <div className="sm:pl-4"><dt className="text-[11px] text-muted-faint">Sudah dibayar (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">Netto {rp(summary.dibayarNetto)} · seluruh riwayat proyek</p></div>
+        <div className="sm:pl-4"><dt title="Gaji terisi dikurangi pembayaran bruto" className="text-[11px] text-muted-faint">Balance gaji terisi</dt><dd className={`mt-0.5 text-base font-bold tabular-nums ${summary.balance !== null && summary.balance < 0 ? "text-rose-600" : ""}`}>{summary.balance === null ? "Menunggu input gaji" : rp(summary.balance)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">{summary.lengkap ? "Semua bulan terisi" : "Sementara · belum semua bulan terisi"}{dirty ? " · Belum disimpan" : ""}</p></div>
+      </dl>
+    </header>
+    {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 text-rose-800 px-3 py-2 text-xs">{error}{error.includes("Muat ulang") && <button className="ml-2 underline" onClick={() => { if (!dirty || window.confirm("Muat ulang dan abaikan perubahan yang belum tersimpan?")) window.location.reload(); }}>Muat ulang data</button>}</div>}
+    {success && <div role="status" className="rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 text-xs">{success}</div>}
+    <details open={!ready} className="rounded-xl border border-border bg-surface-card">
+      <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-navy-text">
+        Kontrak & negosiasi <span className="ml-2 font-normal text-muted-faint">{manual ? "Manual" : "Sidamon"} · {ref.manMonth ?? "—"} MM · RAB {rp(ref.gajiRab)} · Negosiasi {rp(negosiasi)}{basis === "BULAN" ? " / bulan" : " / kontrak"}</span>
+      </summary>
+      <form onSubmit={event => { event.preventDefault(); save(); }} className="border-t border-border px-4 py-3 space-y-3">
+      <fieldset disabled={!canEdit || pending || !manual} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <label className="text-xs space-y-1"><span>Nama pekerjaan</span><input className={inputClass} maxLength={255} value={ref.namaPekerjaan || ""} onChange={e => changeRef("namaPekerjaan", e.target.value || null)} /></label>
         <label className="text-xs space-y-1"><span>Menman (MM)</span><input className={inputClass} type="number" min="0" max="99999999.99" step="0.01" value={ref.manMonth ?? ""} onChange={e => changeRef("manMonth", e.target.value === "" ? null : Number(e.target.value))} /></label>
         <label className="text-xs space-y-1"><span>Gaji RAB (Rp)</span><RupiahInput aria-label="Gaji RAB" value={ref.gajiRab} onValueChange={value => changeRef("gajiRab", value)} /></label>
         <label className="text-xs space-y-1"><span>Mulai SPMK</span><input className={inputClass} type="date" min="2000-01-01" max="2199-12-31" value={ref.spmkMulai || ""} onChange={e => changeRef("spmkMulai", e.target.value || null)} /></label>
         <label className="text-xs space-y-1"><span>Selesai SPMK</span><input className={inputClass} type="date" min="2000-01-01" max="2199-12-31" value={ref.spmkSelesai || ""} onChange={e => changeRef("spmkSelesai", e.target.value || null)} /></label>
       </fieldset>
-      <div className="border-t border-border pt-4 grid sm:grid-cols-2 gap-4">
+      <div className="border-t border-border pt-3 grid sm:grid-cols-2 gap-3">
         <label className="text-xs space-y-1"><span className="font-semibold">Gaji negosiasi (Rp)</span><RupiahInput aria-label="Gaji negosiasi" required min={0.01} disabled={!canEdit || pending} value={negosiasi} onValueChange={value => { setNegosiasi(value); changed(); }} /></label>
         <label className="text-xs space-y-1"><span>Basis gaji negosiasi</span><select className={inputClass} disabled={!canEdit || pending} value={basis} onChange={e => { setBasis(e.target.value as "BULAN" | "KONTRAK"); changed(); }}><option value="BULAN">Per bulan</option><option value="KONTRAK">Total kontrak</option></select></label>
       </div>
       {!ready && <p className="text-xs text-muted-faint">{rows.length} bulan mengikuti SPMK. Nominal bulanan tetap kosong dan diisi manual setelah negosiasi disimpan. Isi periode mulai dan selesai agar daftar bulan terbentuk.</p>}
       {canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} type="submit"><Save size={14} />{pending ? "Menyimpan…" : ready ? "Simpan perubahan" : "Simpan negosiasi & lanjut"}</button>}
-    </form>
-    {(ready || !canEdit) && <div className="rounded-2xl border border-border bg-surface-card overflow-hidden">
-      <div className="p-5 space-y-3 border-b border-border">
-        <h3 className="font-bold text-navy-text">Gaji per bulan</h3><p className="text-xs text-muted-faint">Acuan SPMK: {dateLabel(ref.spmkMulai)} – {dateLabel(ref.spmkSelesai)}. Tambah atau kurangi bulan sesuai pekerjaan aktual.</p>
-        {noteCount > 0 && <button onClick={() => setOnlyNotes(!onlyNotes)} className="flex items-center gap-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 px-3 py-2 text-xs font-semibold" aria-pressed={onlyNotes}><AlertTriangle size={16} />{noteCount} bulan ada kendala · {onlyNotes ? "Tampilkan semua bulan" : "Tampilkan yang ada catatan"}</button>}
-        {canEdit && <div className="flex flex-wrap items-center gap-2"><label className="text-xs">Tambah bulan<input aria-label="Bulan tambahan" type="month" min="2000-01" max="2199-12" disabled={pending} value={newMonth} onChange={e => setNewMonth(e.target.value)} className={`${inputClass} ml-2 !w-auto`} /></label><button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={14} />{newMonth ? "Tambah bulan" : "Tambah bulan berikutnya"}</button></div>}
+      </form>
+    </details>
+    {(ready || !canEdit) && <div className="rounded-xl border border-border bg-surface-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
+        <div><h3 className="text-sm font-semibold text-navy-text">Gaji per bulan <span className="ml-2 text-[11px] font-normal text-muted-faint">SPMK {dateLabel(ref.spmkMulai)} – {dateLabel(ref.spmkSelesai)}</span></h3></div>
+        <div className="flex flex-wrap items-center gap-2">
+          {noteCount > 0 && <button onClick={() => setOnlyNotes(!onlyNotes)} className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" aria-pressed={onlyNotes}><AlertTriangle size={13} />{noteCount} kendala · {onlyNotes ? "Semua bulan" : "Filter catatan"}</button>}
+          {canEdit && <><input aria-label="Bulan tambahan" type="month" min="2000-01" max="2199-12" disabled={pending} value={newMonth} onChange={e => setNewMonth(e.target.value)} className={`${inputClass} !w-auto`} /><button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />{newMonth ? "Tambah bulan" : "Bulan berikutnya"}</button></>}
+        </div>
       </div>
-      <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Bulan</th><th className="p-4 min-w-[180px]">Gaji (Rp)</th><th className="p-4 min-w-[260px]">Catatan kendala</th><th className="p-4">Pembayaran</th>{canEdit && <th className="p-4">Kurangi bulan</th>}</tr></thead><tbody>
+      <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
         {rows.filter(row => !onlyNotes || row.catatan.trim()).map(row => {
           const history = person.riwayatGaji?.filter(item => item.projectId === project.projectId && `${item.tahun}-${String(item.bulan).padStart(2, "0")}` === row.bulan) || [];
           const paid = history.reduce((sum, item) => sum + item.nominalHonor, 0);
           const remaining = row.nominal === null ? null : row.nominal - paid;
           return <tr key={row.bulan} className={`border-t border-border ${row.catatan.trim() ? "bg-amber-50/50 dark:bg-amber-950/10" : ""}`}>
-            <td className="p-4 align-top font-semibold whitespace-nowrap">{monthLabel(row.bulan)}{(ref.spmkMulai && row.bulan < ref.spmkMulai.slice(0, 7)) || (ref.spmkSelesai && row.bulan > ref.spmkSelesai.slice(0, 7)) ? <div className="text-xs text-muted-faint font-normal mt-1">Di luar periode SPMK</div> : null}</td>
-            <td className="p-4 align-top"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value } : item)); changed(); }} /></td>
-            <td className="p-4 align-top"><textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={inputClass} rows={2} maxLength={1000} disabled={!canEdit || pending} placeholder="Alasan penyesuaian / kendala gaji…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />{row.catatan.trim() && <details className="mt-1 text-xs text-amber-800 dark:text-amber-200"><summary className="cursor-pointer font-semibold"><AlertTriangle size={13} className="inline mr-1" />Ada kendala · lihat catatan</summary><p className="mt-2 whitespace-pre-wrap break-words">{row.catatan}</p></details>}</td>
-            <td className="p-4 align-top text-xs"><div className="space-y-2">
-              {history.length ? <div><span className="text-emerald-700 dark:text-emerald-300">Sudah dibayar / tercatat di payroll</span><div className="mt-1 font-mono">{rp(paid)}</div></div> : <span className="text-muted-faint">Belum ada pembayaran</span>}
-              <div className={remaining !== null && remaining < 0 ? "text-rose-600" : "text-muted-faint"}>Balance bulan ini: {remaining === null ? "Menunggu input gaji" : rp(remaining)}</div>
+            <td className="px-3 py-2 align-middle font-semibold whitespace-nowrap">{monthLabel(row.bulan)}{(ref.spmkMulai && row.bulan < ref.spmkMulai.slice(0, 7)) || (ref.spmkSelesai && row.bulan > ref.spmkSelesai.slice(0, 7)) ? <div className="text-xs text-muted-faint font-normal mt-1">Di luar periode SPMK</div> : null}</td>
+            <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value } : item)); changed(); }} /></td>
+            <td className="px-3 py-2 align-middle"><textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={`${inputClass} resize-y !py-1 focus:h-16`} rows={1} maxLength={1000} disabled={!canEdit || pending} placeholder="Catatan kendala…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />{row.catatan.trim() && <details className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200"><summary className="cursor-pointer font-semibold"><AlertTriangle size={13} className="inline mr-1" />Ada kendala</summary><p className="mt-2 whitespace-pre-wrap break-words">{row.catatan}</p></details>}</td>
+            <td className="px-3 py-2 align-middle text-xs"><div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className={history.length ? "font-medium tabular-nums text-emerald-700 dark:text-emerald-300" : "text-muted-faint"}>{history.length ? `${rp(paid)} dibayar` : "Belum dibayar"}</span>
               {canEdit && remaining !== null && remaining > 0 && <button className={buttonClass} disabled={pending || dirty} title={dirty ? "Simpan perubahan terlebih dahulu" : "Buka form pembayaran dan pajak"} onClick={() => onRecord({ ...row, nominal: remaining })}>{history.length ? "Catat sisa pembayaran" : "Catat pembayaran"}</button>}
-            </div></td>
-            {canEdit && <td className="p-4 align-top"><button className={`${buttonClass} text-rose-600`} disabled={pending || history.length > 0} title={history.length ? "Bulan dengan riwayat pembayaran tidak dapat dihapus dari jadwal" : `Hapus ${monthLabel(row.bulan)}`} aria-label={`Hapus ${monthLabel(row.bulan)}`} onClick={() => { if (window.confirm(`Hapus ${monthLabel(row.bulan)} dari jadwal?${row.nominal !== null || row.catatan ? " Nominal dan catatan bulan ini akan dihapus saat disimpan." : ""}`)) { setRows(rows.filter(item => item.bulan !== row.bulan)); changed(); } }}><Trash2 size={14} /></button></td>}
+            </div>{history.length > 0 && remaining !== null && <div className={`mt-0.5 text-[11px] ${remaining < 0 ? "text-rose-600" : "text-muted-faint"}`}>Sisa {rp(remaining)}</div>}</td>
+            {canEdit && <td className="px-3 py-2 align-middle"><button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-faint hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" disabled={pending || history.length > 0} title={history.length ? "Bulan dengan riwayat pembayaran tidak dapat dihapus dari jadwal" : `Hapus ${monthLabel(row.bulan)}`} aria-label={`Hapus ${monthLabel(row.bulan)}`} onClick={() => { if (window.confirm(`Hapus ${monthLabel(row.bulan)} dari jadwal?${row.nominal !== null || row.catatan ? " Nominal dan catatan bulan ini akan dihapus saat disimpan." : ""}`)) { setRows(rows.filter(item => item.bulan !== row.bulan)); changed(); } }}><Trash2 size={14} /></button></td>}
           </tr>;
         })}
         {rows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-muted-faint text-center">Belum ada bulan. Tambahkan bulan sesuai periode kerja.</td></tr>}
       </tbody></table></div>
-      <div className="p-5 border-t border-border flex flex-wrap justify-between gap-3 items-center"><p className="text-xs text-muted-faint">{rows.length} bulan · Total gaji diisi: {rp(rows.reduce((sum, row) => sum + (row.nominal || 0), 0))}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}</p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending || !dirty} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji bulanan"}</button>}</div>
-      <p className="px-5 pb-5 text-xs text-muted-faint">Input gaji menyimpan jadwal dan catatan. Gunakan “Catat pembayaran” untuk mencatat honor beserta pajaknya ke payroll.</p>
+      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{rows.length} bulan · Total gaji diisi: {rp(rows.reduce((sum, row) => sum + (row.nominal || 0), 0))}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}</p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending || !dirty} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji bulanan"}</button>}</div>
     </div>}
   </section>;
 }

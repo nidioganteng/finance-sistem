@@ -1,5 +1,5 @@
 <?php
-// php tests/tenaga-ahli-gaji.php — tanpa koneksi database atau data pribadi.
+// php tests/tenaga-ahli-gaji.php — hanya SQLite in-memory, tanpa database aplikasi/data pribadi.
 define('APP_ENTRY', true);
 require __DIR__ . '/../api/helpers/tenaga-ahli-gaji.php';
 
@@ -40,4 +40,31 @@ check($stored['revision'], 4, 'revision integer');
 check($stored['gajiRab'], 7500000.0, 'decimal menjadi angka');
 check($stored['gajiNegosiasi'], null, 'negosiasi belum disimpan');
 check(json_encode($stored['jadwal']), json_encode($rows), 'jadwal dan catatan tidak berubah saat decode');
+
+// Regresi skema sebelum integrasi Sidamon: jalankan query route sesungguhnya
+// pada Project yang tidak mempunyai kolom sidamon_start_date/sidamon_end_date.
+$db = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$db->exec("CREATE TABLE Project (id TEXT, code TEXT, name TEXT, entityId TEXT);
+    CREATE TABLE Entity (id TEXT, name TEXT);
+    CREATE TABLE Rekanan (id TEXT, nama TEXT, entityId TEXT, tipe TEXT, projectId TEXT);
+    CREATE TABLE TenagaAhliProject (id TEXT, rekananId TEXT, projectId TEXT,
+        tanggalMulaiTugas TEXT, tanggalSelesaiTugas TEXT, createdAt TEXT);
+    INSERT INTO Project VALUES ('project-test', 'TEST', 'Proyek Uji', 'entity-test');
+    INSERT INTO Entity VALUES ('entity-test', 'Entitas Uji');
+    INSERT INTO Rekanan VALUES ('person-test', 'Tenaga Ahli Uji', 'entity-test', 'TENAGA_AHLI', 'project-test');
+    INSERT INTO TenagaAhliProject VALUES ('tap-test', 'person-test', 'project-test', '2026-10-01', '2026-12-31', '2026-10-01');");
+$route = file_get_contents(__DIR__ . '/../api/routes/payroll.php');
+if (!preg_match('/"(SELECT tap\.\*.*?)"/s', $route, $match)) throw new RuntimeException('Query daftar penugasan tidak ditemukan.');
+$query = $db->prepare(str_replace('$placeholders', '?', $match[1]));
+$query->execute(['person-test']);
+$assignment = $query->fetch(PDO::FETCH_ASSOC);
+check($assignment['projectName'], 'Proyek Uji', 'daftar payroll tanpa kolom Sidamon');
+check($assignment['tanggalMulaiTugas'], '2026-10-01', 'tanggal penugasan manual tersedia');
+$route = file_get_contents(__DIR__ . '/../api/routes/payroll-gaji-kontrak.php');
+if (!preg_match('/"(SELECT r\.nama.*?)"/s', $route, $match)) throw new RuntimeException('Query validasi penugasan tidak ditemukan.');
+$query = $db->prepare($match[1]);
+$query->execute(['project-test', 'person-test']);
+check($query->fetch(PDO::FETCH_ASSOC)['projectEntityId'], 'entity-test', 'validasi penyimpanan negosiasi tanpa kolom Sidamon');
+$query->execute(['project-lain', 'person-test']);
+check($query->fetch(PDO::FETCH_ASSOC), false, 'proyek tanpa penugasan tidak diterima');
 echo "$checks pemeriksaan validasi PHP lulus.\n";

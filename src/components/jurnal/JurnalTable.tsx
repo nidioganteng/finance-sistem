@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { Pencil, Check, X, CalendarDays, Receipt } from "lucide-react";
 import { updateKodeAkunJurnal, updateProyekJurnal, updateAkrualJurnal } from "@/lib/actions/jurnal";

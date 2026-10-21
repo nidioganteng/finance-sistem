@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { TerminStatus } from "@/types/app-enums";
 import { auditTermin, updateTerminStatus, cancelProject, completeProject, reopenProject } from "@/lib/actions/piutang";

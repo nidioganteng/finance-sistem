@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { Check, X, UserCheck, UserX, ShieldCheck, Building2, Clock, Users } from "lucide-react";
 import { approveUser, rejectUser, updateUserEntities, deactivateUser, activateUser } from "@/lib/actions/pengguna";

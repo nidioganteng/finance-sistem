@@ -7,13 +7,13 @@ CREATE TABLE Entity (id TEXT PRIMARY KEY, name TEXT);
 CREATE TABLE Project (id TEXT PRIMARY KEY, code TEXT, name TEXT, entityId TEXT);
 CREATE TABLE Rekanan (id TEXT PRIMARY KEY, nama TEXT, nik TEXT, npwp TEXT, tipe TEXT, kategori TEXT, ptkp TEXT, entityId TEXT, projectId TEXT, tanggalMulaiTugas TEXT, tanggalSelesaiTugas TEXT, isTurunLapangan INTEGER, nominalHonorBulanan REAL, createdAt TEXT, updatedAt TEXT);
 CREATE TABLE TenagaAhliProject (id TEXT PRIMARY KEY, rekananId TEXT, projectId TEXT REFERENCES Project(id), tanggalMulaiTugas TEXT, tanggalSelesaiTugas TEXT, isTurunLapangan INTEGER, nominalHonorBulanan REAL, createdAt TEXT, updatedAt TEXT, UNIQUE(rekananId, projectId));
-CREATE TABLE TenagaAhliGajiKontrak (rekananId TEXT, projectId TEXT, gajiNegosiasi REAL);
+CREATE TABLE TenagaAhliGajiKontrak (id TEXT PRIMARY KEY, rekananId TEXT, projectId TEXT, sumber TEXT DEFAULT 'MANUAL', namaPekerjaan TEXT, manMonth REAL, gajiRab REAL, spmkMulai TEXT, spmkSelesai TEXT, gajiNegosiasi REAL, revision INTEGER DEFAULT 0, jadwalJson TEXT);
 CREATE TABLE HonorTenagaAhli (id TEXT PRIMARY KEY, rekananId TEXT, nik TEXT, nominalHonor REAL);
 INSERT INTO Entity VALUES ('gaharu','Gaharu'),('kencana','Kencana');
 INSERT INTO Project VALUES ('A','GH-001','Proyek Gaharu','gaharu'),('B','KN-001','Proyek Kencana','kencana');
 INSERT INTO Rekanan (id,nama,nik,tipe,entityId,projectId) VALUES ('p1','Nama Lama','1111111111111111','TENAGA_AHLI','gaharu','A'),('p2','Orang Lain','3333333333333333','TENAGA_AHLI','kencana','B');
 INSERT INTO TenagaAhliProject (id,rekananId,projectId) VALUES ('old-assignment','p1','A');
-INSERT INTO TenagaAhliGajiKontrak VALUES ('p1','A',35000000);
+INSERT INTO TenagaAhliGajiKontrak (id,rekananId,projectId,gajiNegosiasi,namaPekerjaan,manMonth,jadwalJson) VALUES ('c1','p1','A',35000000,'Pekerjaan Tersimpan',8,'[]');
 INSERT INTO HonorTenagaAhli VALUES ('legacy',NULL,'1111111111111111',10000000);");
 class MasterResponse extends RuntimeException {
     public function __construct(public array $payload, public int $status) { parent::__construct('Response'); }
@@ -56,7 +56,7 @@ verify((int)$pdo->query('SELECT COUNT(*) FROM Rekanan')->fetchColumn(),2,'tidak 
 $person=$pdo->query("SELECT * FROM Rekanan WHERE id='p1'")->fetch();
 verify([$person['nama'],$person['nik'],$person['npwp'],$person['ptkp'],$person['entityId']],['Nama Diperbaiki','2222222222222222','NPWP-UJI','K/1','gaharu'],'perbaikan data diri dan entitas profil');
 verify($pdo->query("SELECT projectId FROM TenagaAhliProject WHERE rekananId='p1' ORDER BY projectId")->fetchAll(PDO::FETCH_COLUMN),['A','B'],'proyek lama dan baru tersimpan');
-verify((float)$pdo->query('SELECT gajiNegosiasi FROM TenagaAhliGajiKontrak')->fetchColumn(),35000000.0,'negosiasi tidak berubah');
+verify((float)$pdo->query('SELECT gajiNegosiasi FROM TenagaAhliGajiKontrak WHERE id=\'c1\'')->fetchColumn(),35000000.0,'negosiasi tidak berubah');
 $history=$pdo->query("SELECT * FROM HonorTenagaAhli WHERE id='legacy'")->fetch();
 verify([$history['rekananId'],$history['nik'],(float)$history['nominalHonor']],['p1','1111111111111111',10000000.0],'koreksi NIK menjaga tautan riwayat dan nominal pembayaran');
 verify(save_master(array_merge($body,['nik'=>'3333333333333333']))->status,409,'NIK tenaga ahli lain ditolak');
@@ -64,6 +64,18 @@ verify(save_master(array_merge($body,['id'=>'missing']))->status,404,'ID tidak d
 verify(save_master(array_merge($body,['proyekList'=>[$assignment('A'),$assignment('A')]]))->status,400,'proyek duplikat ditolak');
 verify(save_master(array_merge($body,['proyekList'=>[$assignment('A'),$assignment('missing')]]))->status,404,'proyek tidak ditemukan ditolak');
 verify(save_master(array_merge($body,['proyekList'=>[$assignment('B')]]))->status,409,'proyek dengan negosiasi tidak boleh dihilangkan');
+$reference_body = $body;
+$reference_body['proyekList'][0]['namaPekerjaan'] = 'Pekerjaan Diperbaiki';
+$reference_body['proyekList'][0]['manMonth'] = 4;
+$reference_body['proyekList'][0]['nominalHonorBulanan'] = 45000000;
+verify(save_master($reference_body)->status,200,'referensi kontrak diedit dari master');
+$reference=$pdo->query("SELECT * FROM TenagaAhliGajiKontrak WHERE id='c1'")->fetch();
+verify([$reference['namaPekerjaan'],(float)$reference['manMonth'],(float)$reference['gajiRab'],$reference['spmkMulai'],$reference['spmkSelesai']],['Pekerjaan Diperbaiki',4.0,45000000.0,'2026-02-01','2026-10-31'],'nama pekerjaan, menman, RAB dan SPMK tersinkron');
+verify([(float)$reference['gajiNegosiasi'],$reference['jadwalJson']],[35000000.0,'[]'],'referensi tidak mengubah negosiasi atau jadwal');
+verify(save_master(array_replace_recursive($reference_body,['proyekList'=>[0=>['manMonth'=>-1]]]))->status,400,'menman negatif ditolak');
+$pdo->exec("UPDATE TenagaAhliGajiKontrak SET sumber='SIDAMON' WHERE id='c1'");
+verify(save_master($body)->status,200,'profil Sidamon tetap dapat diedit tanpa menimpa referensi');
+verify((float)$pdo->query("SELECT gajiRab FROM TenagaAhliGajiKontrak WHERE id='c1'")->fetchColumn(),45000000.0,'referensi Sidamon tidak ditimpa master');
 $pdo->exec("INSERT INTO HonorTenagaAhli VALUES ('legacy-second',NULL,'2222222222222222',100);
 CREATE TRIGGER fail_project_insert BEFORE INSERT ON TenagaAhliProject WHEN NEW.projectId='B' BEGIN SELECT RAISE(ABORT,'fixture failure'); END");
 try {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type InputHTMLAttributes } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Pencil, Plus, Save, Trash2, UserPlus } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
 import { saveGajiTenagaAhliKontrakAction } from "@/lib/actions/payroll";
 import {
@@ -78,7 +78,7 @@ function jadwalPenugasan(person: RekananTenagaAhliItem, project: TenagaAhliProje
   return [...byMonth.values()].sort((a, b) => a.bulan.localeCompare(b.bulan));
 }
 
-export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual }: {
+export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual, onEdit }: {
   people: RekananTenagaAhliItem[];
   entityId?: string;
   year: number;
@@ -86,6 +86,7 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
   canEdit: boolean;
   search: string;
   onAddManual: () => void;
+  onEdit: (person: RekananTenagaAhliItem) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -111,7 +112,7 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
   }
   if (personId) {
     if (!selected) return <div className="rounded-xl border border-border bg-surface-card p-6 space-y-3"><p>Penugasan tenaga ahli tidak ditemukan pada entitas ini.</p><button className={buttonClass} onClick={() => navigate()}>Kembali ke daftar</button></div>;
-    return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} />;
+    return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} onEdit={() => onEdit(selected.person)} />;
   }
   const filtered = available.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
   const warningCount = available.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
@@ -123,16 +124,16 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
     {warningCount > 0 && <div role="status" className="m-5 flex gap-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 p-3 text-sm"><AlertTriangle size={18} className="shrink-0" />{warningCount} bulan memiliki catatan kendala. Buka rincian tenaga ahli untuk memeriksa alasannya.</div>}
     <div className="overflow-x-auto"><table className="w-full text-sm text-left">
       <thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Tenaga ahli / data diri</th><th className="p-4">Nama pekerjaan / proyek</th><th className="p-4">Menman / Gaji RAB</th><th className="p-4 min-w-[180px]">Gaji negosiasi</th><th className="p-4">Gaji & pembayaran (bruto)</th><th className="p-4">Tindak lanjut</th></tr></thead>
-      <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
+      <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} onEdit={() => onEdit(person)} />)}
         {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan tenaga ahli secara manual beserta penugasan proyeknya."}</td></tr>}
       </tbody>
     </table></div>
   </section>;
 }
 
-function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNavigate }: {
+function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNavigate, onEdit }: {
   person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; year: number; month?: number; canEdit: boolean;
-  onSaved: (contract: GajiTenagaAhliKontrak) => void; onNavigate: () => void;
+  onSaved: (contract: GajiTenagaAhliKontrak) => void; onNavigate: () => void; onEdit: () => void;
 }) {
   const router = useRouter();
   const contract = project.gajiKontrak;
@@ -159,7 +160,7 @@ function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNaviga
     });
   }
   return <tr className="border-t border-border align-top">
-    <td className="p-4"><div className="font-semibold text-navy-text">{person.nama}</div><div className="text-xs text-muted-faint mt-1">NIK: {person.nik || "—"}<br />NPWP: {person.npwp || "—"}</div><div className="mt-1 text-xs text-muted-faint">Terdaftar: {person.entityName || "—"}</div></td>
+    <td className="p-4"><div className="font-semibold text-navy-text">{person.nama}</div><div className="text-xs text-muted-faint mt-1">NIK: {person.nik || "—"}<br />NPWP: {person.npwp || "—"}</div><div className="mt-1 text-xs text-muted-faint">Terdaftar: {person.entityName || "—"}</div>{canEdit && <button className={`${buttonClass} mt-2 text-xs`} disabled={pending} onClick={onEdit}><Pencil size={12} />Edit data & proyek</button>}</td>
     <td className="p-4"><div className="font-medium">{ref.namaPekerjaan || "Belum diisi"}</div><div className="text-xs text-muted-faint mt-1">{project.projectCode} · {project.projectName}</div><div className="text-xs mt-1">Entitas proyek: {project.projectEntityName || "—"}</div><span className="text-xs text-muted-faint">{contract?.sumber === "SIDAMON" ? "Sidamon" : "Input manual"}</span></td>
     <td className="p-4 whitespace-nowrap"><div>{ref.manMonth === null ? "Menman belum diisi" : `${ref.manMonth} MM`}</div><div className="font-mono mt-2">{rp(ref.gajiRab)}</div><div className="text-xs text-muted-faint">Gaji RAB</div></td>
     <td className="p-4">{canEdit && editing ? <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-2">
@@ -174,9 +175,9 @@ function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNaviga
   </tr>;
 }
 
-function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: {
+function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved, onEdit }: {
   person: RekananTenagaAhliItem; project: TenagaAhliProjectAssignment; year: number; month: number; canEdit: boolean;
-  onBack: () => void; onSaved: (contract: GajiTenagaAhliKontrak) => void;
+  onBack: () => void; onSaved: (contract: GajiTenagaAhliKontrak) => void; onEdit: () => void;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState(project.gajiKontrak);
@@ -249,6 +250,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
     <div className="flex flex-wrap items-center gap-3">
       <button className={buttonClass} disabled={pending} onClick={() => { if (!dirty || window.confirm("Ada perubahan belum disimpan. Kembali dan abaikan perubahan?")) onBack(); }}><ArrowLeft size={13} />Daftar tenaga ahli</button>
       <span className="text-xs text-muted-faint">Pengisian Gaji & Negosiasi / Tindak lanjut</span>
+      {canEdit && <button className={`${buttonClass} ml-auto`} disabled={pending} onClick={onEdit}><Pencil size={13} />Edit data & proyek</button>}
     </div>
     <header className="rounded-xl border border-border bg-surface-card px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h2 className="text-base font-bold text-navy-text">{person.nama}</h2><p className="text-xs text-muted-faint">{project.projectCode} · {project.projectName}</p></div>

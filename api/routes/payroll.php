@@ -169,6 +169,17 @@ function is_tenaga_ahli_eligible_for_month(array $ta, int $year, int $month, boo
         return false;
     }
 
+    if (isset($ta['gajiKontrak']['jadwal'])) {
+        $period = sprintf('%04d-%02d', $year, $month);
+        foreach ($ta['gajiKontrak']['jadwal'] as $row) {
+            if ($row['bulan'] === $period && $row['nominal'] !== null) return true;
+        }
+        return false;
+    }
+    $period = sprintf('%04d-%02d', $year, $month);
+    if (!empty($ta['tanggalMulaiTugas']) && $period < substr($ta['tanggalMulaiTugas'], 0, 7)) return false;
+    if (!empty($ta['tanggalSelesaiTugas']) && $period > substr($ta['tanggalSelesaiTugas'], 0, 7)) return false;
+
     // Tenaga ahli yang berstatus turun lapangan selalu dimunculkan di daftar gaji bulanan
     // entitas proyeknya (walau belum dibayar), agar dapat diproses pembayarannya oleh bagian keuangan.
     return true;
@@ -870,6 +881,9 @@ if ($method === 'GET' && $sub === '') {
             }
 
             $nominal_honor = (float)($pl['nominalHonorBulanan'] ?? 0.0);
+            foreach ($pl['gajiKontrak']['jadwal'] ?? [] as $salary_row) {
+                if ($salary_row['bulan'] === sprintf('%04d-%02d', $year, $month)) $nominal_honor = (float)($salary_row['nominal'] ?? 0);
+            }
             $has_npwp      = !empty($ta['npwp']);
             $tarif_pph     = $has_npwp ? 2.5 : 3.0; // Standar PPh 21 Bukan Pegawai (50% x 5% = 2.5%, non-NPWP 120% = 3%)
             $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
@@ -1404,6 +1418,9 @@ if ($method === 'GET' && $sub === '') {
             if (!is_tenaga_ahli_eligible_for_month($pl, $year, $month, false, $is_pegawai_tetap_lain)) continue;
 
             $nominal_honor = (float)($pl['nominalHonorBulanan'] ?? 0.0);
+            foreach ($pl['gajiKontrak']['jadwal'] ?? [] as $salary_row) {
+                if ($salary_row['bulan'] === sprintf('%04d-%02d', $year, $month)) $nominal_honor = (float)($salary_row['nominal'] ?? 0);
+            }
             $has_npwp      = !empty($ta['npwp']);
             $tarif_pph     = $has_npwp ? 2.5 : 3.0;
             $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
@@ -1777,6 +1794,7 @@ if ($method === 'GET' && $sub === '') {
         'projects'              => $projects,
         'allProjects'           => $all_projects,
         'rekananTenagaAhli'     => $rekanan_tenaga_ahli,
+        'honorTracking'         => array_map('tenaga_ahli_payment_for_tracking', $all_honor_history),
         'year'                  => $year,
         'month'                 => $month,
         'pegawaiList'           => $pegawai_list,
@@ -2405,10 +2423,11 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
         if ($proj) $nama_proyek = "{$proj['code']} - {$proj['name']}";
     }
 
-    $tgl_ts    = strtotime($tanggal_str);
-    $bulan     = (int)date('n', $tgl_ts);
-    $tahun     = (int)date('Y', $tgl_ts);
-    $tanggal_db = date('Y-m-d', $tgl_ts) . ' 00:00:00';
+    try {
+        [$bulan, $tahun, $tanggal_db] = tenaga_ahli_periode_honor($body, $tanggal_str);
+    } catch (InvalidArgumentException $e) {
+        return error_response($e->getMessage(), 400);
+    }
     $nominal_bersih = max(0, $nominal_honor - $pph21);
 
     // Jika rekananId belum ada, cek match NIK/NPWP

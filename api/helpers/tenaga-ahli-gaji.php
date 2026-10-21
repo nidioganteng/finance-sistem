@@ -60,3 +60,13 @@ function tenaga_ahli_gaji_format(array $row): array {
     unset($row['jadwalJson']);
     return $row;
 }
+
+function tenaga_ahli_merge_riwayat(array $by_nik, array $by_id): array {
+    $unique = [];
+    foreach (array_merge($by_nik, $by_id) as $payment) {
+        $unique[$payment['id']] = $payment;
+    }
+    $payments = array_values($unique);
+    usort($payments, fn($a, $b) => strcmp($b['tanggal'], $a['tanggal']));
+    return $payments;
+}

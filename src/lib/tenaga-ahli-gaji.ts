@@ -70,12 +70,17 @@ export function ringkasanGajiTenagaAhli(
   rows: GajiTenagaAhliBulan[],
   history: { id: string; projectId?: string | null; nominalHonor: number; nominalBersih: number }[],
   projectId: string,
+  negosiasi?: number | null,
 ) {
   const unique = new Map(history.filter(item => item.projectId === projectId).map(item => [item.id, item]));
   const dibayar = [...unique.values()].reduce((sum, item) => sum + item.nominalHonor, 0);
   const dibayarNetto = [...unique.values()].reduce((sum, item) => sum + item.nominalBersih, 0);
   const terisi = rows.filter(row => row.nominal !== null).length;
   const totalGaji = terisi ? rows.reduce((sum, row) => sum + (row.nominal ?? 0), 0) : null;
-  return { dibayar, dibayarNetto, totalGaji, balance: totalGaji === null ? null : totalGaji - dibayar,
+  const target = negosiasi === undefined ? totalGaji : negosiasi;
+  const balance = target === null ? null : Math.round((target - dibayar) * 100) / 100;
+  return { dibayar, dibayarNetto, totalGaji, balance, totalNegosiasi: negosiasi ?? null,
+    lunas: negosiasi != null && negosiasi > 0 && balance === 0,
+    batasTercapai: negosiasi != null && negosiasi > 0 && balance !== null && balance <= 0,
     terisi, jumlahBulan: rows.length, lengkap: rows.length > 0 && terisi === rows.length };
 }

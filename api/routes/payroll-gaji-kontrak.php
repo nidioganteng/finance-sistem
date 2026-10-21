@@ -10,10 +10,7 @@ ensure_tenaga_ahli_tables($pdo);
 ensure_tenaga_ahli_gaji_table($pdo);
 $rekanan_id = is_string($body['rekananId'] ?? null) ? $body['rekananId'] : '';
 $project_id = is_string($body['projectId'] ?? null) ? $body['projectId'] : '';
-$stmt = $pdo->prepare("SELECT r.nama, r.entityId, p.entityId AS projectEntityId,
-        p.sidamon_start_date AS spmkMulai, p.sidamon_end_date AS spmkSelesai,
-        COALESCE(tap.tanggalMulaiTugas, r.tanggalMulaiTugas) AS mulai,
-        COALESCE(tap.tanggalSelesaiTugas, r.tanggalSelesaiTugas) AS selesai
+$stmt = $pdo->prepare("SELECT r.nama, r.entityId, p.entityId AS projectEntityId
     FROM Rekanan r JOIN Project p ON p.id = ?
     LEFT JOIN TenagaAhliProject tap ON tap.rekananId = r.id AND tap.projectId = p.id
     WHERE r.id = ? AND r.tipe = 'TENAGA_AHLI' AND (tap.id IS NOT NULL OR r.projectId = p.id) LIMIT 1");

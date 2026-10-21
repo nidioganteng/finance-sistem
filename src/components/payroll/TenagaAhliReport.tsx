@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
@@ -19,6 +19,7 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
 }) {
   const [scope, setScope] = useState<"bulan" | "tahun">("tahun");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
   const [reportEntity, setReportEntity] = useState("");
   const pathname = usePathname();
   const params = useSearchParams();
@@ -69,10 +70,66 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
 
   function Group({ item }: { item: (typeof groups)[number] }) {
     const open = expanded === item.key;
-    const value = item.summary;
+    const projects = groupTenagaAhliTracking(item.rows, "proyek");
+    for (const assignment of item.assignments) {
+      if (!projects.some(project => project.key === assignment.projectId)) {
+        projects.push({ key: assignment.projectId, label: `${assignment.projectCode ? `${assignment.projectCode} · ` : ""}${assignment.projectName}`, rows: [], summary: summarizeTenagaAhliTracking([]) });
+      }
+    }
+    projects.sort((a, b) => a.label.localeCompare(b.label, "id-ID"));
     return <>
-      <tr className="border-t border-border"><td className="px-3 py-2"><button className="inline-flex items-center gap-1.5 text-left font-semibold" aria-expanded={open} onClick={() => setExpanded(open ? null : item.key)}>{open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{group === "bulan" ? periodName(item.label) : item.label}</button><p className="ml-5 mt-0.5 text-[11px] text-muted-faint">{value.jumlahInput} input · {value.jumlahPembayaran} pembayaran</p>{item.assignments.map(project => <p key={`${project.entityId}:${project.projectId}`} className="ml-5 mt-1 text-[11px] text-muted-faint">{project.entityName} · {project.projectCode} · {project.projectName}</p>)}</td><td className="px-3 py-2 text-right tabular-nums">{money(value.gajiTerisi)}</td><td className="px-3 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-300">{money(value.dibayar)}</td><td className="px-3 py-2 text-right tabular-nums">{money(value.pph)}</td><td className="px-3 py-2 text-right tabular-nums">{money(value.netto)}</td><td className={`px-3 py-2 text-right tabular-nums ${value.balanceNegosiasi !== null && value.balanceNegosiasi < 0 ? "text-rose-600" : ""}`}>{value.balanceNegosiasi === null ? "—" : money(value.balanceNegosiasi)}</td></tr>
-      {open && <tr><td colSpan={6} className="bg-surface-subtle/30 p-3"><div className="overflow-x-auto rounded-lg border border-border bg-surface-card"><table className="w-full text-xs text-left"><thead className="bg-surface-subtle text-muted-faint"><tr><th className="px-3 py-2">Bulan / tenaga ahli</th><th className="px-3 py-2">Proyek / entitas</th><th className="px-3 py-2 text-right">Gaji terisi</th><th className="px-3 py-2 text-right">Dibayar</th><th className="px-3 py-2">Catatan / tracking</th></tr></thead><tbody>{item.rows.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-muted-faint">Belum ada gaji terisi atau pembayaran pada periode ini.</td></tr>}{item.rows.map(row => <tr key={row.id} className="border-t border-border"><td className="px-3 py-2"><div>{periodName(row.periode)}</div><div className="font-semibold">{row.nama}</div></td><td className="px-3 py-2">{row.projectCode} · {row.projectName}<div className="text-muted-faint">{row.entityName}</div></td><td className="px-3 py-2 text-right tabular-nums">{money(row.gajiTerisi)}</td><td className="px-3 py-2 text-right tabular-nums">{money(row.payments.reduce((sum, payment) => sum + payment.nominalHonor, 0))}<div className="text-[11px] text-muted-faint">{row.payments.map(payment => payment.tanggal).join(", ")}</div></td><td className="px-3 py-2">{row.catatan && <p className="mb-1 flex max-w-xs items-start gap-1 whitespace-pre-wrap break-words text-amber-700 dark:text-amber-300"><AlertTriangle size={12} />{row.catatan}</p>}{row.personId && row.projectId && <Link className="font-semibold underline" onClick={onTracking} href={detailUrl(row)}>Tracking bulan ini</Link>}</td></tr>)}</tbody></table></div></td></tr>}
+      <tr className="border-t border-border">
+        <td className="px-3 py-2">
+          <button className="inline-flex items-center gap-1.5 text-left font-semibold" aria-expanded={open} onClick={() => { setExpanded(open ? null : item.key); setExpandedProjects({}); }}>
+            {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{group === "bulan" ? periodName(item.label) : item.label}
+          </button>
+          <p className="ml-5 mt-0.5 text-[11px] text-muted-faint">{group === "nama" && `${projects.length} proyek · `}{item.summary.jumlahInput} input · {item.summary.jumlahPembayaran} pembayaran</p>
+        </td>
+        <SummaryCells value={item.summary} />
+      </tr>
+      {open && <tr><td colSpan={6} className="bg-surface-subtle/30 p-3">
+        {group === "nama" ? <div className="overflow-x-auto rounded-lg border border-border bg-surface-card">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-surface-subtle text-muted-faint"><tr><th className="px-3 py-2">Proyek / entitas</th><th className="px-3 py-2 text-right">Gaji terisi</th><th className="px-3 py-2 text-right">Sudah dibayar</th><th className="px-3 py-2 text-right">PPh</th><th className="px-3 py-2 text-right">Netto</th><th className="px-3 py-2 text-right">Balance negosiasi</th></tr></thead>
+            <tbody>{projects.map(project => {
+              const key = JSON.stringify([item.key, project.key]);
+              const projectOpen = !!expandedProjects[key];
+              const assignment = item.assignments.find(value => value.projectId === project.key);
+              const entityNames = assignment?.entityName || [...new Set(project.rows.map(row => row.entityName))].join(", ");
+              return <Fragment key={project.key}>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-2"><button className="inline-flex items-center gap-1.5 text-left font-semibold" aria-expanded={projectOpen} onClick={() => setExpandedProjects(previous => ({ ...previous, [key]: !previous[key] }))}>{projectOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{project.label}</button><p className="ml-5 mt-0.5 text-[11px] text-muted-faint">{entityNames} · {project.summary.jumlahInput} input · {project.summary.jumlahPembayaran} pembayaran</p></td>
+                  <SummaryCells value={project.summary} />
+                </tr>
+                {projectOpen && <tr><td colSpan={6} className="bg-surface-subtle/30 p-3"><SalaryDetails detailRows={project.rows} /></td></tr>}
+              </Fragment>;
+            })}{projects.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-muted-faint">Belum ada penugasan proyek.</td></tr>}</tbody>
+          </table>
+        </div> : <SalaryDetails detailRows={item.rows} />}
+      </td></tr>}
     </>;
+  }
+
+  function SummaryCells({ value }: { value: ReturnType<typeof summarizeTenagaAhliTracking> }) {
+    return <>
+      <td className="px-3 py-2 text-right tabular-nums">{money(value.gajiTerisi)}</td>
+      <td className="px-3 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-300">{money(value.dibayar)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{money(value.pph)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{money(value.netto)}</td>
+      <td className={`px-3 py-2 text-right tabular-nums ${value.balanceNegosiasi !== null && value.balanceNegosiasi < 0 ? "text-rose-600" : ""}`}>{value.balanceNegosiasi === null ? "—" : money(value.balanceNegosiasi)}</td>
+    </>;
+  }
+
+  function SalaryDetails({ detailRows }: { detailRows: TenagaAhliTrackingRow[] }) {
+    return <div className="overflow-x-auto rounded-lg border border-border bg-surface-card"><table className="w-full text-xs text-left">
+      <thead className="bg-surface-subtle text-muted-faint"><tr><th className="px-3 py-2">Bulan / tenaga ahli</th><th className="px-3 py-2">Proyek / entitas</th><th className="px-3 py-2 text-right">Gaji terisi</th><th className="px-3 py-2 text-right">Dibayar</th><th className="px-3 py-2">Catatan / tracking</th></tr></thead>
+      <tbody>{detailRows.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-muted-faint">Belum ada gaji terisi atau pembayaran pada periode ini.</td></tr>}{detailRows.map(row => <tr key={row.id} className="border-t border-border">
+        <td className="px-3 py-2"><div>{periodName(row.periode)}</div><div className="font-semibold">{row.nama}</div></td>
+        <td className="px-3 py-2">{row.projectCode} · {row.projectName}<div className="text-muted-faint">{row.entityName}</div></td>
+        <td className="px-3 py-2 text-right tabular-nums">{money(row.gajiTerisi)}</td>
+        <td className="px-3 py-2 text-right tabular-nums">{money(row.payments.reduce((sum, payment) => sum + payment.nominalHonor, 0))}<div className="text-[11px] text-muted-faint">{row.payments.map(payment => payment.tanggal).join(", ")}</div></td>
+        <td className="px-3 py-2">{row.catatan && <p className="mb-1 flex max-w-xs items-start gap-1 whitespace-pre-wrap break-words text-amber-700 dark:text-amber-300"><AlertTriangle size={12} />{row.catatan}</p>}{row.personId && row.projectId && <Link className="font-semibold underline" onClick={onTracking} href={detailUrl(row)}>Tracking bulan ini</Link>}</td>
+      </tr>)}</tbody>
+    </table></div>;
   }
 }

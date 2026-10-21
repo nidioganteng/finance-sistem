@@ -70,3 +70,31 @@ function tenaga_ahli_merge_riwayat(array $by_nik, array $by_id): array {
     usort($payments, fn($a, $b) => strcmp($b['tanggal'], $a['tanggal']));
     return $payments;
 }
+
+function tenaga_ahli_payment_for_tracking(array $row): array {
+    return [
+        'id' => $row['id'], 'rekananId' => $row['rekananId'] ?? null,
+        'nik' => $row['nik'] ?? null, 'nama' => $row['nama'],
+        'entityId' => $row['entityId'], 'entityName' => $row['ename'],
+        'projectId' => $row['projectId'] ?? null,
+        'projectCode' => $row['projCode'] ?? null, 'projectName' => $row['projName'] ?? null,
+        'tahun' => (int)$row['tahun'], 'bulan' => (int)$row['bulan'],
+        'tanggal' => substr($row['tanggal'], 0, 10),
+        'nominalHonor' => (float)$row['nominalHonor'], 'pph21' => (float)$row['pph21'],
+        'nominalBersih' => (float)$row['nominalBersih'],
+    ];
+}
+
+function tenaga_ahli_periode_honor(array $body, string $tanggal): array {
+    $date = tenaga_ahli_valid_date($tanggal);
+    if ($date === null) throw new InvalidArgumentException('Tanggal pembayaran wajib diisi.');
+    $has_month = isset($body['bulan']);
+    $has_year = isset($body['tahun']);
+    if ($has_month !== $has_year) throw new InvalidArgumentException('Bulan dan tahun periode gaji harus diisi bersamaan.');
+    $month = $has_month ? filter_var($body['bulan'], FILTER_VALIDATE_INT) : (int)substr($date, 5, 2);
+    $year = $has_year ? filter_var($body['tahun'], FILTER_VALIDATE_INT) : (int)substr($date, 0, 4);
+    if ($month === false || $month < 1 || $month > 12 || $year === false || $year < 2000 || $year > 2199) {
+        throw new InvalidArgumentException('Periode gaji tidak valid (bulan 1–12, tahun 2000–2199).');
+    }
+    return [$month, $year, $date . ' 00:00:00'];
+}

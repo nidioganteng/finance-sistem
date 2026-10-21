@@ -63,6 +63,7 @@ import {
 import { TenagaAhliReport } from "@/components/payroll/TenagaAhliReport";
 import { buildTenagaAhliTracking, type TenagaAhliPayment } from "@/lib/tenaga-ahli-tracking";
 import { TenagaAhliNegosiasi } from "@/components/payroll/TenagaAhliNegosiasi";
+import { PtkpSettingsModal } from "@/components/payroll/PtkpSettingsModal";
 import { RekonsiliasiPajakGajiClient } from "@/components/pajak/RekonsiliasiPajakGajiClient";
 import { type RekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
 import {
@@ -82,6 +83,7 @@ import {
 import { formatRupiah } from "@/lib/dashboard-data";
 
 type PayrollData = {
+  ptkpRates?: Record<string, number>;
   entity: { id: string; key: string; name: string; legalName: string } | null;
   allEntities: { id: string; key: string; name: string; legalName: string }[];
   projects: { id: string; code: string; name: string }[];
@@ -393,6 +395,8 @@ export function PayrollClient({
   const [modalCatatan, setModalCatatan] = useState<string>("");
   const [isCustomTarifTransport, setIsCustomTarifTransport] = useState<boolean>(false);
   const [isBatchTransportModalOpen, setIsBatchTransportModalOpen] = useState<boolean>(false);
+  const [isPtkpSettingsOpen, setIsPtkpSettingsOpen] = useState(false);
+  const ptkpRates = data.ptkpRates || PTKP_RATES;
   const [batchTarifTransport, setBatchTarifTransport] = useState<number>(15000);
   const [quickTransportTarget, setQuickTransportTarget] = useState<PegawaiItem | null>(null);
   const [quickTarifTransportVal, setQuickTarifTransportVal] = useState<number>(15000);
@@ -1086,6 +1090,8 @@ export function PayrollClient({
     return false;
   });
 
+  const honorAssignments = data.rekananTenagaAhli.find(person => person.id === selectedRekananIdForHonor)?.proyekList || [];
+  const honorProjectOptions = honorAssignments.map(project => ({ id: project.projectId, code: project.projectCode || "", name: project.projectName || "", entityName: project.projectEntityName || "" }));
   const projectListToUse: Array<{ id: string; code: string; name: string; entityId?: string; entityName: string }> =
     data.allProjects && data.allProjects.length > 0
       ? data.allProjects.map((p) => ({
@@ -1362,6 +1368,7 @@ export function PayrollClient({
                       >
                         <span>Setting Biaya Transport</span>
                       </button>
+                      <button type="button" onClick={() => setIsPtkpSettingsOpen(true)} className="h-8 whitespace-nowrap rounded-xl border border-border bg-surface-card px-3 text-xs font-semibold text-navy-text hover:bg-surface-hover">Setting Nominal PTKP</button>
                       <button
                         type="button"
                         onClick={() => {
@@ -3795,18 +3802,6 @@ export function PayrollClient({
                                 </button>
                                 {isManager && (
                                   <>
-                                    {anyTurun && (
-                                      <button
-                                        onClick={() => {
-                                          openHonorModal(null, r.id);
-                                        }}
-                                        className="h-7 px-2.5 rounded-lg bg-navy text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs hover:bg-navy-light"
-                                        title="Input Gaji untuk Tenaga Ahli ini"
-                                      >
-                                        <Plus size={11} />
-                                        <span>Input Gaji</span>
-                                      </button>
-                                    )}
                                     <button
                                       onClick={() => {
                                         setEditingMasterAhli(r);
@@ -4322,14 +4317,14 @@ export function PayrollClient({
                           defaultValue={editingPegawai?.statusKeluarga ?? "TK/0"}
                           onChange={(e) => {
                             const form = e.target.form;
-                            if (form && PTKP_RATES[e.target.value]) {
+                            if (form && ptkpRates[e.target.value] !== undefined) {
                               const ptkpInput = form.elements.namedItem("ptkp") as HTMLInputElement;
-                              if (ptkpInput) ptkpInput.value = formatRupiahInput(PTKP_RATES[e.target.value]);
+                              if (ptkpInput) ptkpInput.value = formatRupiahInput(ptkpRates[e.target.value]);
                             }
                           }}
                           className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground font-mono"
                         >
-                          {Object.keys(PTKP_RATES).map((key) => (
+                          {Object.keys(ptkpRates).map((key) => (
                             <option key={key} value={key}>
                               {key}
                             </option>
@@ -4343,7 +4338,8 @@ export function PayrollClient({
                           type="text"
                           inputMode="numeric"
                           name="ptkp"
-                          defaultValue={formatRupiahInput(editingPegawai?.ptkp ?? 54000000)}
+                          defaultValue={formatRupiahInput(ptkpRates[editingPegawai?.statusKeluarga || "TK/0"] ?? 54000000)}
+                          readOnly
                           onChange={(e) => {
                             const num = Number(e.target.value.replace(/[^0-9]/g, "")) || 0;
                             e.target.value = formatRupiahInput(num);
@@ -5864,13 +5860,13 @@ export function PayrollClient({
                   </span>
                 </label>
                 <div className="space-y-1.5">
-                  {projectListToUse.length > 0 && (
+                  {honorProjectOptions.length > 0 && (
                     <select
                       value={modalHonorProjectId}
                       onChange={(e) => {
                         const val = e.target.value;
                         setModalHonorProjectId(val);
-                        const matched = projectListToUse.find((p) => p.id === val);
+                        const matched = honorProjectOptions.find((p) => p.id === val);
                         if (matched) {
                           setModalHonorNamaProyek(`[${matched.code}] ${matched.name}`);
                         }
@@ -5878,13 +5874,13 @@ export function PayrollClient({
                       className="w-full h-8 px-2.5 rounded-lg border border-border bg-surface-card text-foreground text-xs font-semibold"
                     >
                       <option value="">-- Tanpa Alokasi Proyek (Non-Proyek) --</option>
-                      {modalHonorProjectId && !projectListToUse.some((p) => p.id === modalHonorProjectId) && (
+                      {modalHonorProjectId && !honorProjectOptions.some((p) => p.id === modalHonorProjectId) && (
                         <option value={modalHonorProjectId}>
                           {modalHonorNamaProyek || modalHonorProjectId} (Tersimpan)
                         </option>
                       )}
                       {Object.entries(
-                        projectListToUse.reduce<Record<string, typeof projectListToUse>>((acc, proj) => {
+                        honorProjectOptions.reduce<Record<string, typeof honorProjectOptions>>((acc, proj) => {
                           const key = proj.entityName || "Holding / Lainnya";
                           if (!acc[key]) acc[key] = [];
                           acc[key].push(proj);
@@ -7517,6 +7513,7 @@ export function PayrollClient({
       {/* ========================================================= */}
       {/* MODAL 7: SETTING BIAYA TRANSPORT STANDAR (DATABASE PEGAWAI) */}
       {/* ========================================================= */}
+      {mounted && isPtkpSettingsOpen && data.entity && <PtkpSettingsModal entityId={data.entity.id} entityName={data.entity.name} rates={ptkpRates} onClose={() => setIsPtkpSettingsOpen(false)} onSaved={message => { setSuccessMsg(message); setIsPtkpSettingsOpen(false); router.refresh(); }} />}
       {mounted && isBatchTransportModalOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-md bg-surface-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">

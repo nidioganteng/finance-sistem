@@ -44,7 +44,7 @@ const contract = { id: 'c', rekananId: 'test-person', projectId: 'test-project',
   gajiNegosiasi: 5000000, basisNegosiasi: 'BULAN', jadwal: [
     { bulan: '2026-12', nominal: 5000000, catatan: 'Dokumen <belum> lengkap' }, { bulan: '2027-01', nominal: null, catatan: '' },
   ] };
-const props = { entityId: 'entity-test', year: 2026, month: 12, canEdit: true, search: '', onAddManual() {}, onRecord() {}, people: [
+const props = { entityId: 'entity-project', year: 2026, month: 12, canEdit: true, search: '', onAddManual() {}, onRecord() {}, people: [
   { id: 'test-person', nama: 'Freelance Uji', nik: null, npwp: null, kategori: 'Ahli struktur', entityId: 'entity-test', proyekList: [
     { projectId: 'test-project', projectEntityId: 'entity-project', projectCode: 'TEST', projectName: 'Proyek Uji', nominalHonorBulanan: 0, isTurunLapangan: true, gajiKontrak: contract },
   ] },
@@ -66,9 +66,16 @@ assert.equal(balance.balance, 4000000);
 assert.equal(balance.lengkap, false);
 assert.equal(helpers.ringkasanGajiTenagaAhli([{ bulan: '2026-12', nominal: null, catatan: '' }], [paid], 'test-project').balance, null);
 assert.equal(helpers.ringkasanGajiTenagaAhli([{ bulan: '2026-12', nominal: 0, catatan: '' }], [paid], 'test-project').balance, -1000000);
-assert.equal(helpers.penugasanPadaEntitas(props.people[0], props.people[0].proyekList[0], 'entity-test'), true);
+assert.equal(helpers.penugasanPadaEntitas(props.people[0], props.people[0].proyekList[0], 'entity-test'), false);
+assert.equal(helpers.penugasanPadaEntitas(props.people[0], {}, 'entity-test'), true);
+assert.doesNotMatch(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, entityId: 'entity-test' })), /Freelance Uji/);
 assert.equal(helpers.penugasanPadaEntitas(props.people[0], props.people[0].proyekList[0], 'entity-project'), true);
 assert.equal(helpers.penugasanPadaEntitas(props.people[0], props.people[0].proyekList[0], 'other'), false);
+const multiEntityPerson = { ...props.people[0], proyekList: [props.people[0].proyekList[0], { ...props.people[0].proyekList[0], projectId: 'gaharu-project', projectCode: 'GH-001', projectName: 'Proyek Gaharu', projectEntityId: 'entity-test' }] };
+const gaharuList = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, entityId: 'entity-test', people: [multiEntityPerson] }));
+const projectList = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, people: [multiEntityPerson] }));
+assert.match(gaharuList, /Freelance Uji/); assert.match(gaharuList, /GH-001/); assert.doesNotMatch(gaharuList, /TEST · Proyek Uji/);
+assert.match(projectList, /Freelance Uji/); assert.match(projectList, /TEST/); assert.doesNotMatch(projectList, /GH-001/);
 const paidProps = { ...props, people: [{ ...props.people[0], riwayatGaji: [paid] }] };
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, paidProps));
 assert.doesNotMatch(html, /1\.000\.000/); // Pembayaran November 2025 tidak masuk Desember 2026.

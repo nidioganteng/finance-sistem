@@ -40,6 +40,10 @@ check($stored['revision'], 4, 'revision integer');
 check($stored['gajiRab'], 7500000.0, 'decimal menjadi angka');
 check($stored['gajiNegosiasi'], null, 'negosiasi belum disimpan');
 check(json_encode($stored['jadwal']), json_encode($rows), 'jadwal dan catatan tidak berubah saat decode');
+$old_payment = ['id' => 'old-payment', 'tanggal' => '2025-12-01'];
+$new_payment = ['id' => 'new-payment', 'tanggal' => '2026-01-01'];
+$history = tenaga_ahli_merge_riwayat([$old_payment, $new_payment], [$new_payment]);
+check(array_column($history, 'id'), ['new-payment', 'old-payment'], 'pembayaran lama lewat NIK dan baru lewat rekananId tetap lengkap tanpa duplikasi');
 
 // Regresi skema sebelum integrasi Sidamon: jalankan query route sesungguhnya
 // pada Project yang tidak mempunyai kolom sidamon_start_date/sidamon_end_date.

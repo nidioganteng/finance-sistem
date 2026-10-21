@@ -4,10 +4,10 @@ import { SessionProvider } from "@/components/SessionProvider";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "SIMATRA — Sistem Data Keuangan",
-  description: "Sistem data keuangan internal SIMATRA",
+  title: "KOSHA — Sistem Data Keuangan",
+  description: "Sistem data keuangan internal KOSHA",
   icons: {
-    icon: "/logo-entitas/logo-simatra-dark.png",
+    icon: "/logo-entitas/logo-kosha-dark.png",
   },
 };
 

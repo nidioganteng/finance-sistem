@@ -113,7 +113,7 @@ export function AppShell({
                 <rect x="10" y="14" width="4" height="6" fill="#fff" />
               </svg>
             </div>
-            <span className="font-extrabold text-[13.5px] text-navy-text">SIMATRA</span>
+            <span className="font-extrabold text-[13.5px] text-navy-text">KOSHA</span>
           </div>
         </div>
 

@@ -40,7 +40,7 @@ try {
 
 $pdo->beginTransaction();
 try {
-    // Buat placeholder tanpa menimpa referensi KOSHA atau negosiasi yang sudah ada.
+    // Buat placeholder tanpa menimpa referensi Sidamon atau negosiasi yang sudah ada.
     $pdo->prepare('INSERT INTO TenagaAhliGajiKontrak (id, rekananId, projectId) VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE id = id')->execute([uuid4(), $rekanan_id, $project_id]);
     $stmt = $pdo->prepare('SELECT * FROM TenagaAhliGajiKontrak WHERE rekananId = ? AND projectId = ? FOR UPDATE');

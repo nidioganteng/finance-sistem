@@ -162,7 +162,7 @@ function NegosiasiRow({ person, project, year, month, canEdit, onSaved, onNaviga
   }
   return <tr className="border-t border-border align-top">
     <td className="p-4"><div className="font-semibold text-navy-text">{person.nama}</div><div className="text-xs text-muted-faint mt-1">NIK: {person.nik || "—"}<br />NPWP: {person.npwp || "—"}</div><div className="mt-1 text-xs text-muted-faint">Terdaftar: {person.entityName || "—"}</div></td>
-    <td className="p-4"><div className="font-medium">{ref.namaPekerjaan || "Belum diisi"}</div><div className="text-xs text-muted-faint mt-1">{project.projectCode} · {project.projectName}</div><div className="text-xs mt-1">Entitas proyek: {project.projectEntityName || "—"}</div><span className="text-xs text-muted-faint">{contract?.sumber === "SIDAMON" ? "KOSHA" : "Input manual"}</span></td>
+    <td className="p-4"><div className="font-medium">{ref.namaPekerjaan || "Belum diisi"}</div><div className="text-xs text-muted-faint mt-1">{project.projectCode} · {project.projectName}</div><div className="text-xs mt-1">Entitas proyek: {project.projectEntityName || "—"}</div><span className="text-xs text-muted-faint">{contract?.sumber === "SIDAMON" ? "Sidamon" : "Input manual"}</span></td>
     <td className="p-4 whitespace-nowrap"><div>{ref.manMonth === null ? "Menman belum diisi" : `${ref.manMonth} MM`}</div><div className="font-mono mt-2">{rp(ref.gajiRab)}</div><div className="text-xs text-muted-faint">Gaji RAB</div></td>
     <td className="p-4">{canEdit && editing ? <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-2">
       <RupiahInput aria-label={`Gaji negosiasi ${person.nama}`} min={0.01} required disabled={pending} placeholder="Isi nominal negosiasi" value={nominal} onValueChange={setNominal} />
@@ -261,7 +261,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
     {success && <div role="status" className="rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 text-xs">{success}</div>}
     <details open={!ready} className="rounded-xl border border-border bg-surface-card">
       <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-navy-text">
-        Kontrak & negosiasi <span className="ml-2 font-normal text-muted-faint">{manual ? "Manual" : "KOSHA"} · {ref.manMonth ?? "—"} MM · RAB {rp(ref.gajiRab)} · Negosiasi {rp(negosiasi)} / kontrak</span>
+        Kontrak & negosiasi <span className="ml-2 font-normal text-muted-faint">{manual ? "Manual" : "Sidamon"} · {ref.manMonth ?? "—"} MM · RAB {rp(ref.gajiRab)} · Negosiasi {rp(negosiasi)} / kontrak</span>
       </summary>
       <div className="border-t border-border px-4 py-3">
         <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -272,7 +272,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
           <div><dt className="text-muted-faint">Selesai SPMK</dt><dd className="mt-1 font-medium">{dateLabel(ref.spmkSelesai)}</dd></div>
           <div><dt className="text-muted-faint">Gaji negosiasi · total kontrak</dt><dd className="mt-1 font-medium">{rp(negosiasi)}</dd></div>
         </dl>
-        <p className="mt-3 text-[11px] text-muted-faint">Referensi kontrak diubah melalui Database Tenaga Ahli{manual ? "." : "; data KOSHA mengikuti sumber sinkronisasi."} Negosiasi dikelola dari daftar Pengisian Gaji & Negosiasi.</p>
+        <p className="mt-3 text-[11px] text-muted-faint">Referensi kontrak diubah melalui Database Tenaga Ahli{manual ? "." : "; data Sidamon mengikuti sumber sinkronisasi."} Negosiasi dikelola dari daftar Pengisian Gaji & Negosiasi.</p>
       </div>
     </details>
     {(ready || !canEdit) && <div className="rounded-xl border border-border bg-surface-card overflow-hidden">

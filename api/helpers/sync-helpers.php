@@ -2,14 +2,14 @@
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 /**
- * Kirim update progress termin ke KOSHA.
- * Dipanggil setelah termin berhasil di-update di Simatra.
+ * Kirim update progress termin ke Sidamon.
+ * Dipanggil setelah termin berhasil di-update di Kosha.
  * Non-blocking: error tidak menghentikan response utama.
  */
 function sync_termin_to_sidamon(string $project_id): void {
     $pdo = get_pdo();
 
-    // Cek apakah project ini berasal dari KOSHA
+    // Cek apakah project ini berasal dari Sidamon
     $stmt = $pdo->prepare(
         "SELECT id, sidamon_assignment_id, contractValue FROM Project WHERE id = ? LIMIT 1"
     );
@@ -34,7 +34,7 @@ function sync_termin_to_sidamon(string $project_id): void {
         ? round(($total_dibayar / $contract_val) * 100, 1)
         : 0;
 
-    // Otomatis tandai proyek selesai di Simatra saat termin mencapai 100%
+    // Otomatis tandai proyek selesai di Kosha saat termin mencapai 100%
     if ($persen >= 100) {
         $pdo->prepare("UPDATE Project SET status = 'COMPLETED' WHERE id = ? AND status != 'COMPLETED'")
             ->execute([$project_id]);
@@ -56,7 +56,7 @@ function sync_termin_to_sidamon(string $project_id): void {
         'statusProyek'   => $persen >= 100 ? 'Selesai' : 'Aktif',
     ]);
 
-    $ch = curl_init(KOSHA_URL . '/api/sync/termin/' . urlencode($assignment_id));
+    $ch = curl_init(SIDAMON_URL . '/api/sync/termin/' . urlencode($assignment_id));
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST  => 'PUT',

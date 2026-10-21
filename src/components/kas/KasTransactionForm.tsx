@@ -484,7 +484,7 @@ export function KasTransactionForm({
           </div>
         )}
 
-        {/* Integrasi Kode Proyek KOSHA (Semua Transaksi: Masuk & Keluar / Lintas Entitas) */}
+        {/* Integrasi Kode Proyek Sidamon (Semua Transaksi: Masuk & Keluar / Lintas Entitas) */}
         {projectOptions.length > 0 && (() => {
           const selectedProject = projectOptions.find((p) => p.id === projectId);
           const isOtherEntity = selectedProject?.entityKey && selectedProject.entityKey !== entityKey;
@@ -521,7 +521,7 @@ export function KasTransactionForm({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide flex items-center gap-1.5">
-                  Proyek Terkait (KOSHA)
+                  Proyek Terkait (Sidamon)
                   {isOtherEntity && (
                     <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-200/60 dark:border-purple-800/40">
                       Lintas Entitas

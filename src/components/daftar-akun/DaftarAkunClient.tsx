@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { Pencil, Check, X, Search, Lock } from "lucide-react";
 import { upsertSaldoAwal } from "@/lib/actions/saldo-awal";

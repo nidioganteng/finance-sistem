@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PenLine, Plus, Trash2, AlertTriangle, CheckCircle2, CalendarDays, X, ArrowUpDown, Pencil, Briefcase, TrendingUp, Receipt, Sparkles } from "lucide-react";
 import { saveJurnalTransaksi, deleteJurnalTransaksi } from "@/lib/actions/jurnal-transaksi";

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {

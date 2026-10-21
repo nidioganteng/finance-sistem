@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
 import { Plus, X, Check, ToggleLeft, ToggleRight, Trash2, ExternalLink } from "lucide-react";
 import Link from "next/link";

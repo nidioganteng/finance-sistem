@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   AsetTetapWithDepreciation,
   PenyusutanSummary,
@@ -40,6 +43,31 @@ const KATEGORI_OPTIONS = STANDAR_KATEGORI_ASET.map((k) => ({
   value: k.key,
   label: k.label,
 }));
+
+function getAssetStatus(asset: AsetTetapWithDepreciation): { label: string; color: string } | null {
+  if (asset.kategoriStandar === "TANAH") return null;
+  const depreciableBase = Math.max(1, asset.hargaPerolehanNum - asset.nilaiResiduNum);
+  const consumedPct = Math.min(100, (asset.akumulasiPenyusutan / depreciableBase) * 100);
+  if (asset.nilaiBuku <= asset.nilaiResiduNum + 0.01) {
+    return { label: "Selesai Susut", color: "bg-gray-100 dark:bg-gray-500/20 text-gray-500 dark:text-gray-400" };
+  }
+  if (consumedPct >= 80) {
+    return { label: "Hampir Habis", color: "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400" };
+  }
+  const acqDate = new Date(asset.tanggalPerolehan);
+  const now = new Date();
+  const monthsOld = (now.getFullYear() - acqDate.getFullYear()) * 12 + (now.getMonth() - acqDate.getMonth());
+  if (monthsOld <= 12) {
+    return { label: "Baru", color: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" };
+  }
+  return null;
+}
+
+function getDepreciationPercent(asset: AsetTetapWithDepreciation): number {
+  if (asset.kategoriStandar === "TANAH") return 0;
+  const depreciableBase = Math.max(1, asset.hargaPerolehanNum - asset.nilaiResiduNum);
+  return Math.min(100, Math.round((asset.akumulasiPenyusutan / depreciableBase) * 100));
+}
 
 function formatRupiahInput(val: string | number | undefined | null) {
   if (val === undefined || val === null || val === "" || val === 0 || val === "0") return "";
@@ -198,17 +226,27 @@ export function AktivaTetapManager({
   };
 
   const handleDelete = (id: string, namaAset: string) => {
-    if (!confirm(`Yakin ingin menghapus aset "${namaAset}"? Data penyusutan akan otomatis terupdate di Laporan Keuangan.`)) {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        await deleteAsetTetapAction(id);
-        router.refresh();
-      } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : "Gagal menghapus aset.");
-      }
+    toast(`Hapus "${namaAset}"?`, {
+      description: "Data penyusutan akan otomatis terupdate di Laporan Keuangan.",
+      duration: 8000,
+      action: {
+        label: "Ya, Hapus",
+        onClick: () => {
+          startTransition(async () => {
+            try {
+              await deleteAsetTetapAction(id);
+              router.refresh();
+              toast.success("Aset berhasil dihapus.");
+            } catch (err: unknown) {
+              toast.error(err instanceof Error ? err.message : "Gagal menghapus aset.");
+            }
+          });
+        },
+      },
+      cancel: {
+        label: "Batal",
+        onClick: () => {},
+      },
     });
   };
 
@@ -456,7 +494,7 @@ export function AktivaTetapManager({
                     )}
           </div>
         ) : (
-          <div className="divide-y divide-border-soft">
+          <div className="divide-y divide-border-soft max-h-[62vh] overflow-y-auto">
             {STANDAR_KATEGORI_ASET
               .filter((kat) => filteredAssets.some((asset) => asset.kategoriStandar === kat.key))
               .map((kat) => {
@@ -506,7 +544,17 @@ export function AktivaTetapManager({
                         </span>
                       </span>
                     </button>
-                    <div id={`rincian-${kat.key}`} hidden={!isExpanded} className="border-t border-border-soft">
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                    <motion.div
+                      key={`rincian-${kat.key}`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: "easeInOut" }}
+                      style={{ overflow: "hidden" }}
+                      className="border-t border-border-soft"
+                    >
                       <div className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" role="region" aria-label={`Rincian unit ${kat.label}, geser untuk melihat seluruh kolom`} tabIndex={0}>
                         <table className="w-full min-w-[1560px] text-left border-collapse">
             <thead className="[&_th]:whitespace-nowrap">
@@ -539,8 +587,30 @@ export function AktivaTetapManager({
                                 {asset.kode}
                               </td>
                               <td className="py-3 px-5">
-                                <div className="font-bold text-navy-text">{asset.nama}</div>
-                                <div className="text-[11px] text-muted-faint">{katLabel}</div>
+                                <div className="flex items-start gap-2 flex-wrap">
+                                  <span className="font-bold text-navy-text leading-snug">{asset.nama}</span>
+                                  {(() => {
+                                    const status = getAssetStatus(asset);
+                                    return status ? (
+                                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold shrink-0 ${status.color}`}>
+                                        {status.label}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                </div>
+                                <div className="text-[11px] text-muted-faint mt-0.5">{katLabel}</div>
+                                {asset.kategoriStandar !== "TANAH" && (() => {
+                                  const pct = getDepreciationPercent(asset);
+                                  const barColor = pct >= 100 ? "bg-gray-400 dark:bg-gray-500" : pct >= 80 ? "bg-amber-500" : "bg-brand/70";
+                                  return (
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      <div className="flex-1 h-1 rounded-full bg-surface-subtle overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                                      </div>
+                                      <span className="text-[10px] font-semibold text-muted-faint tabular-nums">{pct}%</span>
+                                    </div>
+                                  );
+                                })()}
                               </td>
                               <td className="py-3 px-5 text-[12.5px] text-muted-strong whitespace-nowrap">
                                 {asset.tanggalPerolehanFmt}
@@ -598,7 +668,9 @@ export function AktivaTetapManager({
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 );
               })}
@@ -803,7 +875,7 @@ export function AktivaTetapManager({
                   </div>
                 </div>
               ) : hargaPerolehan > 0 ? (
-                <div className="p-3 bg-surface-subtle/70 rounded-xl border border-border-soft text-[12px] flex flex-col gap-1">
+                <div className="p-3 bg-surface-subtle/70 rounded-xl border border-border-soft text-[12px] flex flex-col gap-2">
                   <div className="font-bold text-navy-text flex items-center justify-between">
                     <span>Estimasi Penyusutan Garis Lurus:</span>
                     <span className="text-brand font-mono">{formatRupiah(Math.round(livePenyusutanBulan))} / bulan</span>
@@ -811,6 +883,27 @@ export function AktivaTetapManager({
                   <div className="text-muted-faint text-[11.5px]">
                     Beban tahunan: {formatRupiah(Math.round(livePenyusutanTahun))} • Basis susut: {formatRupiah(liveDepreciable)}
                   </div>
+                  {livePenyusutanTahun > 0 && (
+                    <div className="pt-1.5 border-t border-border-soft space-y-1.5">
+                      <div className="text-[10.5px] font-semibold text-muted-strong uppercase tracking-wide">Nilai buku per tahun</div>
+                      {Array.from({ length: Math.min(5, Math.ceil(umurBulan / 12)) }, (_, i) => {
+                        const yr = i + 1;
+                        const bookVal = Math.max(0, liveDepreciable - livePenyusutanTahun * yr);
+                        const widthPct = (bookVal / liveDepreciable) * 100;
+                        return (
+                          <div key={yr} className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-faint w-7 text-right shrink-0">Th {yr}</span>
+                            <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
+                              <div className="h-full bg-brand/60 rounded-full transition-all duration-300" style={{ width: `${widthPct}%` }} />
+                            </div>
+                            <span className="text-[10px] text-muted-strong tabular-nums w-24 text-right shrink-0">
+                              {formatRupiah(Math.round(bookVal))}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : null}
 

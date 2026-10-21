@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useTransition, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { KasTransactionForm } from "./KasTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";

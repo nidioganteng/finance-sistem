@@ -44,7 +44,7 @@ const contract = { id: 'c', rekananId: 'test-person', projectId: 'test-project',
   gajiNegosiasi: 5000000, basisNegosiasi: 'BULAN', jadwal: [
     { bulan: '2026-12', nominal: 5000000, catatan: 'Dokumen <belum> lengkap' }, { bulan: '2027-01', nominal: null, catatan: '' },
   ] };
-const props = { entityId: 'entity-project', year: 2026, month: 12, canEdit: true, search: '', onAddManual() {}, onRecord() {}, people: [
+const props = { entityId: 'entity-project', year: 2026, month: 12, canEdit: true, search: '', onAddManual() {}, onEdit() {}, people: [
   { id: 'test-person', nama: 'Freelance Uji', nik: null, npwp: null, kategori: 'Ahli struktur', entityId: 'entity-test', proyekList: [
     { projectId: 'test-project', projectEntityId: 'entity-project', projectCode: 'TEST', projectName: 'Proyek Uji', nominalHonorBulanan: 0, isTurunLapangan: true, gajiKontrak: contract },
   ] },
@@ -54,6 +54,7 @@ assert.match(html, /Tambah tenaga ahli manual/);
 assert.match(html, /Ada kendala/);
 assert.match(html, /Freelance Uji/);
 assert.match(html, /Tindak lanjut/);
+assert.match(html, /Edit data &amp; proyek/);
 assert.match(html, /Sudah dibayar/);
 assert.match(html, /Balance negosiasi/);
 assert.match(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props, entityId: 'entity-project' })), /Freelance Uji/);
@@ -87,6 +88,7 @@ assert.match(html, /Simpan negosiasi/);
 query = new URLSearchParams('ahliId=test-person&proyekAhliId=test-project');
 html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, props));
 assert.match(html, /Desember 2026/);
+assert.match(html, /Edit data &amp; proyek/);
 const partialProps = { ...props, people: [{ ...props.people[0], riwayatGaji: [{ ...paid, id: 'partial', tahun: 2026, bulan: 12, nominalHonor: 2000000 }] }] };
 const partialHtml = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, partialProps));
 assert.doesNotMatch(partialHtml, /Catat sisa pembayaran/);
@@ -119,4 +121,5 @@ html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...props,
 assert.doesNotMatch(html, /Catat pembayaran<\/button>/);
 assert.doesNotMatch(html, /Simpan perubahan/);
 assert.doesNotMatch(html, /Kurangi bulan/);
+assert.doesNotMatch(html, /Edit data &amp; proyek/);
 console.log('Pengujian periode SPMK, tenaga ahli lintas entitas, negosiasi di daftar, balance, riwayat lintas tahun, catatan, dan read-only lulus.');

@@ -323,7 +323,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
       </tbody></table></div>
       <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}<span className="block mt-0.5">Menyimpan gaji sekaligus mencatat pembayaran otomatis untuk semua bulan terisi.</span></p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji & pembayaran"}</button>}</div>
     </div>}
-    <dialog ref={deleteDialog} onClose={() => setDeleteMonth(null)} aria-labelledby="delete-salary-month-title" aria-describedby="delete-salary-month-description" className="m-auto w-[calc(100%_-_2rem)] max-w-[380px] rounded-2xl border border-border-soft bg-surface-card p-0 text-foreground shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
+    <dialog ref={deleteDialog} onClose={() => setDeleteMonth(null)} aria-labelledby="delete-salary-month-title" aria-describedby="delete-salary-month-description" className="fixed inset-auto left-1/2 top-1/2 !m-0 w-[calc(100%_-_2rem)] max-w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border-soft bg-surface-card p-0 text-foreground shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
       {deleteRow && <>
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-start gap-3.5">

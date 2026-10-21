@@ -98,3 +98,62 @@ function tenaga_ahli_periode_honor(array $body, string $tanggal): array {
     }
     return [$month, $year, $date . ' 00:00:00'];
 }
+
+// ID tetap membuat simpan ulang memperbarui pembayaran otomatis, bukan menambah transaksi.
+function tenaga_ahli_auto_payment_id(string $person_id, string $project_id, string $period): string {
+    return 'gaji-' . substr(hash('sha256', json_encode([$person_id, $project_id, $period])), 0, 31);
+}
+
+function tenaga_ahli_sync_pembayaran(PDO $pdo, array $person, string $person_id, string $project_id, array $jadwal, array $old_jadwal = []): void {
+    if (!$pdo->inTransaction()) throw new LogicException('Sinkronisasi pembayaran wajib dalam transaksi gaji.');
+    $stmt = $pdo->prepare('SELECT * FROM HonorTenagaAhli WHERE projectId = ? AND (rekananId = ? OR (nik = ? AND nik <> \'\'))');
+    $stmt->execute([$project_id, $person_id, $person['nik'] ?? '']);
+    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $periods = array_column($jadwal, 'bulan');
+    $old_periods = array_column($old_jadwal, 'bulan');
+    foreach ($history as $payment) {
+        $period = sprintf('%04d-%02d', $payment['tahun'], $payment['bulan']);
+        if (in_array($period, $periods, true)) continue;
+        if ($payment['id'] !== tenaga_ahli_auto_payment_id($person_id, $project_id, $period)) {
+            if (in_array($period, $old_periods, true)) throw new InvalidArgumentException('Bulan yang memiliki pembayaran manual tidak dapat dihapus dari jadwal.');
+            continue;
+        }
+        $pdo->prepare('DELETE FROM HonorTenagaAhli WHERE id = ?')->execute([$payment['id']]);
+    }
+    foreach ($jadwal as $row) {
+        [$year, $month] = array_map('intval', explode('-', $row['bulan']));
+        $id = tenaga_ahli_auto_payment_id($person_id, $project_id, $row['bulan']);
+        $automatic = null;
+        $manual = 0.0;
+        foreach ($history as $payment) {
+            if ((int)$payment['tahun'] !== $year || (int)$payment['bulan'] !== $month) continue;
+            if ($payment['id'] === $id) $automatic = $payment;
+            else $manual += (float)$payment['nominalHonor'];
+        }
+        if ($manual > (float)($row['nominal'] ?? 0) + 0.001) {
+            throw new InvalidArgumentException("Gaji {$row['bulan']} tidak boleh kurang dari pembayaran manual yang sudah tercatat.");
+        }
+        $amount = round(max(0, (float)($row['nominal'] ?? 0) - $manual), 2);
+        if ($amount <= 0) {
+            if ($automatic) $pdo->prepare('DELETE FROM HonorTenagaAhli WHERE id = ?')->execute([$id]);
+            continue;
+        }
+        if (!trim($person['nik'] ?? '')) throw new InvalidArgumentException('Lengkapi NIK tenaga ahli sebelum menyimpan gaji dan pembayaran.');
+        $entity = $person['projectEntityId'] ?: $person['entityId'];
+        if (!$entity) throw new InvalidArgumentException('Entitas proyek wajib tersedia untuk pembayaran gaji.');
+        // Ikuti tarif default form honor yang sudah dipakai aplikasi.
+        $rate = $automatic ? (float)$automatic['tarifPph21Persen'] : (!empty($person['npwp']) ? 2.5 : 3.0);
+        $tax = $automatic && abs((float)$automatic['nominalHonor'] - $amount) < 0.001
+            ? (float)$automatic['pph21'] : round($amount * $rate / 100);
+        $now = date('Y-m-d H:i:s');
+        if ($automatic) {
+            $pdo->prepare('UPDATE HonorTenagaAhli SET entityId = ?, nominalHonor = ?, tarifPph21Persen = ?, pph21 = ?, nominalBersih = ?, updatedAt = ? WHERE id = ?')
+                ->execute([$entity, $amount, $rate, $tax, $amount - $tax, $now, $id]);
+        } else {
+            $pdo->prepare('INSERT INTO HonorTenagaAhli (id, entityId, rekananId, nik, nama, npwp, uraian, tanggal, bulan, tahun, nominalHonor, tarifPph21Persen, pph21, nominalBersih, projectId, namaProyek, noBukti, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                ->execute([$id, $entity, $person_id, $person['nik'], $person['nama'], $person['npwp'] ?? null,
+                    "Gaji tenaga ahli otomatis: {$person['nama']} - {$row['bulan']}", date('Y-m-d') . ' 00:00:00', $month, $year,
+                    $amount, $rate, $tax, $amount - $tax, $project_id, $person['projectName'] ?? null, null, $now, $now]);
+        }
+    }
+}

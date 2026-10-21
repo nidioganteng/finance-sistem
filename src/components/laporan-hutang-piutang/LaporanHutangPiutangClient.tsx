@@ -345,10 +345,10 @@ export function LaporanHutangPiutangClient({
                           {row.saldoAwalNetFmt}
                         </td>
                         <td className="py-3.5 px-4 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400 text-[12.5px] font-mono whitespace-nowrap">
-                          {row.penambahanPiutang > 0 ? `+${row.penambahanPiutangFmt}` : "Rp\u00A0-"}
+                          {row.penambahanPiutang > 0 ? `+${row.penambahanPiutangFmt}` : "Rp 0"}
                         </td>
                         <td className="py-3.5 px-4 text-right tabular-nums font-bold text-rose-600 dark:text-rose-400 text-[12.5px] font-mono whitespace-nowrap">
-                          {row.penambahanHutang > 0 ? `−${row.penambahanHutangFmt}` : "Rp\u00A0-"}
+                          {row.penambahanHutang > 0 ? `−${row.penambahanHutangFmt}` : "Rp 0"}
                         </td>
                         <td className="py-3.5 px-5 text-right tabular-nums whitespace-nowrap">
                           <span
@@ -405,12 +405,12 @@ export function LaporanHutangPiutangClient({
                       <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
                         {rekapPiutang.totalPerubahan > 0
                           ? `+${rekapPiutang.totalPerubahanFmt}`
-                          : "Rp\u00A0-"}
+                          : "Rp 0"}
                       </td>
                       <td className="py-4 px-4 text-right tabular-nums text-[12.5px] text-rose-600 dark:text-rose-400 font-mono whitespace-nowrap">
                         {rekapHutang.totalHutangTahunIni > 0
                           ? `−${rekapHutang.totalHutangTahunIniFmt}`
-                          : "Rp\u00A0-"}
+                          : "Rp 0"}
                       </td>
                       <td className="py-4 px-5 text-right tabular-nums whitespace-nowrap">
                         <span
@@ -652,7 +652,7 @@ export function LaporanHutangPiutangClient({
                     <div className="text-[17px] font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums whitespace-nowrap">
                       {selectedCpRow.penambahanPiutang > 0
                         ? `+${selectedCpRow.penambahanPiutangFmt}`
-                        : "Rp\u00A0-"}
+                        : "Rp 0"}
                     </div>
                     <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-1">
                       Pengeluaran untuk rekanan
@@ -667,7 +667,7 @@ export function LaporanHutangPiutangClient({
                     <div className="text-[17px] font-extrabold text-rose-600 dark:text-rose-400 font-mono tabular-nums whitespace-nowrap">
                       {selectedCpRow.penambahanHutang > 0
                         ? `−${selectedCpRow.penambahanHutangFmt}`
-                        : "Rp\u00A0-"}
+                        : "Rp 0"}
                     </div>
                     <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-1">
                       Dana masuk / talangan rekanan
@@ -717,13 +717,13 @@ export function LaporanHutangPiutangClient({
                     <span className="text-[10px] font-sans uppercase block text-emerald-700/80 dark:text-emerald-400/80">
                       Total Penambahan (+)
                     </span>
-                    {totalPenambahanTx > 0 ? `+${formatStandardRupiah(totalPenambahanTx)}` : "Rp\u00A0-"}
+                    {totalPenambahanTx > 0 ? `+${formatStandardRupiah(totalPenambahanTx)}` : "Rp 0"}
                   </div>
                   <div className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3.5 py-2 rounded-xl font-bold whitespace-nowrap">
                     <span className="text-[10px] font-sans uppercase block text-rose-700/80 dark:text-rose-400/80">
                       Total Pengurangan (−)
                     </span>
-                    {totalPenguranganTx > 0 ? `−${formatStandardRupiah(totalPenguranganTx)}` : "Rp\u00A0-"}
+                    {totalPenguranganTx > 0 ? `−${formatStandardRupiah(totalPenguranganTx)}` : "Rp 0"}
                   </div>
                 </div>
               </div>
@@ -1504,7 +1504,7 @@ export function LaporanHutangPiutangClient({
                         return (
                           <td key={colEnt.key} className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
                             {cell.net === 0 ? (
-                              <span className="text-[11.5px] text-muted-faint font-mono whitespace-nowrap">Rp\u00A0-</span>
+                              <span className="text-[11.5px] text-muted-faint font-mono whitespace-nowrap">Rp 0</span>
                             ) : cell.net > 0 ? (
                               <span className="text-[11.5px] font-bold text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
                                 +{formatAccountingRupiah(cell.net)}
@@ -1673,13 +1673,13 @@ export function LaporanHutangPiutangClient({
                       Total Pemegang Saham
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400">
-                      {grupData.pemegangSahamSummary?.totalPiutangFmt ?? "Rp -"}
+                      {grupData.pemegangSahamSummary?.totalPiutangFmt ?? "Rp 0"}
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-rose-600 dark:text-rose-400">
-                      {grupData.pemegangSahamSummary?.totalHutangFmt ?? "Rp -"}
+                      {grupData.pemegangSahamSummary?.totalHutangFmt ?? "Rp 0"}
                     </td>
                     <td className="py-3.5 px-5 text-right font-mono text-[13.5px]">
-                      {grupData.pemegangSahamSummary?.netGlobalFmt ?? "Rp -"}
+                      {grupData.pemegangSahamSummary?.netGlobalFmt ?? "Rp 0"}
                     </td>
                     <td className="py-3.5 px-6 text-center text-[11px] text-muted font-normal">
                       {(grupData.pemegangSahamSummary?.netGlobal ?? 0) > 0 ? "Hak Tagih Bersih" : (grupData.pemegangSahamSummary?.netGlobal ?? 0) < 0 ? "Kewajiban Bersih" : "Nihil"}
@@ -1709,7 +1709,7 @@ export function LaporanHutangPiutangClient({
                   Total Piutang Lainnya
                 </span>
                 <span className="text-[15px] font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
-                  {grupData.piutangLainnyaSummary?.totalFmt ?? "Rp -"}
+                  {grupData.piutangLainnyaSummary?.totalFmt ?? "Rp 0"}
                 </span>
               </div>
             </div>
@@ -1742,7 +1742,7 @@ export function LaporanHutangPiutangClient({
                       Total Seluruh Entitas
                     </td>
                     <td className="py-3.5 px-5 text-right font-mono text-[13.5px] text-emerald-600 dark:text-emerald-400">
-                      {grupData.piutangLainnyaSummary?.totalFmt ?? "Rp -"}
+                      {grupData.piutangLainnyaSummary?.totalFmt ?? "Rp 0"}
                     </td>
                   </tr>
                 </tbody>

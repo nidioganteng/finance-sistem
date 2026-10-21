@@ -41,6 +41,7 @@ Selain field profil/penugasan yang sudah ada, setiap item dapat membawa:
 
 - `php tests/tenaga-ahli-gaji.php`
 - `node tests/tenaga-ahli-gaji.cjs`
+- `node tests/tenaga-ahli-tracking.cjs`
 - `npx tsc --noEmit --incremental false`
 - `npm run build`
 - PHP lint pada helper dan route yang berubah.
@@ -53,6 +54,22 @@ Menu Gaji Bulanan lama dikeluarkan dari navigasi Tenaga Ahli. Pengisian berpusat
 
 Tenaga ahli muncul di entitas tempat profilnya terdaftar maupun entitas proyek penugasannya. Contoh: profil di Gaharu dengan proyek Cipta Asri tetap tampil pada Gaharu; entitas profil dan proyek ditampilkan terpisah. Hak tulis staf menerima akses ke salah satu dari kedua entitas tersebut. Tidak ada profil duplikat yang dibuat untuk lintas entitas.
 
-Daftar awal dan halaman tindak lanjut menampilkan gaji yang telah diisi, pembayaran bruto dari seluruh riwayat proyek (termasuk tahun sebelumnya), dan **balance = total gaji terisi − sudah dibayar bruto**. Gaji yang masih kosong tidak dihitung sebagai nol: balance belum tersedia jika belum ada nominal yang diisi, dan diberi tanda **sementara** jika baru sebagian bulan terisi. Kelebihan bayar tetap ditampilkan sebagai balance negatif. Pembayaran lama berdasarkan NIK digabung dengan pembayaran berdasarkan rekananId tanpa menghitung transaksi yang sama dua kali. Bulan yang sudah pernah dibayar di luar rentang SPMK tetap ditampilkan pada tindak lanjut.
+Daftar awal dan halaman tindak lanjut menampilkan gaji yang telah diisi, pembayaran bruto pada periode yang dipilih, dan **balance = total gaji terisi − sudah dibayar bruto**. Pilihan Tahun di daftar atau Semua bulan kontrak di tindak lanjut menampilkan rentang yang lebih luas, termasuk riwayat tahun sebelumnya pada mode seluruh kontrak. Gaji yang masih kosong tidak dihitung sebagai nol: balance belum tersedia jika belum ada nominal yang diisi, dan diberi tanda **sementara** jika baru sebagian bulan terisi. Kelebihan bayar tetap ditampilkan sebagai balance negatif. Pembayaran lama berdasarkan NIK digabung dengan pembayaran berdasarkan rekananId tanpa menghitung transaksi yang sama dua kali. Bulan yang sudah pernah dibayar di luar rentang SPMK tetap ditampilkan pada tindak lanjut.
 
 Untuk fixture lokal sesuai screenshot, jalankan `php scripts/seed-tenaga-ahli-testing.php` sebagai preview, lalu tambahkan `--apply` untuk melengkapi referensi kosong pada profil **kevinnn / CAD-001** yang sudah ada: nama pekerjaan Landscape Taman Kota Palangka Raya, RAB Rp50.000.000, menman contoh 8, dan periode 21 Februari–21 Oktober 2026. Script tidak membuat profil/pembayaran baru, tidak menimpa referensi terisi atau data Sidamon, dan mempertahankan negosiasi/jadwal yang sudah disimpan. Gunakan input negosiasi di daftar untuk mencoba alur selanjutnya.
+
+## Rekap terpadu dan tracking per bulan
+
+Rekap Per Proyek, Rekap Setahun, Akumulasi Tenaga Ahli, dan Konsolidasi Holding sekarang memakai satu pembentuk data: `src/lib/tenaga-ahli-tracking.ts`. Sumber gaji terisi adalah `TenagaAhliGajiKontrak.jadwalJson`, dan sumber pembayaran adalah `HonorTenagaAhli` yang dinormalisasi melalui `honorTracking` pada respons payroll. Pembayaran lama yang tidak memiliki master tetap ikut terhitung. ID pembayaran dideduplikasi agar riwayat lewat NIK/rekanan tidak menggandakan total.
+
+Setiap rekap menampilkan gaji terisi, pembayaran bruto, PPh, netto, dan balance. Menyimpan gaji bulanan saja tidak membuat pembayaran, pajak, kas keluar, atau jurnal baru. Penyesuaian Gaji dan Sinkronisasi Laba Rugi tetap mencocokkan pembayaran riil dengan jurnal; ringkasan gaji terisi di Penyesuaian ditampilkan terpisah. Nilai RAB/negosiasi tidak menggantikan input bulanan dan tidak dianggap terbayar.
+
+Tampilan bulanan memfilter **bulan dan tahun** secara tepat. Rekap Setahun awalnya menampilkan satu tahun; menu periode dapat diubah ke bulan yang dipilih pada halaman. Rekap lain awalnya mengikuti bulan terpilih dan menyediakan pilihan Setahun. Klik detail kelompok untuk melihat baris orang/proyek/bulan, catatan, dan tanggal bayar. **Tracking bulan ini** membuka orang/proyek dengan periode baris tersebut.
+
+Daftar negosiasi mengikuti bulan terpilih untuk ringkasan nominal dan pembayaran, dengan pilihan Tahun untuk melihat semua input pada tahun itu. Tindak lanjut awalnya hanya memperlihatkan bulan terpilih; **Semua bulan kontrak** menampilkan seluruh jadwal untuk input beberapa bulan atau perpanjangan. Pergantian tampilan tidak menghapus bulan yang tersembunyi: penyimpanan tetap membawa jadwal lengkap. Modal Riwayat Gaji di database juga awalnya memfilter bulan/tahun terpilih.
+
+Periode gaji disimpan dari `bulan`/`tahun` form honor, sedangkan `tanggal` menyimpan tanggal pembayaran. Contoh: gaji Oktober yang dicatat dibayar pada November tetap masuk periode payroll Oktober, dengan tanggal bayar November terlihat di rincian. Payload lama tanpa bulan/tahun mengikuti tanggal. Keduanya harus valid; periode bulan 1–12 dan tahun 2000–2199. Rekonsiliasi jurnal tetap menggunakan periodenya sendiri dan dapat menunjukkan selisih jika tanggal pengeluaran berbeda.
+
+Pada rekap entitas, gaji terisi dialokasikan ke entitas profil, sedangkan pembayaran mengikuti entitas pembayar. Konsolidasi Holding mencakup semua entitas sekali tanpa menjumlahkan ulang data yang sama. Database menampilkan gaji terisi pada bulan yang dipilih sebagai pengganti Honor Standar; referensi RAB tetap tersedia pada data kontrak. Pengambilan payroll memakai `cache: no-store` agar refresh sesudah edit/pembayaran mengambil data terbaru.
+
+Verifikasi tambahan: `node tests/tenaga-ahli-tracking.cjs` mencakup dua bulan pembayaran, cicilan, duplikasi ID, perubahan gaji tersimpan, pembayaran lama tanpa master, perbedaan entitas/tahun, dan konsistensi total di semua pengelompokan. Uji MySQL lokal memakai fixture sementara: Februari/Maret dibayar Rp20 juta, gaji Oktober Rp15 juta belum dibayar. Semua rekap setahun sepakat pada gaji terisi Rp35 juta dan pembayaran Rp20 juta; filter Oktober hanya berisi gaji Rp15 juta dan pembayaran Rp0. Fixture pengujian dihapus/di-rollback; data asli pengguna dipertahankan.

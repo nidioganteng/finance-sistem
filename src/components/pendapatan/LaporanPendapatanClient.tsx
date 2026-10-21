@@ -826,9 +826,9 @@ export function LaporanPendapatanClient({
             }
             className="h-9 pl-3 pr-8 rounded-pill bg-surface-subtle border border-border-soft text-[13px] font-semibold text-navy-text focus:outline-none focus:border-brand cursor-pointer"
           >
-            <option value="">Semua Masa (12 Bulan)</option>
+            <option value="">Semua Masa</option>
             {NAMA_BULAN.map((m, idx) => (
-              <option key={idx + 1} value={idx + 1}>Bulan {idx + 1} — {m}</option>
+              <option key={idx + 1} value={idx + 1}>{m}</option>
             ))}
           </select>
 

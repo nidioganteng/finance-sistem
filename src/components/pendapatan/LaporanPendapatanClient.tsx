@@ -1259,7 +1259,7 @@ export function LaporanPendapatanClient({
                             title={f.ceklisPpn ? "Fisik PPN: Diterima — klik untuk ubah" : "Fisik PPN: Belum — klik untuk ceklis"}
                             className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
                               f.ceklisPpn
-                                ? "bg-muted-stronger/15 text-navy-text border-muted-stronger/30"
+                                ? "bg-brand text-white border-brand"
                                 : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
                             }`}
                           >
@@ -1272,7 +1272,7 @@ export function LaporanPendapatanClient({
                             title={f.ceklisPph ? "Fisik PPh: Diterima — klik untuk ubah" : "Fisik PPh: Belum — klik untuk ceklis"}
                             className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
                               f.ceklisPph
-                                ? "bg-muted-stronger/15 text-navy-text border-muted-stronger/30"
+                                ? "bg-brand text-white border-brand"
                                 : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
                             }`}
                           >
@@ -1285,7 +1285,7 @@ export function LaporanPendapatanClient({
                             title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima — klik untuk ubah" : "Bukti Potong: Belum — klik untuk ceklis"}
                             className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
                               f.ceklisBuktiPotong
-                                ? "bg-muted-stronger/15 text-navy-text border-muted-stronger/30"
+                                ? "bg-brand text-white border-brand"
                                 : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
                             }`}
                           >

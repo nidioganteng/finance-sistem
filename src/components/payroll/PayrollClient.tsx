@@ -60,6 +60,7 @@ import {
   PTKP_RATES,
   hitungPph21Ter,
 } from "@/lib/payroll";
+import { TenagaAhliNegosiasi } from "@/components/payroll/TenagaAhliNegosiasi";
 import { RekonsiliasiPajakGajiClient } from "@/components/pajak/RekonsiliasiPajakGajiClient";
 import { type RekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
 import {
@@ -152,6 +153,7 @@ function formatRupiahInput(val: string | number | undefined | null) {
 }
 
 const TENAGA_AHLI_SUBTABS = [
+  { key: "negosiasi" as const, label: "Pengisian Gaji & Negosiasi", description: "Negosiasi dan jadwal gaji per tenaga ahli", icon: DollarSign, hasIndicator: false },
   {
     key: "honor" as const,
     label: "Gaji Bulanan",
@@ -280,8 +282,8 @@ export function PayrollClient({
 
   // Sub-tab tenaga ahli: "honor" (Honor Per Bulan) | "rekap-proyek" (Rekap Per Proyek) | "rekap-bulan" (Rekap Gaji Setahun) | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
-    "honor" | "rekap-proyek" | "rekap-bulan" | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
-  >("honor");
+    "negosiasi" | "honor" | "rekap-proyek" | "rekap-bulan" | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
+  >("negosiasi");
   const [isAhliSubTabDropdownOpen, setIsAhliSubTabDropdownOpen] = useState(false);
   const ahliSubTabDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -3198,7 +3200,7 @@ export function PayrollClient({
                 />
               </div>
 
-              {isManager && (
+              {isManager && tenagaAhliSubTab !== "negosiasi" && (
                 <div>
                   {tenagaAhliSubTab === "penyesuaian" ? (
                     <Link
@@ -3239,8 +3241,27 @@ export function PayrollClient({
             </div>
           </div>
 
+          {tenagaAhliSubTab === "negosiasi" && <TenagaAhliNegosiasi
+            people={data.rekananTenagaAhli}
+            entityId={data.entity?.id}
+            canEdit={isManager}
+            search={searchQuery}
+            onAddManual={() => { setEditingMasterAhli(null); setIsMasterAhliModalOpen(true); }}
+            onRecord={(person, project, row) => {
+              openHonorModal(null, person.id, project.projectId);
+              const [year, month] = row.bulan.split("-").map(Number);
+              setModalHonorBulan(month);
+              setModalHonorTahun(year);
+              setModalHonorTanggal(`${row.bulan}-01`);
+              setModalHonorNominal(row.nominal || 0);
+              const rate = person.npwp ? 2.5 : 3;
+              setModalHonorNominalPph(Math.round(((row.nominal || 0) * rate) / 100));
+              setModalHonorUraian(`Honorarium Tenaga Ahli: ${person.nama} - Bulan ${BULAN_NAMES[month - 1]} ${year}`);
+            }}
+          />}
+
           {/* Stat Cards Tenaga Ahli */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          {tenagaAhliSubTab !== "negosiasi" && <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
             <div className="p-4 rounded-2xl border border-border bg-surface-card">
               <div className="text-[11px] font-medium text-muted-faint">
                 Transaksi Honorarium
@@ -3288,7 +3309,7 @@ export function PayrollClient({
                 Net diterima tenaga ahli
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* Sub-Tab 1: Gaji Bulanan Tenaga Ahli */}
           {tenagaAhliSubTab === "honor" && (
@@ -3455,6 +3476,12 @@ export function PayrollClient({
 
                             <td className="py-3 px-3.5 text-muted-stronger border-b border-r border-border">
                               <div>{h.uraian}</div>
+                              {(() => {
+                                const contract = data.rekananTenagaAhli.find(r => r.id === h.rekananId)?.proyekList?.find(p => p.projectId === h.projectId)?.gajiKontrak;
+                                const note = contract?.jadwal?.find(row => row.bulan === `${h.tahun}-${String(h.bulan).padStart(2, "0")}`)?.catatan;
+                                return note ? <details className="mt-1 text-xs text-amber-700 dark:text-amber-300"><summary className="cursor-pointer font-semibold"><AlertCircle size={12} className="inline mr-1" />Ada kendala · lihat catatan</summary><p className="whitespace-pre-wrap mt-1">{note}</p></details> : null;
+                              })()}
+
                               {(h.namaProyek || h.projectName) ? (
                                 <div className="text-[11px] text-brand font-semibold mt-0.5 inline-flex items-center gap-1">
                                   <Briefcase size={11} />

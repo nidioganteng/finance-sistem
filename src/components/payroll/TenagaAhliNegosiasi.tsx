@@ -195,11 +195,17 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
   const visibleRows = detailScope === "kontrak" ? rows : rows.filter(row => row.bulan === activePeriod);
   const [activeNoteMonth, setActiveNoteMonth] = useState<string | null>(null);
   const noteDialog = useRef<HTMLDialogElement>(null);
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  const [deleteMonth, setDeleteMonth] = useState<string | null>(null);
+  const deleteRow = rows.find(row => row.bulan === deleteMonth);
   const activeNote = rows.find(row => row.bulan === activeNoteMonth);
   const selectedNewMonth = newMonth || (rows.length ? bulanBerikutnya(rows[rows.length - 1].bulan) : ref.spmkMulai?.slice(0, 7)) || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   useEffect(() => {
     if (activeNoteMonth && noteDialog.current && !noteDialog.current.open) noteDialog.current.showModal();
   }, [activeNoteMonth]);
+  useEffect(() => {
+    if (deleteMonth && deleteDialog.current && !deleteDialog.current.open) deleteDialog.current.showModal();
+  }, [deleteMonth]);
   const manual = saved?.sumber !== "SIDAMON";
   const ready = (saved?.gajiNegosiasi ?? 0) > 0;
   const noteCount = visibleRows.filter(row => row.catatan.trim()).length;
@@ -310,13 +316,32 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
             <td className="px-3 py-2 align-middle text-xs"><div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
               <span className={history.length ? "font-medium tabular-nums text-emerald-700 dark:text-emerald-300" : "text-muted-faint"}>{history.length ? `${rp(paid)} dibayar` : row.nominal !== null && row.nominal > 0 ? "Otomatis saat disimpan" : "Menunggu input gaji"}</span>
             </div>{history.length > 0 && remaining !== null && <div className={`mt-0.5 text-[11px] ${remaining < 0 ? "text-rose-600" : "text-muted-faint"}`}>Sisa {rp(remaining)}</div>}</td>
-            {canEdit && <td className="px-3 py-2 align-middle"><button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-faint hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" disabled={pending || hasManualPayment} title={hasManualPayment ? "Bulan dengan pembayaran manual tidak dapat dihapus dari jadwal" : `Hapus ${monthLabel(row.bulan)}`} aria-label={`Hapus ${monthLabel(row.bulan)}`} onClick={() => { if (window.confirm(`Hapus ${monthLabel(row.bulan)} dari jadwal?${row.nominal !== null || row.catatan ? " Nominal, catatan, dan pembayaran otomatis bulan ini akan dihapus saat disimpan." : ""}`)) { setRows(rows.filter(item => item.bulan !== row.bulan)); changed(); } }}><Trash2 size={14} /></button></td>}
+            {canEdit && <td className="px-3 py-2 align-middle"><button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-faint hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" disabled={pending || hasManualPayment} title={hasManualPayment ? "Bulan dengan pembayaran manual tidak dapat dihapus dari jadwal" : `Hapus ${monthLabel(row.bulan)}`} aria-label={`Hapus ${monthLabel(row.bulan)}`} onClick={() => setDeleteMonth(row.bulan)}><Trash2 size={14} /></button></td>}
           </tr>;
         })}
         {visibleRows.length === 0 && <tr><td colSpan={canEdit ? 5 : 4} className="p-6 text-muted-faint text-center">Belum ada jadwal untuk {monthLabel(activePeriod)}. Pilih Semua bulan kontrak atau tambahkan bulan.</td></tr>}
       </tbody></table></div>
       <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}<span className="block mt-0.5">Menyimpan gaji sekaligus mencatat pembayaran otomatis untuk semua bulan terisi.</span></p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji & pembayaran"}</button>}</div>
     </div>}
+    <dialog ref={deleteDialog} onClose={() => setDeleteMonth(null)} aria-labelledby="delete-salary-month-title" aria-describedby="delete-salary-month-description" className="m-auto w-[calc(100%_-_2rem)] max-w-[380px] rounded-2xl border border-border-soft bg-surface-card p-0 text-foreground shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
+      {deleteRow && <>
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex items-start gap-3.5">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-500/15"><Trash2 size={16} className="text-status-red" /></div>
+            <div><h3 id="delete-salary-month-title" className="text-sm font-bold text-navy-text">Hapus bulan gaji?</h3><p id="delete-salary-month-description" className="mt-0.5 text-xs leading-relaxed text-muted-faint">Bulan ini akan dihapus dari jadwal setelah perubahan disimpan.</p></div>
+          </div>
+          <div className="mt-4 rounded-xl border border-border-soft bg-surface-subtle px-3.5 py-2.5">
+            <p className="text-xs font-bold text-navy-text">{monthLabel(deleteRow.bulan)}</p>
+            <p className="mt-1 text-xs text-muted-faint">{person.nama} · {project.projectCode}</p>
+            {(deleteRow.nominal !== null || deleteRow.catatan) && <p className="mt-2 text-xs leading-relaxed text-muted-faint">Nominal, catatan, dan pembayaran otomatis bulan ini ikut dihapus saat disimpan.</p>}
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-surface-subtle/50 px-5 py-3">
+          <button autoFocus type="button" disabled={pending} className="rounded-xl border border-border-soft px-4 py-2 text-xs font-semibold text-muted-stronger transition-colors hover:bg-surface-hover disabled:opacity-50" onClick={() => deleteDialog.current?.close()}>Batal</button>
+          <button type="button" disabled={pending || !canEdit} className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50" onClick={() => { setRows(previous => previous.filter(row => row.bulan !== deleteMonth)); changed(); deleteDialog.current?.close(); }}>Hapus bulan</button>
+        </div>
+      </>}
+    </dialog>
     <dialog ref={noteDialog} onClose={() => setActiveNoteMonth(null)} aria-labelledby="salary-note-title" className="m-auto w-full max-w-md rounded-xl border border-border bg-surface-card p-0 text-foreground shadow-xl backdrop:bg-slate-900/40">
       {activeNote && <>
         <div className="flex items-center justify-between border-b border-border px-4 py-3"><h3 id="salary-note-title" className="text-sm font-semibold">Catatan kendala · {monthLabel(activeNote.bulan)}</h3><button type="button" className={buttonClass} onClick={() => noteDialog.current?.close()}>Tutup</button></div>

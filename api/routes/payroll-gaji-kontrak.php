@@ -10,7 +10,7 @@ ensure_tenaga_ahli_tables($pdo);
 ensure_tenaga_ahli_gaji_table($pdo);
 $rekanan_id = is_string($body['rekananId'] ?? null) ? $body['rekananId'] : '';
 $project_id = is_string($body['projectId'] ?? null) ? $body['projectId'] : '';
-$stmt = $pdo->prepare("SELECT r.nama, r.entityId, p.entityId AS projectEntityId
+$stmt = $pdo->prepare("SELECT r.nama, r.nik, r.npwp, r.entityId, p.name AS projectName, p.entityId AS projectEntityId
     FROM Rekanan r JOIN Project p ON p.id = ?
     LEFT JOIN TenagaAhliProject tap ON tap.rekananId = r.id AND tap.projectId = p.id
     WHERE r.id = ? AND r.tipe = 'TENAGA_AHLI' AND (tap.id IS NOT NULL OR r.projectId = p.id) LIMIT 1");
@@ -65,10 +65,11 @@ try {
     $old_rows = $existing['jadwalJson'] === null ? [] : json_decode($existing['jadwalJson'], true, 512, JSON_THROW_ON_ERROR);
     $removed = array_diff(array_column($old_rows, 'bulan'), array_column($jadwal, 'bulan'));
     if ($removed) {
-        $paid = $pdo->prepare("SELECT DISTINCT tahun, bulan FROM HonorTenagaAhli WHERE rekananId = ? AND projectId = ?");
+        $paid = $pdo->prepare("SELECT id, tahun, bulan FROM HonorTenagaAhli WHERE rekananId = ? AND projectId = ?");
         $paid->execute([$rekanan_id, $project_id]);
         foreach ($paid->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            if (in_array(sprintf('%04d-%02d', $row['tahun'], $row['bulan']), $removed, true)) {
+            $period = sprintf('%04d-%02d', $row['tahun'], $row['bulan']);
+            if (in_array($period, $removed, true) && $row['id'] !== tenaga_ahli_auto_payment_id($rekanan_id, $project_id, $period)) {
                 $pdo->rollBack();
                 error_response('Bulan yang memiliki riwayat pembayaran tidak dapat dihapus dari jadwal.', 409);
             }
@@ -80,9 +81,10 @@ try {
         $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ? WHERE id = ?')
             ->execute([$nama_pekerjaan, $mm, $rab, $mulai, $selesai, $existing['id']]);
     }
+    tenaga_ahli_sync_pembayaran($pdo, $person, $rekanan_id, $project_id, $jadwal, $old_rows);
     $stmt->execute([$rekanan_id, $project_id]);
     $saved = tenaga_ahli_gaji_format($stmt->fetch(PDO::FETCH_ASSOC));
-    log_activity($user['id'], "Simpan negosiasi dan gaji bulanan tenaga ahli: {$person['nama']}", 'FINANCIAL_CHANGE', [
+    log_activity($user['id'], "Simpan negosiasi, gaji dan pembayaran otomatis tenaga ahli: {$person['nama']}", 'FINANCIAL_CHANGE', [
         'rekananId' => $rekanan_id, 'projectId' => $project_id,
         'sebelum' => tenaga_ahli_gaji_format($existing), 'sesudah' => $saved,
     ]);
@@ -90,5 +92,6 @@ try {
     json_response(['success' => true, 'data' => $saved]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    if ($e instanceof InvalidArgumentException) error_response($e->getMessage(), 400);
     throw $e;
 }

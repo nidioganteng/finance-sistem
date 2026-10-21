@@ -135,7 +135,8 @@ for (const [entityId, code, amount] of [['A', 'gh-001', 10000000], ['B', 'kn-001
 }
 const globalHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows: multiRows, people: multiPeople, entities: [{ id: 'A', key: 'gaharu', name: 'Gaharu' }, { id: 'B', key: 'kencana', name: 'Kencana' }], group: 'nama', entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' }));
 assert.match(globalHtml, /Semua entitas/); assert.match(globalHtml, /Ahli Belum Digaji/);
-assert.match(globalHtml, /GH-001/); assert.match(globalHtml, /KN-001/); assert.match(globalHtml, /25\.000\.000/);
+assert.doesNotMatch(globalHtml, /GH-001|KN-001|Tracking bulan ini/); assert.match(globalHtml, /25\.000\.000/);
+assert.match(globalHtml, /2 proyek · 2 input/);
 assert.match(globalHtml, /value="B">Kencana/);
 const navigationMocks = { usePathname: () => '/payroll', useSearchParams: () => new URLSearchParams('entity=gaharu') };
 const entityProps = { rows: multiRows, people: multiPeople, entities: [{ id: 'A', key: 'gaharu', name: 'Gaharu' }, { id: 'B', key: 'kencana', name: 'Kencana' }], group: 'nama', entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' };
@@ -145,7 +146,7 @@ const scopedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
   'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
 }).TenagaAhliReport;
 const scopedHtml = renderToStaticMarkup(React.createElement(scopedReport, entityProps));
-assert.match(scopedHtml, /15\.000\.000/); assert.match(scopedHtml, /KN-001/);
+assert.match(scopedHtml, /15\.000\.000/); assert.match(scopedHtml, /1 proyek · 1 input/);
 assert.doesNotMatch(scopedHtml, /GH-001|Ahli Belum Digaji/);
 const expandedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
   react: { ...React, useState: initial => React.useState(initial === null ? 'multi-nik' : initial) },
@@ -153,8 +154,27 @@ const expandedReport = compile('src/components/payroll/TenagaAhliReport.tsx', {
   'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
 }).TenagaAhliReport;
 const expandedHtml = renderToStaticMarkup(React.createElement(expandedReport, entityProps));
-assert.match(expandedHtml, /entity=kencana[^" ]*proyekAhliId=kn-001/);
-assert.match(expandedHtml, /entity=gaharu[^" ]*proyekAhliId=gh-001/);
+assert.match(expandedHtml, /GH-001/); assert.match(expandedHtml, /KN-001/);
+assert.match(expandedHtml, /Proyek \/ entitas/);
+assert.doesNotMatch(expandedHtml, /Bulan \/ tenaga ahli|Tracking bulan ini/);
+function renderProjectDetails(personKey, projectIds, props = entityProps) {
+  const Report = compile('src/components/payroll/TenagaAhliReport.tsx', {
+    react: { ...React, useState: initial => React.useState(initial === null ? personKey : typeof initial === 'object' ? Object.fromEntries(projectIds.map(id => [JSON.stringify([personKey, id]), true])) : initial) },
+    '@/lib/tenaga-ahli-tracking': tracking, 'next/navigation': navigationMocks,
+    'next/link': { default: ({ children, ...linkProps }) => React.createElement('a', linkProps, children) },
+  }).TenagaAhliReport;
+  return renderToStaticMarkup(React.createElement(Report, props));
+}
+const gaharuDetailHtml = renderProjectDetails('multi-nik', ['gh-001']);
+assert.match(gaharuDetailHtml, /Bulan \/ tenaga ahli/);
+assert.match(gaharuDetailHtml, /entity=gaharu[^" ]*proyekAhliId=gh-001/);
+assert.doesNotMatch(gaharuDetailHtml, /entity=kencana[^" ]*proyekAhliId=kn-001/);
+const bothDetailsHtml = renderProjectDetails('multi-nik', ['gh-001', 'kn-001']);
+assert.match(bothDetailsHtml, /entity=kencana[^" ]*proyekAhliId=kn-001/);
+assert.match(bothDetailsHtml, /entity=gaharu[^" ]*proyekAhliId=gh-001/);
+const emptyProjectHtml = renderProjectDetails('new-nik', ['gh-002']);
+assert.match(emptyProjectHtml, /GH-002/);
+assert.match(emptyProjectHtml, /Belum ada gaji terisi atau pembayaran pada periode ini/);
 assert.equal(tracking.groupTenagaAhliPeople([], multiPeople, undefined, 'tidak cocok').length, 0);
 const negotiatedPeople = [{ ...people[0], proyekList: [{ ...project('project-1', [salary('2026-02', 10000000), salary('2026-03', 10000000), salary('2026-04', null)]), gajiKontrak: { gajiNegosiasi: 35000000, gajiRab: 50000000, jadwal: [salary('2026-02', 10000000), salary('2026-03', 10000000), salary('2026-04', null)] } }] }];
 const negotiatedRows = build(negotiatedPeople, [feb, payment('mar-full', 3, 10000000)]);

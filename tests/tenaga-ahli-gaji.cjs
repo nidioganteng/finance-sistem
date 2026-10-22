@@ -38,6 +38,7 @@ const { TenagaAhliNegosiasi } = compile('src/components/payroll/TenagaAhliNegosi
   'next/navigation': { useRouter: () => ({ push() {}, refresh() {} }), usePathname: () => '/payroll', useSearchParams: () => query },
   '@/lib/actions/payroll': { saveGajiTenagaAhliKontrakAction() { throw new Error('Fixture tidak boleh menulis data'); } },
   '@/lib/tenaga-ahli-gaji': helpers,
+  '@/lib/tenaga-ahli-periode': compile('src/lib/tenaga-ahli-periode.ts'),
 });
 const contract = { id: 'c', rekananId: 'test-person', projectId: 'test-project', sumber: 'MANUAL', revision: 1,
   namaPekerjaan: 'Ahli struktur', manMonth: 2, gajiRab: 6000000, spmkMulai: '2026-12-01', spmkSelesai: '2027-01-31',
@@ -135,3 +136,19 @@ assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, ca
 assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '', pph21: 500000 }, []), 500000);
 assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '', pph21: 0 }, []), 0);
 assert.equal(helpers.pphGajiTenagaAhli({ bulan: '2026-03', nominal: 10000000, catatan: '' }, [{id:'old',nominalHonor:10000000,pph21:750000}]),750000);
+const { penugasanDalamPeriode: active } = compile('src/lib/tenaga-ahli-periode.ts');
+const term = { tanggalMulaiTugas: '2026-02-21', tanggalSelesaiTugas: '2026-03-01' };
+for (const [month, expected] of [[1,false],[2,true],[3,true],[4,false]]) assert.equal(active(term, { year: 2026, month }), expected);
+assert.equal(active(term, { year: 2025 }), false);
+assert.equal(active(term, { year: 2026, untilMonth: 1 }), false);
+assert.equal(active(term, { year: 2026, untilMonth: 4 }), true);
+const extended = { ...term, gajiKontrak: { jadwal: [{ bulan: '2026-04', nominal: null, catatan: '' }] } };
+assert.equal(active(extended, { year: 2026, month: 4 }), true);
+assert.equal(active({ ...extended, gajiKontrak: { jadwal: [] } }, { year: 2026, month: 4 }), false);
+assert.equal(active({ ...term, tanggalSelesaiTugas: '2026-05-31' }, { year: 2026, month: 5 }), true);
+assert.equal(active({ tanggalMulaiTugas: '2026-12-31', tanggalSelesaiTugas: '2027-01-01' }, { year: 2027, month: 1 }), true);
+query = new URLSearchParams();
+const datedProps = { ...props, year: 2026, people: [{ ...props.people[0], proyekList: [{ ...props.people[0].proyekList[0], ...term, gajiKontrak: null }] }] };
+for (const month of [1,4]) assert.doesNotMatch(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...datedProps, month })), /Freelance Uji/);
+for (const month of [2,3]) assert.match(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...datedProps, month })), /Freelance Uji/);
+assert.match(renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, { ...datedProps, month: 4, people: [{ ...datedProps.people[0], proyekList: [{ ...datedProps.people[0].proyekList[0], gajiKontrak: extended.gajiKontrak }] }] })), /Freelance Uji/);

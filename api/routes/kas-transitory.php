@@ -18,6 +18,7 @@ try {
                 $ok=transitory_fingerprint($source['rows'])===($snapshot['hash']??'') && transitory_allocated($pdo,$source['id'])<=transitory_cents($source['kredit']);
                 if(!$ok) $issue='Nominal atau rincian bukti cash out berubah.';
             } catch(Throwable $e) { $issue=$e->getMessage(); }
+            if((int)($row['accountingVersion']??1)!==2) { $ok=false; $issue='Data lama memerlukan migrasi pengakuan kas transitory.'; }
             if($summary['remaining']<0) { $ok=false; $issue='Saldo ditahan negatif.'; }
             try { transitory_check_payroll($pdo,$row); } catch(RuntimeException $e) { $ok=false; $issue=$e->getMessage(); }
             $held+=$summary['remaining']; $released+=$summary['released']; $reversed+=$summary['reversed'];
@@ -25,6 +26,8 @@ try {
             unset($row['sourceSnapshot']); $row['amount']=(float)$row['amount']; $row['revision']=(int)$row['revision'];
             $items[]=array_merge($row,$summary,['balanced'=>$ok,'balanceIssue'=>$issue,'events'=>$events]);
         }
+        $cash=transitory_cash_summary($pdo,[$entity],'2199-12-31');
+        if(!$cash['balanced']) $unbalanced=max(1,$unbalanced);
         // Hanya kas entry: baris jurnal/mirror tidak menggandakan pilihan sumber.
         $s=$pdo->prepare('SELECT t.*,p.code AS projectCode,p.name AS projectName FROM `Transaction` t LEFT JOIN Project p ON p.id=t.projectId WHERE t.entityId=? AND t.kredit>0 ORDER BY t.tanggal DESC,t.id'); $s->execute([$entity]); $sources=[];
         foreach($s->fetchAll(PDO::FETCH_ASSOC) as $candidate) {
@@ -40,7 +43,7 @@ try {
         foreach($s->fetchAll() as $r) $payroll[]=['id'=>$r['id'],'type'=>'HONOR','name'=>$r['nama'],'month'=>(int)$r['bulan'],'year'=>(int)$r['tahun'],'amount'=>(float)$r['nominalHonor']];
         $s=$pdo->prepare('SELECT g.id,p.nama,g.bulan,g.tahun,g.totalGajiBersih FROM GajiPegawaiBulanan g JOIN Pegawai p ON p.id=g.pegawaiId WHERE g.entityId=? ORDER BY g.tahun DESC,g.bulan DESC,p.nama'); $s->execute([$entity]);
         foreach($s->fetchAll() as $r) $payroll[]=['id'=>$r['id'],'type'=>'PEGAWAI','name'=>$r['nama'],'month'=>(int)$r['bulan'],'year'=>(int)$r['tahun'],'amount'=>(float)$r['totalGajiBersih']];
-        return json_response(['today'=>transitory_today(),'items'=>$items,'sources'=>$sources,'payroll'=>$payroll,'summary'=>['held'=>$held,'released'=>$released,'reversed'=>$reversed,'overdue'=>$overdue,'unbalanced'=>$unbalanced]]);
+        return json_response(['today'=>transitory_today(),'items'=>$items,'sources'=>$sources,'payroll'=>$payroll,'summary'=>['held'=>$held,'released'=>$released,'reversed'=>$reversed,'overdue'=>$overdue,'unbalanced'=>$unbalanced,'ledgerHeld'=>$cash['ledgerHeld'],'ledgerBalanced'=>$cash['balanced']]]);
     }
     if($method==='POST') {
         $action=$segments[2]??''; $id=$segments[1]??'';

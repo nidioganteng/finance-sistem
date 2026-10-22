@@ -13,11 +13,13 @@ const item = { id: 'test-hold', entityId: 'A', sourceTransactionId: 'cash', sour
 const data = { today: '2026-10-22', items: [item], sources: [], payroll: [], summary: { held: 4000000, released: 6000000, reversed: 0, overdue: 1, unbalanced: 1 } };
 let html = renderToStaticMarkup(React.createElement(KasTransitoryClient, { data, canReverse: true }));
 assert.match(html, /Kas Transitory|Dana ditahan/); assert.match(html, /Lewat target/); assert.match(html, /4\.000\.000/); assert.match(html, /6\.000\.000/);
+assert.match(html, /masih termasuk kas perusahaan/); assert.match(html, /Pengeluaran diakui saat diserahkan/);
 assert.match(html, /Unbalanced/); assert.match(html, /&lt;script&gt;Nama&lt;\/script&gt;/); assert.doesNotMatch(html, /<script>Nama/);
 assert.match(html, /disabled=""[^>]*>.*?Cairkan/); assert.match(html, /tidak tersedia untuk operasional/);
 let stateIndex = 0;
 const { KasTransitoryClient: ExpandedOnly } = compile('src/components/kas-transitory/KasTransitoryClient.tsx', { ...mocks, react: { ...React, useState: initial => React.useState(stateIndex++ === 2 ? item.id : initial) } });
 html = renderToStaticMarkup(React.createElement(ExpandedOnly, { data, canReverse: false }));
+assert.match(html, /Pencatatan:/); assert.match(html, /Diserahkan:/);
 assert.match(html, /Menunggu &lt;LPJ&gt;/); assert.match(html, /TRF-01/); assert.match(html, /Sudah diserahkan/); assert.match(html, /Sumber berubah/);
 assert.doesNotMatch(html, />Reversal<\/button>/);
 html = renderToStaticMarkup(React.createElement(KasTransitoryClient, { data: { ...data, items: [] }, canReverse: true }));

@@ -31,7 +31,7 @@ export function TenagaAhliReport({ rows, group, entityId, entityName, year, mont
   const scopeName = group === "holding" ? "Seluruh holding" : canSelectEntity && reportEntity === "all" ? "Semua entitas" : entityName;
   const visible = filterTenagaAhliTracking(rows, { year, month: activeScope === "bulan" ? month : undefined, untilMonth: activeScope === "kumulatif" ? month : undefined, entityId: filterEntity, search });
   const summary = summarizeTenagaAhliTracking(visible);
-  const groups = canSelectEntity ? groupTenagaAhliPeople(visible, people, filterEntity, search)
+  const groups = canSelectEntity ? groupTenagaAhliPeople(visible, people, filterEntity, search, { year, month: activeScope === "bulan" ? month : undefined, untilMonth: activeScope === "kumulatif" ? month : undefined })
     : groupTenagaAhliTracking(visible, group).map(item => ({ ...item, assignments: [] as ReturnType<typeof groupTenagaAhliPeople>[number]["assignments"] }));
   function detailUrl(row: TenagaAhliTrackingRow) {
     const next = new URLSearchParams(params.toString());

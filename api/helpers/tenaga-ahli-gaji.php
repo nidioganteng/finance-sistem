@@ -4,7 +4,7 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 function ensure_tenaga_ahli_gaji_table(PDO $pdo): void {
     static $done = false;
     if ($done) return;
-    $pdo->exec(file_get_contents(__DIR__ . '/../../database/migrations/2026-10-21-tenaga-ahli-gaji-negosiasi.sql'));
+    $pdo->exec(file_get_contents(__DIR__ . '/tenaga-ahli-gaji-schema.sql'));
     $done = true;
 }
 

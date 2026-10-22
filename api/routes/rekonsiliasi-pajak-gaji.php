@@ -22,11 +22,13 @@ $sub = $segments[1] ?? '';
 function ensure_rekonsiliasi_columns(PDO $pdo): void {
     static $done = false;
     if ($done) return;
-    $col = $pdo->query("SHOW COLUMNS FROM `GajiPegawaiBulanan` LIKE 'totalGajiTerlaporPajak'")->fetch();
-    if (!$col) {
-        $pdo->exec("ALTER TABLE `GajiPegawaiBulanan` ADD COLUMN `totalGajiTerlaporPajak` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `totalGajiKotor`");
-        $pdo->exec("UPDATE `GajiPegawaiBulanan` SET `totalGajiTerlaporPajak` = `totalGajiKotor` WHERE `totalGajiTerlaporPajak` = 0.00");
-    }
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM `GajiPegawaiBulanan` LIKE 'totalGajiTerlaporPajak'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE `GajiPegawaiBulanan` ADD COLUMN `totalGajiTerlaporPajak` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `totalGajiKotor`");
+            $pdo->exec("UPDATE `GajiPegawaiBulanan` SET `totalGajiTerlaporPajak` = `totalGajiKotor` WHERE `totalGajiTerlaporPajak` = 0.00");
+        }
+    } catch (PDOException $ignored) { /* Tabel GajiPegawaiBulanan belum ada – dilewati */ }
     $done = true;
 }
 

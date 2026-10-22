@@ -143,11 +143,14 @@ function ensure_tenaga_ahli_tables(PDO $pdo): void {
     }
 
     // GajiPegawaiBulanan.totalGajiTerlaporPajak: basis PPh 21 terlapor ke SPT
-    $col2 = $pdo->query("SHOW COLUMNS FROM `GajiPegawaiBulanan` LIKE 'totalGajiTerlaporPajak'")->fetch();
-    if (!$col2) {
-        $pdo->exec("ALTER TABLE `GajiPegawaiBulanan` ADD COLUMN `totalGajiTerlaporPajak` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `totalGajiKotor`");
-        $pdo->exec("UPDATE `GajiPegawaiBulanan` SET `totalGajiTerlaporPajak` = `totalGajiKotor` WHERE `totalGajiTerlaporPajak` = 0.00");
-    }
+    // Dibungkus try/catch: jika tabel belum ada (DB baru), lewati migrasi ini
+    try {
+        $col2 = $pdo->query("SHOW COLUMNS FROM `GajiPegawaiBulanan` LIKE 'totalGajiTerlaporPajak'")->fetch();
+        if (!$col2) {
+            $pdo->exec("ALTER TABLE `GajiPegawaiBulanan` ADD COLUMN `totalGajiTerlaporPajak` DECIMAL(18,2) NOT NULL DEFAULT 0.00 AFTER `totalGajiKotor`");
+            $pdo->exec("UPDATE `GajiPegawaiBulanan` SET `totalGajiTerlaporPajak` = `totalGajiKotor` WHERE `totalGajiTerlaporPajak` = 0.00");
+        }
+    } catch (PDOException $ignored) { /* Tabel GajiPegawaiBulanan belum ada – dilewati */ }
 
     $done = true;
 }

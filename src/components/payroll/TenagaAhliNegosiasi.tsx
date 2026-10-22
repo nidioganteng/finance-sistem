@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2 } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
 import { saveGajiTenagaAhliKontrakAction } from "@/lib/actions/payroll";
+import { penugasanDalamPeriode } from "@/lib/tenaga-ahli-periode";
 import {
   bulanBerikutnya, bulanDariSpmk, penugasanPadaEntitas, ringkasanGajiTenagaAhli, pphGajiTenagaAhli,
   type GajiTenagaAhliBulan, type ReferensiGajiTenagaAhli, type GajiTenagaAhliKontrak,
@@ -112,8 +113,9 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
     if (!selected) return <div className="rounded-xl border border-border bg-surface-card p-6 space-y-3"><p>Penugasan tenaga ahli tidak ditemukan pada entitas ini.</p><button className={buttonClass} onClick={() => navigate()}>Kembali ke daftar</button></div>;
     return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} />;
   }
-  const filtered = available.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
-  const warningCount = available.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
+  const inPeriod = available.filter(({ project }) => penugasanDalamPeriode(project, { year, month: listScope === "bulan" ? month : undefined }));
+  const filtered = inPeriod.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
+  const warningCount = filtered.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
   return <section className="rounded-2xl border border-border bg-surface-card overflow-hidden">
     <div className="p-5 border-b border-border flex flex-wrap gap-4 items-start justify-between">
       <div><h2 className="font-bold text-navy-text">Pengisian Gaji & Negosiasi</h2><p className="text-xs text-muted-faint mt-1">Pilih tenaga ahli, isi gaji negosiasi, lalu kelola gaji bulanan pada halaman pribadinya.</p></div>
@@ -123,7 +125,7 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
     <div className="overflow-x-auto"><table className="w-full text-sm text-left">
       <thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Tenaga ahli / data diri</th><th className="p-4">Nama pekerjaan / proyek</th><th className="p-4">Menman / Gaji RAB</th><th className="p-4 min-w-[180px]">Gaji negosiasi</th><th className="p-4">Gaji & pembayaran (bruto)</th><th className="p-4">Tindak lanjut</th></tr></thead>
       <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
-        {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan profil dan penugasan proyek melalui menu Database Tenaga Ahli."}</td></tr>}
+        {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{inPeriod.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : available.length ? "Tidak ada penugasan tenaga ahli pada periode ini. Periksa masa tugas atau bulan perpanjangan yang tersimpan." : "Belum ada tenaga ahli pada entitas ini. Tambahkan profil dan penugasan proyek melalui menu Database Tenaga Ahli."}</td></tr>}
       </tbody>
     </table></div>
   </section>;

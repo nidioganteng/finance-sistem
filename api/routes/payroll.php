@@ -4,6 +4,7 @@ require_once __DIR__ . '/../helpers/tenaga-ahli-gaji.php';
 require_once __DIR__ . '/../helpers/kas-helpers.php';
 require_once __DIR__ . '/../helpers/payroll-ptkp.php';
 require_once __DIR__ . '/../helpers/payroll-journal.php';
+require_once __DIR__ . '/../helpers/tenaga-ahli-periode.php';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 // $segments[0] = 'payroll'
@@ -2930,8 +2931,9 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
             $work = $pl_item['hasNamaPekerjaan'] ? $pl_item['namaPekerjaan'] : ($contract_ref['namaPekerjaan'] ?? null);
             $mm = $pl_item['hasManMonth'] ? $pl_item['manMonth'] : ($contract_ref['manMonth'] ?? null);
             if ($contract_ref) {
-                $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ?, revision = revision + 1 WHERE id = ?')
-                    ->execute([$work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'], $contract_ref['id']]);
+                $jadwal = tenaga_ahli_jadwal_masa_tugas($contract_ref, $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas']);
+                $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ?, jadwalJson = ?, revision = revision + 1 WHERE id = ?')
+                    ->execute([$work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'], $jadwal, $contract_ref['id']]);
             } else {
                 $pdo->prepare('INSERT INTO TenagaAhliGajiKontrak (id, rekananId, projectId, namaPekerjaan, manMonth, gajiRab, spmkMulai, spmkSelesai) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
                     ->execute([uuid4(), $record_id, $pl_item['projectId'], $work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas']]);

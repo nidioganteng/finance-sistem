@@ -1,5 +1,5 @@
 <?php
-// Entry point API — semua request masuk lewat sini via .htaccess
+// Entry point API — semua request masuk lewat sini via .htaccess (v2)
 // Pastikan error PHP tidak bocor ke JSON response
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);

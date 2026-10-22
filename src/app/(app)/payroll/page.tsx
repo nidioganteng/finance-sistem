@@ -45,13 +45,13 @@ export default async function PayrollPage({
     );
   }
 
+  let payrollError: string | null = null;
   const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
     getPayrollData(selectedEntity.id, year, month).catch((e: unknown) => {
-      console.error("[payroll] getPayrollData error:", e); return null;
+      payrollError = e instanceof Error ? e.message : String(e);
+      return null;
     }),
-    getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch((e: unknown) => {
-      console.error("[payroll] getRekonsiliasiPajakGajiData error:", e); return null;
-    }),
+    getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch(() => null),
     ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)
       ? getKasTransitory(selectedEntity.id).catch(() => null)
       : Promise.resolve(null),
@@ -63,6 +63,7 @@ export default async function PayrollPage({
         <PageHeader title={`Laporan Gaji – ${selectedEntity.name}`} subtitle="" rightSlot={<YearSelect currentYear={year} />} />
         <div className="mt-8 rounded-xl border border-border bg-surface-card p-6 text-sm text-muted-strong">
           <p className="font-semibold text-status-red">Gagal memuat data Laporan Gaji.</p>
+          {payrollError && <p className="mt-1 font-mono text-xs text-status-red/80">{payrollError}</p>}
           <p className="mt-2 text-xs text-muted">Pastikan server PHP aktif. Coba muat ulang halaman.</p>
         </div>
       </PageTransition>

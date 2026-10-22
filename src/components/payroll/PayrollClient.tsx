@@ -263,7 +263,7 @@ export function PayrollClient({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const trackingRows = useMemo(() => buildTenagaAhliTracking(data.rekananTenagaAhli, data.honorTracking || []), [data.rekananTenagaAhli, data.honorTracking]);
+  const trackingRows = useMemo(() => buildTenagaAhliTracking(data.rekananTenagaAhli ?? [], data.honorTracking ?? []), [data.rekananTenagaAhli, data.honorTracking]);
   const isManager =
     userRole === "MANAJER_KEUANGAN" ||
     userRole === "STAF_KEUANGAN" ||
@@ -321,18 +321,20 @@ export function PayrollClient({
 
   // Semua baris transaksi sinkronisasi (kombinasi 511 dan 612)
   const allSyncRows = useMemo(() => {
-    if (data.syncData.jurnalSemuaRows && data.syncData.jurnalSemuaRows.length > 0) {
-      return data.syncData.jurnalSemuaRows;
+    const syncData = data.syncData ?? {};
+    if (syncData.jurnalSemuaRows && syncData.jurnalSemuaRows.length > 0) {
+      return syncData.jurnalSemuaRows;
     }
-    return [...data.syncData.jurnalPegawaiRows, ...data.syncData.jurnalTenagaAhliRows].sort((a, b) =>
+    return [...(syncData.jurnalPegawaiRows ?? []), ...(syncData.jurnalTenagaAhliRows ?? [])].sort((a, b) =>
       b.tanggal.localeCompare(a.tanggal)
     );
   }, [data.syncData]);
 
   // Baris yang sedang ditampilkan berdasarkan tab aktif
   const displayedSyncRows = useMemo(() => {
-    if (syncDetailTab === "pegawai") return data.syncData.jurnalPegawaiRows;
-    if (syncDetailTab === "tenaga-ahli") return data.syncData.jurnalTenagaAhliRows;
+    const syncData = data.syncData ?? {};
+    if (syncDetailTab === "pegawai") return syncData.jurnalPegawaiRows ?? [];
+    if (syncDetailTab === "tenaga-ahli") return syncData.jurnalTenagaAhliRows ?? [];
     return allSyncRows;
   }, [syncDetailTab, data.syncData, allSyncRows]);
 
@@ -1078,7 +1080,7 @@ export function PayrollClient({
     return matchSearch && matchEntitas;
   });
 
-  const filteredRekananList = data.rekananTenagaAhli.filter((r) => {
+  const filteredRekananList = (data.rekananTenagaAhli ?? []).filter((r) => {
     const q = searchQuery.toLowerCase();
     const matchBasic =
       r.nama.toLowerCase().includes(q) ||
@@ -1097,7 +1099,7 @@ export function PayrollClient({
     return false;
   });
 
-  const honorAssignments = data.rekananTenagaAhli.find(person => person.id === selectedRekananIdForHonor)?.proyekList || [];
+  const honorAssignments = (data.rekananTenagaAhli ?? []).find(person => person.id === selectedRekananIdForHonor)?.proyekList || [];
   const honorProjectOptions = honorAssignments.map(project => ({ id: project.projectId, code: project.projectCode || "", name: project.projectName || "", entityName: project.projectEntityName || "" }));
   const projectListToUse: Array<{ id: string; code: string; name: string; entityId?: string; entityName: string }> =
     data.allProjects && data.allProjects.length > 0

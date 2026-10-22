@@ -9,7 +9,9 @@ import { TRANSITORY_CATEGORIES, type TransitoryData, type TransitoryItem } from 
 const rp = (value: number) => `Rp ${value.toLocaleString("id-ID", { maximumFractionDigits: 2 })}`;
 const date = (value: string) => new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 const input = "h-9 w-full rounded-lg border border-border bg-surface-card px-3 text-xs text-foreground disabled:opacity-50";
-const button = "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-navy-text hover:bg-surface-hover disabled:opacity-50";
+const buttonBase = "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold disabled:opacity-50";
+const button = `${buttonBase} text-navy-text hover:bg-surface-hover`;
+const primaryButton = `${buttonBase} bg-navy text-white hover:brightness-110`;
 const statuses = { HELD: "Ditahan", OVERDUE: "Lewat target", RELEASED: "Diserahkan", REVERSED: "Dibatalkan" };
 type DialogState = { action: "hold" | "release" | "reversal"; item?: TransitoryItem; requestId: string };
 
@@ -27,7 +29,7 @@ export function KasTransitoryClient({ data, canReverse }: { data: TransitoryData
         <div><h2 className="text-sm font-semibold text-navy-text">Dana ditahan</h2><p className={`mt-0.5 text-[11px] ${data.summary.unbalanced ? "text-status-red" : "text-muted"}`}>{data.summary.unbalanced ? `${data.summary.unbalanced} Unbalanced — periksa sumber cash out/payroll` : "Balance Check: sumber cash out dan rincian saldo sesuai"}</p></div>
         <div className="flex flex-wrap gap-2"><div className="relative"><Search size={14} className="absolute left-2.5 top-2.5 text-muted" /><input aria-label="Cari dana ditahan" className={`${input} !w-56 !pl-8`} placeholder="Nama, proyek, atau bukti…" value={search} onChange={e => setSearch(e.target.value)} /></div>
           <select aria-label="Status dana" className={`${input} !w-auto`} value={status} onChange={e => setStatus(e.target.value)}><option value="ALL">Semua status</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}<option value="UNBALANCED">Unbalanced</option></select>
-          <button className={`${button} !h-9 bg-navy text-white hover:bg-navy-light`} onClick={() => open("hold")}><Plus size={14} />Tambah dana ditahan</button>
+          <button className={`${primaryButton} !h-9`} onClick={() => open("hold")}><Plus size={14} />Tambah dana ditahan</button>
         </div>
       </div>
       <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs"><thead className="bg-surface-subtle text-muted"><tr>{["Penerima / tujuan", "Cash out / proyek", "Posisi uang", "Target", "Saldo ditahan", "Status / balance", "Tindak lanjut"].map(label => <th key={label} className="px-3 py-2 font-medium">{label}</th>)}</tr></thead><tbody>
@@ -99,7 +101,7 @@ function TransitoryDialog({ state, data, onClose, onSaved }: { state: DialogStat
         <label className="block space-y-1"><span>Nomor bukti {reversal ? "pengembalian / persetujuan" : "transfer / tanda terima"} *</span><input required disabled={pending} name="receipt" maxLength={255} className={input} /></label>
         <label className="block space-y-1"><span>{reversal ? "Alasan dan persetujuan pembatalan" : "Catatan akhir / penyerahan"} *</span><textarea required disabled={pending} name="note" maxLength={1000} className={`${input} !h-20 py-2`} /></label>
       </>}
-      <div className="flex justify-end gap-2 border-t border-border pt-3"><button type="button" disabled={pending} className={button} onClick={onClose}>Batal</button><button disabled={pending || hold && !source} className={`${button} ${reversal ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-navy text-white hover:bg-navy-light"}`} type="submit">{reversal && <Undo2 size={13} />}{pending ? "Menyimpan…" : hold ? "Simpan dana ditahan" : reversal ? "Simpan reversal" : "Catat penyerahan"}</button></div>
+      <div className="flex justify-end gap-2 border-t border-border pt-3"><button type="button" disabled={pending} className={button} onClick={onClose}>Batal</button><button disabled={pending || hold && !source} className={reversal ? `${buttonBase} bg-rose-600 text-white hover:bg-rose-700` : primaryButton} type="submit">{reversal && <Undo2 size={13} />}{pending ? "Menyimpan…" : hold ? "Simpan dana ditahan" : reversal ? "Simpan reversal" : "Catat penyerahan"}</button></div>
     </form>
   </dialog>;
 }

@@ -952,7 +952,10 @@ export function PayrollClient({
     setErrorMsg(null);
     setSuccessMsg(null);
     setMainTab(tab);
+    if (tab === "tenaga-ahli") setTenagaAhliSubTab("negosiasi");
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("ahliId");
+    params.delete("proyekAhliId");
     params.set("tab", tab);
     router.push(`${pathname}?${params.toString()}`);
   }
@@ -3156,6 +3159,12 @@ export function PayrollClient({
                           onClick={() => {
                             setTenagaAhliSubTab(tab.key);
                             setIsAhliSubTabDropdownOpen(false);
+                            if (searchParams.has("ahliId") || searchParams.has("proyekAhliId")) {
+                              const next = new URLSearchParams(searchParams.toString());
+                              next.delete("ahliId");
+                              next.delete("proyekAhliId");
+                              router.replace(`${pathname}?${next}`, { scroll: false });
+                            }
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left cursor-pointer ${
                             isActive

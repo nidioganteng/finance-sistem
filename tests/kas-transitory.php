@@ -5,11 +5,12 @@ require __DIR__.'/../api/helpers/kas-helpers.php';
 function uuid4(): string { return sprintf('%08s-%04s-%04s-%04s-%012s',bin2hex(random_bytes(4)),bin2hex(random_bytes(2)),bin2hex(random_bytes(2)),bin2hex(random_bytes(2)),bin2hex(random_bytes(6))); }
 class TransitoryPDO extends PDO {
     public function exec(string $statement): int|false {
-        if(str_contains($statement,'CREATE TABLE IF NOT EXISTS KasTransitory')) return 0;
+        if(str_contains($statement,'CREATE TABLE IF NOT EXISTS KasTransitory (')) return 0;
         return parent::exec($statement);
     }
 }
 $pdo=new TransitoryPDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
+transitory_ensure_voucher_sequence($pdo);
 // PDO subclass still needs the legacy SQLite registration on PHP 8.5.
 @$pdo->sqliteCreateFunction('JSON_VALUE',function($json,$path) { $value=(json_decode($json??'{}',true)?:[])[substr($path,2)]??null; return is_bool($value)?($value?'true':'false'):$value; },2);
 $pdo->exec("CREATE TABLE Entity(id TEXT PRIMARY KEY,`key` TEXT); INSERT INTO Entity VALUES ('A','gaharu'),('B','kencana');

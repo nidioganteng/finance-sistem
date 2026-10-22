@@ -3,6 +3,8 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 require_once __DIR__ . '/../helpers/tenaga-ahli-gaji.php';
 require_once __DIR__ . '/../helpers/kas-helpers.php';
 require_once __DIR__ . '/../helpers/payroll-ptkp.php';
+require_once __DIR__ . '/../helpers/payroll-journal.php';
+require_once __DIR__ . '/../helpers/tenaga-ahli-periode.php';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 // $segments[0] = 'payroll'
@@ -784,7 +786,7 @@ if ($method === 'GET' && $sub === '') {
     foreach ($honor_raw as $h) {
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
         $tgl_str = substr($h['tanggal'], 0, 10); // YYYY-MM-DD
@@ -918,7 +920,7 @@ if ($method === 'GET' && $sub === '') {
             $has_npwp      = !empty($ta['npwp']);
             $tarif_pph     = $has_npwp ? 2.5 : 3.0; // Standar PPh 21 Bukan Pegawai (50% x 5% = 2.5%, non-NPWP 120% = 3%)
             $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
-            $bersih        = max(0, $nominal_honor - $pph21);
+            $bersih        = $nominal_honor;
             $resolved_proj = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : ($pl['projectName'] ?? null);
             $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
             $unique_pending_id = 'pending_' . $ta['id'] . ($p_id ? '_' . $p_id : '');
@@ -1028,7 +1030,7 @@ if ($method === 'GET' && $sub === '') {
         $h_list = array_values($h_list);
         $bruto  = array_sum(array_column($h_list, 'nominalHonor'));
         $pph    = array_sum(array_column($h_list, 'pph21'));
-        $bersih = array_sum(array_column($h_list, 'nominalBersih'));
+        $bersih = array_sum(array_column($h_list, 'nominalHonor'));
         $rekap_bulanan_ta[] = [
             'bulan'              => $m,
             'bulanName'          => $bulan_names[$m - 1],
@@ -1145,7 +1147,7 @@ if ($method === 'GET' && $sub === '') {
         $key = trim($h['nik'] ?? '') ?: trim($h['nama']);
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek'] ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
         $bulan_name = $bulan_names[(int)$h['bulan'] - 1] ?? "Bulan {$h['bulan']}";
         $tgl_str = substr($h['tanggal'], 0, 10);
@@ -1242,7 +1244,7 @@ if ($method === 'GET' && $sub === '') {
         $rek_key = trim($h['rekananId'] ?? '');
         $bruto   = (float)$h['nominalHonor'];
         $pph     = (float)$h['pph21'];
-        $bersih  = (float)$h['nominalBersih'];
+        $bersih  = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek'] ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
         $bulan_name = $bulan_names[(int)$h['bulan'] - 1] ?? "Bulan {$h['bulan']}";
         $tgl_str = substr($h['tanggal'], 0, 10);
@@ -1294,7 +1296,7 @@ if ($method === 'GET' && $sub === '') {
         $key    = $h['nik'] ?: $h['nama'];
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
 
         if (!isset($konsolidasi_map[$key])) {
             $konsolidasi_map[$key] = [
@@ -1361,7 +1363,7 @@ if ($method === 'GET' && $sub === '') {
         if ((int)$h['bulan'] !== $month) continue;
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
         $tgl_str = substr($h['tanggal'], 0, 10);
@@ -1455,7 +1457,7 @@ if ($method === 'GET' && $sub === '') {
             $has_npwp      = !empty($ta['npwp']);
             $tarif_pph     = $has_npwp ? 2.5 : 3.0;
             $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
-            $bersih        = max(0, $nominal_honor - $pph21);
+            $bersih        = $nominal_honor;
             $resolved_proj = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : ($pl['projectName'] ?? null);
             $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
 
@@ -1561,7 +1563,7 @@ if ($method === 'GET' && $sub === '') {
         $proj_key = $h['projectId'] ?: '__none__';
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $proj_name = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
 
@@ -1633,7 +1635,7 @@ if ($method === 'GET' && $sub === '') {
          ORDER BY t.tanggal DESC, t.noBukti DESC"
     );
     $stmt->execute([$entity_id, $year_start, $year_end, (string)$year, (string)$year . '%']);
-    $tx_gaji_tahun = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $tx_gaji_tahun = payroll_journal_net_rows($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), $entity_id);
 
     $tx_pegawai_tahun = [];
     $tx_ta_tahun      = [];
@@ -1709,6 +1711,9 @@ if ($method === 'GET' && $sub === '') {
             'debitFmt'               => fmt_rp_payroll($d),
             'kredit'                 => $k,
             'kreditFmt'              => fmt_rp_payroll($k),
+            'expenseAmount'          => $t['expenseAmount'],
+            'expenseAmountFmt'       => fmt_rp_payroll($t['expenseAmount']),
+            'hasTransitory'          => $t['hasTransitory'],
             'staffName'              => $t['staff_name'] ?? null,
         ];
 
@@ -1722,15 +1727,15 @@ if ($method === 'GET' && $sub === '') {
     $tx_pegawai_bulan = array_values(array_filter($tx_pegawai_tahun, fn($t) => $t['bulan'] === $month));
     $tx_ta_bulan      = array_values(array_filter($tx_ta_tahun,      fn($t) => $t['bulan'] === $month));
 
-    $total_jurnal_pegawai_bulan  = array_sum(array_column($tx_pegawai_bulan, 'debit'));
-    $total_jurnal_pegawai_tahun  = array_sum(array_column($tx_pegawai_tahun, 'debit'));
+    $total_jurnal_pegawai_bulan  = array_sum(array_column($tx_pegawai_bulan, 'expenseAmount'));
+    $total_jurnal_pegawai_tahun  = array_sum(array_column($tx_pegawai_tahun, 'expenseAmount'));
     $total_payload_pegawai_bulan = $summary_bulan_ini['totalGajiKotor'];
     $total_payload_pegawai_tahun = array_sum(array_column($rekap_bulanan_pegawai, 'totalGajiKotor'));
     $selisih_pgw_bulan           = abs($total_payload_pegawai_bulan - $total_jurnal_pegawai_bulan);
     $selisih_pgw_tahun           = abs($total_payload_pegawai_tahun - $total_jurnal_pegawai_tahun);
 
-    $total_jurnal_ta_bulan  = array_sum(array_column($tx_ta_bulan,  'debit'));
-    $total_jurnal_ta_tahun  = array_sum(array_column($tx_ta_tahun,  'debit'));
+    $total_jurnal_ta_bulan  = array_sum(array_column($tx_ta_bulan,  'expenseAmount'));
+    $total_jurnal_ta_tahun  = array_sum(array_column($tx_ta_tahun,  'expenseAmount'));
     $total_payload_ta_bulan = $summary_honor_bulan_ini['totalHonorBruto'];
     $total_payload_ta_tahun = array_sum(array_column($rekap_bulanan_ta, 'totalHonorBruto'));
     $selisih_ta_bulan       = abs($total_payload_ta_bulan - $total_jurnal_ta_bulan);
@@ -2471,7 +2476,7 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
     } catch (InvalidArgumentException $e) {
         return error_response($e->getMessage(), 400);
     }
-    $nominal_bersih = max(0, $nominal_honor - $pph21);
+    $nominal_bersih = $nominal_honor;
 
     // Jika rekananId belum ada, cek match NIK/NPWP
     if (!$final_rekanan_id) {
@@ -2926,8 +2931,9 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli' && $sub2 === '') {
             $work = $pl_item['hasNamaPekerjaan'] ? $pl_item['namaPekerjaan'] : ($contract_ref['namaPekerjaan'] ?? null);
             $mm = $pl_item['hasManMonth'] ? $pl_item['manMonth'] : ($contract_ref['manMonth'] ?? null);
             if ($contract_ref) {
-                $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ?, revision = revision + 1 WHERE id = ?')
-                    ->execute([$work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'], $contract_ref['id']]);
+                $jadwal = tenaga_ahli_jadwal_masa_tugas($contract_ref, $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas']);
+                $pdo->prepare('UPDATE TenagaAhliGajiKontrak SET namaPekerjaan = ?, manMonth = ?, gajiRab = ?, spmkMulai = ?, spmkSelesai = ?, jadwalJson = ?, revision = revision + 1 WHERE id = ?')
+                    ->execute([$work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas'], $jadwal, $contract_ref['id']]);
             } else {
                 $pdo->prepare('INSERT INTO TenagaAhliGajiKontrak (id, rekananId, projectId, namaPekerjaan, manMonth, gajiRab, spmkMulai, spmkSelesai) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
                     ->execute([uuid4(), $record_id, $pl_item['projectId'], $work, $mm, $pl_item['nominalHonorBulanan'], $pl_item['tanggalMulaiTugas'], $pl_item['tanggalSelesaiTugas']]);

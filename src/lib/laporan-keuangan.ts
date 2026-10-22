@@ -89,6 +89,7 @@ type PhpCoaLine = {
 type PhpRekap = Record<string, { beban?: number; akumulasi?: number; count?: number; harga_perolehan?: number; nilai_buku?: number }>;
 
 type PhpLaporanKeuanganRaw = {
+  kas?: { kasTotal: number; kasTersedia: number; kasDitahan: number; kasAwal: number };
   entityIds: string[];
   entities: { id: string; key: string; name: string }[];
   year: number;
@@ -249,16 +250,16 @@ export async function getLaporanKeuanganData(
   const kasPendanaan = 0; // PHP doesn't return pendanaan breakdown separately
 
   // Kas awal = zero (PHP doesn't compute it; would need SaldoAwal query)
-  const kasAwal = 0;
+  const kasAwal = raw.kas?.kasAwal ?? 0;
   const kenaikanBersihKas = kasOperasi + kasInvestasi + kasPendanaan;
-  const kasAkhir = kasAwal + kenaikanBersihKas;
+  const kasAkhir = raw.kas?.kasTotal ?? kasAwal + kenaikanBersihKas;
 
   // Total kas+bank from aktiva lancar (codes starting with 1 typically = kas/bank aset)
-  const totalKasBank = aktivaLancar
+  const totalKasBank = raw.kas?.kasTotal ?? aktivaLancar
     .filter((a) => /^1/.test(a.code))
     .reduce((s, a) => s + a.saldo, 0);
 
-  const arusKasBalanced = Math.abs(kasAkhir - totalKasBank) < 1 || totalKasBank === 0;
+  const arusKasBalanced = Math.abs(kasAwal + kenaikanBersihKas - kasAkhir) < 1 || totalKasBank === 0;
 
   const perubahanAsetNonKas = 0;
   const perubahanKewajiban = 0;

@@ -206,7 +206,11 @@ function compute_projects_expenses_and_breakdowns(PDO $pdo, array $projects): ar
                 ];
             }
 
-            if ($debit <= 0) continue;
+            if (!empty($extra['transitoryAccounting']) || !empty($extra['transitoryReversalId'])) {
+                if ($c_kat!=='BEBAN') continue;
+                $debit -= $kredit;
+                if (abs($debit)<0.005) continue;
+            } elseif ($debit <= 0) continue;
 
             $is_crossing = !empty($extra['isCrossingEntry']) || !empty($extra['crossingFromEntityKey']);
 

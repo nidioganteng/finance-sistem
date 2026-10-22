@@ -62,6 +62,7 @@ import {
   hitungPph21Ter,
 } from "@/lib/payroll";
 import { TenagaAhliReport } from "@/components/payroll/TenagaAhliReport";
+import { TenagaAhliPaidSummary } from "@/components/payroll/TenagaAhliPaidSummary";
 import { buildTenagaAhliTracking, type TenagaAhliPayment } from "@/lib/tenaga-ahli-tracking";
 import { TenagaAhliNegosiasi } from "@/components/payroll/TenagaAhliNegosiasi";
 import { PtkpSettingsModal } from "@/components/payroll/PtkpSettingsModal";
@@ -284,6 +285,7 @@ export function PayrollClient({
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
     "negosiasi" | "rekap-proyek" | "rekap-bulan" | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   >("negosiasi");
+  const showAhliNameSearch = ["negosiasi", "database-ahli", "rekap-nama"].includes(tenagaAhliSubTab);
   const [isAhliSubTabDropdownOpen, setIsAhliSubTabDropdownOpen] = useState(false);
   const ahliSubTabDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -620,7 +622,8 @@ export function PayrollClient({
       ? new Date(tx.tanggal).toISOString().split("T")[0]
       : `${tx.tahun || selectedYear}-${String(tx.bulan || selectedMonth).padStart(2, "0")}-01`;
     setModalHonorTanggal(dStr);
-    setModalHonorNominal(tx.debit || 0);
+    const expense = tx.expenseAmount ?? (tx.debit - tx.kredit);
+    setModalHonorNominal(expense || 0);
     setModalHonorNoBukti(tx.noBukti || "");
     setModalHonorUraian(tx.keterangan || "");
     if (tx.projectId) {
@@ -633,7 +636,7 @@ export function PayrollClient({
       setModalHonorPtkp(defaultRekanan.ptkp || "TK/0");
       const pphRate = defaultRekanan.npwp ? 2.5 : 3.0;
       setModalHonorTarifPph(pphRate);
-      setModalHonorNominalPph(tx.debit > 0 ? Math.round((tx.debit * pphRate) / 100) : 0);
+      setModalHonorNominalPph(expense > 0 ? Math.round((expense * pphRate) / 100) : 0);
     }
     setIsHonorModalOpen(true);
   }
@@ -949,7 +952,10 @@ export function PayrollClient({
     setErrorMsg(null);
     setSuccessMsg(null);
     setMainTab(tab);
+    if (tab === "tenaga-ahli") setTenagaAhliSubTab("negosiasi");
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("ahliId");
+    params.delete("proyekAhliId");
     params.set("tab", tab);
     router.push(`${pathname}?${params.toString()}`);
   }
@@ -1047,7 +1053,7 @@ export function PayrollClient({
   );
   const totalHonorBersihFiltered = paidHonorList.reduce(
     (acc, h) =>
-      acc + (h.nominalBersih || Math.max(0, h.nominalHonor - (h.pph21 || 0))),
+      acc + (h.nominalHonor),
     0
   );
 
@@ -2056,7 +2062,7 @@ export function PayrollClient({
                         : data.penyesuaianJurnal.pegawai.totalJurnalTahunFmt}
                     </div>
                     <p className="text-[11px] text-muted-faint">
-                      Total debet akun 511 ({periodeFilterPegawai === "bulan" ? data.penyesuaianJurnal.pegawai.transaksiBulan.length : data.penyesuaianJurnal.pegawai.transaksiTahun.length} transaksi)
+                      Beban bersih akun 511 ({periodeFilterPegawai === "bulan" ? data.penyesuaianJurnal.pegawai.transaksiBulan.length : data.penyesuaianJurnal.pegawai.transaksiTahun.length} transaksi)
                     </p>
                   </div>
 
@@ -2102,7 +2108,7 @@ export function PayrollClient({
                         <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px] border-b border-r border-border">Kode & Nama Akun</th>
                         <th className="py-2.5 px-3.5 border-b border-r border-border">Keterangan / Uraian</th>
                         <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[120px] border-b border-r border-border">Proyek</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px] border-b border-r border-border">Pengeluaran (Debit)</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px] border-b border-r border-border">Beban Bersih</th>
                         <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[90px] border-b border-border">Staff</th>
                       </tr>
                     </thead>
@@ -2199,7 +2205,7 @@ export function PayrollClient({
                               )}
                             </td>
                             <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm whitespace-nowrap border-b border-r border-border">
-                              {tx.debitFmt}
+                              {tx.expenseAmountFmt ?? formatRupiah(tx.debit - tx.kredit)}
                             </td>
                             <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint whitespace-nowrap border-b border-border">
                               {tx.staffName || "-"}
@@ -3153,6 +3159,12 @@ export function PayrollClient({
                           onClick={() => {
                             setTenagaAhliSubTab(tab.key);
                             setIsAhliSubTabDropdownOpen(false);
+                            if (searchParams.has("ahliId") || searchParams.has("proyekAhliId")) {
+                              const next = new URLSearchParams(searchParams.toString());
+                              next.delete("ahliId");
+                              next.delete("proyekAhliId");
+                              router.replace(`${pathname}?${next}`, { scroll: false });
+                            }
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left cursor-pointer ${
                             isActive
@@ -3199,7 +3211,7 @@ export function PayrollClient({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <div className="relative flex-1 sm:w-60">
+              {showAhliNameSearch && <div className="relative flex-1 sm:w-60">
                 <Search
                   size={14}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-faint"
@@ -3211,7 +3223,7 @@ export function PayrollClient({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-8 w-full pl-8 pr-3 text-xs rounded-xl border border-border bg-surface-card text-foreground"
                 />
-              </div>
+              </div>}
 
               {isManager && tenagaAhliSubTab !== "negosiasi" && (
                 <div>
@@ -3260,7 +3272,6 @@ export function PayrollClient({
             month={selectedMonth}
             canEdit={isManager}
             search={searchQuery}
-            onAddManual={() => { setEditingMasterAhli(null); setIsMasterAhliModalOpen(true); }}
           />}
 
           {(["rekap-proyek", "rekap-bulan", "rekap-nama", "konsolidasi"] as string[]).includes(tenagaAhliSubTab) && <TenagaAhliReport
@@ -3271,11 +3282,11 @@ export function PayrollClient({
             entities={data.allEntities}
             group={tenagaAhliSubTab === "rekap-proyek" ? "proyek" : tenagaAhliSubTab === "rekap-bulan" ? "bulan" : tenagaAhliSubTab === "konsolidasi" ? "holding" : "nama"}
             entityId={data.entity?.id} entityName={data.entity?.name}
-            year={selectedYear} month={selectedMonth} search={searchQuery}
+            year={selectedYear} month={selectedMonth} search={showAhliNameSearch ? searchQuery : ""}
           />}
           {(tenagaAhliSubTab === "database-ahli" || tenagaAhliSubTab === "penyesuaian") && <TenagaAhliReport
             rows={trackingRows} group="nama" entityId={data.entity?.id} entityName={data.entity?.name}
-            year={selectedYear} month={selectedMonth} search={searchQuery} summaryOnly
+            year={selectedYear} month={selectedMonth} search={showAhliNameSearch ? searchQuery : ""} summaryOnly
             periodScope={tenagaAhliSubTab === "penyesuaian" ? periodeFilterAhli : "bulan"}
           />}
 
@@ -3400,7 +3411,7 @@ export function PayrollClient({
                         : data.penyesuaianJurnal.tenagaAhli.totalJurnalTahunFmt}
                     </div>
                     <p className="text-[11px] text-muted-faint">
-                      Total debet akun 612 ({periodeFilterAhli === "bulan" ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan.length : data.penyesuaianJurnal.tenagaAhli.transaksiTahun.length} transaksi)
+                      Beban bersih akun 612 ({periodeFilterAhli === "bulan" ? data.penyesuaianJurnal.tenagaAhli.transaksiBulan.length : data.penyesuaianJurnal.tenagaAhli.transaksiTahun.length} transaksi)
                     </p>
                   </div>
 
@@ -3446,7 +3457,7 @@ export function PayrollClient({
                         <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[140px] border-b border-r border-border">Kode & Nama Akun</th>
                         <th className="py-2.5 px-3.5 border-b border-r border-border">Keterangan / Uraian</th>
                         <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[120px] border-b border-r border-border">Proyek</th>
-                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px] border-b border-r border-border">Pengeluaran (Debit)</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[140px] border-b border-r border-border">Beban Bersih</th>
                         <th className="py-2.5 px-3.5 text-center whitespace-nowrap min-w-[90px] border-b border-border">Staff</th>
                       </tr>
                     </thead>
@@ -3543,7 +3554,7 @@ export function PayrollClient({
                               )}
                             </td>
                             <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text text-sm whitespace-nowrap border-b border-r border-border">
-                              {tx.debitFmt}
+                              {tx.expenseAmountFmt ?? formatRupiah(tx.debit - tx.kredit)}
                             </td>
                             <td className="py-3 px-3.5 text-center text-[11px] text-muted-faint whitespace-nowrap border-b border-border">
                               {tx.staffName || "-"}
@@ -3585,10 +3596,10 @@ export function PayrollClient({
               <div className="p-4 border-b border-border bg-surface-subtle/30">
                 <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                   <Users size={16} className="text-navy" />
-                  <span>Database Pegawai Tenaga Ahli (Master Rekanan)</span>
+                  <span>Database Tenaga Ahli</span>
                 </h3>
                 <p className="text-xs text-muted-faint mt-0.5">
-                  Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
+                  Daftar profil dan penugasan tenaga ahli. Kolom pembayaran menampilkan gaji yang sudah tercatat beserta bulan gajinya untuk tahun dipilih, dari seluruh proyek.
                 </p>
               </div>
 
@@ -3602,7 +3613,7 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">Proyek Penugasan</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">Masa Tugas / Kontrak</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[150px] border-b border-r border-border">Status Lapangan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Gaji terisi bulan dipilih</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Sudah dibayar · {selectedYear}</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[160px] border-b border-r border-border">NIK & NPWP</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px] border-b border-border">Aksi</th>
                     </tr>
@@ -3755,26 +3766,8 @@ export function PayrollClient({
                               )}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                              {pList.length === 0 ? (
-                                <span>Belum diisi</span>
-                              ) : (
-                                <div className="space-y-1.5 py-0.5 text-right font-mono">
-                                  {pList.map((pl, pIdx) => (
-                                    <div key={pIdx} className="font-bold text-navy-text text-xs">
-                                      {(() => {
-                                        const salary = pl.gajiKontrak?.jadwal?.find(row => row.bulan === `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`);
-                                        return salary?.nominal == null ? "Belum diisi" : formatRupiah(salary.nominal);
-                                      })()}
-                                    </div>
-                                  ))}
-                                  {pList.length > 1 && (
-                                    <div className="text-[10px] text-muted-faint border-t border-border/60 pt-0.5 font-semibold">
-                                      Total terisi: {formatRupiah(pList.reduce((sum, project) => sum + (project.gajiKontrak?.jadwal?.find(row => row.bulan === `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`)?.nominal ?? 0), 0))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                            <td className="py-3 px-3.5 align-top border-b border-r border-border">
+                              <TenagaAhliPaidSummary history={r.riwayatGaji} year={selectedYear} />
                             </td>
 
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">
@@ -3822,7 +3815,7 @@ export function PayrollClient({
                                           itemSub: `NIK: ${r.nik || "-"} · NPWP: ${r.npwp || "-"}`,
                                           warningNote:
                                             "Tindakan ini hanya diperbolehkan jika belum ada riwayat pembayaran honorarium pada tenaga ahli ini.",
-                                          confirmLabel: "Ya, Hapus Rekanan",
+                                          confirmLabel: "Ya, Hapus Tenaga Ahli",
                                           onConfirm: async () => {
                                             try {
                                               const res = await deleteTenagaAhliMasterAction(r.id);
@@ -3977,7 +3970,7 @@ export function PayrollClient({
                       Daftar Transaksi yang Ditarik Langsung dari Jurnal Umum
                     </h4>
                     <p className="text-[11px] text-muted-faint">
-                      Transaksi beban penggajian riil dari Jurnal Umum entitas {data.entity?.name} (Bulan {BULAN_NAMES[selectedMonth - 1]} {selectedYear})
+                      Beban bersih per bukti asal entitas {data.entity?.name} (Bulan {BULAN_NAMES[selectedMonth - 1]} {selectedYear}). Dana ditahan belum menjadi beban; pencairan dihitung sekali pada periode asal.
                     </p>
                   </div>
                 </div>
@@ -4037,7 +4030,7 @@ export function PayrollClient({
                       <th className="py-2.5 px-3 whitespace-nowrap min-w-[150px] border-b border-r border-border">Kode Akun</th>
                       <th className="py-2.5 px-3 border-b border-r border-border">Keterangan</th>
                       <th className="py-2.5 px-3 whitespace-nowrap min-w-[120px] border-b border-r border-border">Proyek</th>
-                      <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[130px] border-b border-r border-border">Debit (Beban)</th>
+                      <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[130px] border-b border-r border-border">Beban Bersih</th>
                       <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[90px] border-b border-r border-border">Staff</th>
                       <th className="py-2.5 px-3 text-center whitespace-nowrap min-w-[110px] border-b border-border">Aksi</th>
                     </tr>
@@ -4114,6 +4107,7 @@ export function PayrollClient({
                           </td>
                           <td className="py-2.5 px-3 text-muted-stronger border-b border-r border-border">
                             {tx.keterangan}
+                            {tx.hasTransitory && <div className="mt-1 text-[10px] text-muted-faint">Termasuk penyesuaian Kas Transitory · rincian jurnal tetap tersimpan</div>}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap border-b border-r border-border">
                             {tx.namaProyek ? (
@@ -4126,13 +4120,15 @@ export function PayrollClient({
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                            {tx.debitFmt}
+                            {tx.expenseAmountFmt ?? formatRupiah(tx.debit - tx.kredit)}
                           </td>
                           <td className="py-2.5 px-3 text-center text-[11px] text-muted-faint whitespace-nowrap border-b border-r border-border">
                             {tx.staffName || "-"}
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap border-b border-border">
-                            {tx.coaCode === "612" ? (
+                            {(tx.expenseAmount ?? (tx.debit - tx.kredit)) <= 0 ? (
+                              <span className="text-[10px] text-muted-faint">Belum ada beban dicatat</span>
+                            ) : tx.coaCode === "612" ? (
                               <button
                                 type="button"
                                 onClick={() => openHonorModalFromJurnal(tx)}
@@ -4166,7 +4162,7 @@ export function PayrollClient({
                     <tfoot className="bg-surface-subtle font-bold text-xs">
                       <tr>
                         <td colSpan={5} className="py-2.5 px-3 text-navy-text border-t-2 border-b border-r border-border bg-surface-subtle">
-                          Total Debit ({syncDetailTab === "semua" ? "Semua Beban Gaji" : syncDetailTab === "pegawai" ? "Akun 511" : "Akun 612"}):
+                          Total Beban Bersih ({syncDetailTab === "semua" ? "Semua Beban Gaji" : syncDetailTab === "pegawai" ? "Akun 511" : "Akun 612"}):
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-navy-text whitespace-nowrap border-t-2 border-b border-r border-border bg-surface-subtle">
                           {syncDetailTab === "semua"
@@ -5961,7 +5957,7 @@ export function PayrollClient({
                 </div>
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">
-                    Potongan Pajak (Rp)
+                    PPh pelaporan · ditanggung perusahaan (Rp)
                   </label>
                   <input
                     type="text"
@@ -5990,7 +5986,7 @@ export function PayrollClient({
               <div className="p-3 rounded-xl bg-surface-subtle border border-border flex items-center justify-between text-xs">
                 <span className="text-muted-faint font-medium">Gaji Bersih Diterima:</span>
                 <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
-                  {formatRupiah(Math.max(0, modalHonorNominal - modalHonorNominalPph))}
+                  {formatRupiah(modalHonorNominal)}
                 </span>
               </div>
 

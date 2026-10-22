@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 require_once __DIR__ . '/../helpers/akuntansi-helpers.php';
 
@@ -418,6 +419,8 @@ if ($method === 'GET') {
         ]);
     }
 
+    $held_summary=transitory_cash_summary($pdo,$entity_ids,substr($date_to,0,10));
+    $aktiva_lancar=transitory_asset_line($aktiva_lancar,$held_summary['ledgerHeld']);
     $total_aktiva_lancar = 0.0;
     foreach ($aktiva_lancar as $item) {
         $total_aktiva_lancar += !empty($item['isContra']) ? -$item['saldo'] : $item['saldo'];
@@ -444,10 +447,11 @@ if ($method === 'GET') {
 
     // ── Arus Kas Gabungan (Monthly) ──────────────────────────────────────────
     $params_ak = array_merge($entity_ids, [$date_from, $date_to], $nobukti_params);
+    $cash_debit_sql=transitory_cash_sql($pdo,'debit'); $cash_credit_sql=transitory_cash_sql($pdo,'kredit');
     $stmt_ak   = $pdo->prepare(
         "SELECT MONTH(t.tanggal) AS bulan,
-                COALESCE(SUM(t.debit),  0) AS total_masuk,
-                COALESCE(SUM(t.kredit), 0) AS total_keluar
+                COALESCE(SUM($cash_debit_sql),  0) AS total_masuk,
+                COALESCE(SUM($cash_credit_sql), 0) AS total_keluar
          FROM `Transaction` t
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId IN ($placeholders)
@@ -483,7 +487,10 @@ if ($method === 'GET') {
         ];
     }
 
+    $cash_summary=['kasTotal'=>0.0,'kasTersedia'=>0.0,'kasDitahan'=>0.0,'kasAwal'=>0.0];
+    foreach($entity_ids as $cash_entity) { $item=transitory_company_cash($pdo,$cash_entity,$year,$version); foreach(array_keys($cash_summary) as $key) $cash_summary[$key]+=$item[$key]; }
     json_response([
+        'kas'=>$cash_summary,
         'entityIds'           => $entity_ids,
         'entities'            => $entities,
         'year'                => $year,

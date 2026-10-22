@@ -63,6 +63,7 @@ $routes = [
     'entities'          => 'entities',
     'dashboard'         => 'dashboard',
     'kas'               => 'kas',
+    'kas-transitory'    => 'kas-transitory',
     'jurnal'            => 'jurnal',
     'jurnal-transaksi'  => 'jurnal-transaksi',
     'coa'               => 'coa',

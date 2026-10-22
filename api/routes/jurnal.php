@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 require_once __DIR__ . '/../helpers/kas-helpers.php';
 
@@ -51,11 +52,16 @@ if ($method === 'GET' && $sub === '') {
     // Bangun WHERE dinamis
     $where_parts = ['t.entityId = ?'];
     $params      = [$entity_id];
+    $transitory_source = "(COALESCE(JSON_VALUE(t.extraFieldsJson, '$.transitoryAccounting'),'') IN ('true','1') OR JSON_VALUE(t.extraFieldsJson, '$.transitoryReversalId') IS NOT NULL)";
 
     if ($jenis_input_key && $jenis_input_key !== 'semua') {
-        if ($jenis_input_key === 'jurnalTransaksi') {
+        if ($jenis_input_key === 'kasTransitory') {
+            $where_parts[] = $transitory_source;
+        } elseif ($jenis_input_key === 'jurnalTransaksi') {
+            $where_parts[] = "NOT $transitory_source";
             $where_parts[] = "(ji.`key` = 'jurnalTransaksi' AND (t.extraFieldsJson IS NULL OR JSON_VALID(t.extraFieldsJson) = 0 OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') = false))";
         } elseif (in_array($jenis_input_key, ['kasKecil', 'kasBesar', 'bankBuku'], true)) {
+            $where_parts[] = "NOT $transitory_source";
             $where_parts[] = "(ji.`key` = ? OR (JSON_VALID(t.extraFieldsJson) = 1 AND JSON_UNQUOTE(JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry')) = 'true' AND JSON_UNQUOTE(JSON_EXTRACT(t.extraFieldsJson, '$.crossingFromJenisInputKey')) = ?))";
             $params[]      = $jenis_input_key;
             $params[]      = $jenis_input_key;
@@ -238,6 +244,9 @@ if ($method === 'GET' && $sub === '') {
                 'label' => $from_name ? "{$base_style['label']} {$from_name}{$rek_suffix}" : $base_style['label'],
             ];
         }
+        if (!empty($extra['transitoryAccounting']) || !empty($extra['transitoryReversalId'])) {
+            $style = ['bg' => '#ccfbf1', 'color' => '#115e59', 'label' => 'Kas Transitory'];
+        }
 
         $kode_akun = $r['coa_code'] ?? '—';
         $nama_akun = $r['coa_name'] ?? '—';
@@ -324,6 +333,8 @@ elseif ($method === 'PATCH' && $sub === 'kode-akun') {
         return error_response('Kamu tidak punya akses ke entitas ini.', 403);
     }
 
+    $pdo->beginTransaction();
+    transitory_assert_unlinked($pdo,[$transaction_id]);
     // Cari transaksi
     $stmt = $pdo->prepare(
         "SELECT t.id, t.projectId, c.code as old_code, c.name as old_name
@@ -336,7 +347,8 @@ elseif ($method === 'PATCH' && $sub === 'kode-akun') {
     if (!$tx) return error_response('Transaksi tidak ditemukan di entitas ini.', 404);
     if (!$tx['old_code']) return error_response('Baris ini tidak punya akun yang bisa diedit.', 400);
     if ($tx['old_code'] === $new_code) {
-        json_response(['success' => true]);
+        if($pdo->inTransaction()) $pdo->commit();
+    json_response(['success' => true]);
         return;
     }
 
@@ -348,6 +360,7 @@ elseif ($method === 'PATCH' && $sub === 'kode-akun') {
         return error_response("Kode akun \"$new_code\" tidak ditemukan di Bagan Akun.", 404);
     }
 
+    try { transitory_guard_coa([$target_coa_id]); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     $stmt = $pdo->prepare("UPDATE `Transaction` SET coaAccountId = ? WHERE id = ? AND entityId = ?");
     $stmt->execute([$target_coa_id, $transaction_id, $entity_id]);
     if ($stmt->rowCount() === 0) return error_response('Transaksi tidak ditemukan.', 404);
@@ -361,6 +374,7 @@ elseif ($method === 'PATCH' && $sub === 'kode-akun') {
         'oldCode' => $tx['old_code'], 'newCode' => $new_code,
     ]);
 
+    if($pdo->inTransaction()) $pdo->commit();
     json_response(['success' => true]);
 }
 
@@ -384,6 +398,8 @@ elseif ($method === 'PATCH' && $sub === 'proyek') {
         return error_response('Kamu tidak punya akses ke entitas ini.', 403);
     }
 
+    $pdo->beginTransaction();
+    transitory_assert_unlinked($pdo,[$transaction_id]);
     // Cari transaksi
     $stmt = $pdo->prepare("SELECT id, noBukti, projectId FROM `Transaction` WHERE id = ? AND entityId = ? LIMIT 1");
     $stmt->execute([$transaction_id, $entity_id]);
@@ -426,6 +442,7 @@ elseif ($method === 'PATCH' && $sub === 'proyek') {
         'oldProjectId' => $tx['projectId'], 'newProjectId' => $new_project_id,
     ]);
 
+    if($pdo->inTransaction()) $pdo->commit();
     json_response(['success' => true]);
 }
 
@@ -450,6 +467,8 @@ elseif ($method === 'PATCH' && $sub === 'akrual') {
         return error_response('Kamu tidak punya akses ke entitas ini.', 403);
     }
 
+    $pdo->beginTransaction();
+    transitory_assert_unlinked($pdo,[$transaction_id]);
     // Cari transaksi
     $stmt = $pdo->prepare("SELECT id, noBukti, extraFieldsJson FROM `Transaction` WHERE id = ? AND entityId = ? LIMIT 1");
     $stmt->execute([$transaction_id, $entity_id]);
@@ -475,6 +494,7 @@ elseif ($method === 'PATCH' && $sub === 'akrual') {
         'bulan' => $bulan, 'tahun' => $tahun,
     ]);
 
+    if($pdo->inTransaction()) $pdo->commit();
     json_response(['success' => true]);
 }
 

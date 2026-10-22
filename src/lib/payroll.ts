@@ -658,6 +658,83 @@ export type PayrollSyncLabaRugi = {
   jurnalSemuaRows?: JurnalTransaksiGajiItem[];
 };
 
+const EMPTY_PENYESUAIAN_DETAIL = {
+  coaCode: "", coaName: "",
+  totalPayrollBulan: 0, totalPayrollBulanFmt: "Rp 0",
+  totalJurnalBulan: 0, totalJurnalBulanFmt: "Rp 0",
+  selisihBulan: 0, selisihBulanFmt: "Rp 0", isSinkronBulan: true,
+  totalPayrollTahun: 0, totalPayrollTahunFmt: "Rp 0",
+  totalJurnalTahun: 0, totalJurnalTahunFmt: "Rp 0",
+  selisihTahun: 0, selisihTahunFmt: "Rp 0", isSinkronTahun: true,
+  transaksiBulan: [], transaksiTahun: [],
+};
+
+const EMPTY_SYNC_DATA = {
+  tahun: 0, bulan: 0,
+  payrollGajiPegawai: 0, payrollGajiPegawaiFmt: "Rp 0",
+  glBebanGaji511: 0, glBebanGaji511Fmt: "Rp 0",
+  selisihGajiPegawai: 0, selisihGajiPegawaiFmt: "Rp 0", isGajiPegawaiSinkron: true,
+  payrollHonorTenagaAhli: 0, payrollHonorTenagaAhliFmt: "Rp 0",
+  glBebanTenagaAhli612: 0, glBebanTenagaAhli612Fmt: "Rp 0",
+  selisihTenagaAhli: 0, selisihTenagaAhliFmt: "Rp 0", isTenagaAhliSinkron: true,
+  totalPayroll: 0, totalPayrollFmt: "Rp 0",
+  totalGLBeban: 0, totalGLBebanFmt: "Rp 0",
+  totalSelisih: 0, totalSelisihFmt: "Rp 0", isOverallSinkron: true,
+  jurnalPegawaiRows: [], jurnalTenagaAhliRows: [], jurnalSemuaRows: [],
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizePayrollData(raw: any): any {
+  if (!raw || typeof raw !== "object") return raw;
+  return {
+    ...raw,
+    pegawaiList:              Array.isArray(raw.pegawaiList)              ? raw.pegawaiList              : [],
+    allPegawaiMaster:         Array.isArray(raw.allPegawaiMaster)         ? raw.allPegawaiMaster         : (raw.pegawaiList ?? []),
+    allHoldingPegawaiMaster:  Array.isArray(raw.allHoldingPegawaiMaster)  ? raw.allHoldingPegawaiMaster  : [],
+    honorList:                Array.isArray(raw.honorList)                ? raw.honorList                : [],
+    allHonorBulanIni:         Array.isArray(raw.allHonorBulanIni)         ? raw.allHonorBulanIni         : [],
+    rekapBulananPegawai:      Array.isArray(raw.rekapBulananPegawai)      ? raw.rekapBulananPegawai      : [],
+    rekapBulananTenagaAhli:   Array.isArray(raw.rekapBulananTenagaAhli)   ? raw.rekapBulananTenagaAhli   : [],
+    rekananTenagaAhli:        Array.isArray(raw.rekananTenagaAhli)        ? raw.rekananTenagaAhli        : [],
+    konsolidasiTenagaAhli:    Array.isArray(raw.konsolidasiTenagaAhli)    ? raw.konsolidasiTenagaAhli    : [],
+    rekapTenagaAhliPerNama:   Array.isArray(raw.rekapTenagaAhliPerNama)   ? raw.rekapTenagaAhliPerNama   : [],
+    rekapTenagaAhliPerProyek: Array.isArray(raw.rekapTenagaAhliPerProyek) ? raw.rekapTenagaAhliPerProyek : [],
+    honorTracking:            Array.isArray(raw.honorTracking)            ? raw.honorTracking            : [],
+    projects:                 Array.isArray(raw.projects)                 ? raw.projects                 : [],
+    allProjects:              Array.isArray(raw.allProjects)              ? raw.allProjects               : [],
+    allEntities:              Array.isArray(raw.allEntities)              ? raw.allEntities               : [],
+    gajiBulanIni:             Array.isArray(raw.gajiBulanIni)             ? raw.gajiBulanIni              : [],
+    syncData: raw.syncData && typeof raw.syncData === "object"
+      ? { ...EMPTY_SYNC_DATA, ...raw.syncData,
+          jurnalPegawaiRows:  Array.isArray(raw.syncData.jurnalPegawaiRows)  ? raw.syncData.jurnalPegawaiRows  : [],
+          jurnalTenagaAhliRows: Array.isArray(raw.syncData.jurnalTenagaAhliRows) ? raw.syncData.jurnalTenagaAhliRows : [],
+          jurnalSemuaRows:    Array.isArray(raw.syncData.jurnalSemuaRows)    ? raw.syncData.jurnalSemuaRows    : [],
+        }
+      : { ...EMPTY_SYNC_DATA },
+    penyesuaianJurnal: raw.penyesuaianJurnal && typeof raw.penyesuaianJurnal === "object"
+      ? {
+          pegawai:     { ...EMPTY_PENYESUAIAN_DETAIL, ...(raw.penyesuaianJurnal.pegawai    ?? {}),
+                         transaksiBulan: Array.isArray(raw.penyesuaianJurnal.pegawai?.transaksiBulan)    ? raw.penyesuaianJurnal.pegawai.transaksiBulan    : [],
+                         transaksiTahun: Array.isArray(raw.penyesuaianJurnal.pegawai?.transaksiTahun)    ? raw.penyesuaianJurnal.pegawai.transaksiTahun    : [] },
+          tenagaAhli:  { ...EMPTY_PENYESUAIAN_DETAIL, ...(raw.penyesuaianJurnal.tenagaAhli ?? {}),
+                         transaksiBulan: Array.isArray(raw.penyesuaianJurnal.tenagaAhli?.transaksiBulan) ? raw.penyesuaianJurnal.tenagaAhli.transaksiBulan : [],
+                         transaksiTahun: Array.isArray(raw.penyesuaianJurnal.tenagaAhli?.transaksiTahun) ? raw.penyesuaianJurnal.tenagaAhli.transaksiTahun : [] },
+        }
+      : { pegawai: { ...EMPTY_PENYESUAIAN_DETAIL }, tenagaAhli: { ...EMPTY_PENYESUAIAN_DETAIL } },
+    summaryBulanIni: raw.summaryBulanIni && typeof raw.summaryBulanIni === "object"
+      ? raw.summaryBulanIni
+      : { totalPegawaiInput: 0, totalPegawaiAktif: 0, totalGajiPokokFmt: "Rp 0", totalGajiBersihFmt: "Rp 0",
+          totalTunjanganJabatanFmt: "Rp 0", totalTunjanganTransportFmt: "Rp 0", totalInsentifFmt: "Rp 0",
+          totalThrFmt: "Rp 0", totalTunjanganBpjsFmt: "Rp 0", totalTunjanganPphFmt: "Rp 0",
+          totalBpjsKesehatanFmt: "Rp 0", totalBpjsKetenagakerjaanFmt: "Rp 0", totalPotonganBpjsFmt: "Rp 0",
+          totalPotonganLainFmt: "Rp 0", totalPph21Fmt: "Rp 0", totalGajiKotorFmt: "Rp 0",
+          totalGajiTerlaporPajakFmt: "Rp 0" },
+    summaryHonorBulanIni: raw.summaryHonorBulanIni && typeof raw.summaryHonorBulanIni === "object"
+      ? raw.summaryHonorBulanIni
+      : { totalHonorBruto: 0, totalHonorBrutoFmt: "Rp 0", totalPph21: 0, totalPph21Fmt: "Rp 0", totalHonorBersih: 0, totalHonorBersihFmt: "Rp 0" },
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getPayrollData(
   entityId: string,
@@ -667,9 +744,10 @@ export async function getPayrollData(
 ): Promise<any> {
   const token = await getPhpToken();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return phpFetch<any>(
+  const raw = await phpFetch<any>(
     `/api/payroll?entityId=${encodeURIComponent(entityId)}&year=${year}&month=${month}`,
     token,
     { cache: "no-store" }
   );
+  return normalizePayrollData(raw);
 }

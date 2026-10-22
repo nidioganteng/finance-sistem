@@ -38,26 +38,13 @@ export default async function PayrollPage({
     );
   }
 
-  const tag = `[payroll page entity=${selectedEntity.id} year=${year} month=${month}]`;
   const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
-    getPayrollData(selectedEntity.id, year, month).catch((e: unknown) => { console.error(tag, "getPayrollData failed:", e); throw e; }),
-    getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch((e: unknown) => { console.error(tag, "getRekonsiliasiPajakGajiData failed:", e); throw e; }),
-    ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role) ? getKasTransitory(selectedEntity.id).catch((e: unknown) => { console.error(tag, "getKasTransitory failed (non-fatal):", e); return null; }) : Promise.resolve(null),
+    getPayrollData(selectedEntity.id, year, month),
+    getRekonsiliasiPajakGajiData(selectedEntity.id, year),
+    ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)
+      ? getKasTransitory(selectedEntity.id).catch(() => null)
+      : Promise.resolve(null),
   ]);
-  // debug: log which fields are present so we can see in Vercel logs
-  console.error(tag, "payrollData field check:", {
-    hasEntity: !!payrollData?.entity,
-    hasPegawaiList: Array.isArray(payrollData?.pegawaiList),
-    pegawaiListLen: payrollData?.pegawaiList?.length,
-    hasSyncData: !!payrollData?.syncData,
-    hasPenyesuaianJurnal: !!payrollData?.penyesuaianJurnal,
-    hasRekananTenagaAhli: Array.isArray(payrollData?.rekananTenagaAhli),
-    hasKonsolidasiTenagaAhli: Array.isArray(payrollData?.konsolidasiTenagaAhli),
-    hasRekapTenagaAhliPerNama: Array.isArray(payrollData?.rekapTenagaAhliPerNama),
-    hasHonorList: Array.isArray(payrollData?.honorList),
-    hasProjects: Array.isArray(payrollData?.projects),
-    rekonsiliasiDataKeys: Object.keys(rekonsiliasiData || {}),
-  });
 
   return (
     <PageTransition>

@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 require_once __DIR__ . '/../helpers/akuntansi-helpers.php';
 
@@ -436,6 +437,8 @@ if ($method === 'GET') {
     }
 
     // ── Hitung Total-Total Neraca Sesuai Standar Akuntansi ───────────────────
+    $held_summary=transitory_cash_summary($pdo,[$entity_id],substr($date_to,0,10));
+    $aktiva_lancar=transitory_asset_line($aktiva_lancar,$held_summary['ledgerHeld']);
     $total_aktiva_lancar = 0.0;
     foreach ($aktiva_lancar as $item) {
         $total_aktiva_lancar += !empty($item['isContra']) ? -$item['saldo'] : $item['saldo'];

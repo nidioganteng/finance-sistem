@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type InputHTMLAttributes } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2 } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
 import { saveGajiTenagaAhliKontrakAction } from "@/lib/actions/payroll";
 import {
@@ -78,14 +78,13 @@ function jadwalPenugasan(person: RekananTenagaAhliItem, project: TenagaAhliProje
   return [...byMonth.values()].map(row => row.pph21 === undefined ? { ...row, pph21: pphGajiTenagaAhli(row, (person.riwayatGaji || []).filter(payment => payment.projectId === project.projectId && `${payment.tahun}-${String(payment.bulan).padStart(2, "0")}` === row.bulan)) } : row).sort((a, b) => a.bulan.localeCompare(b.bulan));
 }
 
-export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual }: {
+export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search }: {
   people: RekananTenagaAhliItem[];
   entityId?: string;
   year: number;
   month: number;
   canEdit: boolean;
   search: string;
-  onAddManual: () => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -118,13 +117,13 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
   return <section className="rounded-2xl border border-border bg-surface-card overflow-hidden">
     <div className="p-5 border-b border-border flex flex-wrap gap-4 items-start justify-between">
       <div><h2 className="font-bold text-navy-text">Pengisian Gaji & Negosiasi</h2><p className="text-xs text-muted-faint mt-1">Pilih tenaga ahli, isi gaji negosiasi, lalu kelola gaji bulanan pada halaman pribadinya.</p></div>
-      <div className="flex flex-wrap items-center gap-2"><select aria-label="Periode tracking daftar" className={`${inputClass} !w-auto`} value={listScope} onChange={event => setListScope(event.target.value as "bulan" | "tahun")}><option value="bulan">{monthLabel(`${year}-${String(month).padStart(2, "0")}`)}</option><option value="tahun">Tahun {year}</option></select>{canEdit && <button className={buttonClass} onClick={onAddManual}><UserPlus size={14} />Tambah tenaga ahli manual</button>}</div>
+      <div className="flex flex-wrap items-center gap-2"><select aria-label="Periode tracking daftar" className={`${inputClass} !w-auto`} value={listScope} onChange={event => setListScope(event.target.value as "bulan" | "tahun")}><option value="bulan">{monthLabel(`${year}-${String(month).padStart(2, "0")}`)}</option><option value="tahun">Tahun {year}</option></select></div>
     </div>
     {warningCount > 0 && <div role="status" className="m-5 flex gap-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 p-3 text-sm"><AlertTriangle size={18} className="shrink-0" />{warningCount} bulan memiliki catatan kendala. Buka rincian tenaga ahli untuk memeriksa alasannya.</div>}
     <div className="overflow-x-auto"><table className="w-full text-sm text-left">
       <thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Tenaga ahli / data diri</th><th className="p-4">Nama pekerjaan / proyek</th><th className="p-4">Menman / Gaji RAB</th><th className="p-4 min-w-[180px]">Gaji negosiasi</th><th className="p-4">Gaji & pembayaran (bruto)</th><th className="p-4">Tindak lanjut</th></tr></thead>
       <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
-        {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan tenaga ahli secara manual beserta penugasan proyeknya."}</td></tr>}
+        {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan profil dan penugasan proyek melalui menu Database Tenaga Ahli."}</td></tr>}
       </tbody>
     </table></div>
   </section>;

@@ -166,8 +166,8 @@ export function Sidebar({
       <div className={`flex items-center pb-6 overflow-hidden ${collapsed ? "justify-center px-0" : "gap-3 px-2"}`}>
         <div className="w-9 h-9 flex-none flex items-center justify-center overflow-hidden">
           <Image
-            src="/logo-entitas/logo-simatra-dark.png"
-            alt="SIMATRA"
+            src="/logo-entitas/logo-kosha-dark.png"
+            alt="KOSHA"
             width={36}
             height={36}
             priority
@@ -177,7 +177,7 @@ export function Sidebar({
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <div className="font-black text-[17px] tracking-tight text-white leading-tight">SIMATRA</div>
+            <div className="font-black text-[17px] tracking-tight text-white leading-tight">KOSHA</div>
             <div className="text-[11px] text-white/50 font-semibold">Gaharu Sempana Group</div>
           </div>
         )}

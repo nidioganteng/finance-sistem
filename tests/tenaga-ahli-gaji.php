@@ -89,7 +89,7 @@ tenaga_ahli_sync_pembayaran($db, $person, 'p1', 'project-test', $schedule);
 check((int)$db->query('SELECT COUNT(*) FROM HonorTenagaAhli')->fetchColumn(), 1, 'hanya bulan terisi membuat pembayaran');
 $auto = $db->query('SELECT * FROM HonorTenagaAhli')->fetch(PDO::FETCH_ASSOC);
 check([$auto['entityId'], (int)$auto['bulan'], (int)$auto['tahun']], ['cipta', 2, 2026], 'pembayaran mengikuti proyek dan periode gaji');
-check([(float)$auto['nominalHonor'], (float)$auto['pph21'], (float)$auto['nominalBersih']], [10000000.0, 300000.0, 9700000.0], 'PPh manual dan netto');
+check([(float)$auto['nominalHonor'], (float)$auto['pph21'], (float)$auto['nominalBersih']], [10000000.0, 300000.0, 10000000.0], 'PPh manual dan netto');
 tenaga_ahli_sync_pembayaran($db, $person, 'p1', 'project-test', $schedule);
 check((int)$db->query('SELECT COUNT(*) FROM HonorTenagaAhli')->fetchColumn(), 1, 'simpan ulang tidak membuat pembayaran dobel');
 $schedule[0]['nominal'] = 12000000.0;

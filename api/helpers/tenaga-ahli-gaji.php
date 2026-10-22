@@ -172,12 +172,12 @@ function tenaga_ahli_sync_pembayaran(PDO $pdo, array $person, string $person_id,
         $now = date('Y-m-d H:i:s');
         if ($automatic) {
             $pdo->prepare('UPDATE HonorTenagaAhli SET uraian = ?, entityId = ?, nominalHonor = ?, tarifPph21Persen = ?, pph21 = ?, nominalBersih = ?, updatedAt = ? WHERE id = ?')
-                ->execute([$description, $entity, $amount, $rate, $tax, $amount - $tax, $now, $id]);
+                ->execute([$description, $entity, $amount, $rate, $tax, $amount, $now, $id]);
         } else {
             $pdo->prepare('INSERT INTO HonorTenagaAhli (id, entityId, rekananId, nik, nama, npwp, uraian, tanggal, bulan, tahun, nominalHonor, tarifPph21Persen, pph21, nominalBersih, projectId, namaProyek, noBukti, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
                 ->execute([$id, $entity, $person_id, $person['nik'], $person['nama'], $person['npwp'] ?? null,
                     $description, date('Y-m-d') . ' 00:00:00', $month, $year,
-                    $amount, $rate, $tax, $amount - $tax, $project_id, $person['projectName'] ?? null, null, $now, $now]);
+                    $amount, $rate, $tax, $amount, $project_id, $person['projectName'] ?? null, null, $now, $now]);
         }
     }
 }

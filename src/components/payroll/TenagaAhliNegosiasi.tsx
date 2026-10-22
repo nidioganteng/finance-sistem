@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition, type InputHTMLAttributes } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Plus, Save, Trash2 } from "lucide-react";
 import type { RekananTenagaAhliItem, TenagaAhliProjectAssignment } from "@/lib/payroll";
 import { saveGajiTenagaAhliKontrakAction } from "@/lib/actions/payroll";
+import { penugasanDalamPeriode } from "@/lib/tenaga-ahli-periode";
 import {
   bulanBerikutnya, bulanDariSpmk, penugasanPadaEntitas, ringkasanGajiTenagaAhli, pphGajiTenagaAhli,
   type GajiTenagaAhliBulan, type ReferensiGajiTenagaAhli, type GajiTenagaAhliKontrak,
@@ -78,14 +79,13 @@ function jadwalPenugasan(person: RekananTenagaAhliItem, project: TenagaAhliProje
   return [...byMonth.values()].map(row => row.pph21 === undefined ? { ...row, pph21: pphGajiTenagaAhli(row, (person.riwayatGaji || []).filter(payment => payment.projectId === project.projectId && `${payment.tahun}-${String(payment.bulan).padStart(2, "0")}` === row.bulan)) } : row).sort((a, b) => a.bulan.localeCompare(b.bulan));
 }
 
-export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search, onAddManual }: {
+export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, search }: {
   people: RekananTenagaAhliItem[];
   entityId?: string;
   year: number;
   month: number;
   canEdit: boolean;
   search: string;
-  onAddManual: () => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,18 +113,19 @@ export function TenagaAhliNegosiasi({ people, entityId, year, month, canEdit, se
     if (!selected) return <div className="rounded-xl border border-border bg-surface-card p-6 space-y-3"><p>Penugasan tenaga ahli tidak ditemukan pada entitas ini.</p><button className={buttonClass} onClick={() => navigate()}>Kembali ke daftar</button></div>;
     return <DetailGaji key={`${personId}:${projectId}`} {...selected} year={year} month={month} canEdit={canEdit} onSaved={onSaved} onBack={() => navigate()} />;
   }
-  const filtered = available.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
-  const warningCount = available.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
+  const inPeriod = available.filter(({ project }) => penugasanDalamPeriode(project, { year, month: listScope === "bulan" ? month : undefined }));
+  const filtered = inPeriod.filter(({ person, project }) => `${person.nama} ${person.nik} ${person.kategori} ${project.projectCode} ${project.projectName}`.toLowerCase().includes(search.toLowerCase()));
+  const warningCount = filtered.reduce((sum, { project }) => sum + (project.gajiKontrak?.jadwal?.filter(row => row.catatan.trim() && (listScope === "bulan" ? row.bulan === `${year}-${String(month).padStart(2, "0")}` : row.bulan.startsWith(`${year}-`))).length || 0), 0);
   return <section className="rounded-2xl border border-border bg-surface-card overflow-hidden">
     <div className="p-5 border-b border-border flex flex-wrap gap-4 items-start justify-between">
       <div><h2 className="font-bold text-navy-text">Pengisian Gaji & Negosiasi</h2><p className="text-xs text-muted-faint mt-1">Pilih tenaga ahli, isi gaji negosiasi, lalu kelola gaji bulanan pada halaman pribadinya.</p></div>
-      <div className="flex flex-wrap items-center gap-2"><select aria-label="Periode tracking daftar" className={`${inputClass} !w-auto`} value={listScope} onChange={event => setListScope(event.target.value as "bulan" | "tahun")}><option value="bulan">{monthLabel(`${year}-${String(month).padStart(2, "0")}`)}</option><option value="tahun">Tahun {year}</option></select>{canEdit && <button className={buttonClass} onClick={onAddManual}><UserPlus size={14} />Tambah tenaga ahli manual</button>}</div>
+      <div className="flex flex-wrap items-center gap-2"><select aria-label="Periode tracking daftar" className={`${inputClass} !w-auto`} value={listScope} onChange={event => setListScope(event.target.value as "bulan" | "tahun")}><option value="bulan">{monthLabel(`${year}-${String(month).padStart(2, "0")}`)}</option><option value="tahun">Tahun {year}</option></select></div>
     </div>
     {warningCount > 0 && <div role="status" className="m-5 flex gap-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 p-3 text-sm"><AlertTriangle size={18} className="shrink-0" />{warningCount} bulan memiliki catatan kendala. Buka rincian tenaga ahli untuk memeriksa alasannya.</div>}
     <div className="overflow-x-auto"><table className="w-full text-sm text-left">
       <thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="p-4">Tenaga ahli / data diri</th><th className="p-4">Nama pekerjaan / proyek</th><th className="p-4">Menman / Gaji RAB</th><th className="p-4 min-w-[180px]">Gaji negosiasi</th><th className="p-4">Gaji & pembayaran (bruto)</th><th className="p-4">Tindak lanjut</th></tr></thead>
       <tbody>{filtered.map(({ person, project }) => <NegosiasiRow key={`${person.id}:${project.projectId}`} person={person} project={project} year={year} month={listScope === "bulan" ? month : undefined} canEdit={canEdit} onSaved={onSaved} onNavigate={() => navigate(person, project)} />)}
-        {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{available.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : "Belum ada tenaga ahli pada entitas ini. Tambahkan tenaga ahli secara manual beserta penugasan proyeknya."}</td></tr>}
+        {filtered.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-muted-faint">{inPeriod.length ? "Tidak ada tenaga ahli yang cocok dengan pencarian." : available.length ? "Tidak ada penugasan tenaga ahli pada periode ini. Periksa masa tugas atau bulan perpanjangan yang tersimpan." : "Belum ada tenaga ahli pada entitas ini. Tambahkan profil dan penugasan proyek melalui menu Database Tenaga Ahli."}</td></tr>}
       </tbody>
     </table></div>
   </section>;
@@ -253,7 +254,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
       <p className="mt-1 text-[11px] text-muted-faint">NIK: {person.nik || "—"} · NPWP: {person.npwp || "—"} · PTKP: {person.ptkp || "—"}</p>
       <dl className="mt-3 grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-3 sm:divide-x sm:divide-border">
         <div><dt className="text-[11px] text-muted-faint">Total gaji negosiasi (kontrak)</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{negosiasi === null ? "Belum diisi" : rp(negosiasi)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">Gaji terisi {rp(summary.totalGaji)} · {summary.terisi}/{summary.jumlahBulan} bulan diisi</p></div>
-        <div className="sm:pl-4"><dt className="text-[11px] text-muted-faint">Sudah dibayar (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">Netto {rp(summary.dibayarNetto)} · seluruh kontrak</p></div>
+        <div className="sm:pl-4"><dt className="text-[11px] text-muted-faint">Sudah dibayar (bruto)</dt><dd className="mt-0.5 text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{rp(summary.dibayar)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">Gaji diterima {rp(summary.dibayarNetto)} · seluruh kontrak</p></div>
         <div className="sm:pl-4"><dt title="Total negosiasi dikurangi seluruh pembayaran bruto kontrak" className="text-[11px] text-muted-faint">Balance negosiasi</dt><dd className={`mt-0.5 text-base font-bold tabular-nums ${summary.balance !== null && summary.balance < 0 ? "text-rose-600" : ""}`}>{summary.balance === null ? "Menunggu negosiasi" : rp(summary.balance)}</dd><p className="mt-0.5 text-[11px] text-muted-faint">{summary.lunas ? "Balance · total negosiasi terpenuhi" : summary.balance !== null && summary.balance < 0 ? "Melebihi total negosiasi" : "Belum balance · sisa total negosiasi"}{dirty ? " · Belum disimpan" : ""}</p></div>
       </dl>
     </header>
@@ -294,7 +295,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
             </select>
             <button disabled={pending} className={buttonClass} onClick={addMonth}><Plus size={13} />Tambahkan ke jadwal</button>
       </div>}
-      <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[160px]">PPh (Rp)</th><th className="px-3 py-2 min-w-[130px] text-right">Netto (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-xs text-left"><thead className="bg-surface-subtle text-xs text-muted-faint"><tr><th className="px-3 py-2">Bulan</th><th className="px-3 py-2 min-w-[170px]">Gaji (Rp)</th><th className="px-3 py-2 min-w-[160px]">PPh pelaporan (Rp)</th><th className="px-3 py-2 min-w-[130px] text-right">Gaji diterima (Rp)</th><th className="px-3 py-2 min-w-[220px]">Catatan kendala</th><th className="px-3 py-2">Pembayaran</th>{canEdit && <th className="px-3 py-2"><span className="sr-only">Kurangi bulan</span></th>}</tr></thead><tbody>
         {visibleRows.filter(row => !onlyNotes || row.catatan.trim()).map(row => {
           const history = person.riwayatGaji?.filter(item => item.projectId === project.projectId && `${item.tahun}-${String(item.bulan).padStart(2, "0")}` === row.bulan) || [];
           const hasManualPayment = history.some(item => !item.id.startsWith("gaji-"));
@@ -305,7 +306,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
             <td className="px-3 py-2 align-middle font-semibold whitespace-nowrap">{monthLabel(row.bulan)}{(ref.spmkMulai && row.bulan < ref.spmkMulai.slice(0, 7)) || (ref.spmkSelesai && row.bulan > ref.spmkSelesai.slice(0, 7)) ? <div className="text-xs text-muted-faint font-normal mt-1">Di luar periode SPMK</div> : null}</td>
             <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`Gaji ${monthLabel(row.bulan)}`} disabled={!canEdit || pending} placeholder="Belum diisi" value={row.nominal} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, nominal: value, ...(value === null ? { pph21: null } : value === 0 ? { pph21: 0 } : {}) } : item)); changed(); }} /></td>
             <td className="px-3 py-2 align-middle"><RupiahInput aria-label={`PPh ${monthLabel(row.bulan)}`} disabled={!canEdit || pending || row.nominal === null} placeholder="PPh" value={tax} onValueChange={value => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, pph21: value } : item)); changed(); }} /></td>
-            <td className="px-3 py-2 align-middle text-right font-medium tabular-nums whitespace-nowrap">{row.nominal === null || tax === null ? <span className="text-muted-faint">—</span> : rp(row.nominal - tax)}</td>
+            <td className="px-3 py-2 align-middle text-right font-medium tabular-nums whitespace-nowrap">{row.nominal === null ? <span className="text-muted-faint">—</span> : rp(row.nominal)}</td>
             <td className="px-3 py-2 align-middle"><div className="relative">
               <textarea aria-label={`Catatan kendala ${monthLabel(row.bulan)}`} className={`${inputClass} block resize-none overflow-hidden !py-1 !pr-9`} rows={1} maxLength={1000} disabled={!canEdit || pending} placeholder="Catatan kendala…" value={row.catatan} onChange={e => { setRows(rows.map(item => item.bulan === row.bulan ? { ...item, catatan: e.target.value } : item)); changed(); }} />
               {row.catatan.trim() && <button type="button" className="absolute right-0 top-0 inline-flex h-8 w-8 items-center justify-center rounded-r-lg text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-950/50" aria-label={`Ada kendala ${monthLabel(row.bulan)}: lihat catatan lengkap`} title="Ada kendala · lihat catatan lengkap" onClick={() => setActiveNoteMonth(row.bulan)}><AlertTriangle size={14} /></button>}
@@ -318,7 +319,7 @@ function DetailGaji({ person, project, year, month, canEdit, onBack, onSaved }: 
         })}
         {visibleRows.length === 0 && <tr><td colSpan={canEdit ? 7 : 6} className="p-6 text-muted-faint text-center">Belum ada jadwal untuk {monthLabel(activePeriod)}. Pilih Semua bulan kontrak atau tambahkan bulan.</td></tr>}
       </tbody></table></div>
-      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}<span className="block mt-0.5">Gaji dan PPh tersimpan untuk proyek {project.projectCode || project.projectName}. Bruto masuk pengeluaran proyek; PPh mengurangi netto.</span></p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji & pembayaran"}</button>}</div>
+      <div className="px-3 py-2 border-t border-border flex flex-wrap justify-between gap-2 items-center"><p className="text-[11px] text-muted-faint">{visibleRows.length} bulan ditampilkan · Total gaji terisi periode ini: {rp(summary.totalGaji)}{dirty && <span className="ml-2 text-amber-700">· Belum disimpan</span>}<span className="block mt-0.5">Gaji dan PPh tersimpan untuk proyek {project.projectCode || project.projectName}. Bruto masuk pengeluaran proyek; PPh ditanggung perusahaan untuk pelaporan dan tidak mengurangi gaji diterima.</span></p>{canEdit && <button className={`${buttonClass} bg-navy text-white hover:bg-navy-light`} disabled={pending} onClick={save}><Save size={14} />{pending ? "Menyimpan…" : "Simpan gaji & pembayaran"}</button>}</div>
     </div>}
     <dialog ref={deleteDialog} onClose={() => setDeleteMonth(null)} aria-labelledby="delete-salary-month-title" aria-describedby="delete-salary-month-description" className="fixed inset-auto left-1/2 top-1/2 !m-0 w-[calc(100%_-_2rem)] max-w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border-soft bg-surface-card p-0 text-foreground shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm">
       {deleteRow && <>

@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { getKasTransitory } from "@/lib/kas-transitory";
+import { PayrollHoldSummary } from "@/components/kas-transitory/PayrollHoldSummary";
 import { PayrollClient } from "@/components/payroll/PayrollClient";
 
 export default async function PayrollPage({
@@ -36,9 +38,10 @@ export default async function PayrollPage({
     );
   }
 
-  const [payrollData, rekonsiliasiData] = await Promise.all([
+  const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
     getPayrollData(selectedEntity.id, year, month),
     getRekonsiliasiPajakGajiData(selectedEntity.id, year),
+    ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role) ? getKasTransitory(selectedEntity.id) : Promise.resolve(null),
   ]);
 
   return (
@@ -58,6 +61,7 @@ export default async function PayrollPage({
         }
       />
 
+      {transitoryData && <PayrollHoldSummary items={transitoryData.items} entityKey={selectedEntity.key} />}
       <PayrollClient
         data={payrollData}
         rekonsiliasiData={rekonsiliasiData}

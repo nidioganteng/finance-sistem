@@ -44,13 +44,13 @@ const contract = { id: 'c', rekananId: 'test-person', projectId: 'test-project',
   gajiNegosiasi: 5000000, basisNegosiasi: 'BULAN', jadwal: [
     { bulan: '2026-12', nominal: 5000000, catatan: 'Dokumen <belum> lengkap' }, { bulan: '2027-01', nominal: null, catatan: '' },
   ] };
-const props = { entityId: 'entity-project', year: 2026, month: 12, canEdit: true, search: '', onAddManual() {}, people: [
+const props = { entityId: 'entity-project', year: 2026, month: 12, canEdit: true, search: '', people: [
   { id: 'test-person', nama: 'Freelance Uji', nik: null, npwp: null, kategori: 'Ahli struktur', entityId: 'entity-test', proyekList: [
     { projectId: 'test-project', projectEntityId: 'entity-project', projectCode: 'TEST', projectName: 'Proyek Uji', nominalHonorBulanan: 0, isTurunLapangan: true, gajiKontrak: contract },
   ] },
 ] };
 let html = renderToStaticMarkup(React.createElement(TenagaAhliNegosiasi, props));
-assert.match(html, /Tambah tenaga ahli manual/);
+assert.doesNotMatch(html, /Tambah tenaga ahli manual/);
 assert.match(html, /Ada kendala/);
 assert.match(html, /Freelance Uji/);
 assert.match(html, /Tindak lanjut/);

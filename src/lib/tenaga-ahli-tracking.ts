@@ -88,11 +88,12 @@ export function buildTenagaAhliTracking(people: RekananTenagaAhliItem[], payment
 }
 
 export function filterTenagaAhliTracking(rows: TenagaAhliTrackingRow[], options: {
-  year: number; month?: number; entityId?: string; search?: string;
+  year: number; month?: number; untilMonth?: number; entityId?: string; search?: string;
 }) {
   const period = options.month ? `${options.year}-${String(options.month).padStart(2, "0")}` : String(options.year);
   const search = (options.search || "").toLocaleLowerCase("id-ID").trim();
   return rows.filter(row => (options.month ? row.periode === period : row.periode.startsWith(`${period}-`))
+    && (!options.untilMonth || row.periode <= `${options.year}-${String(options.untilMonth).padStart(2, "0")}`)
     && (!options.entityId || row.entityId === options.entityId)
     && (!search || `${row.nama} ${row.nik || ""} ${row.projectCode || ""} ${row.projectName} ${row.entityName} ${row.catatan}`.toLocaleLowerCase("id-ID").includes(search)));
 }

@@ -42,7 +42,7 @@ export default async function PayrollPage({
   const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
     getPayrollData(selectedEntity.id, year, month).catch((e: unknown) => { console.error(tag, "getPayrollData failed:", e); throw e; }),
     getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch((e: unknown) => { console.error(tag, "getRekonsiliasiPajakGajiData failed:", e); throw e; }),
-    ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role) ? getKasTransitory(selectedEntity.id).catch((e: unknown) => { console.error(tag, "getKasTransitory failed:", e); throw e; }) : Promise.resolve(null),
+    ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role) ? getKasTransitory(selectedEntity.id).catch((e: unknown) => { console.error(tag, "getKasTransitory failed (non-fatal):", e); return null; }) : Promise.resolve(null),
   ]);
 
   return (

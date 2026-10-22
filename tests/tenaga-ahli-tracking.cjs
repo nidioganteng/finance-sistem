@@ -93,7 +93,7 @@ for (const dimension of ['proyek', 'nama', 'bulan', 'holding']) {
 }
 for (const dimension of ['proyek', 'nama', 'holding']) {
   const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '' }));
-  assert.match(html, /Tahun 2026/);
+  assert.match(html, dimension === 'nama' ? /Januari – Oktober 2026/ : /Tahun 2026/);
   assert.match(html, dimension === 'proyek' ? /34\.000\.000/ : /42\.000\.000/);
   assert.match(html, /Gaji terisi/); assert.match(html, /Sudah dibayar/);
   const monthlyHtml = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows, group: dimension, entityId: 'A', entityName: 'Entitas A', year: 2026, month: 10, search: '', periodScope: 'bulan' }));
@@ -201,4 +201,33 @@ for (const dimension of ['nama', 'proyek', 'bulan', 'holding']) {
   const html = renderToStaticMarkup(React.createElement(TenagaAhliReport, { rows: negotiatedRows, people: negotiatedPeople, group: dimension, entityId: 'A', entityName: 'Gaharu', year: 2026, month: 2, search: '' }));
   assert.match(html, /Balance negosiasi/); assert.match(html, /35\.000\.000/); assert.match(html, /15\.000\.000/);
 }
-console.log('Lulus: total semua rekap konsisten, dua bulan/parsial, edit gaji terbaru, entitas/tahun, gaji belum dibayar, deduplikasi, dan tracking Oktober hanya Oktober.');
+const taxPayments = [
+  payment('tax-feb', 2, 10000000, { pph21: 300000 }),
+  payment('tax-feb', 2, 10000000, { pph21: 300000 }),
+  payment('tax-mar', 3, 10000000, { pph21: 200000 }),
+  payment('tax-oct', 10, 15000000, { pph21: 900000 }),
+  payment('tax-old', 12, 1000000, { tahun: 2025, pph21: 123456 }),
+  payment('tax-next', 1, 1000000, { tahun: 2027, pph21: 654321 }),
+  payment('tax-other', 3, 20000000, { rekananId: 'p2', nik: 'nik-2', nama: 'Ahli Kedua', projectId: 'project-3', entityId: 'B', entityName: 'Entitas B', pph21: 700000 }),
+];
+const taxRows = build(people, taxPayments);
+const throughMarch = filter(taxRows, { year: 2026, untilMonth: 3, entityId: 'A', search: 'Ahli Uji' });
+assert.deepEqual([sum(throughMarch).dibayar, sum(throughMarch).pph, sum(throughMarch).netto, sum(throughMarch).jumlahPembayaran], [20000000, 500000, 20000000, 2]);
+assert(throughMarch.every(row => row.periode >= '2026-01' && row.periode <= '2026-03'));
+assert.equal(sum(filter(taxRows, { year: 2026, untilMonth: 2, entityId: 'A' })).pph, 300000);
+assert.equal(sum(filter(taxRows, { year: 2026, untilMonth: 1, entityId: 'A' })).pph, 0);
+assert.equal(sum(filter(taxRows, { year: 2026, untilMonth: 12, entityId: 'A' })).pph, 1400000);
+assert.equal(sum(filter(taxRows, { year: 2026, untilMonth: 3 })).pph, 1200000);
+assert.equal(sum(filter(taxRows, { year: 2026, month: 3, entityId: 'A' })).pph, 200000);
+assert.equal(group(throughMarch, 'nama')[0].summary.pph, 500000);
+const taxHtml = renderProjectDetails('nik-1', ['project-1'], { rows: taxRows, people, group: 'nama', entityId: 'A', entityName: 'Entitas A', year: 2026, month: 3, search: 'Ahli Uji' });
+assert.match(taxHtml, /Januari – Maret 2026/);
+assert.match(taxHtml, /Sampai bulan dipilih/);
+assert.match(taxHtml, /Total PPh perusahaan/);
+assert.match(taxHtml, /500\.000/);
+assert.match(taxHtml, /300\.000/);
+assert.match(taxHtml, /200\.000/);
+assert.match(taxHtml, /Februari 2026|Maret 2026/);
+assert.doesNotMatch(taxHtml, /Oktober 2026|Januari 2027|Ahli Kedua|900\.000/);
+assert.match(taxHtml, /tanpa mengurangi gaji diterima/);
+console.log('Lulus: rekap gaji/PPh kumulatif per nama, rincian bulanan, batas bulan/tahun, pencarian, entitas, tanpa pemotongan PPh, deduplikasi, dan tracking.');

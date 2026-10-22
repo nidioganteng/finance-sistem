@@ -1,4 +1,5 @@
 import type { RekananTenagaAhliItem } from "./payroll";
+import { penugasanDalamPeriode, type PeriodeTenagaAhli } from "./tenaga-ahli-periode";
 
 export type TenagaAhliPayment = {
   id: string;
@@ -129,7 +130,7 @@ export function groupTenagaAhliTracking(rows: TenagaAhliTrackingRow[], group: "p
 }
 
 // Sertakan tenaga ahli terdaftar meskipun belum ada gaji pada periode rekap.
-export function groupTenagaAhliPeople(rows: TenagaAhliTrackingRow[], people: RekananTenagaAhliItem[], entityId?: string, search = "") {
+export function groupTenagaAhliPeople(rows: TenagaAhliTrackingRow[], people: RekananTenagaAhliItem[], entityId?: string, search = "", period?: PeriodeTenagaAhli) {
   type Assignment = { projectId: string; projectCode: string | null; projectName: string; entityId: string; entityName: string };
   const groups = new Map(groupTenagaAhliTracking(rows, "nama").map(item => [item.key, { ...item, assignments: [] as Assignment[] }]));
   const query = search.toLocaleLowerCase("id-ID").trim();
@@ -137,14 +138,16 @@ export function groupTenagaAhliPeople(rows: TenagaAhliTrackingRow[], people: Rek
     const projects = person.proyekList?.length ? person.proyekList : person.projectId ? [{
       projectId: person.projectId, projectCode: person.projectCode, projectName: person.projectName,
       projectEntityId: person.projectEntityId, projectEntityName: person.projectEntityName,
+      tanggalMulaiTugas: person.tanggalMulaiTugas, tanggalSelesaiTugas: person.tanggalSelesaiTugas,
     }] : [];
-    const assignments = projects.map(project => ({ projectId: project.projectId, projectCode: project.projectCode || null,
+    const assignments = projects.filter(project => !period || penugasanDalamPeriode(project, period)).map(project => ({ projectId: project.projectId, projectCode: project.projectCode || null,
       projectName: project.projectName || "Proyek", entityId: project.projectEntityId || person.entityId || "",
       entityName: project.projectEntityId ? (project.projectEntityName || (project.projectEntityId === person.entityId ? person.entityName : null) || "Entitas") : (person.entityName || "Entitas"),
     })).filter(project => !entityId || project.entityId === entityId);
     if (entityId && !assignments.length) continue;
     const key = person.nik || person.id;
     const existing = groups.get(key);
+    if (period && !assignments.length && !existing) continue;
     if (query && !`${person.nama} ${person.nik || ""} ${assignments.map(project => `${project.projectCode || ""} ${project.projectName} ${project.entityName}`).join(" ")}`.toLocaleLowerCase("id-ID").includes(query) && !existing) continue;
     const item = existing || { key, label: person.nama, rows: [], summary: summarizeTenagaAhliTracking([]), assignments: [] };
     for (const project of assignments) {

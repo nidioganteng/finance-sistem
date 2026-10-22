@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 require_once __DIR__ . '/../helpers/kas-helpers.php';
 
@@ -409,6 +410,7 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
 
     $pdo->beginTransaction();
     try {
+        transitory_guard_reference($pdo,$entity_id,$no_bukti);
         $now       = date('Y-m-d H:i:s');
         $staff_id  = $user['staffId'] ?? $user['id'];
         $proj_id   = $project_id ?: null;
@@ -583,6 +585,7 @@ elseif ($method === 'DELETE' && $sub === 'transaksi') {
 
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi untuk dihapus.', 400);
+    transitory_assert_unlinked($pdo,array_values($tx_ids));
 
     // Cari crossingGroupIds dan projectIds dari source transactions sebelum dihapus
     $placeholders = implode(',', array_fill(0, count($tx_ids), '?'));
@@ -606,6 +609,7 @@ elseif ($method === 'DELETE' && $sub === 'transaksi') {
 
     $pdo->beginTransaction();
     try {
+        transitory_assert_unlinked($pdo,array_values($tx_ids));
         $pdo->prepare("DELETE FROM `Transaction` WHERE id IN ($placeholders)")->execute(array_values($tx_ids));
 
         foreach ($crossing_group_ids as $gid) {
@@ -635,6 +639,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
 
     $existing_tx_ids = array_filter((array)($body['existingTxIds'] ?? []));
     if (empty($existing_tx_ids)) return error_response('Tidak ada transaksi lama untuk diganti.', 400);
+    transitory_assert_unlinked($pdo,array_values($existing_tx_ids));
 
     $entity_key      = $body['entityKey']      ?? '';
     $jenis_input_key = $body['jenisInputKey']  ?? '';
@@ -694,7 +699,9 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
 
     $pdo->beginTransaction();
     try {
+        transitory_guard_reference($pdo,$entity_id,$no_bukti);
         // Hapus lama
+        transitory_assert_unlinked($pdo,array_values($existing_tx_ids));
         $pdo->prepare("DELETE FROM `Transaction` WHERE id IN ($placeholders_old)")->execute(array_values($existing_tx_ids));
         foreach ($old_crossing_ids as $gid) {
             $pdo->prepare("DELETE FROM `Transaction` WHERE JSON_VALUE(extraFieldsJson, '$.crossingGroupId') = ?")->execute([$gid]);
@@ -822,10 +829,12 @@ elseif ($method === 'PATCH' && $sub === 'transaksi') {
     $coa_updates   = (array)($body['coaUpdates'] ?? []); // [{txId, newCoaAccountId}]
 
     if (empty($tx_ids)) return error_response('txIds wajib diisi.', 400);
+    transitory_assert_unlinked($pdo,array_merge(array_values($tx_ids),array_column($coa_updates,'txId')));
     if (!$new_no_bukti || !$new_keterangan) return error_response('No. bukti dan keterangan wajib diisi.', 400);
 
     $pdo->beginTransaction();
     try {
+        transitory_assert_unlinked($pdo,array_merge(array_values($tx_ids),array_column($coa_updates,'txId')));
         $placeholders = implode(',', array_fill(0, count($tx_ids), '?'));
         $pdo->prepare(
             "UPDATE `Transaction` SET noBukti = ?, keterangan = ? WHERE id IN ($placeholders)"

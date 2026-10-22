@@ -44,6 +44,10 @@ export default async function PayrollPage({
     getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch((e: unknown) => { console.error(tag, "getRekonsiliasiPajakGajiData failed:", e); throw e; }),
     ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role) ? getKasTransitory(selectedEntity.id).catch((e: unknown) => { console.error(tag, "getKasTransitory failed (non-fatal):", e); return null; }) : Promise.resolve(null),
   ]);
+  console.log(tag, "data keys:", Object.keys(payrollData ?? {}));
+  console.log(tag, "penyesuaianJurnal:", JSON.stringify(payrollData?.penyesuaianJurnal)?.slice(0, 200));
+  console.log(tag, "syncData keys:", Object.keys(payrollData?.syncData ?? {}));
+  console.log(tag, "rekonsiliasiData summary keys:", Object.keys(rekonsiliasiData?.summary ?? {}));
 
   return (
     <PageTransition>

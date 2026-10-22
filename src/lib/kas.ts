@@ -41,7 +41,7 @@ export async function getCoaOptions() {
     `/api/coa`,
     token
   );
-  return result.data.sort((a, b) => parseInt(a.code) - parseInt(b.code));
+  return result.data.filter(account => account.id !== "system-kas-transitory").sort((a, b) => parseInt(a.code) - parseInt(b.code));
 }
 
 // Saldo awal dihitung di PHP side

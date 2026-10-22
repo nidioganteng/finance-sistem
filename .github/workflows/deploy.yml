@@ -23,6 +23,7 @@ jobs:
           port: 21
           local-dir: ./api/
           server-dir: /public_html/kosha/api/
+          state-name: .deploy-state-v2
           exclude: |
             **/.git*
             **/.git*/**

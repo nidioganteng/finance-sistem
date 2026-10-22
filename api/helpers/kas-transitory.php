@@ -1,11 +1,17 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/kas-transitory-accounting.php';
 
 function transitory_ensure(PDO $pdo): void {
     static $done = false;
     if (!$done) {
         $pdo->exec(file_get_contents(__DIR__.'/../../database/migrations/2026-10-22-kas-transitory.sql'));
         if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' && !$pdo->query("SHOW COLUMNS FROM KasTransitoryEvent LIKE 'eventOrder'")->fetch()) $pdo->exec('ALTER TABLE KasTransitoryEvent ADD COLUMN eventOrder INT NOT NULL DEFAULT 0');
+        if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql') {
+            if(!$pdo->query("SHOW COLUMNS FROM KasTransitory LIKE 'accountingVersion'")->fetch()) $pdo->exec('ALTER TABLE KasTransitory ADD COLUMN accountingVersion INT NOT NULL DEFAULT 1');
+            if(!$pdo->query("SHOW COLUMNS FROM KasTransitoryEvent LIKE 'accountingNoBukti'")->fetch()) $pdo->exec('ALTER TABLE KasTransitoryEvent ADD COLUMN accountingNoBukti VARCHAR(255) NULL');
+        }
+        transitory_ensure_account($pdo);
         $done = true;
     }
 }
@@ -46,7 +52,7 @@ function transitory_source(PDO $pdo, string $id, bool $lock=false): array {
     $stmt=$pdo->prepare('SELECT * FROM `Transaction` WHERE id=?'.($lock?transitory_lock($pdo):'')); $stmt->execute([$id]); $source=$stmt->fetch(PDO::FETCH_ASSOC);
     if (!$source) throw new InvalidArgumentException('Cash out asal tidak ditemukan.');
     $extra=json_decode($source['extraFieldsJson']??'{}',true)?:[];
-    if (empty($extra['isKasEntry']) || (float)$source['kredit']<=0 || (float)$source['debit']!=0 || empty($source['noBukti']) || !empty($extra['transitoryReversalId'])) throw new InvalidArgumentException('Pilih baris cash out dari kas/bank.');
+    if (empty($source['coaAccountId']) || empty($extra['isKasEntry']) || (float)$source['kredit']<=0 || (float)$source['debit']!=0 || empty($source['noBukti']) || !empty($extra['transitoryReversalId'])) throw new InvalidArgumentException('Pilih baris cash out dari kas/bank.');
     $rows=transitory_rows($pdo,$source,$lock); $cashOut=0; $cashIn=0;
     foreach($rows as $r) {
         $e=json_decode($r['extraFieldsJson']??'{}',true)?:[];
@@ -103,9 +109,11 @@ function transitory_create(PDO $pdo,array $user,array $body): string {
     }
     $id=transitory_text($body['requestId']??null,'ID permintaan',36);
     if(!preg_match('/^[a-f0-9-]{36}$/D',$id)) throw new InvalidArgumentException('ID permintaan tidak valid.');
-    $pdo->prepare('INSERT INTO KasTransitory (id,entityId,sourceTransactionId,sourceNoBukti,sourceDate,sourceSnapshot,projectId,category,recipient,amount,location,reason,targetDate,payrollType,payrollId,createdBy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([
+    $pdo->prepare('INSERT INTO KasTransitory (id,entityId,sourceTransactionId,sourceNoBukti,sourceDate,sourceSnapshot,projectId,category,recipient,amount,location,reason,targetDate,payrollType,payrollId,createdBy,accountingVersion) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([
         $id,$source['entityId'],$source['id'],$source['noBukti'],substr($source['tanggal'],0,10),json_encode(['hash'=>transitory_fingerprint($source['rows']),'rows'=>$source['rows']],JSON_THROW_ON_ERROR),$source['projectId'],$category,
-        transitory_text($body['recipient']??null,'Penerima',255),$amount/100,transitory_text($body['location']??null,'Posisi fisik uang',500),transitory_text($body['reason']??null,'Alasan penahanan'),$target,$payrollType,$payrollId,$user['id']]);
+        transitory_text($body['recipient']??null,'Penerima',255),$amount/100,transitory_text($body['location']??null,'Posisi fisik uang',500),transitory_text($body['reason']??null,'Alasan penahanan'),$target,$payrollType,$payrollId,$user['id'],2]);
+    $s=$pdo->prepare('SELECT * FROM KasTransitory WHERE id=?'); $s->execute([$id]);
+    transitory_post($pdo,$s->fetch(PDO::FETCH_ASSOC),$source,$amount,'HOLD',$user['id'],$id);
     return $id;
 }
 
@@ -116,7 +124,7 @@ function transitory_guard_transactions(PDO $pdo,array $ids): void {
     $ph=implode(',',array_fill(0,count($ids),'?'));
     if($pdo->inTransaction()) { $lock=$pdo->prepare("SELECT id FROM `Transaction` WHERE id IN ($ph) ORDER BY id".transitory_lock($pdo)); $lock->execute(array_values($ids)); $lock->fetchAll(); }
     $s=$pdo->prepare("SELECT t.extraFieldsJson FROM `Transaction` t WHERE t.id IN ($ph)"); $s->execute(array_values($ids));
-    foreach($s->fetchAll(PDO::FETCH_COLUMN) as $json) if(!empty((json_decode($json??'{}',true)?:[])['transitoryReversalId'])) throw new RuntimeException('Bukti reversal transitory tidak boleh diubah atau dihapus.',409);
+    foreach($s->fetchAll(PDO::FETCH_COLUMN) as $json) if(!empty((json_decode($json??'{}',true)?:[])['transitoryReversalId']) || !empty((json_decode($json??'{}',true)?:[])['transitoryAccounting'])) throw new RuntimeException('Bukti reversal transitory tidak boleh diubah atau dihapus.',409);
     $s=$pdo->prepare("SELECT k.id FROM KasTransitory k JOIN `Transaction` src ON src.id=k.sourceTransactionId JOIN `Transaction` t ON t.entityId=src.entityId AND t.noBukti=src.noBukti AND t.tanggal=src.tanggal WHERE t.id IN ($ph) LIMIT 1".($pdo->inTransaction()?transitory_lock($pdo):'')); $s->execute(array_values($ids));
     if($s->fetchColumn()) throw new RuntimeException('Bukti sudah terhubung ke Kas Transitory dan dikunci untuk menjaga riwayat. Gunakan Release atau Reversal di Kas Transitory.',409);
 }
@@ -155,6 +163,7 @@ function transitory_record_event(PDO $pdo,array $user,string $id,string $kind,ar
     $s=$pdo->prepare('SELECT * FROM KasTransitory WHERE id=?'.transitory_lock($pdo)); $s->execute([$id]); $row=$s->fetch(PDO::FETCH_ASSOC);
     if(!$row) throw new RuntimeException('Dana ditahan tidak ditemukan.',404);
     transitory_access($pdo,$user,$row['entityId']);
+    if((int)($row['accountingVersion']??1)!==2) throw new RuntimeException('Data lama memerlukan migrasi pencatatan Kas Transitory sebelum diproses.',409);
     if($kind==='REVERSAL' && !in_array($user['role'],['SUPER_ADMIN','MANAJER_KEUANGAN'],true)) throw new RuntimeException('Reversal hanya untuk manajer keuangan atau admin.',403);
     if(!in_array($kind,['RELEASE','REVERSAL'],true)) throw new InvalidArgumentException('Aksi tidak valid.');
     $request=transitory_text($body['requestId']??null,'ID permintaan',64);
@@ -173,8 +182,8 @@ function transitory_record_event(PDO $pdo,array $user,string $id,string $kind,ar
     $source=transitory_source($pdo,$row['sourceTransactionId'],true); $snapshot=json_decode($row['sourceSnapshot'],true,512,JSON_THROW_ON_ERROR);
     if(transitory_fingerprint($source['rows'])!==$snapshot['hash']) throw new RuntimeException('Unbalanced: bukti asal berubah. Periksa sumber sebelum pencairan/reversal.',409);
     $receipt=transitory_text($body['receipt']??null,'Nomor bukti / tanda terima',255); $note=transitory_text($body['note']??null,$kind==='REVERSAL'?'Alasan dan persetujuan pembatalan':'Catatan penyerahan');
-    $eventId=uuid4(); $nb=$kind==='REVERSAL'?transitory_reversal($pdo,$row,$source,$cents,$date,$user['id'],$eventId):null;
-    $pdo->prepare('INSERT INTO KasTransitoryEvent (id,transitoryId,kind,eventOrder,amount,eventDate,receipt,note,reversalNoBukti,requestId,actorId) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute([$eventId,$id,$kind,(int)$row['revision'],$cents/100,$date,$receipt,$note,$nb,$request,$user['id']]);
+    $eventId=uuid4(); $nb=transitory_post($pdo,$row,$source,$cents,$kind,$user['id'],$eventId);
+    $pdo->prepare('INSERT INTO KasTransitoryEvent (id,transitoryId,kind,eventOrder,amount,eventDate,receipt,note,reversalNoBukti,accountingNoBukti,requestId,actorId) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')->execute([$eventId,$id,$kind,(int)$row['revision'],$cents/100,$date,$receipt,$note,$kind==='REVERSAL'?$nb:null,$nb,$request,$user['id']]);
     $pdo->prepare('UPDATE KasTransitory SET revision=revision+1 WHERE id=?')->execute([$id]);
     if($kind==='REVERSAL' && $row['projectId']) sync_project_spend($pdo,$row['projectId']);
     return $eventId;

@@ -365,6 +365,7 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
         return error_response('Kamu tidak punya akses ke entity ini.', 403);
     }
 
+    try { transitory_guard_coa(array_column((array)$rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     $valid_rows = array_values(array_filter($rows, fn($r) => !empty($r['coaAccountId']) && (float)($r['nominal'] ?? 0) > 0));
     if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
 
@@ -663,6 +664,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
         return error_response('Kamu tidak punya akses ke entity ini.', 403);
     }
 
+    try { transitory_guard_coa(array_column((array)$rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     $valid_rows = array_values(array_filter($rows, fn($r) => !empty($r['coaAccountId']) && (float)($r['nominal'] ?? 0) > 0));
     if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
 
@@ -826,7 +828,8 @@ elseif ($method === 'PATCH' && $sub === 'transaksi') {
     $tx_ids        = array_filter((array)($body['txIds'] ?? []));
     $new_no_bukti  = trim($body['newNoBukti']   ?? '');
     $new_keterangan= trim($body['newKeterangan'] ?? '');
-    $coa_updates   = (array)($body['coaUpdates'] ?? []); // [{txId, newCoaAccountId}]
+    $coa_updates   = (array)($body['coaUpdates'] ?? []);
+    try { transitory_guard_coa(array_column($coa_updates,'newCoaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); } // [{txId, newCoaAccountId}]
 
     if (empty($tx_ids)) return error_response('txIds wajib diisi.', 400);
     transitory_assert_unlinked($pdo,array_merge(array_values($tx_ids),array_column($coa_updates,'txId')));

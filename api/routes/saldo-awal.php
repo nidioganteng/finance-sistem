@@ -10,6 +10,7 @@ if ($method === 'POST') {
     $year        = isset($body['year']) ? (int)$body['year'] : null;
     $nominal     = isset($body['nominal'])   ? $body['nominal'] : null;
 
+    if ($coaId==='system-kas-transitory') return error_response('Saldo Kas Transitory dihitung dari dana ditahan, bukan saldo awal manual.',409);
     if (!$entityId || !$coaId || !$year || $nominal === null) {
         error_response('entityId, coaAccountId, year, dan nominal wajib diisi.', 400);
     }

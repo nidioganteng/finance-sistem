@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getPayrollData } from "@/lib/payroll";
-import { getRekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
+import { getRekonsiliasiPajakGajiData, type RekonsiliasiPajakGajiData } from "@/lib/rekonsiliasi-pajak-gaji";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
@@ -89,7 +89,7 @@ export default async function PayrollPage({
       {transitoryData && <PayrollHoldSummary items={transitoryData.items} entityKey={selectedEntity.key} />}
       <PayrollClient
         data={payrollData}
-        rekonsiliasiData={rekonsiliasiData}
+        rekonsiliasiData={(rekonsiliasiData ?? {}) as RekonsiliasiPajakGajiData}
         userRole={role}
         initialTab={initialTab}
         selectedYear={year}

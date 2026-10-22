@@ -1047,7 +1047,7 @@ export function PayrollClient({
   );
   const totalHonorBersihFiltered = paidHonorList.reduce(
     (acc, h) =>
-      acc + (h.nominalBersih || Math.max(0, h.nominalHonor - (h.pph21 || 0))),
+      acc + (h.nominalHonor),
     0
   );
 
@@ -5961,7 +5961,7 @@ export function PayrollClient({
                 </div>
                 <div>
                   <label className="font-semibold text-navy-text block mb-1">
-                    Potongan Pajak (Rp)
+                    PPh pelaporan · ditanggung perusahaan (Rp)
                   </label>
                   <input
                     type="text"
@@ -5990,7 +5990,7 @@ export function PayrollClient({
               <div className="p-3 rounded-xl bg-surface-subtle border border-border flex items-center justify-between text-xs">
                 <span className="text-muted-faint font-medium">Gaji Bersih Diterima:</span>
                 <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
-                  {formatRupiah(Math.max(0, modalHonorNominal - modalHonorNominalPph))}
+                  {formatRupiah(modalHonorNominal)}
                 </span>
               </div>
 

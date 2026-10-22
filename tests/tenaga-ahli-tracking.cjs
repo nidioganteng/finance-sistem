@@ -240,4 +240,13 @@ assert.equal(tracking.groupTenagaAhliPeople([], datedPeople, 'A', '', { year: 20
 assert.equal(tracking.groupTenagaAhliPeople(throughMarch, datedPeople, 'A', '', { year: 2026, untilMonth: 4 })[0].summary.dibayar, 20000000);
 const futureEmpty = [{ ...datedPeople[0], proyekList: [{ ...datedPeople[0].proyekList[0], tanggalMulaiTugas: '2026-05-01', tanggalSelesaiTugas: '2026-06-30' }] }];
 assert.equal(tracking.groupTenagaAhliPeople([], futureEmpty, 'A', '', { year: 2026, untilMonth: 4 }).length, 0);
+const { TenagaAhliPaidSummary } = compile('src/components/payroll/TenagaAhliPaidSummary.tsx');
+const masterPayments = [payment('master-jan', 1, 10000), payment('master-jan', 1, 10000), payment('master-feb', 2, 20000), payment('master-mar', 3, 30000, { projectId: 'project-2' }), payment('master-apr', 4, 40000), payment('master-old', 1, 999999, { tahun: 2025 })];
+const masterPaidHtml = renderToStaticMarkup(React.createElement(TenagaAhliPaidSummary, { history: masterPayments, year: 2026 }));
+assert.match(masterPaidHtml, /100\.000/);
+assert.match(masterPaidHtml, /Januari 2026/); assert.match(masterPaidHtml, /Februari 2026/); assert.match(masterPaidHtml, /Maret 2026/); assert.match(masterPaidHtml, /April 2026/);
+assert.match(masterPaidHtml, /10\.000/); assert.match(masterPaidHtml, /20\.000/); assert.match(masterPaidHtml, /30\.000/); assert.match(masterPaidHtml, /40\.000/);
+assert.match(masterPaidHtml, /Seluruh proyek · 4 bulan · 2026/);
+assert.doesNotMatch(masterPaidHtml, /999\.999|2025/);
+assert.match(renderToStaticMarkup(React.createElement(TenagaAhliPaidSummary, { history: [], year: 2026 })), /Belum ada pembayaran 2026/);
 console.log('Lulus: rekap gaji/PPh kumulatif per nama, rincian bulanan, batas bulan/tahun, pencarian, entitas, tanpa pemotongan PPh, deduplikasi, dan tracking.');

@@ -6,7 +6,7 @@ function payroll_ptkp_defaults(): array {
         'K/0'=>58500000.0,'K/1'=>63000000.0,'K/2'=>67500000.0,'K/3'=>72000000.0];
 }
 function ensure_payroll_ptkp_table(PDO $pdo): void {
-    static $done=false;
+    static $done = false;
     if ($done) return;
     $pdo->exec("CREATE TABLE IF NOT EXISTS `PayrollPtkpSetting` (
       `entityId` VARCHAR(36) NOT NULL PRIMARY KEY,

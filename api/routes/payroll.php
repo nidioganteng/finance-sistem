@@ -784,7 +784,7 @@ if ($method === 'GET' && $sub === '') {
     foreach ($honor_raw as $h) {
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
         $tgl_str = substr($h['tanggal'], 0, 10); // YYYY-MM-DD
@@ -918,7 +918,7 @@ if ($method === 'GET' && $sub === '') {
             $has_npwp      = !empty($ta['npwp']);
             $tarif_pph     = $has_npwp ? 2.5 : 3.0; // Standar PPh 21 Bukan Pegawai (50% x 5% = 2.5%, non-NPWP 120% = 3%)
             $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
-            $bersih        = max(0, $nominal_honor - $pph21);
+            $bersih        = $nominal_honor;
             $resolved_proj = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : ($pl['projectName'] ?? null);
             $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
             $unique_pending_id = 'pending_' . $ta['id'] . ($p_id ? '_' . $p_id : '');
@@ -1028,7 +1028,7 @@ if ($method === 'GET' && $sub === '') {
         $h_list = array_values($h_list);
         $bruto  = array_sum(array_column($h_list, 'nominalHonor'));
         $pph    = array_sum(array_column($h_list, 'pph21'));
-        $bersih = array_sum(array_column($h_list, 'nominalBersih'));
+        $bersih = array_sum(array_column($h_list, 'nominalHonor'));
         $rekap_bulanan_ta[] = [
             'bulan'              => $m,
             'bulanName'          => $bulan_names[$m - 1],
@@ -1145,7 +1145,7 @@ if ($method === 'GET' && $sub === '') {
         $key = trim($h['nik'] ?? '') ?: trim($h['nama']);
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek'] ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
         $bulan_name = $bulan_names[(int)$h['bulan'] - 1] ?? "Bulan {$h['bulan']}";
         $tgl_str = substr($h['tanggal'], 0, 10);
@@ -1242,7 +1242,7 @@ if ($method === 'GET' && $sub === '') {
         $rek_key = trim($h['rekananId'] ?? '');
         $bruto   = (float)$h['nominalHonor'];
         $pph     = (float)$h['pph21'];
-        $bersih  = (float)$h['nominalBersih'];
+        $bersih  = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek'] ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
         $bulan_name = $bulan_names[(int)$h['bulan'] - 1] ?? "Bulan {$h['bulan']}";
         $tgl_str = substr($h['tanggal'], 0, 10);
@@ -1294,7 +1294,7 @@ if ($method === 'GET' && $sub === '') {
         $key    = $h['nik'] ?: $h['nama'];
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
 
         if (!isset($konsolidasi_map[$key])) {
             $konsolidasi_map[$key] = [
@@ -1361,7 +1361,7 @@ if ($method === 'GET' && $sub === '') {
         if ((int)$h['bulan'] !== $month) continue;
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $resolved_proj = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : null);
         $tgl_str = substr($h['tanggal'], 0, 10);
@@ -1455,7 +1455,7 @@ if ($method === 'GET' && $sub === '') {
             $has_npwp      = !empty($ta['npwp']);
             $tarif_pph     = $has_npwp ? 2.5 : 3.0;
             $pph21         = $nominal_honor > 0 ? round(($nominal_honor * $tarif_pph) / 100) : 0.0;
-            $bersih        = max(0, $nominal_honor - $pph21);
+            $bersih        = $nominal_honor;
             $resolved_proj = $pl['projectCode'] ? "{$pl['projectCode']} - {$pl['projectName']}" : ($pl['projectName'] ?? null);
             $tgl_default   = sprintf('%04d-%02d-01', $year, $month);
 
@@ -1561,7 +1561,7 @@ if ($method === 'GET' && $sub === '') {
         $proj_key = $h['projectId'] ?: '__none__';
         $bruto  = (float)$h['nominalHonor'];
         $pph    = (float)$h['pph21'];
-        $bersih = (float)$h['nominalBersih'];
+        $bersih = (float)$h['nominalHonor'];
         $proj_name = $h['namaProyek']
             ?: ($h['projCode'] ? "{$h['projCode']} - {$h['projName']}" : 'Umum / Non-Proyek');
 
@@ -2471,7 +2471,7 @@ elseif ($method === 'POST' && $sub === 'honor' && $sub2 === '') {
     } catch (InvalidArgumentException $e) {
         return error_response($e->getMessage(), 400);
     }
-    $nominal_bersih = max(0, $nominal_honor - $pph21);
+    $nominal_bersih = $nominal_honor;
 
     // Jika rekananId belum ada, cek match NIK/NPWP
     if (!$final_rekanan_id) {

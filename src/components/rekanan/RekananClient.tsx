@@ -19,7 +19,6 @@ import {
   X,
   Building2,
   Briefcase,
-  UserCheck,
   CreditCard,
   Phone,
   Mail,
@@ -28,7 +27,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const TIPE_BADGE: Record<RekananTipe, { label: string; badgeClass: string; icon: any }> = {
+const TIPE_BADGE: Record<Exclude<RekananTipe, "TENAGA_AHLI">, { label: string; badgeClass: string; icon: any }> = {
   KLIEN: {
     label: "Klien / Dinas",
     badgeClass: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200",
@@ -38,11 +37,6 @@ const TIPE_BADGE: Record<RekananTipe, { label: string; badgeClass: string; icon:
     label: "Vendor / Supplier",
     badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200",
     icon: Briefcase,
-  },
-  TENAGA_AHLI: {
-    label: "Tenaga Ahli",
-    badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200",
-    icon: UserCheck,
   },
   SUBKONTRAKTOR: {
     label: "Subkontraktor",
@@ -124,7 +118,6 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
     ALL: rekananList.length,
     KLIEN: rekananList.filter((r) => r.tipe === RekananTipe.KLIEN).length,
     VENDOR: rekananList.filter((r) => r.tipe === RekananTipe.VENDOR).length,
-    TENAGA_AHLI: rekananList.filter((r) => r.tipe === RekananTipe.TENAGA_AHLI).length,
   };
 
   function openCreateModal() {
@@ -236,7 +229,6 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
             { key: "ALL", label: `Semua (${counts.ALL})` },
             { key: "KLIEN", label: `Klien/Dinas (${counts.KLIEN})` },
             { key: "VENDOR", label: `Vendor (${counts.VENDOR})` },
-            { key: "TENAGA_AHLI", label: `Tenaga Ahli (${counts.TENAGA_AHLI})` },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -302,7 +294,7 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
                 </tr>
               ) : (
                 filteredList.map((r) => {
-                  const badgeInfo = TIPE_BADGE[r.tipe] || TIPE_BADGE.LAINNYA;
+                  const badgeInfo = TIPE_BADGE[r.tipe as keyof typeof TIPE_BADGE] || TIPE_BADGE.LAINNYA;
                   const Icon = badgeInfo.icon;
                   return (
                     <tr
@@ -493,7 +485,6 @@ export function RekananClient({ initialRekanan, canManage }: Props) {
                     >
                       <option value={RekananTipe.VENDOR}>Vendor / Supplier</option>
                       <option value={RekananTipe.KLIEN}>Klien / Instansi / Dinas</option>
-                      <option value={RekananTipe.TENAGA_AHLI}>Tenaga Ahli</option>
                       <option value={RekananTipe.LAINNYA}>Lainnya</option>
                     </select>
                   </div>

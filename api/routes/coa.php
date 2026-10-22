@@ -3,6 +3,7 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 $auth_user = require_auth();
 $id_param  = $segments[1] ?? null;
+if($id_param==='system-kas-transitory' && $method!=='GET') return error_response('Akun Kas Transitory dikelola otomatis oleh modul dan tidak dapat diubah/dihapus.',409);
 
 // GET /api/coa
 if ($method === 'GET' && !$id_param) {
@@ -29,6 +30,7 @@ if ($method === 'POST' && !$id_param) {
     $reportType     = trim($body['reportType']     ?? '');
     $reportCategory = trim($body['reportCategory'] ?? 'SEMUA');
 
+    if ($code === '159-TR') return error_response('Kode 159-TR dicadangkan untuk akun Kas Transitory.',409);
     if (!$code || !$name || !$kategori || !$reportType) {
         error_response('code, name, kategori, dan reportType wajib diisi.', 400);
     }
@@ -94,6 +96,7 @@ if ($method === 'PUT' && $id_param) {
     $reportType     = trim($body['reportType']     ?? '');
     $reportCategory = trim($body['reportCategory'] ?? 'SEMUA');
 
+    if ($code === '159-TR') return error_response('Kode 159-TR dicadangkan untuk akun Kas Transitory.',409);
     if (!$code || !$name || !$kategori || !$reportType) {
         error_response('code, name, kategori, dan reportType wajib diisi.', 400);
     }

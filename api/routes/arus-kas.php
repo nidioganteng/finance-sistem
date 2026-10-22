@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 require_once __DIR__ . '/../helpers/akuntansi-helpers.php';
 
@@ -68,6 +69,9 @@ if ($method === 'GET') {
         foreach ($stmt_sa->fetchAll() as $sa) {
             $saldo_awal_map[$sa['coaAccountId']] = (float)$sa['total_sa'];
         }
+
+        $held_opening=transitory_cash_summary($pdo,$entity_ids,($year-1).'-12-31');
+        $saldo_awal_map[TRANSITORY_COA_ID]=$held_opening['ledgerHeld'];
 
         // 3. Ambil mutasi transaksi (abaikan mirror autoPostedFromJurnal)
         $stmt_tx = $pdo->prepare(
@@ -356,12 +360,13 @@ if ($method === 'GET') {
     // MODE DEFAULT: Arus Kas Bulanan (12 Bulan)
     // ──────────────────────────────────────────────────────────────────────────
     $entity_id = $entity_ids[0];
+    $cash_debit_sql=transitory_cash_sql($pdo,'debit'); $cash_credit_sql=transitory_cash_sql($pdo,'kredit');
     $ph_entities = implode(',', array_fill(0, count($entity_ids), '?'));
 
     $stmt = $pdo->prepare(
         "SELECT MONTH(t.tanggal) AS bulan,
-                COALESCE(SUM(t.debit),  0) AS total_masuk,
-                COALESCE(SUM(t.kredit), 0) AS total_keluar
+                COALESCE(SUM($cash_debit_sql),  0) AS total_masuk,
+                COALESCE(SUM($cash_credit_sql), 0) AS total_keluar
          FROM `Transaction` t
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId IN ($ph_entities)

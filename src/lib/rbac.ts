@@ -34,6 +34,17 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       ],
     },
     {
+      title: "Operasional",
+      items: [
+        {
+          label: "Transaksi",
+          href: "/operasional-transaksi",
+          icon: "penLine",
+          subItems: [{ label: "Kas Transitory", href: "/kas-transitory" }],
+        },
+      ],
+    },
+    {
       title: "Laporan",
       collapsible: true,
       items: [
@@ -78,6 +89,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
           subItems: [
             { label: "Kas Kecil", href: "/kas-kecil" },
             { label: "Kas Besar", href: "/kas-besar" },
+            { label: "Kas Transitory", href: "/kas-transitory" },
             { label: "Buku Bank", href: "/bank-buku" },
             { label: "Entry Jurnal", href: "/jurnal-transaksi" },
             { label: "Aktiva Tetap", href: "/aktiva-tetap" },
@@ -144,6 +156,7 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
           subItems: [
             { label: "Kas Kecil", href: "/kas-kecil" },
             { label: "Kas Besar", href: "/kas-besar" },
+            { label: "Kas Transitory", href: "/kas-transitory" },
             { label: "Buku Bank", href: "/bank-buku" },
             { label: "Entry Jurnal", href: "/jurnal-transaksi" },
             { label: "Aktiva Tetap", href: "/aktiva-tetap" },

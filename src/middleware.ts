@@ -24,6 +24,7 @@ export const config = {
     "/jenis-input/:path*",
     "/kas-kecil/:path*",
     "/kas-besar/:path*",
+    "/kas-transitory/:path*",
     "/bank-buku/:path*",
     "/buku-besar/:path*",
     "/neraca/:path*",

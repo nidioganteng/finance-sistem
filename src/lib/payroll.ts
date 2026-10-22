@@ -559,6 +559,9 @@ export type RekapTenagaAhliPerProyekItem = {
 };
 
 export type JurnalTransaksiGajiItem = {
+  expenseAmount?: number;
+  expenseAmountFmt?: string;
+  hasTransitory?: boolean;
   id: string;
   entityId: string;
   tanggal: string;

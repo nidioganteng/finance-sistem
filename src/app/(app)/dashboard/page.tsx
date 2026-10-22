@@ -158,6 +158,17 @@ export default async function DashboardPage({
       />
 
       {welcomeBanner}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          ["Total kas perusahaan", "kasTotal", "Termasuk kas tersedia dan dana transitory"],
+          ["Kas tersedia operasional", "kasTersedia", "Dana transitory tidak dapat dipakai operasional"],
+          ["Kas Transitory (ditahan)", "kasDitahan", "Masih milik perusahaan, belum menjadi pengeluaran"],
+        ].map(([label, field, note]) => <div key={field} className="rounded-xl border border-border bg-surface-card px-4 py-3">
+          <p className="text-xs text-muted">{label}</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-navy-text">{formatRupiah((showingGrup ? entities : selectedEntity ? [selectedEntity] : []).reduce((total, entity) => total + Number(entity[field as "kasTotal" | "kasTersedia" | "kasDitahan"] || 0), 0))}</p>
+          <p className="mt-1 text-[11px] text-muted">{note}</p>
+        </div>)}
+      </div>
 
       {/* Grup / Master Dashboard view */}
       {showingGrup ? (

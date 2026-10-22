@@ -7,7 +7,9 @@ export async function getJenisInputChips(_entityId: string) {
     `/api/jenis-input`,
     token
   );
-  return result.data.map((j) => ({ key: j.key, label: j.nama }));
+  const chips = result.data.map((j) => ({ key: j.key, label: j.nama }));
+  if (!chips.some(j => j.key === "kasTransitory")) chips.push({ key: "kasTransitory", label: "Kas Transitory" });
+  return chips;
 }
 
 export async function getCoaList() {

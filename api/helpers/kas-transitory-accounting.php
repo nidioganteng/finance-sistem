@@ -4,6 +4,47 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 const TRANSITORY_COA_ID = 'system-kas-transitory';
 const TRANSITORY_COA_CODE = '159-TR';
 
+function transitory_ensure_voucher_sequence(PDO $pdo): void {
+    $id=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?'BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY':'INTEGER PRIMARY KEY AUTOINCREMENT';
+    $pdo->exec("CREATE TABLE IF NOT EXISTS KasTransitoryVoucher (id $id, postingKey VARCHAR(191) NOT NULL UNIQUE)");
+}
+
+function transitory_voucher_number(PDO $pdo,string $phase,string $key): string {
+    $prefix=['HOLD'=>'KTH','RELEASE'=>'KTL','REVERSAL'=>'KTR','LEGACY_COMPENSATION'=>'KTC'][$phase]??null;
+    if(!$prefix || !$pdo->inTransaction()) throw new LogicException('Nomor bukti wajib dialokasikan dalam transaksi.');
+    $postingKey=$phase.':'.$key;
+    $s=$pdo->prepare('SELECT id FROM KasTransitoryVoucher WHERE postingKey=?'); $s->execute([$postingKey]);
+    $id=$s->fetchColumn();
+    if($id===false) {
+        $pdo->prepare('INSERT INTO KasTransitoryVoucher (postingKey) VALUES (?)')->execute([$postingKey]);
+        $id=$pdo->lastInsertId();
+    }
+    return $prefix.'-'.str_pad((string)$id,6,'0',STR_PAD_LEFT);
+}
+
+function transitory_shorten_vouchers(PDO $pdo): int {
+    if(!$pdo->inTransaction()) throw new LogicException('Penyesuaian nomor wajib dalam transaksi.');
+    $rows=$pdo->query("SELECT id,entityId,noBukti,extraFieldsJson FROM `Transaction` WHERE JSON_VALUE(extraFieldsJson,'$.transitoryAccounting') IS NOT NULL OR JSON_VALUE(extraFieldsJson,'$.transitoryReversalId') IS NOT NULL ORDER BY tanggal,noBukti,id".transitory_lock($pdo))->fetchAll(PDO::FETCH_ASSOC);
+    $groups=[];
+    foreach($rows as $r) {
+        if(preg_match('/^KT[HLRC]-[0-9]+$/D',$r['noBukti'])) continue;
+        $key=json_encode([$r['entityId'],$r['noBukti']]);
+        $groups[$key][]=$r;
+    }
+    foreach($groups as $rows) {
+        $first=$rows[0]; $extra=json_decode($first['extraFieldsJson'],true)?:[];
+        $phase=$extra['transitoryPhase']??'REVERSAL';
+        $nb=transitory_voucher_number($pdo,$phase,'legacy-'.hash('sha256',json_encode([$first['entityId'],$first['noBukti']])));
+        $s=$pdo->prepare('UPDATE `Transaction` SET noBukti=? WHERE id=?');
+        foreach($rows as $r) $s->execute([$nb,$r['id']]);
+        foreach(['accountingNoBukti','reversalNoBukti'] as $field) {
+            $s=$pdo->prepare("UPDATE KasTransitoryEvent SET $field=? WHERE $field=? AND transitoryId IN (SELECT id FROM KasTransitory WHERE entityId=?)");
+            $s->execute([$nb,$first['noBukti'],$first['entityId']]);
+        }
+    }
+    return count($groups);
+}
+
 function transitory_ensure_account(PDO $pdo): void {
     $stmt=$pdo->prepare('SELECT id,code,kategori,reportType,report_category FROM CoaAccount WHERE id=? OR code=?');
     $stmt->execute([TRANSITORY_COA_ID,TRANSITORY_COA_CODE]); $rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -25,7 +66,7 @@ function transitory_guard_coa(array $ids): void {
 function transitory_post(PDO $pdo,array $hold,array $source,int $amount,string $phase,string $actor,string $eventId): string {
     if(!$pdo->inTransaction()) throw new LogicException('Posting transitory wajib dalam transaksi.');
     $kind=get_or_create_jurnal_transaksi_jenis($pdo);
-    $nb='KT'.substr($phase,0,1).'-'.str_replace('-','',$eventId);
+    $nb=transitory_voucher_number($pdo,$phase,$eventId);
     $extra=['transitoryAccounting'=>true,'transitoryId'=>$hold['id'],'transitoryPhase'=>$phase,'sourceTransactionId'=>$source['id'],'sourceNoBukti'=>$source['noBukti'],'accountingDate'=>$hold['sourceDate']];
     if($phase!=='RELEASE') $extra['transitoryInternalTransfer']=true;
     $legs=[];
@@ -113,10 +154,11 @@ function transitory_migrate_accounting(PDO $pdo,string $id): void {
             $s=$pdo->prepare('SELECT * FROM `Transaction` WHERE entityId=? AND noBukti=? ORDER BY id'.transitory_lock($pdo)); $s->execute([$hold['entityId'],$event['reversalNoBukti']]); $old=$s->fetchAll(PDO::FETCH_ASSOC);
             if(!$old) throw new RuntimeException('Bukti reversal lama tidak ditemukan; migrasi dibatalkan.');
             $insert=$pdo->prepare('INSERT INTO `Transaction` (id,entityId,jenisInputId,tanggal,noBukti,keterangan,coaAccountId,debit,kredit,saldoSetelah,extraFieldsJson,staffId,projectId,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $compensationNb=transitory_voucher_number($pdo,'LEGACY_COMPENSATION',$event['id']);
             foreach($old as $r) {
                 $e=json_decode($r['extraFieldsJson']??'{}',true)?:[];
                 $e=array_merge($e,['transitoryAccounting'=>true,'transitoryId'=>$id,'transitoryInternalTransfer'=>true,'transitoryPhase'=>'LEGACY_COMPENSATION']);
-                $insert->execute([uuid4(),$r['entityId'],$r['jenisInputId'],$r['tanggal'],'KTC-'.str_replace('-','',$event['id']),'Koreksi alur transitory lama / '.$event['reversalNoBukti'],$r['coaAccountId'],$r['kredit'],$r['debit'],0,json_encode($e),$event['actorId'],$r['projectId'],date('Y-m-d H:i:s')]);
+                $insert->execute([uuid4(),$r['entityId'],$r['jenisInputId'],$r['tanggal'],$compensationNb,'Koreksi alur transitory lama / '.$event['reversalNoBukti'],$r['coaAccountId'],$r['kredit'],$r['debit'],0,json_encode($e),$event['actorId'],$r['projectId'],date('Y-m-d H:i:s')]);
             }
         }
         $nb=transitory_post($pdo,$hold,$source,transitory_cents($event['amount']),$event['kind'],$event['actorId'],$event['id']);

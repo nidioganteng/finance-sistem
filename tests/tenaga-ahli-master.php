@@ -1,6 +1,7 @@
 <?php
 // Jalankan route master sesungguhnya pada SQLite in-memory, tanpa database aplikasi.
 define('APP_ENTRY', true);
+require __DIR__.'/../api/helpers/tenaga-ahli-periode.php';
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 $pdo->exec("PRAGMA foreign_keys=ON;
 CREATE TABLE Entity (id TEXT PRIMARY KEY, name TEXT);
@@ -86,4 +87,18 @@ verify($pdo->inTransaction(),false,'transaksi gagal ditutup');
 verify($pdo->query("SELECT nama FROM Rekanan WHERE id='p1'")->fetchColumn(),'Nama Diperbaiki','profil rollback jika penugasan gagal');
 verify($pdo->query("SELECT projectId FROM TenagaAhliProject WHERE rekananId='p1' ORDER BY projectId")->fetchAll(PDO::FETCH_COLUMN),['A','B'],'seluruh penugasan rollback jika satu insert gagal');
 verify($pdo->query("SELECT rekananId FROM HonorTenagaAhli WHERE id='legacy-second'")->fetchColumn(),null,'tautan riwayat juga rollback jika penugasan gagal');
+$pdo->exec("DROP TRIGGER fail_project_insert; UPDATE TenagaAhliGajiKontrak SET sumber='MANUAL',spmkMulai='2026-02-01',spmkSelesai='2026-03-31',jadwalJson='[{\"bulan\":\"2026-02\",\"nominal\":10000000,\"pph21\":300000,\"catatan\":\"\"},{\"bulan\":\"2026-03\",\"nominal\":null,\"catatan\":\"\"}]' WHERE id='c1'");
+$extended_body=$reference_body;
+$extended_body['proyekList'][0]['tanggalSelesaiTugas']='2026-05-31';
+verify(save_master($extended_body)->status,200,'extend tanggal akhir melalui database tenaga ahli');
+$schedule=json_decode($pdo->query("SELECT jadwalJson FROM TenagaAhliGajiKontrak WHERE id='c1'")->fetchColumn(),true);
+verify(array_column($schedule,'bulan'),['2026-02','2026-03','2026-04','2026-05'],'extend menambahkan bulan kosong baru');
+verify([$schedule[0]['nominal'],$schedule[0]['pph21']],[10000000,300000],'extend tidak mengubah gaji dan PPh tersimpan');
+$extended_body['proyekList'][0]['tanggalSelesaiTugas']='2026-02-28';
+verify(save_master($extended_body)->status,200,'tanggal selesai dapat dipercepat');
+$schedule=json_decode($pdo->query("SELECT jadwalJson FROM TenagaAhliGajiKontrak WHERE id='c1'")->fetchColumn(),true);
+verify(array_column($schedule,'bulan'),['2026-02'],'bulan kosong di luar masa kerja dihapus dari jadwal');
+verify((float)$pdo->query("SELECT nominalHonor FROM HonorTenagaAhli WHERE id='legacy'")->fetchColumn(),10000000.0,'riwayat pembayaran tetap utuh');
+$kept=tenaga_ahli_jadwal_masa_tugas(['spmkMulai'=>'2026-02-01','spmkSelesai'=>'2026-03-31','jadwalJson'=>'[{"bulan":"2026-03","nominal":100,"pph21":5,"catatan":"LPJ"},{"bulan":"2026-04","nominal":null,"catatan":""}]'],'2026-02-01','2026-02-28');
+verify(array_column(json_decode($kept,true),'bulan'),['2026-03','2026-04'],'gaji/catatan dan perpanjangan eksplisit dipertahankan saat masa kerja berubah');
 echo "$checks pemeriksaan edit master tenaga ahli lulus.\n";

@@ -3261,7 +3261,6 @@ export function PayrollClient({
             month={selectedMonth}
             canEdit={isManager}
             search={searchQuery}
-            onAddManual={() => { setEditingMasterAhli(null); setIsMasterAhliModalOpen(true); }}
           />}
 
           {(["rekap-proyek", "rekap-bulan", "rekap-nama", "konsolidasi"] as string[]).includes(tenagaAhliSubTab) && <TenagaAhliReport
@@ -3586,7 +3585,7 @@ export function PayrollClient({
               <div className="p-4 border-b border-border bg-surface-subtle/30">
                 <h3 className="text-sm font-bold text-navy-text flex items-center gap-2">
                   <Users size={16} className="text-navy" />
-                  <span>Database Pegawai Tenaga Ahli (Master Rekanan)</span>
+                  <span>Database Tenaga Ahli</span>
                 </h3>
                 <p className="text-xs text-muted-faint mt-0.5">
                   Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
@@ -3823,7 +3822,7 @@ export function PayrollClient({
                                           itemSub: `NIK: ${r.nik || "-"} · NPWP: ${r.npwp || "-"}`,
                                           warningNote:
                                             "Tindakan ini hanya diperbolehkan jika belum ada riwayat pembayaran honorarium pada tenaga ahli ini.",
-                                          confirmLabel: "Ya, Hapus Rekanan",
+                                          confirmLabel: "Ya, Hapus Tenaga Ahli",
                                           onConfirm: async () => {
                                             try {
                                               const res = await deleteTenagaAhliMasterAction(r.id);

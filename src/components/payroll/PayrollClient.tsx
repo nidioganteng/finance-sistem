@@ -62,6 +62,7 @@ import {
   hitungPph21Ter,
 } from "@/lib/payroll";
 import { TenagaAhliReport } from "@/components/payroll/TenagaAhliReport";
+import { TenagaAhliPaidSummary } from "@/components/payroll/TenagaAhliPaidSummary";
 import { buildTenagaAhliTracking, type TenagaAhliPayment } from "@/lib/tenaga-ahli-tracking";
 import { TenagaAhliNegosiasi } from "@/components/payroll/TenagaAhliNegosiasi";
 import { PtkpSettingsModal } from "@/components/payroll/PtkpSettingsModal";
@@ -3589,7 +3590,7 @@ export function PayrollClient({
                   <span>Database Tenaga Ahli</span>
                 </h3>
                 <p className="text-xs text-muted-faint mt-0.5">
-                  Daftar profil tenaga ahli lepas / konsultan holding. NIK dan NPWP didaftarkan sekali di sini, sehingga saat input gaji bulanan cukup memilih nama dari daftar tanpa perlu mengetik ulang NIK dan NPWP.
+                  Daftar profil dan penugasan tenaga ahli. Kolom pembayaran menampilkan gaji yang sudah tercatat beserta bulan gajinya untuk tahun dipilih, dari seluruh proyek.
                 </p>
               </div>
 
@@ -3603,7 +3604,7 @@ export function PayrollClient({
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">Proyek Penugasan</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[170px] border-b border-r border-border">Masa Tugas / Kontrak</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[150px] border-b border-r border-border">Status Lapangan</th>
-                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Gaji terisi bulan dipilih</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[120px] border-b border-r border-border">Sudah dibayar · {selectedYear}</th>
                       <th className="py-2.5 px-3.5 whitespace-nowrap min-w-[160px] border-b border-r border-border">NIK & NPWP</th>
                       <th className="py-2.5 px-3.5 text-right whitespace-nowrap min-w-[150px] border-b border-border">Aksi</th>
                     </tr>
@@ -3756,26 +3757,8 @@ export function PayrollClient({
                               )}
                             </td>
 
-                            <td className="py-3 px-3.5 text-right font-mono font-bold text-navy-text whitespace-nowrap border-b border-r border-border">
-                              {pList.length === 0 ? (
-                                <span>Belum diisi</span>
-                              ) : (
-                                <div className="space-y-1.5 py-0.5 text-right font-mono">
-                                  {pList.map((pl, pIdx) => (
-                                    <div key={pIdx} className="font-bold text-navy-text text-xs">
-                                      {(() => {
-                                        const salary = pl.gajiKontrak?.jadwal?.find(row => row.bulan === `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`);
-                                        return salary?.nominal == null ? "Belum diisi" : formatRupiah(salary.nominal);
-                                      })()}
-                                    </div>
-                                  ))}
-                                  {pList.length > 1 && (
-                                    <div className="text-[10px] text-muted-faint border-t border-border/60 pt-0.5 font-semibold">
-                                      Total terisi: {formatRupiah(pList.reduce((sum, project) => sum + (project.gajiKontrak?.jadwal?.find(row => row.bulan === `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`)?.nominal ?? 0), 0))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                            <td className="py-3 px-3.5 align-top border-b border-r border-border">
+                              <TenagaAhliPaidSummary history={r.riwayatGaji} year={selectedYear} />
                             </td>
 
                             <td className="py-3 px-3.5 whitespace-nowrap border-b border-r border-border">

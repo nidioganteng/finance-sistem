@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS KasTransitory (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  entityId VARCHAR(191) NOT NULL,
+  sourceTransactionId VARCHAR(191) NOT NULL,
+  sourceNoBukti VARCHAR(255) NOT NULL,
+  sourceDate DATE NOT NULL,
+  sourceSnapshot LONGTEXT NOT NULL,
+  projectId VARCHAR(191) NULL,
+  category VARCHAR(32) NOT NULL,
+  recipient VARCHAR(255) NOT NULL,
+  amount DECIMAL(18,2) NOT NULL,
+  location VARCHAR(500) NOT NULL,
+  reason TEXT NOT NULL,
+  targetDate DATE NOT NULL,
+  payrollType VARCHAR(16) NULL,
+  payrollId VARCHAR(191) NULL,
+  revision INT NOT NULL DEFAULT 1,
+  createdBy VARCHAR(191) NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_transitory_entity (entityId, targetDate),
+  INDEX idx_transitory_source (sourceTransactionId),
+  INDEX idx_transitory_payroll (payrollType, payrollId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS KasTransitoryEvent (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  transitoryId VARCHAR(36) NOT NULL,
+  kind VARCHAR(16) NOT NULL,
+  eventOrder INT NOT NULL,
+  amount DECIMAL(18,2) NOT NULL,
+  eventDate DATE NOT NULL,
+  receipt VARCHAR(255) NOT NULL,
+  note TEXT NOT NULL,
+  reversalNoBukti VARCHAR(255) NULL,
+  requestId VARCHAR(64) NOT NULL,
+  actorId VARCHAR(191) NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_transitory_request (requestId),
+  UNIQUE KEY uq_transitory_event_order (transitoryId, eventOrder),
+  INDEX idx_transitory_event (transitoryId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -52,11 +52,16 @@ if ($method === 'GET' && $sub === '') {
     // Bangun WHERE dinamis
     $where_parts = ['t.entityId = ?'];
     $params      = [$entity_id];
+    $transitory_source = "(COALESCE(JSON_VALUE(t.extraFieldsJson, '$.transitoryAccounting'),'') IN ('true','1') OR JSON_VALUE(t.extraFieldsJson, '$.transitoryReversalId') IS NOT NULL)";
 
     if ($jenis_input_key && $jenis_input_key !== 'semua') {
-        if ($jenis_input_key === 'jurnalTransaksi') {
+        if ($jenis_input_key === 'kasTransitory') {
+            $where_parts[] = $transitory_source;
+        } elseif ($jenis_input_key === 'jurnalTransaksi') {
+            $where_parts[] = "NOT $transitory_source";
             $where_parts[] = "(ji.`key` = 'jurnalTransaksi' AND (t.extraFieldsJson IS NULL OR JSON_VALID(t.extraFieldsJson) = 0 OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') = false))";
         } elseif (in_array($jenis_input_key, ['kasKecil', 'kasBesar', 'bankBuku'], true)) {
+            $where_parts[] = "NOT $transitory_source";
             $where_parts[] = "(ji.`key` = ? OR (JSON_VALID(t.extraFieldsJson) = 1 AND JSON_UNQUOTE(JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry')) = 'true' AND JSON_UNQUOTE(JSON_EXTRACT(t.extraFieldsJson, '$.crossingFromJenisInputKey')) = ?))";
             $params[]      = $jenis_input_key;
             $params[]      = $jenis_input_key;
@@ -238,6 +243,9 @@ if ($method === 'GET' && $sub === '') {
                 'color' => $base_style['color'],
                 'label' => $from_name ? "{$base_style['label']} {$from_name}{$rek_suffix}" : $base_style['label'],
             ];
+        }
+        if (!empty($extra['transitoryAccounting']) || !empty($extra['transitoryReversalId'])) {
+            $style = ['bg' => '#ccfbf1', 'color' => '#115e59', 'label' => 'Kas Transitory'];
         }
 
         $kode_akun = $r['coa_code'] ?? '—';

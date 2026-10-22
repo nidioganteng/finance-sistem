@@ -5,7 +5,7 @@ require_once __DIR__.'/kas-transitory-accounting.php';
 function transitory_ensure(PDO $pdo): void {
     static $done = false;
     if (!$done) {
-        $pdo->exec(file_get_contents(__DIR__.'/../../database/migrations/2026-10-22-kas-transitory.sql'));
+        $pdo->exec(file_get_contents(__DIR__.'/kas-transitory-schema.sql'));
         if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' && !$pdo->query("SHOW COLUMNS FROM KasTransitoryEvent LIKE 'eventOrder'")->fetch()) $pdo->exec('ALTER TABLE KasTransitoryEvent ADD COLUMN eventOrder INT NOT NULL DEFAULT 0');
         if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql') {
             if(!$pdo->query("SHOW COLUMNS FROM KasTransitory LIKE 'accountingVersion'")->fetch()) $pdo->exec('ALTER TABLE KasTransitory ADD COLUMN accountingVersion INT NOT NULL DEFAULT 1');

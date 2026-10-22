@@ -8,7 +8,7 @@ function payroll_ptkp_defaults(): array {
 function ensure_payroll_ptkp_table(PDO $pdo): void {
     static $done=false;
     if ($done) return;
-    $pdo->exec(file_get_contents(__DIR__.'/../../database/migrations/2026-10-21-payroll-ptkp-settings.sql'));
+    $pdo->exec(file_get_contents(__DIR__.'/payroll-ptkp-schema.sql'));
     $done=true;
 }
 function payroll_validate_ptkp_rates($rates): array {

@@ -13,7 +13,8 @@ function compile(file, mocks = {}) {
   } }).outputText, filename);
   return mod.exports;
 }
-const tracking = compile('src/lib/tenaga-ahli-tracking.ts');
+const periode = compile('src/lib/tenaga-ahli-periode.ts');
+const tracking = compile('src/lib/tenaga-ahli-tracking.ts', { './tenaga-ahli-periode': periode });
 const { buildTenagaAhliTracking: build, filterTenagaAhliTracking: filter, summarizeTenagaAhliTracking: sum, groupTenagaAhliTracking: group } = tracking;
 const salary = (bulan, nominal, catatan = '') => ({ bulan, nominal, catatan });
 const project = (id, jadwal) => ({ projectId: id, projectCode: id.toUpperCase(), projectName: `Proyek ${id}`, projectEntityId: 'A', isTurunLapangan: true, nominalHonorBulanan: 999999999, gajiKontrak: { jadwal, gajiRab: 888888888, gajiNegosiasi: 777777777 } });
@@ -230,4 +231,13 @@ assert.match(taxHtml, /200\.000/);
 assert.match(taxHtml, /Februari 2026|Maret 2026/);
 assert.doesNotMatch(taxHtml, /Oktober 2026|Januari 2027|Ahli Kedua|900\.000/);
 assert.match(taxHtml, /tanpa mengurangi gaji diterima/);
+const datedPeople = [{ ...people[0], proyekList: [{ ...people[0].proyekList[0], tanggalMulaiTugas: '2026-02-21', tanggalSelesaiTugas: '2026-03-21', gajiKontrak: null }] }];
+assert.equal(tracking.groupTenagaAhliPeople([], datedPeople, 'A', '', { year: 2026, month: 1 }).length, 0);
+assert.equal(tracking.groupTenagaAhliPeople([], datedPeople, 'A', '', { year: 2026, month: 2 }).length, 1);
+assert.equal(tracking.groupTenagaAhliPeople([], datedPeople, 'A', '', { year: 2026, month: 3 }).length, 1);
+assert.equal(tracking.groupTenagaAhliPeople([], datedPeople, 'A', '', { year: 2026, month: 4 }).length, 0);
+assert.equal(tracking.groupTenagaAhliPeople([], datedPeople, 'A', '', { year: 2026, untilMonth: 4 }).length, 1);
+assert.equal(tracking.groupTenagaAhliPeople(throughMarch, datedPeople, 'A', '', { year: 2026, untilMonth: 4 })[0].summary.dibayar, 20000000);
+const futureEmpty = [{ ...datedPeople[0], proyekList: [{ ...datedPeople[0].proyekList[0], tanggalMulaiTugas: '2026-05-01', tanggalSelesaiTugas: '2026-06-30' }] }];
+assert.equal(tracking.groupTenagaAhliPeople([], futureEmpty, 'A', '', { year: 2026, untilMonth: 4 }).length, 0);
 console.log('Lulus: rekap gaji/PPh kumulatif per nama, rincian bulanan, batas bulan/tahun, pencarian, entitas, tanpa pemotongan PPh, deduplikasi, dan tracking.');

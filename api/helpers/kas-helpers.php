@@ -532,6 +532,10 @@ function sync_project_spend(PDO $pdo, string $project_id): float {
             if ($is_tax) $total += (float)$j['debit'];
             continue;
         }
+        if (!empty($extra['transitoryAccounting'])) {
+            if (($j['coa_kategori'] ?? '') === 'BEBAN' || preg_match('/^[56]/', $j['coa_code'] ?? '')) $total += (float)$j['debit'] - (float)$j['kredit'];
+            continue;
+        }
         if ($j['entityId'] === $project['entityId'] && !empty($extra['transitoryReversalId'])) {
             $is_cost = ($j['coa_kategori'] ?? '') === 'BEBAN' || preg_match('/^[56]/', $j['coa_code'] ?? '') || !preg_match('/bank|kas|piutang/i', $j['coa_name'] ?? '');
             if (empty($extra['isKasEntry']) && $is_cost) $total += (float)$j['debit'] - (float)$j['kredit'];

@@ -3,6 +3,7 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 require_once __DIR__ . '/../helpers/tenaga-ahli-gaji.php';
 require_once __DIR__ . '/../helpers/kas-helpers.php';
 require_once __DIR__ . '/../helpers/payroll-ptkp.php';
+require_once __DIR__ . '/../helpers/payroll-journal.php';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 // $segments[0] = 'payroll'
@@ -1633,7 +1634,7 @@ if ($method === 'GET' && $sub === '') {
          ORDER BY t.tanggal DESC, t.noBukti DESC"
     );
     $stmt->execute([$entity_id, $year_start, $year_end, (string)$year, (string)$year . '%']);
-    $tx_gaji_tahun = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $tx_gaji_tahun = payroll_journal_net_rows($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), $entity_id);
 
     $tx_pegawai_tahun = [];
     $tx_ta_tahun      = [];
@@ -1709,6 +1710,9 @@ if ($method === 'GET' && $sub === '') {
             'debitFmt'               => fmt_rp_payroll($d),
             'kredit'                 => $k,
             'kreditFmt'              => fmt_rp_payroll($k),
+            'expenseAmount'          => $t['expenseAmount'],
+            'expenseAmountFmt'       => fmt_rp_payroll($t['expenseAmount']),
+            'hasTransitory'          => $t['hasTransitory'],
             'staffName'              => $t['staff_name'] ?? null,
         ];
 
@@ -1722,15 +1726,15 @@ if ($method === 'GET' && $sub === '') {
     $tx_pegawai_bulan = array_values(array_filter($tx_pegawai_tahun, fn($t) => $t['bulan'] === $month));
     $tx_ta_bulan      = array_values(array_filter($tx_ta_tahun,      fn($t) => $t['bulan'] === $month));
 
-    $total_jurnal_pegawai_bulan  = array_sum(array_column($tx_pegawai_bulan, 'debit'));
-    $total_jurnal_pegawai_tahun  = array_sum(array_column($tx_pegawai_tahun, 'debit'));
+    $total_jurnal_pegawai_bulan  = array_sum(array_column($tx_pegawai_bulan, 'expenseAmount'));
+    $total_jurnal_pegawai_tahun  = array_sum(array_column($tx_pegawai_tahun, 'expenseAmount'));
     $total_payload_pegawai_bulan = $summary_bulan_ini['totalGajiKotor'];
     $total_payload_pegawai_tahun = array_sum(array_column($rekap_bulanan_pegawai, 'totalGajiKotor'));
     $selisih_pgw_bulan           = abs($total_payload_pegawai_bulan - $total_jurnal_pegawai_bulan);
     $selisih_pgw_tahun           = abs($total_payload_pegawai_tahun - $total_jurnal_pegawai_tahun);
 
-    $total_jurnal_ta_bulan  = array_sum(array_column($tx_ta_bulan,  'debit'));
-    $total_jurnal_ta_tahun  = array_sum(array_column($tx_ta_tahun,  'debit'));
+    $total_jurnal_ta_bulan  = array_sum(array_column($tx_ta_bulan,  'expenseAmount'));
+    $total_jurnal_ta_tahun  = array_sum(array_column($tx_ta_tahun,  'expenseAmount'));
     $total_payload_ta_bulan = $summary_honor_bulan_ini['totalHonorBruto'];
     $total_payload_ta_tahun = array_sum(array_column($rekap_bulanan_ta, 'totalHonorBruto'));
     $selisih_ta_bulan       = abs($total_payload_ta_bulan - $total_jurnal_ta_bulan);

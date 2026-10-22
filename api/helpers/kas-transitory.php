@@ -12,6 +12,7 @@ function transitory_ensure(PDO $pdo): void {
             if(!$pdo->query("SHOW COLUMNS FROM KasTransitoryEvent LIKE 'accountingNoBukti'")->fetch()) $pdo->exec('ALTER TABLE KasTransitoryEvent ADD COLUMN accountingNoBukti VARCHAR(255) NULL');
         }
         transitory_ensure_account($pdo);
+        transitory_ensure_voucher_sequence($pdo);
         $done = true;
     }
 }

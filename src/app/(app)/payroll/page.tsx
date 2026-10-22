@@ -9,9 +9,16 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PageTransition } from "@/components/layout/PageTransition";
+import dynamic from "next/dynamic";
 import { getKasTransitory } from "@/lib/kas-transitory";
 import { PayrollHoldSummary } from "@/components/kas-transitory/PayrollHoldSummary";
-import { PayrollClient } from "@/components/payroll/PayrollClient";
+
+// Disable SSR for PayrollClient — komponen 7000+ baris ini hanya butuh render di browser,
+// bukan di server. Ini menghilangkan semua kemungkinan crash saat SSR.
+const PayrollClient = dynamic(
+  () => import("@/components/payroll/PayrollClient").then((m) => ({ default: m.PayrollClient })),
+  { ssr: false, loading: () => <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data payroll…</div> }
+);
 
 export default async function PayrollPage({
   searchParams,
@@ -39,12 +46,28 @@ export default async function PayrollPage({
   }
 
   const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
-    getPayrollData(selectedEntity.id, year, month),
-    getRekonsiliasiPajakGajiData(selectedEntity.id, year),
+    getPayrollData(selectedEntity.id, year, month).catch((e: unknown) => {
+      console.error("[payroll] getPayrollData error:", e); return null;
+    }),
+    getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch((e: unknown) => {
+      console.error("[payroll] getRekonsiliasiPajakGajiData error:", e); return null;
+    }),
     ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)
       ? getKasTransitory(selectedEntity.id).catch(() => null)
       : Promise.resolve(null),
   ]);
+
+  if (!payrollData) {
+    return (
+      <PageTransition>
+        <PageHeader title={`Laporan Gaji – ${selectedEntity.name}`} subtitle="" rightSlot={<YearSelect currentYear={year} />} />
+        <div className="mt-8 rounded-xl border border-border bg-surface-card p-6 text-sm text-muted-strong">
+          <p className="font-semibold text-status-red">Gagal memuat data Laporan Gaji.</p>
+          <p className="mt-2 text-xs text-muted">Pastikan server PHP aktif. Coba muat ulang halaman.</p>
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>

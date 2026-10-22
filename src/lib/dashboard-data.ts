@@ -23,6 +23,10 @@ export interface AccessibleEntity {
   isUmum: boolean;
   revenue: number;
   beban?: number;
+  kasTotal?: number;
+  kasDitahan?: number;
+  kasTersedia?: number;
+  kasTransitoryBalanced?: boolean;
   spend: number;
   profit: number;
   talanganKeluar?: number;
@@ -49,6 +53,10 @@ type RawEntityFromPhp = {
   colorHex: string;
   isUmum: boolean;
   revenue: number;
+  kasTotal?: number;
+  kasDitahan?: number;
+  kasTersedia?: number;
+  kasTransitoryBalanced?: boolean;
   beban: number;
   laba: number;
 };
@@ -74,6 +82,10 @@ export async function getAccessibleEntities(
     isUmum: e.isUmum,
     revenue: e.revenue,
     beban: e.beban,
+    kasTotal: e.kasTotal ?? 0,
+    kasDitahan: e.kasDitahan ?? 0,
+    kasTersedia: e.kasTersedia ?? 0,
+    kasTransitoryBalanced: e.kasTransitoryBalanced ?? true,
     // PHP returns beban (operational expenses) and laba (profit)
     spend: e.beban,
     profit: e.laba,

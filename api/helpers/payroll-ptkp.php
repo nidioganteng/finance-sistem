@@ -8,7 +8,11 @@ function payroll_ptkp_defaults(): array {
 function ensure_payroll_ptkp_table(PDO $pdo): void {
     static $done=false;
     if ($done) return;
-    $pdo->exec(file_get_contents(__DIR__.'/payroll-ptkp-schema.sql'));
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `PayrollPtkpSetting` (
+      `entityId` VARCHAR(36) NOT NULL PRIMARY KEY,
+      `ratesJson` LONGTEXT NOT NULL,
+      `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $done=true;
 }
 function payroll_validate_ptkp_rates($rates): array {

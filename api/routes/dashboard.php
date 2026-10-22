@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 $auth_user = require_auth();
 $sub = $segments[1] ?? null; // 'chart' | 'chart-by-year' | null
@@ -173,6 +174,7 @@ if ($method === 'GET' && !$sub) {
          JOIN CoaAccount c ON t.coaAccountId = c.id
          WHERE t.entityId IN ($idPlaceholders)
            AND t.tanggal >= ? AND t.tanggal <= ?
+           AND (t.extraFieldsJson IS NULL OR COALESCE(JSON_VALUE(t.extraFieldsJson,'$.autoPostedFromJurnal'),'') NOT IN ('true','1'))
            AND c.kategori IN ('PENDAPATAN','BEBAN')
            AND $reportCatFilter
          GROUP BY t.entityId"
@@ -196,6 +198,7 @@ if ($method === 'GET' && !$sub) {
         $ent['beban']       = $rb['beban'];
         $ent['laba']        = $rb['revenue'] - $rb['beban'];
         $ent['isUmum']      = (bool)$ent['isUmum'];
+        $ent = array_merge($ent,transitory_company_cash($pdo,$ent['id'],$year,$version));
     }
     unset($ent);
 

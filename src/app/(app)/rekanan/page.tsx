@@ -25,10 +25,10 @@ export default async function RekananPage() {
     <PageTransition>
       <PageHeader
         title="Rekanan"
-        subtitle="Database terpusat Vendor, Klien, dan Tenaga Ahli untuk pengisian otomatis transaksi"
+        subtitle="Database vendor, klien, subkontraktor, dan rekanan lainnya untuk pengisian otomatis transaksi"
       />
       <div className="p-4 md:p-6 space-y-6">
-        <RekananClient initialRekanan={initialRekanan} canManage={canManage} />
+        <RekananClient initialRekanan={initialRekanan.filter(item => item.tipe !== "TENAGA_AHLI")} canManage={canManage} />
       </div>
     </PageTransition>
   );

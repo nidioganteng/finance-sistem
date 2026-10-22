@@ -28,7 +28,7 @@ if ($method === 'POST' && $sub === 'assignment') {
         error_response('assignmentId, jobName, dan entitas wajib diisi.', 400);
     }
 
-    // Map entitas Sidamon → entity key Simatra
+    // Map entitas Sidamon → entity key Kosha
     $entitas_map = [
         'Gaharu'    => 'gaharu',
         'Kencana'   => 'kencana',
@@ -42,11 +42,11 @@ if ($method === 'POST' && $sub === 'assignment') {
     $stmt->execute([$entity_key]);
     $entity = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$entity) {
-        error_response("Entitas '$entitas' tidak ditemukan di Simatra.", 422);
+        error_response("Entitas '$entitas' tidak ditemukan di Kosha.", 422);
     }
     $entity_id = $entity['id'];
 
-    // Cek apakah assignment ini sudah punya project di Simatra
+    // Cek apakah assignment ini sudah punya project di Kosha
     $stmt = $pdo->prepare("SELECT id, code FROM Project WHERE sidamon_assignment_id = ? LIMIT 1");
     $stmt->execute([$assignment_id]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -306,7 +306,7 @@ elseif ($method === 'POST' && $sub === 'pegawai') {
                 'nik' => $nik,
                 'nama' => $nama,
                 'status' => 'error',
-                'message' => "Entitas '$entitas_input' tidak ditemukan di Simatra.",
+                'message' => "Entitas '$entitas_input' tidak ditemukan di Kosha.",
             ];
             continue;
         }
@@ -439,7 +439,7 @@ elseif ($method === 'POST' && $sub === 'tenaga-ahli') {
                 'nik' => $nik,
                 'nama' => $nama,
                 'status' => 'error',
-                'message' => "Entitas '$entitas_input' tidak ditemukan di Simatra.",
+                'message' => "Entitas '$entitas_input' tidak ditemukan di Kosha.",
             ];
             continue;
         }

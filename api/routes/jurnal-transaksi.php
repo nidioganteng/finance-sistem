@@ -2,6 +2,7 @@
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 require_once __DIR__ . '/../helpers/kas-helpers.php';
+require_once __DIR__.'/../helpers/kas-transitory.php';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 // $segments[0] = 'jurnal-transaksi'
@@ -219,6 +220,7 @@ elseif ($method === 'POST' && $sub === '') {
     $valid_rows = array_values(array_filter(
         $rows, fn($r) => !empty($r['coaAccountId']) && ((float)($r['debit'] ?? 0) > 0 || (float)($r['kredit'] ?? 0) > 0)
     ));
+    try { transitory_guard_coa(array_column($valid_rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
 
     // Resolve entity
@@ -257,9 +259,14 @@ elseif ($method === 'POST' && $sub === '') {
 
     $now       = date('Y-m-d H:i:s');
 
+    $pdo->beginTransaction();
+    try {
+    transitory_guard_reference($pdo,$entity['id'],$no_bukti);
     // ─ EDIT mode: hapus lama ─────────────────────────────────────────────────
     $preserved_crossing = null;
     if ($edit_no_bukti) {
+        $guard=$pdo->prepare('SELECT id FROM `Transaction` WHERE noBukti=?'); $guard->execute([$edit_no_bukti]);
+        transitory_assert_unlinked($pdo,$guard->fetchAll(PDO::FETCH_COLUMN));
         // Simpan crossing info sebelum hapus
         $stmt = $pdo->prepare(
             "SELECT extraFieldsJson FROM `Transaction`
@@ -335,8 +342,6 @@ elseif ($method === 'POST' && $sub === '') {
 
     $first_keterangan = trim($valid_rows[0]['keterangan'] ?? '');
 
-    $pdo->beginTransaction();
-    try {
         $assigned_termin_id = ($termin_id && $termin_id !== '__NEW__') ? $termin_id : uuid4();
 
         // ── 1. Insert baris jurnal utama ──────────────────────────────────────
@@ -780,7 +785,11 @@ elseif ($method === 'DELETE' && $sub === '') {
 
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi yang dihapus.', 400);
+    transitory_assert_unlinked($pdo,array_values($tx_ids));
 
+    $pdo->beginTransaction();
+    try {
+    transitory_assert_unlinked($pdo,array_values($tx_ids));
     // Ambil noBukti, fakturId, dan projectIds sebelum dihapus
     $ph_pre = implode(',', array_fill(0, count($tx_ids), '?'));
     $stmt_nb = $pdo->prepare("SELECT DISTINCT noBukti FROM `Transaction` WHERE id IN ($ph_pre) AND noBukti IS NOT NULL AND noBukti != ''");
@@ -870,6 +879,8 @@ elseif ($method === 'DELETE' && $sub === '') {
         sync_project_spend($pdo, $pid);
     }
 
+    $pdo->commit();
+    } catch(Throwable $e) { if($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
     log_activity($user['id'], 'Hapus Jurnal Transaksi (' . count($tx_ids) . ' baris)', 'FINANCIAL_CHANGE', ['txIds' => $tx_ids]);
     json_response(['success' => true]);
 }

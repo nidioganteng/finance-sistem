@@ -3,7 +3,7 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 /**
  * Kirim update progress termin ke Sidamon.
- * Dipanggil setelah termin berhasil di-update di Simatra.
+ * Dipanggil setelah termin berhasil di-update di Kosha.
  * Non-blocking: error tidak menghentikan response utama.
  */
 function sync_termin_to_sidamon(string $project_id): void {
@@ -34,7 +34,7 @@ function sync_termin_to_sidamon(string $project_id): void {
         ? round(($total_dibayar / $contract_val) * 100, 1)
         : 0;
 
-    // Otomatis tandai proyek selesai di Simatra saat termin mencapai 100%
+    // Otomatis tandai proyek selesai di Kosha saat termin mencapai 100%
     if ($persen >= 100) {
         $pdo->prepare("UPDATE Project SET status = 'COMPLETED' WHERE id = ? AND status != 'COMPLETED'")
             ->execute([$project_id]);

@@ -152,6 +152,9 @@ export function DaftarAkunClient({
         <div className="mx-5 mt-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-status-red text-sm">{error}</div>
       )}
 
+      <p className="px-5 py-3 text-xs leading-relaxed text-muted-strong border-b border-border">
+        Debet dan kredit menunjukkan seluruh mutasi jurnal. Untuk akun beban, saldo akhir = saldo awal + debet − kredit. Penahanan Kas Transitory mengurangi beban; pencairannya mengakui beban sekali dengan tanggal bukti awal.
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[900px]">
           <thead>

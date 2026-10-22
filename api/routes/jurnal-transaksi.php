@@ -220,6 +220,7 @@ elseif ($method === 'POST' && $sub === '') {
     $valid_rows = array_values(array_filter(
         $rows, fn($r) => !empty($r['coaAccountId']) && ((float)($r['debit'] ?? 0) > 0 || (float)($r['kredit'] ?? 0) > 0)
     ));
+    try { transitory_guard_coa(array_column($valid_rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
 
     // Resolve entity

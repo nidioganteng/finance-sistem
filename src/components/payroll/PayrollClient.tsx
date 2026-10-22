@@ -284,6 +284,7 @@ export function PayrollClient({
   const [tenagaAhliSubTab, setTenagaAhliSubTab] = useState<
     "negosiasi" | "rekap-proyek" | "rekap-bulan" | "penyesuaian" | "database-ahli" | "rekap-nama" | "konsolidasi"
   >("negosiasi");
+  const showAhliNameSearch = ["negosiasi", "database-ahli", "rekap-nama"].includes(tenagaAhliSubTab);
   const [isAhliSubTabDropdownOpen, setIsAhliSubTabDropdownOpen] = useState(false);
   const ahliSubTabDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -3200,7 +3201,7 @@ export function PayrollClient({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <div className="relative flex-1 sm:w-60">
+              {showAhliNameSearch && <div className="relative flex-1 sm:w-60">
                 <Search
                   size={14}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-faint"
@@ -3212,7 +3213,7 @@ export function PayrollClient({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-8 w-full pl-8 pr-3 text-xs rounded-xl border border-border bg-surface-card text-foreground"
                 />
-              </div>
+              </div>}
 
               {isManager && tenagaAhliSubTab !== "negosiasi" && (
                 <div>
@@ -3271,11 +3272,11 @@ export function PayrollClient({
             entities={data.allEntities}
             group={tenagaAhliSubTab === "rekap-proyek" ? "proyek" : tenagaAhliSubTab === "rekap-bulan" ? "bulan" : tenagaAhliSubTab === "konsolidasi" ? "holding" : "nama"}
             entityId={data.entity?.id} entityName={data.entity?.name}
-            year={selectedYear} month={selectedMonth} search={searchQuery}
+            year={selectedYear} month={selectedMonth} search={showAhliNameSearch ? searchQuery : ""}
           />}
           {(tenagaAhliSubTab === "database-ahli" || tenagaAhliSubTab === "penyesuaian") && <TenagaAhliReport
             rows={trackingRows} group="nama" entityId={data.entity?.id} entityName={data.entity?.name}
-            year={selectedYear} month={selectedMonth} search={searchQuery} summaryOnly
+            year={selectedYear} month={selectedMonth} search={showAhliNameSearch ? searchQuery : ""} summaryOnly
             periodScope={tenagaAhliSubTab === "penyesuaian" ? periodeFilterAhli : "bulan"}
           />}
 

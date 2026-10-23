@@ -1,11 +1,12 @@
 # ALUR SISTEM KOSHA — Dokumentasi Lengkap
-> Dibuat: 21 Oktober 2026  
-> Versi: feat/php-conversion  
+> Dibuat: 21 Oktober 2026 | Diperbarui: 23 Oktober 2026  
+> Branch: `main`  
 > **Tujuan:** Referensi acuan sebelum refactor apapun. Jika ada perubahan, cek alur ini satu per satu.
 
 ---
 
 ## DAFTAR ISI
+0. [Infrastruktur & Target Deployment](#0-infrastruktur--target-deployment)
 1. [Alur Autentikasi](#1-alur-autentikasi)
 2. [Middleware & Proteksi Route](#2-middleware--proteksi-route)
 3. [RBAC — Role & Hak Akses](#3-rbac--role--hak-akses)
@@ -16,6 +17,79 @@
 8. [Server Actions (Mutasi Data)](#8-server-actions-mutasi-data)
 9. [PHP API Endpoints](#9-php-api-endpoints)
 10. [Diagram Data Flow](#10-diagram-data-flow)
+
+---
+
+## 0. INFRASTRUKTUR & TARGET DEPLOYMENT
+
+**Target:** Semua komponen (frontend, backend PHP, database MySQL) berjalan di **Hostinger**.
+
+### Komponen Sistem
+
+| Komponen | Teknologi | Target Hosting |
+|----------|-----------|---------------|
+| Frontend | Next.js 14 App Router (TypeScript) | Hostinger (static export) |
+| Backend API | PHP 8.x + PDO (plain PHP, tanpa framework) | Hostinger shared hosting |
+| Database | MySQL | Hostinger shared hosting |
+
+### Arsitektur Request
+
+```
+Browser
+  ↓ halaman HTML/JS (file statis dari Hostinger)
+Next.js Static Export (di-serve Hostinger)
+  ↓ fetch ke PHP API (Authorization: Bearer <token>)
+PHP Backend  →  api/index.php  →  api/routes/*.php
+  ↓ PDO
+MySQL Database (Hostinger)
+```
+
+### Konfigurasi Next.js untuk Hostinger
+
+File `next.config.mjs` harus menggunakan `output: "export"` (bukan `"standalone"`):
+
+```js
+const nextConfig = {
+  output: "export",   // ← static HTML/CSS/JS, tidak butuh Node.js runtime
+  ...
+};
+```
+
+**Konsekuensi static export:**
+- Server Components tetap bisa fetch data saat build, tapi halaman yang butuh data real-time (session, entity aktif) harus pakai client-side fetch
+- NextAuth tidak bisa berjalan server-side → session harus dikelola via JWT di localStorage atau cookie httpOnly yang di-set PHP
+- Server Actions (`"use server"`) tidak tersedia di static export → semua mutasi data harus jadi client-side `fetch` ke PHP endpoint langsung
+- API Routes Next.js (`app/api/*/route.ts`) tidak tersedia → digantikan PHP endpoint langsung
+
+> **Catatan:** Perubahan dari `standalone` ke `export` membutuhkan refactor signifikan di layer auth dan server actions. Ini adalah pekerjaan yang belum selesai.
+
+### Struktur File di Hostinger
+
+```
+public_html/
+  kosha/
+    api/          ← PHP backend (di-deploy dari api/ di repo)
+      index.php
+      config/
+      helpers/
+      middleware/
+      routes/
+    (frontend)    ← Next.js static export (folder out/ setelah build)
+      index.html
+      _next/
+      ...
+```
+
+### Environment Variables
+
+| Variable | Dipakai oleh | Keterangan |
+|----------|-------------|-----------|
+| `PHP_API_URL` | Next.js (server-side) | URL base PHP backend |
+| `NEXT_PUBLIC_PHP_API_URL` | Next.js (client-side) | Sama, untuk fetch dari browser |
+| `NEXTAUTH_SECRET` | NextAuth | Secret JWT session |
+| `NEXTAUTH_URL` | NextAuth | URL app Next.js |
+| `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` | PHP | Koneksi MySQL Hostinger |
+| `JWT_SECRET` | PHP | Secret untuk JWT token PHP |
 
 ---
 
@@ -541,6 +615,7 @@ Pattern: `"use server"` → `getServerSession` → `phpFetch()` → revalidatePa
 |------|---------|
 | `auth.ts` | `registerUser` |
 | `kas.ts` | `generateNoBukti`, `createKasTransaction`, `deleteKasTransactionGroup`, `replaceKasTransaction`, `updateKasTransactionGroup` |
+| `kas-transitory.ts` | Aksi kas transitory (hold, release, transfer antar entitas) |
 | `notifikasi.ts` | `markAllNotifikasiRead`, `markNotifikasiRead`, `deleteNotifikasiAction` |
 | `pengguna.ts` | `approveUser`, `rejectUser`, `updateUserEntities`, `deactivateUser`, `activateUser` |
 | `jurnal.ts` | Edit COA per row |
@@ -551,7 +626,7 @@ Pattern: `"use server"` → `getServerSession` → `phpFetch()` → revalidatePa
 | `dokumen.ts` | Upload, delete dokumen |
 | `jenis-input.ts` | CRUD jenis input |
 | `payroll.ts` | Input gaji, honor |
-| `rekonsiliasi-pajak-gaji.ts` | Input rekonsiliasi |
+| `rekonsiliasi-pajak-gaji.ts` | Input rekonsiliasi pajak gaji |
 | `saldo-awal.ts` | Set saldo awal akun |
 | `log.ts` | Clear log lama |
 | `aset-tetap.ts` | CRUD aset tetap |
@@ -623,6 +698,14 @@ GET /api/laporan-keuangan?type=utang-aset&...          → utang & aset detail
 GET /api/laporan-keuangan?type=tx-count&dateFrom&dateTo
 ```
 
+### Kas Transitory
+```
+GET    /api/kas-transitory              → { items: [...], summary }
+POST   /api/kas-transitory              → buat entri hold baru
+PATCH  /api/kas-transitory/:id          → update status (release, transfer)
+DELETE /api/kas-transitory/:id          → hapus entri
+```
+
 ### Lainnya
 ```
 GET /api/entities            → list entitas
@@ -641,6 +724,7 @@ GET /api/buku-besar
 GET /api/jenis-input
 GET /api/rekanan
 GET /api/aset-tetap
+GET /api/saldo-awal
 GET /api/validasi-pajak-3arah
 GET /api/sync                → sync dari Sidamon
 ```

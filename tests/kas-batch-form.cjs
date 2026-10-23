@@ -3,7 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), Module = require('no
 const React = require('react');
 const filename = path.resolve('src/components/kas/KasBatchTransactionForm.tsx');
 const mod = new Module(filename, module); mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
-let hooks = [], cursor = 0, effects = [], payloads = [], closed = 0, response = { success: true };
+let hooks = [], cursor = 0, effects = [], payloads = [], edits = [], generations = 0, closed = 0, response = { success: true };
 const mocks = {
   react: {
     ...React,
@@ -12,7 +12,7 @@ const mocks = {
     useEffect: (fn, deps) => { const i = cursor++; if (!hooks[i] || deps.some((d, n) => d !== hooks[i][n])) { hooks[i] = deps; effects.push(fn); } },
   },
   'next/navigation': { useRouter: () => ({ push() {}, refresh() {} }) },
-  '@/lib/actions/kas': { generateNoBukti: async () => 'UG/10231', createKasTransactionBatch: async data => { payloads.push(data); return response; } },
+  '@/lib/actions/kas': { generateNoBukti: async () => { generations++; return 'UG/10231'; }, replaceKasTransaction: async data => { edits.push(data); return { success: true }; }, createKasTransactionBatch: async data => { payloads.push(data); return response; } },
   '@/components/shared/DatePicker': { DatePicker: () => null }, './CoaCombobox': { CoaCombobox: () => null },
 };
 const original = mod.require.bind(mod); mod.require = name => Object.hasOwn(mocks, name) ? mocks[name] : original(name);
@@ -55,5 +55,26 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG/10231', 'P', 'Uraian 1', 100000], ['UG/10232', 'Q', 'Uraian 2', 250000]]);
   assert.deepEqual(data.map(d => [d.periodeBulanGaji, d.periodeTahunGaji]), [[9,2026],[12,2025]], 'each voucher retains its own accrual period');
   assert.ok(data.every(d => d.rekeningId === 'gs-bpd' && d.entityKey === 'gaharu'));
+  const generationCount = generations;
+  hooks = []; effects = [];
+  props.initialValues = { tanggal: '2026-09-15', noBukti: 'UK/09151', keterangan: 'Keterangan lama', arah: 'keluar', rekeningId: 'gs-bpd', projectId: 'P', crossingEntityKeys: ['kencana'], tanggalNota: '2026-09-14', periodeBulanGaji: 8, periodeTahunGaji: 2026, existingTxIds: ['cash','row1','row2'], rows: [{ coaAccountId: 'cost', nominal: '100000', keterangan: 'Item pertama' }, { coaAccountId: 'cost', nominal: '200000', keterangan: 'Item kedua' }] };
+  render(); await flush();
+  assert.equal(generations, generationCount, 'edit never generates a new voucher number');
+  assert.equal(byLabel('Nomor bukti transaksi 1').props.value, 'UK/09151');
+  assert.equal(byLabel('Nomor bukti transaksi 2').props.value, 'UK/09151');
+  assert.equal(byLabel('Periode akrual transaksi 1').props.value, '2026-08');
+  byLabel('Periode akrual transaksi 1').props.onChange({ target: { value: '2026-07' } }); render();
+  byLabel('Keterangan transaksi 1').props.onChange({ target: { value: 'Keterangan baru' } }); render();
+  assert.equal(byLabel('Keterangan transaksi 2').props.value, 'Keterangan baru', 'same voucher shares header metadata');
+  button('Simpan Perubahan').props.onClick(); await flush();
+  assert.equal(edits.length, 1);
+  assert.equal(payloads.length, 2, 'edit replaces the voucher rather than creating a batch');
+  assert.deepEqual(edits[0].existingTxIds, ['cash','row1','row2']);
+  assert.deepEqual(edits[0].rows.map(r => [r.nominal,r.keterangan]), [[100000,'Item pertama'],[200000,'Item kedua']], 'all original account details preserved');
+  assert.equal(edits[0].noBukti, 'UK/09151');
+  assert.equal(edits[0].tanggal, '2026-09-15');
+  assert.equal(edits[0].periodeBulanGaji, 7);
+  assert.equal(edits[0].tanggalNota, '2026-09-14');
+  assert.deepEqual(edits[0].crossingEntityKeys, ['kencana']);
   console.log('Batch form: independent vouchers, projects, amounts, error preservation and double-click guard passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

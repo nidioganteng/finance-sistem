@@ -1,0 +1,30 @@
+name: Deploy PHP ke Hostinger
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+  workflow_dispatch:
+
+jobs:
+  deploy-php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload PHP ke Hostinger via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./api/
+          server-dir: /public_html/kosha/api/
+          state-name: .deploy-state-v2
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**

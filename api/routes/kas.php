@@ -61,16 +61,23 @@ if ($method === 'GET' && $sub === 'ledger') {
 
     $sql .= " ORDER BY t.tanggal ASC, t.noBukti ASC, t.createdAt ASC";
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($jenis_input_key === 'bankBuku') {
+        $rows = bank_ledger_rows($pdo, $entity_id, $jenis_input_id, $rekening_nama, $dari, $sampai);
+    } else {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     // Kelompokkan per noBukti|tanggal — logika dari getKasLedger() src/lib/kas.ts
     $groups = [];
     foreach ($rows as $r) {
         $tanggal_raw = substr($r['tanggal'], 0, 10);
-        $key = $r['noBukti'] . '|' . $tanggal_raw;
         $extra = $r['extraFieldsJson'] ? json_decode($r['extraFieldsJson'], true) : [];
+        $key = $r['noBukti'] . '|' . $tanggal_raw;
+        if ($jenis_input_key === 'bankBuku') {
+            $key .= '|' . ($extra['rekeningNama'] ?? '') . '|' . (!empty($r['sourceJurnal']) ? 'jurnal|' . $r['entityId'] . '|' . ((float)$r['debit'] > 0 ? 'in' : 'out') : 'bank');
+        }
 
         if (!isset($groups[$key])) {
             $groups[$key] = [
@@ -86,6 +93,7 @@ if ($method === 'GET' && $sub === 'ledger') {
                 'crossingFromEntityKey' => null,
                 'crossingGroupId'     => null,
                 'hasKasEntry'         => false,
+                'sourceJurnal'        => !empty($r['sourceJurnal']),
                 'allTxIds'            => [],
                 'coaRows'             => [],
                 'project'             => null,
@@ -115,8 +123,8 @@ if ($method === 'GET' && $sub === 'ledger') {
 
         if ($is_kas_entry) {
             $g['hasKasEntry'] = true;
-            $g['masuk']       = (float)$r['debit'];
-            $g['keluar']      = (float)$r['kredit'];
+            $g['masuk']       += (float)$r['debit'];
+            $g['keluar']      += (float)$r['kredit'];
             if (!empty($extra['rekeningNama']))        $g['rekening']            = $extra['rekeningNama'];
             if (!empty($extra['crossingEntityKeys']))  $g['crossingEntityKeys']  = $extra['crossingEntityKeys'];
             elseif (!empty($extra['crossingEntityKey'])) $g['crossingEntityKeys'] = [$extra['crossingEntityKey']]; // backward compat
@@ -229,6 +237,7 @@ if ($method === 'GET' && $sub === 'ledger') {
                 'keterangan'          => $g['keterangan'],
                 'akunTags'            => $g['akunTags'],
                 'rekening'            => $g['rekening'],
+                'sourceJurnal'        => $g['sourceJurnal'],
                 'crossingEntityKeys'  => $g['crossingEntityKeys'],
                 'crossingFromEntityKey' => $g['crossingFromEntityKey'],
                 'masuk'               => $g['masuk'],
@@ -302,36 +311,12 @@ elseif ($method === 'POST' && $sub === 'no-bukti') {
     $tanggal    = $body['tanggal']   ?? '';
     if (!$entity_key || !$tanggal) return error_response('entityKey dan tanggal wajib diisi.', 400);
 
-    // Prefix — logika dari generateNoBukti() src/lib/actions/kas.ts
-    $prefix_umum = ENTITY_PREFIX_UMUM;
-    $prefix_norm = ENTITY_PREFIX;
-    $prefix = $prefix_umum[$entity_key] ?? $prefix_norm[$entity_key] ?? strtoupper(substr($entity_key, 0, 2));
-
-    $mm   = date('m', strtotime($tanggal));
-    $dd   = date('d', strtotime($tanggal));
-    $day_part = $mm . $dd;
-    $pattern  = $prefix . $day_part;
-
-    // Cari entity id
-    $stmt = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
-    $stmt->execute([$entity_key]);
-    $entity_id = $stmt->fetchColumn();
-    if (!$entity_id) return error_response('Entity tidak ditemukan.', 404);
-
-    $stmt = $pdo->prepare("SELECT noBukti FROM `Transaction` WHERE entityId = ? AND noBukti LIKE ?");
-    $stmt->execute([$entity_id, $pattern . '%']);
-    $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    $max_seq = 0;
-    foreach ($existing as $nb) {
-        $seq_str = substr($nb, strlen($pattern));
-        if (is_numeric($seq_str)) {
-            $seq = (int)$seq_str;
-            if ($seq > $max_seq) $max_seq = $seq;
-        }
+    try {
+        json_response(['noBukti' => kas_next_voucher_number($pdo, $entity_key, $tanggal)]);
+    } catch (InvalidArgumentException $e) {
+        return error_response($e->getMessage(), 400);
     }
 
-    json_response(['noBukti' => $pattern . ($max_seq + 1)]);
 }
 
 // ─── POST /api/kas/transaksi ───────────────────────────────────────────────────
@@ -339,244 +324,43 @@ elseif ($method === 'POST' && $sub === 'transaksi') {
     $user = require_auth();
     $pdo  = get_pdo();
 
-    $entity_key      = $body['entityKey']      ?? '';
-    $jenis_input_key = $body['jenisInputKey']  ?? '';
-    $tanggal         = $body['tanggal']        ?? '';
-    $no_bukti        = trim($body['noBukti']   ?? '');
-    $keterangan      = trim($body['keterangan'] ?? '');
-    $arah            = $body['arah']           ?? ''; // 'masuk' | 'keluar'
-    $rows            = $body['rows']           ?? [];
-    $rekening_id     = $body['rekeningId']     ?? null;
-    $crossing_keys   = array_filter((array)($body['crossingEntityKeys'] ?? []));
-    $project_id      = $body['projectId']      ?? null;
-    $arah_laporan    = $body['arahLaporan']    ?? null;
-    $sync_bank_rek_id = $body['syncBukuBankRekeningId'] ?? null;
-    $periode_bulan_gaji = !empty($body['periodeBulanGaji']) ? (int)$body['periodeBulanGaji'] : null;
-    $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
-    $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
-
-    // Validasi dasar
-    if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$keterangan || !$arah) {
-        return error_response('entityKey, jenisInputKey, tanggal, noBukti, keterangan, dan arah wajib diisi.', 400);
-    }
-
-    // Cek akses entity
-    if (!in_array($entity_key, $user['entityKeys'] ?? [])) {
-        return error_response('Kamu tidak punya akses ke entity ini.', 403);
-    }
-
-    try { transitory_guard_coa(array_column((array)$rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
-    $valid_rows = array_values(array_filter($rows, fn($r) => !empty($r['coaAccountId']) && (float)($r['nominal'] ?? 0) > 0));
-    if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
-
-    if ($jenis_input_key === 'bankBuku') {
-        if (!$rekening_id) return error_response('Rekening/Bank wajib dipilih untuk transaksi Buku Bank.', 400);
-        if (!is_valid_rekening($entity_key, $rekening_id)) {
-            return error_response('Rekening yang dipilih tidak sesuai dengan entitas ini.', 400);
-        }
-    }
-
-    // Cari entity & jenis input
-    $stmt = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
-    $stmt->execute([$entity_key]);
-    $entity_id = $stmt->fetchColumn();
-    if (!$entity_id) return error_response('Entity tidak ditemukan.', 404);
-
-    $stmt = $pdo->prepare("SELECT id, nama FROM JenisInputTransaksi WHERE `key` = ?");
-    $stmt->execute([$jenis_input_key]);
-    $jenis_input = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$jenis_input) return error_response('Jenis input tidak ditemukan.', 404);
-
-    // Cek duplikat noBukti
-    $stmt = $pdo->prepare("SELECT id FROM `Transaction` WHERE entityId = ? AND noBukti = ? LIMIT 1");
-    $stmt->execute([$entity_id, $no_bukti]);
-    if ($stmt->fetchColumn()) return error_response("No. bukti \"$no_bukti\" sudah dipakai di entitas ini.", 409);
-
-    if ($arah === 'masuk' && !empty($crossing_keys)) {
-        return error_response('Pemasukan hanya boleh dari entitas yang sama, tidak bisa lintas entitas.', 400);
-    }
-
-    // Hitung saldo
-    $rekening_nama  = $rekening_id ? get_rekening_nama($entity_key, $rekening_id) : null;
-    $kas_coa_id     = resolve_kas_coa($pdo, $jenis_input_key, $entity_key, $rekening_id);
-    $total          = array_sum(array_column($valid_rows, 'nominal'));
-    $tx_year        = (int)date('Y', strtotime($tanggal));
-    $prev_saldo     = get_running_saldo($pdo, $entity_id, $jenis_input['id'], $rekening_nama, $tx_year);
-    $new_saldo      = $prev_saldo + ($arah === 'masuk' ? $total : -$total);
-    $is_keluar      = ($arah === 'keluar');
-
-    // crossing
-    $crossing_group_id = !empty($crossing_keys) ? uuid4() : null;
-    $arah_laporan_arr  = is_array($arah_laporan) && count($arah_laporan) > 0 ? $arah_laporan : null;
-
-    $pdo->beginTransaction();
+    require_once __DIR__.'/../helpers/kas-create.php';
     try {
-        transitory_guard_reference($pdo,$entity_id,$no_bukti);
-        $now       = date('Y-m-d H:i:s');
-        $staff_id  = $user['staffId'] ?? $user['id'];
-        $proj_id   = $project_id ?: null;
-        $tanggal_dt = $tanggal . ' 00:00:00';
-
-        $common = [
-            'entityId'    => $entity_id,
-            'jenisInputId'=> $jenis_input['id'],
-            'tanggal'     => $tanggal_dt,
-            'noBukti'     => $no_bukti,
-            'keterangan'  => $keterangan,
-            'saldoSetelah'=> $new_saldo,
-            'staffId'     => $staff_id,
-            'projectId'   => $proj_id,
-        ];
-
-        // Tentukan apakah mode sync kas kecil dari buku bank
-        $is_sync_mode = (
-            ($jenis_input_key === 'kasKecil' || $jenis_input_key === 'kasBesar')
-            && $arah === 'masuk'
-            && !empty($sync_bank_rek_id)
-        );
-
-        // akunRows — skip jika sync mode (Buku Bank keluar sudah jadi counterpart)
-        if (!$is_sync_mode) {
-            foreach ($valid_rows as $row) {
-                $extra = [];
-                if ($arah_laporan_arr)   $extra['arahLaporan']    = $arah_laporan_arr;
-                if (!empty($row['keterangan'])) $extra['itemDescription'] = $row['keterangan'];
-                if ($crossing_group_id) { $extra['crossingEntityKeys'] = array_values($crossing_keys); $extra['crossingGroupId'] = $crossing_group_id; }
-                $row_bulan = !empty($row['periodeBulanGaji']) ? (int)$row['periodeBulanGaji'] : $periode_bulan_gaji;
-                $row_tahun = !empty($row['periodeTahunGaji']) ? (int)$row['periodeTahunGaji'] : ($row_bulan ? $periode_tahun_gaji : null);
-                if ($row_bulan) {
-                    $extra['periodeBulanGaji'] = $row_bulan;
-                    if ($row_tahun) {
-                        $extra['periodeTahunGaji'] = $row_tahun;
-                    }
-                }
-                if ($tanggal_nota) {
-                    $extra['tanggalNota'] = $tanggal_nota;
-                }
-                $stmt = $pdo->prepare(
-                    "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                     debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                );
-                $stmt->execute([
-                    uuid4(), $common['entityId'], $common['jenisInputId'], $common['tanggal'],
-                    $common['noBukti'], $common['keterangan'], $row['coaAccountId'],
-                    $is_keluar ? (float)$row['nominal'] : 0,
-                    $is_keluar ? 0 : (float)$row['nominal'],
-                    $common['saldoSetelah'],
-                    $extra ? json_encode($extra) : null,
-                    $common['staffId'], $common['projectId'], $now,
-                ]);
-            }
-        }
-
-        // kasEntry
-        $kas_extra = ['isKasEntry' => true];
-        if ($rekening_nama)      $kas_extra['rekeningNama']        = $rekening_nama;
-        if ($crossing_group_id) { $kas_extra['crossingEntityKeys'] = array_values($crossing_keys); $kas_extra['crossingGroupId'] = $crossing_group_id; }
-        if ($arah_laporan_arr)   $kas_extra['arahLaporan']         = $arah_laporan_arr;
-        if ($proj_id)            $kas_extra['projectId']           = $proj_id;
-        if ($tanggal_nota)       $kas_extra['tanggalNota']         = $tanggal_nota;
-
-        $stmt = $pdo->prepare(
-            "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-             debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $stmt->execute([
-            uuid4(), $common['entityId'], $common['jenisInputId'], $common['tanggal'],
-            $common['noBukti'], $common['keterangan'], $kas_coa_id,
-            $is_keluar ? 0 : $total,
-            $is_keluar ? $total : 0,
-            $common['saldoSetelah'],
-            json_encode($kas_extra),
-            $common['staffId'], $common['projectId'], $now,
-        ]);
-
-        // Crossing entries (saat keluar ke entitas lain → masuk sebagai Jurnal Transaksi di entitas tujuan)
-        if ($crossing_group_id && !empty($crossing_keys)) {
-            create_crossing_entries(
-                $pdo,
-                $crossing_group_id,
-                $crossing_keys,
-                $entity_key,
-                $jenis_input_key,
-                $rekening_id,
-                $rekening_nama,
-                $proj_id,
-                $no_bukti,
-                $keterangan,
-                $tanggal_dt,
-                $valid_rows,
-                $staff_id,
-                $now
-            );
-        }
-
-        // Otomatis buat Termin jika uang masuk dan ada projectId
-        // Logika: 1:1 dengan bagian terminCreate di createKasTransaction src/lib/actions/kas.ts
-        if (!$is_keluar && $proj_id) {
-            $stmt_p = $pdo->prepare("SELECT id, contractValue FROM Project WHERE id = ?");
-            $stmt_p->execute([$proj_id]);
-            $project = $stmt_p->fetch(PDO::FETCH_ASSOC);
-            if ($project) {
-                $stmt_t = $pdo->prepare("SELECT percentage FROM Termin WHERE projectId = ?");
-                $stmt_t->execute([$proj_id]);
-                $existing_pcts = array_column($stmt_t->fetchAll(PDO::FETCH_ASSOC), 'percentage');
-                $termin_count  = count($existing_pcts);
-                $max_pct       = empty($existing_pcts) ? 0 : max($existing_pcts);
-                $new_pct       = compute_new_termin_percentage((float)$project['contractValue'], array_map('intval', $existing_pcts), $total);
-                $delta_pct     = max(0, $new_pct - $max_pct);
-                $termin_ke     = $termin_count + 1;
-                $status        = $new_pct >= 80 ? 'ON_TRACK' : 'AT_RISK';
-
-                $pdo->prepare(
-                    "INSERT INTO Termin (id, projectId, name, percentage, status, createdAt) VALUES (?, ?, ?, ?, ?, ?)"
-                )->execute([uuid4(), $proj_id, "Termin $termin_ke ($delta_pct% Kontrak)", $new_pct, $status, $now]);
-
-                if ($new_pct >= 100) {
-                    $pdo->prepare("UPDATE Project SET status = 'COMPLETED' WHERE id = ?")->execute([$proj_id]);
-                }
-            }
-        }
-
+        $pdo->beginTransaction();
+        $result = kas_create_transaction($pdo, $user, $body);
         $pdo->commit();
-
-        // Auto-sync Kas Kecil masuk dari Buku Bank
-        if ($is_sync_mode) {
-            $stmt_bj = $pdo->prepare("SELECT id FROM JenisInputTransaksi WHERE `key` = 'bankBuku'");
-            $stmt_bj->execute();
-            $bank_jenis_id = $stmt_bj->fetchColumn();
-            if ($bank_jenis_id) {
-                $sync_rek_nama  = get_rekening_nama($entity_key, $sync_bank_rek_id);
-                $bank_prev      = get_running_saldo($pdo, $entity_id, $bank_jenis_id, $sync_rek_nama, $tx_year);
-                $bank_new_saldo = $bank_prev - $total;
-                $bank_coa_id    = resolve_kas_coa($pdo, 'bankBuku', $entity_key, $sync_bank_rek_id);
-                $sync_extra     = json_encode(['isKasEntry' => true, 'rekeningNama' => $sync_rek_nama, 'syncFromKasKecil' => true]);
-                $pdo->prepare(
-                    "INSERT INTO `Transaction` (id, entityId, jenisInputId, tanggal, noBukti, keterangan, coaAccountId,
-                     debit, kredit, saldoSetelah, extraFieldsJson, staffId, projectId, createdAt)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                )->execute([
-                    uuid4(), $entity_id, $bank_jenis_id, $tanggal_dt,
-                    $no_bukti, "[Auto] $keterangan", $bank_coa_id,
-                    0, $total, $bank_new_saldo, $sync_extra,
-                    $staff_id, $proj_id, date('Y-m-d H:i:s'),
-                ]);
-            }
-        }
-
-        log_activity($user['id'], "Input transaksi {$jenis_input['nama']} – $no_bukti", 'FINANCIAL_CHANGE', [
-            'entityKey' => $entity_key, 'noBukti' => $no_bukti, 'total' => $total,
-            'arah' => $arah, 'keterangan' => $keterangan,
-        ]);
-
-        json_response(['success' => true]);
-
     } catch (Throwable $e) {
-        $pdo->rollBack();
-        error_response('Gagal menyimpan transaksi: ' . $e->getMessage(), 500);
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return error_response('Gagal menyimpan transaksi: ' . $e->getMessage(), $e instanceof KasInputException ? $e->getCode() : 500);
     }
+    json_response($result);
+}
+
+// Seluruh nomor bukti disimpan sebagai satu unit: gagal satu, batalkan semua.
+elseif ($method === 'POST' && $sub === 'batch') {
+    $user = require_auth();
+    $pdo = get_pdo();
+    require_once __DIR__.'/../helpers/kas-create.php';
+    $transactions = $body['transactions'] ?? null;
+    if (!is_array($transactions) || !array_is_list($transactions) || count($transactions) < 1 || count($transactions) > 50) {
+        return error_response('Isi 1 sampai 50 transaksi per penyimpanan.', 400);
+    }
+    try {
+        $pdo->beginTransaction();
+        $results = [];
+        foreach ($transactions as $index => $transaction) {
+            if (!is_array($transaction) || !in_array($transaction['jenisInputKey'] ?? '', ['kasKecil','kasBesar','bankBuku'], true)) {
+                throw new KasInputException('Jenis transaksi tidak valid.', 400);
+            }
+            try { $results[] = kas_create_transaction($pdo, $user, $transaction); }
+            catch (Throwable $e) { throw new KasInputException('Transaksi ' . ($index + 1) . ': ' . $e->getMessage(), $e instanceof KasInputException ? $e->getCode() : 500); }
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return error_response('Semua transaksi belum disimpan. ' . $e->getMessage(), $e instanceof KasInputException ? $e->getCode() : 500);
+    }
+    json_response(['success' => true, 'transactions' => $results]);
 }
 
 // ─── DELETE /api/kas/transaksi ─────────────────────────────────────────────────
@@ -586,6 +370,7 @@ elseif ($method === 'DELETE' && $sub === 'transaksi') {
 
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi untuk dihapus.', 400);
+    if (bank_ledger_has_journal_source($pdo, $tx_ids)) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_values($tx_ids));
 
     // Cari crossingGroupIds dan projectIds dari source transactions sebelum dihapus
@@ -640,6 +425,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
 
     $existing_tx_ids = array_filter((array)($body['existingTxIds'] ?? []));
     if (empty($existing_tx_ids)) return error_response('Tidak ada transaksi lama untuk diganti.', 400);
+    if (bank_ledger_has_journal_source($pdo, $existing_tx_ids)) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_values($existing_tx_ids));
 
     $entity_key      = $body['entityKey']      ?? '';
@@ -667,6 +453,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
     try { transitory_guard_coa(array_column((array)$rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     $valid_rows = array_values(array_filter($rows, fn($r) => !empty($r['coaAccountId']) && (float)($r['nominal'] ?? 0) > 0));
     if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
+    $crossing_keys = kas_piutang_crossing_keys($pdo, $entity_key, $arah, $valid_rows, $crossing_keys);
 
     if ($jenis_input_key === 'bankBuku') {
         if (!$rekening_id) return error_response('Rekening/Bank wajib dipilih.', 400);
@@ -832,6 +619,7 @@ elseif ($method === 'PATCH' && $sub === 'transaksi') {
     try { transitory_guard_coa(array_column($coa_updates,'newCoaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); } // [{txId, newCoaAccountId}]
 
     if (empty($tx_ids)) return error_response('txIds wajib diisi.', 400);
+    if (bank_ledger_has_journal_source($pdo, array_merge($tx_ids, array_column($coa_updates, 'txId')))) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_merge(array_values($tx_ids),array_column($coa_updates,'txId')));
     if (!$new_no_bukti || !$new_keterangan) return error_response('No. bukti dan keterangan wajib diisi.', 400);
 

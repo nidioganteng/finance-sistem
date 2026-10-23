@@ -98,7 +98,8 @@ export function CoaCombobox({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
-        className="w-full px-2.5 py-2 rounded-[9px] border border-border text-[13px] bg-surface-input text-navy-text placeholder:text-muted-faint focus:outline-none focus:ring-2 focus:ring-brand/30"
+        title={selectedOption ? `${selectedOption.code} — ${selectedOption.name}` : placeholder}
+        className="w-full px-2.5 py-2 rounded-[9px] border border-border text-[13px] bg-surface-input text-navy-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
       />
       {open && (
         <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-surface-card border border-border-soft rounded-[10px] shadow-lg max-h-52 overflow-y-auto">
@@ -111,12 +112,12 @@ export function CoaCombobox({
                 type="button"
                 onMouseDown={() => select(opt)}
                 onMouseEnter={() => setHighlightIdx(idx)}
-                className={`w-full text-left px-3 py-2 text-[12.5px] flex items-center gap-2 ${
+                className={`w-full text-left px-3 py-2 text-[12.5px] flex items-start gap-2 ${
                   idx === highlightIdx ? "bg-surface-hover" : ""
                 }`}
               >
                 <span className="font-mono text-[11.5px] text-muted-faint w-14 shrink-0">{opt.code}</span>
-                <span className="text-navy-text truncate">{opt.name}</span>
+                <span className="min-w-0 text-navy-text whitespace-normal break-words leading-relaxed">{opt.name}</span>
               </button>
             ))
           )}

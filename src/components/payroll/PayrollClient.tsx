@@ -263,7 +263,7 @@ export function PayrollClient({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const trackingRows = useMemo(() => buildTenagaAhliTracking(data.rekananTenagaAhli, data.honorTracking || []), [data.rekananTenagaAhli, data.honorTracking]);
+  const trackingRows = useMemo(() => buildTenagaAhliTracking(data.rekananTenagaAhli ?? [], data.honorTracking ?? []), [data.rekananTenagaAhli, data.honorTracking]);
   const isManager =
     userRole === "MANAJER_KEUANGAN" ||
     userRole === "STAF_KEUANGAN" ||
@@ -321,18 +321,20 @@ export function PayrollClient({
 
   // Semua baris transaksi sinkronisasi (kombinasi 511 dan 612)
   const allSyncRows = useMemo(() => {
-    if (data.syncData.jurnalSemuaRows && data.syncData.jurnalSemuaRows.length > 0) {
-      return data.syncData.jurnalSemuaRows;
+    const syncData = data.syncData ?? {};
+    if (syncData.jurnalSemuaRows && syncData.jurnalSemuaRows.length > 0) {
+      return syncData.jurnalSemuaRows;
     }
-    return [...data.syncData.jurnalPegawaiRows, ...data.syncData.jurnalTenagaAhliRows].sort((a, b) =>
+    return [...(syncData.jurnalPegawaiRows ?? []), ...(syncData.jurnalTenagaAhliRows ?? [])].sort((a, b) =>
       b.tanggal.localeCompare(a.tanggal)
     );
   }, [data.syncData]);
 
   // Baris yang sedang ditampilkan berdasarkan tab aktif
   const displayedSyncRows = useMemo(() => {
-    if (syncDetailTab === "pegawai") return data.syncData.jurnalPegawaiRows;
-    if (syncDetailTab === "tenaga-ahli") return data.syncData.jurnalTenagaAhliRows;
+    const syncData = data.syncData ?? {};
+    if (syncDetailTab === "pegawai") return syncData.jurnalPegawaiRows ?? [];
+    if (syncDetailTab === "tenaga-ahli") return syncData.jurnalTenagaAhliRows ?? [];
     return allSyncRows;
   }, [syncDetailTab, data.syncData, allSyncRows]);
 
@@ -963,7 +965,7 @@ export function PayrollClient({
   // Filter items based on query untuk penggajian bulanan:
   // Karyawan berstatus RESIGN atau PENSIUN hanya muncul jika memang SUDAH memiliki data gaji di bulan ini (arsip).
   // Jika belum digaji di bulan ini, langsung dihilangkan dari daftar input penggajian bulanan.
-  const filteredPegawaiList = data.pegawaiList.filter((p) => {
+  const filteredPegawaiList = (data.pegawaiList ?? []).filter((p) => {
     const isInactive =
       (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "RESIGN" ||
       (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "PENSIUN" ||
@@ -980,7 +982,7 @@ export function PayrollClient({
   });
 
   // Master Pegawai Tetap (seluruh profil karyawan)
-  const allMasterPegawai = data.allPegawaiMaster ?? data.pegawaiList;
+  const allMasterPegawai = data.allPegawaiMaster ?? data.pegawaiList ?? [];
   const currentAkumulasiPegawai =
     allMasterPegawai.find((p) => p.id === selectedAkumulasiPegawaiId) ||
     allMasterPegawai[0] ||
@@ -1005,7 +1007,7 @@ export function PayrollClient({
   const masterCountPensiun = allMasterPegawai.filter(
     (p) => (p.status ?? (p.isActive ? "AKTIF" : "RESIGN")) === "PENSIUN"
   ).length;
-  const countBelumInput = data.pegawaiList.filter((p) => !p.currentGaji).length;
+  const countBelumInput = (data.pegawaiList ?? []).filter((p) => !p.currentGaji).length;
 
   // Filter rekapitulasi tahunan (menampilkan seluruh pegawai yang pernah digaji tahun ini atau berstatus aktif)
   const filteredTahunanList = allMasterPegawai.filter((p) => {
@@ -1019,8 +1021,8 @@ export function PayrollClient({
 
   const baseHonorList =
     honorFilterScope === "holding"
-      ? data.allHonorBulanIni || data.honorList
-      : data.honorList;
+      ? (data.allHonorBulanIni ?? data.honorList ?? [])
+      : (data.honorList ?? []);
 
   const filteredHonorList = baseHonorList.filter((h) => {
     const matchSearch =
@@ -1057,13 +1059,13 @@ export function PayrollClient({
     0
   );
 
-  const filteredKonsolidasi = data.konsolidasiTenagaAhli.filter(
+  const filteredKonsolidasi = (data.konsolidasiTenagaAhli ?? []).filter(
     (k) =>
       k.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
       k.nik.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredRekapPerNama = data.rekapTenagaAhliPerNama.filter((k) => {
+  const filteredRekapPerNama = (data.rekapTenagaAhliPerNama ?? []).filter((k) => {
     const q = searchQuery.toLowerCase();
     const matchSearch =
       (k.nama || "").toLowerCase().includes(q) ||
@@ -1078,7 +1080,7 @@ export function PayrollClient({
     return matchSearch && matchEntitas;
   });
 
-  const filteredRekananList = data.rekananTenagaAhli.filter((r) => {
+  const filteredRekananList = (data.rekananTenagaAhli ?? []).filter((r) => {
     const q = searchQuery.toLowerCase();
     const matchBasic =
       r.nama.toLowerCase().includes(q) ||
@@ -1097,7 +1099,7 @@ export function PayrollClient({
     return false;
   });
 
-  const honorAssignments = data.rekananTenagaAhli.find(person => person.id === selectedRekananIdForHonor)?.proyekList || [];
+  const honorAssignments = (data.rekananTenagaAhli ?? []).find(person => person.id === selectedRekananIdForHonor)?.proyekList || [];
   const honorProjectOptions = honorAssignments.map(project => ({ id: project.projectId, code: project.projectCode || "", name: project.projectName || "", entityName: project.projectEntityName || "" }));
   const projectListToUse: Array<{ id: string; code: string; name: string; entityId?: string; entityName: string }> =
     data.allProjects && data.allProjects.length > 0
@@ -1105,7 +1107,7 @@ export function PayrollClient({
           ...p,
           entityName: p.entityName || "Holding / Lainnya",
         }))
-      : data.projects.map((p) => ({
+      : (data.projects ?? []).map((p) => ({
           ...p,
           entityName: data.entity?.name || "Entitas Aktif",
         }));
@@ -1173,7 +1175,7 @@ export function PayrollClient({
           >
             <Scale size={15} />
             <span>Sinkronisasi Laba Rugi</span>
-            {data.syncData.isOverallSinkron ? (
+            {data.syncData?.isOverallSinkron ? (
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
             ) : (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -1190,9 +1192,9 @@ export function PayrollClient({
           >
             <ShieldCheck size={15} />
             <span>Rekonsiliasi PPh 21 (SPT)</span>
-            {rekonsiliasiData?.summary.overallStatus === "ALL_BALANCED" ? (
+            {rekonsiliasiData?.summary?.overallStatus === "ALL_BALANCED" ? (
               <span className="w-2 h-2 rounded-full bg-emerald-400" title="Semua 12 Bulan Balance" />
-            ) : rekonsiliasiData?.summary.overallStatus === "HAS_DIFF" ? (
+            ) : rekonsiliasiData?.summary?.overallStatus === "HAS_DIFF" ? (
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="Terdapat Selisih Jurnal vs SPT" />
             ) : (
               <span className="w-2 h-2 rounded-full bg-amber-400" title="Sebagian Belum Dilaporkan" />

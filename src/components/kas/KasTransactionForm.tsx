@@ -237,30 +237,7 @@ export function KasTransactionForm({
   const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
   const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
 
-  const hasSalaryAccount = rows.some((r) => {
-    const c = coaOptions.find((opt) => opt.id === r.coaAccountId);
-    if (!c) return false;
-    return c.code === "511" || c.code === "612" || c.code.startsWith("511") || c.code.startsWith("612") || /gaji|honor|upah|tenaga ahli|payroll/i.test(c.name);
-  });
-
-  useEffect(() => {
-    if (hasSalaryAccount) {
-      if (periodeBulanGaji === null && !initialValues?.periodeBulanGaji) {
-        const txDate = tanggal ? new Date(tanggal) : new Date();
-        const curM = txDate.getMonth() + 1;
-        const defM = curM === 1 ? 12 : curM - 1;
-        const defY = curM === 1 ? txDate.getFullYear() - 1 : txDate.getFullYear();
-        setPeriodeBulanGaji(defM);
-        setPeriodeTahunGaji(defY);
-      }
-    } else {
-      if (periodeBulanGaji !== null) {
-        setPeriodeBulanGaji(null);
-        setPeriodeTahunGaji(null);
-      }
-    }
-  }, [hasSalaryAccount, tanggal, periodeBulanGaji, initialValues]);
-
+  const hasSalaryAccount = rows.some((r) => coaOptions.some((c) => c.id === r.coaAccountId && /^(511|612)/.test(c.code)));
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
   const isKasBesar = jenisInputKey === "kasBesar";
@@ -317,7 +294,7 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
-      ...(periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
+      ...(hasSalaryAccount && periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
       ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
@@ -358,9 +335,9 @@ export function KasTransactionForm({
   const inputClass = "w-full px-3.5 py-2.5 rounded-[10px] border border-border-soft bg-surface-input text-[13.5px] text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand/60 transition-colors";
 
   return (
-    <div className="bg-surface-card border border-border-soft rounded-[22px] overflow-hidden shadow-sm">
+    <div className="bg-surface-card border border-border-soft rounded-[22px] shadow-sm">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-border-soft flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-border-soft flex flex-wrap gap-3 items-center justify-between">
         <div>
           <div className="text-[15px] font-bold text-navy-text">{isEdit ? "Edit Transaksi" : "Transaksi Baru"}</div>
           <div className="text-[11.5px] text-muted-faint mt-0.5">
@@ -398,7 +375,7 @@ export function KasTransactionForm({
 
       <div className="px-6 py-5 flex flex-col gap-5">
         {/* Row 1: Tanggal + No Bukti */}
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">Tanggal</label>
             <DatePicker value={tanggal} onChange={setTanggal} required />
@@ -428,7 +405,7 @@ export function KasTransactionForm({
                   setIsNoBuktiManual(true);
                   setNoBukti(e.target.value);
                 }}
-                placeholder="mis. UK09281 atau KC/0002"
+                placeholder="mis. UK/09281 atau KC/0002"
                 className={`${inputClass} font-mono pr-24`}
               />
             </div>
@@ -787,12 +764,12 @@ export function KasTransactionForm({
           </div>
         )}
 
-        {/* Pilihan Periode Beban Gaji (Akrual) — Langsung tampil saat input gaji */}
+        {/* Periode akrual hanya untuk akun gaji dan gaji tenaga ahli. */}
         {hasSalaryAccount && (
           <div className="rounded-[12px] border border-border-soft bg-surface-card p-4 flex flex-col gap-3 shadow-xs">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-[11.5px] font-bold text-navy-text uppercase tracking-wide">
-                Periode Beban Gaji (Akrual)
+                Periode Akrual
               </label>
               {periodeBulanGaji && (
                 <span className="text-[11px] font-semibold text-brand">
@@ -804,7 +781,7 @@ export function KasTransactionForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
-                  Bulan Gaji
+                  Bulan Akrual
                 </label>
                 <select
                   value={periodeBulanGaji ?? ""}
@@ -828,7 +805,7 @@ export function KasTransactionForm({
 
               <div>
                 <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
-                  Tahun Gaji
+                  Tahun Akrual
                 </label>
                 <input
                   type="number"
@@ -860,45 +837,49 @@ export function KasTransactionForm({
             </button>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="rounded-xl border border-border-soft">
+            <div className="hidden md:grid grid-cols-[2rem_minmax(0,1.2fr)_minmax(0,1.6fr)_11rem_2rem] gap-3 px-4 py-3 rounded-t-xl bg-surface-subtle text-[11px] font-bold uppercase tracking-wide text-muted-stronger border-b border-border-soft">
+              <span>#</span><span>Akun COA</span><span>Uraian Transaksi</span><span className="text-right">Nominal (Rp)</span><span />
+            </div>
             {rows.map((r, idx) => (
-              <div key={r.id} className="bg-surface-subtle/60 border border-border-soft rounded-[12px] p-3 flex gap-2.5">
-                {/* Kolom kiri: nomor + trash */}
-                <div className="flex flex-col items-center justify-between flex-none w-6 pt-1.5 pb-0.5">
-                  <span className="text-[11px] font-bold text-muted-faint">{idx + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(r.id)}
-                    disabled={rows.length === 1}
-                    className="p-1 rounded text-muted-faint hover:text-status-red hover:bg-surface-hover transition-colors disabled:opacity-20"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-[2rem_minmax(0,1.2fr)_minmax(0,1.6fr)_11rem_2rem] gap-3 items-center p-4 border-b border-border-soft last:border-b-0">
+                <span className="text-[11px] font-bold text-muted-faint">{idx + 1}</span>
+                <div className="min-w-0">
+                  <span className="md:sr-only block mb-1 text-[11px] text-muted-stronger">Akun COA</span>
+                  <CoaCombobox
+                    value={r.coaAccountId}
+                    onChange={(id) => updateRow(r.id, { coaAccountId: id })}
+                    options={coaOptions}
+                  />
                 </div>
-                {/* Kolom kanan: akun + nominal + keterangan */}
-                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                  <div className="flex gap-2">
-                    <div className="flex-1 min-w-0">
-                      <CoaCombobox
-                        value={r.coaAccountId}
-                        onChange={(id) => updateRow(r.id, { coaAccountId: id })}
-                        options={coaOptions}
-                      />
-                    </div>
-                    <input
-                      value={r.nominal ? formatRupiahInput(r.nominal) : ""}
-                      onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
-                      placeholder="0"
-                      className="w-[120px] flex-none px-3 py-2 rounded-[9px] border border-border-soft bg-surface-input text-[13px] text-right font-mono text-navy-text placeholder:text-muted-faint focus:outline-none focus:border-brand/60"
-                    />
-                  </div>
+                <label className="min-w-0">
+                  <span className="md:sr-only block mb-1 text-[11px] text-muted-stronger">Uraian Transaksi</span>
                   <input
                     value={r.keterangan ?? ""}
                     onChange={(e) => updateRow(r.id, { keterangan: e.target.value })}
                     placeholder="Keterangan item (opsional)"
-                    className="w-full px-3 py-1.5 rounded-[8px] border border-border-soft bg-surface-input text-[12px] text-muted-stronger placeholder:text-muted-faint focus:outline-none focus:border-brand/60"
+                    className={`${inputClass} text-[12px]`}
                   />
-                </div>
+                </label>
+                <label className="min-w-0">
+                  <span className="md:sr-only block mb-1 text-[11px] text-muted-stronger">Nominal (Rp)</span>
+                  <input
+                    value={r.nominal ? formatRupiahInput(r.nominal) : ""}
+                    onChange={(e) => updateRow(r.id, { nominal: e.target.value.replace(/[^0-9]/g, "") })}
+                    placeholder="0"
+                    inputMode="numeric"
+                    className={`${inputClass} text-right font-mono tabular-nums`}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeRow(r.id)}
+                  disabled={rows.length === 1}
+                  aria-label={`Hapus baris akun ${idx + 1}`}
+                  className="justify-self-end p-2 rounded text-muted-faint hover:text-status-red hover:bg-surface-hover transition-colors disabled:opacity-20"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             ))}
           </div>
@@ -924,7 +905,7 @@ export function KasTransactionForm({
           </div>
         )}
 
-        <div className="flex gap-2.5">
+        <div className="flex flex-wrap justify-end gap-2.5">
           <button
             type="button"
             onClick={onClose}
@@ -936,7 +917,7 @@ export function KasTransactionForm({
             type="button"
             disabled={isPending || rowsTotal === 0}
             onClick={handleSave}
-            className={`flex-1 py-2.5 rounded-[10px] text-[13.5px] font-bold transition-all disabled:opacity-50 ${
+            className={`w-full sm:w-auto sm:min-w-[200px] px-6 py-2.5 rounded-[10px] text-[13.5px] font-bold transition-all disabled:opacity-50 ${
               arah === "keluar"
                 ? "bg-red-500 hover:bg-red-600 text-white"
                 : "bg-emerald-500 hover:bg-emerald-600 text-white"

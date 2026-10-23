@@ -56,6 +56,13 @@ export function KasScreen({
     currentYear: number;
   } | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
+  const [dataRevision, setDataRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setDataRevision((current) => current + 1);
+    window.addEventListener("kas:changed", refresh);
+    return () => window.removeEventListener("kas:changed", refresh);
+  }, []);
+
 
   useEffect(() => {
     if (!user) return;
@@ -71,8 +78,10 @@ export function KasScreen({
       ? new Date(sampaiParam).getFullYear()
       : new Date().getFullYear();
 
+    let cancelled = false;
     setPageLoading(true);
     getAccessibleEntities(entityKeys).then(async (allEntities) => {
+      if (cancelled) return;
       const entities = allEntities.filter((e) => !excludeEntityKeys.includes(e.key));
       const validKeys = entities.map((e) => e.key);
       const selectedKey = resolveEntityKey(entityParam, validKeys);
@@ -116,6 +125,7 @@ export function KasScreen({
       const extra = jenisInput.extraFieldsJson as { arahLaporan?: string[] } | null;
       const defaultArahLaporan = Array.isArray(extra?.arahLaporan) ? extra.arahLaporan : [];
 
+      if (cancelled) return;
       setPageData({
         entities,
         selectedEntity,
@@ -135,9 +145,10 @@ export function KasScreen({
         bukuBankRekeningOptions,
         currentYear,
       });
-    }).catch(() => setPageData(null))
-      .finally(() => setPageLoading(false));
-  }, [user, entityParam, rekeningParam, dariParam, sampaiParam, pageParam, jenisInputKey]);
+    }).catch(() => { if (!cancelled) setPageData(null); })
+      .finally(() => { if (!cancelled) setPageLoading(false); });
+    return () => { cancelled = true; };
+  }, [user, entityParam, rekeningParam, dariParam, sampaiParam, pageParam, jenisInputKey, dataRevision]);
 
   if (isLoading || pageLoading) {
     return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;

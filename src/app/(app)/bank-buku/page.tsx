@@ -1,7 +1,10 @@
+"use client";
+
+import { Suspense } from "react";
 import { KasScreen } from "@/components/kas/KasScreen";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export default function BankBukuPage({ searchParams }: { searchParams: { entity?: string; rekening?: string; dari?: string; sampai?: string; page?: string } }) {
+function BankBukuContent() {
   return (
     <PageTransition>
       <KasScreen
@@ -9,8 +12,15 @@ export default function BankBukuPage({ searchParams }: { searchParams: { entity?
         title="Buku Bank"
         subtitle="Input dan riwayat transaksi rekening bank"
         pagePath="/bank-buku"
-        searchParams={searchParams}
       />
     </PageTransition>
+  );
+}
+
+export default function BankBukuPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <BankBukuContent />
+    </Suspense>
   );
 }

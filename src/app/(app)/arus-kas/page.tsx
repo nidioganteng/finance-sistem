@@ -1,5 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getArusKasData } from "@/lib/arus-kas";
 import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
@@ -11,28 +14,55 @@ import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
 import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
 
-export default async function ArusKasPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string; version?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { entityKeys } = session!.user;
+function ArusKasContent() {
+  const { user, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
+  const versionParam = searchParams.get("version") ?? undefined;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    currentYear: number;
+    currentVersion: ReportVersion;
+    data: Awaited<ReturnType<typeof getArusKasData>>;
+    presisiData: Awaited<ReturnType<typeof getArusKasPresisiData>>;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  useEffect(() => {
+    if (!user) return;
+    const { entityKeys } = user;
+    const currentYear = parseInt(yearStr ?? "") || new Date().getFullYear();
+    const currentVersion: ReportVersion = (versionParam ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+      const [data, presisiData] = await Promise.all([
+        getArusKasData(selectedEntity.id, currentYear, currentVersion),
+        getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion),
+      ]);
+      setPageData({ entities, selectedKey: selectedKey!, selectedEntity, currentYear, currentVersion, data, presisiData });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr, versionParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  const [data, presisiData] = await Promise.all([
-    getArusKasData(selectedEntity.id, currentYear, currentVersion),
-    getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion),
-  ]);
+  const { entities, selectedKey, selectedEntity, currentYear, currentVersion, data, presisiData } = pageData;
   const hasData = data.monthly.some((m) => m.hasData);
 
   return (
@@ -64,63 +94,71 @@ export default async function ArusKasPage({
                 {
                   label: "Net Arus Kas",
                   value: (data.netTotalPositive ? "" : "-") + data.netTotalFmt,
-            color: data.netTotalPositive ? "text-status-green" : "text-status-red",
-          },
-        ].map((card) => (
-          <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
-            <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
-            <div className={`text-[20px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
-          </div>
-        ))}
-      </div>
+                  color: data.netTotalPositive ? "text-status-green" : "text-status-red",
+                },
+              ].map((card) => (
+                <div key={card.label} className="bg-surface-card rounded-[16px] border border-border-soft p-5">
+                  <div className="text-[12px] font-semibold text-muted-faint mb-1">{card.label}</div>
+                  <div className={`text-[20px] font-extrabold tabular-nums ${card.color}`}>{card.value}</div>
+                </div>
+              ))}
+            </div>
 
-      <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[480px]">
-          <thead>
-            <tr className="border-b border-surface-hover text-left">
-              <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Bulan</th>
-              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Kas Masuk</th>
-              <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Kas Keluar</th>
-              <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Net Flow</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!hasData && (
-              <tr>
-                <td colSpan={4} className="py-10 text-center text-sm text-muted">
-                  Belum ada transaksi untuk periode ini.
-                </td>
-              </tr>
-            )}
-            {data.monthly.map((m) => (
-              <tr
-                key={m.bulan}
-                className={`border-b border-surface-subtle ${m.hasData ? "hover:bg-surface-hover/30" : "opacity-40"}`}
-              >
-                <td className="py-3 px-6 font-semibold text-navy-text">{m.bulan}</td>
-                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-green">{m.masukFmt}</td>
-                <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-red">{m.keluarFmt}</td>
-                <td className={`py-3 px-6 text-right tabular-nums text-[13px] font-bold ${m.netPositive ? "text-status-green" : "text-status-red"}`}>
-                  {m.hasData ? (m.netPositive ? "+" : "-") + m.netFmt : "-"}
-                </td>
-              </tr>
-            ))}
-            <tr className="bg-surface-subtle">
-              <td className="py-3 px-6 font-extrabold text-navy-text">Total {currentYear}</td>
-              <td className="py-3 px-3 text-right tabular-nums font-extrabold text-status-green">{data.totalMasukFmt}</td>
-              <td className="py-3 px-3 text-right tabular-nums font-extrabold text-status-red">{data.totalKeluarFmt}</td>
-              <td className={`py-3 px-6 text-right tabular-nums font-extrabold ${data.netTotalPositive ? "text-status-green" : "text-status-red"}`}>
-                {data.netTotalPositive ? "+" : "-"}{data.netTotalFmt}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        </div>
-      </div>
-    </div>
-  }
-/>
-</PageTransition>
-);
+            <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-surface-hover text-left">
+                    <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase">Bulan</th>
+                    <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Kas Masuk</th>
+                    <th className="py-3 px-3 text-[11px] font-bold text-muted-faint uppercase text-right">Kas Keluar</th>
+                    <th className="py-3 px-6 text-[11px] font-bold text-muted-faint uppercase text-right">Net Flow</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!hasData && (
+                    <tr>
+                      <td colSpan={4} className="py-10 text-center text-sm text-muted">
+                        Belum ada transaksi untuk periode ini.
+                      </td>
+                    </tr>
+                  )}
+                  {data.monthly.map((m) => (
+                    <tr
+                      key={m.bulan}
+                      className={`border-b border-surface-subtle ${m.hasData ? "hover:bg-surface-hover/30" : "opacity-40"}`}
+                    >
+                      <td className="py-3 px-6 font-semibold text-navy-text">{m.bulan}</td>
+                      <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-green">{m.masukFmt}</td>
+                      <td className="py-3 px-3 text-right tabular-nums text-[13px] text-status-red">{m.keluarFmt}</td>
+                      <td className={`py-3 px-6 text-right tabular-nums text-[13px] font-bold ${m.netPositive ? "text-status-green" : "text-status-red"}`}>
+                        {m.hasData ? (m.netPositive ? "+" : "-") + m.netFmt : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-surface-subtle">
+                    <td className="py-3 px-6 font-extrabold text-navy-text">Total {currentYear}</td>
+                    <td className="py-3 px-3 text-right tabular-nums font-extrabold text-status-green">{data.totalMasukFmt}</td>
+                    <td className="py-3 px-3 text-right tabular-nums font-extrabold text-status-red">{data.totalKeluarFmt}</td>
+                    <td className={`py-3 px-6 text-right tabular-nums font-extrabold ${data.netTotalPositive ? "text-status-green" : "text-status-red"}`}>
+                      {data.netTotalPositive ? "+" : "-"}{data.netTotalFmt}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </div>
+        }
+      />
+    </PageTransition>
+  );
+}
+
+export default function ArusKasPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <ArusKasContent />
+    </Suspense>
+  );
 }

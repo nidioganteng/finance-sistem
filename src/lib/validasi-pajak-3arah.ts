@@ -1,4 +1,3 @@
-"use server";
 import { phpFetch, getPhpToken } from "./api-client";
 
 export interface ValidasiPajakItem {

@@ -1,5 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
   getAccessibleEntities,
   getUnreadNotificationCount,
@@ -30,50 +33,90 @@ import {
 import Link from "next/link";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; chartYear?: string; compareYears?: string; year?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role, entityKeys, name } = session!.user;
+function DashboardContent() {
+  const { user, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearParam = searchParams.get("year") ?? undefined;
+  const chartYearParam = searchParams.get("chartYear") ?? undefined;
+  const compareYearsParam = searchParams.get("compareYears") ?? undefined;
 
-  const currentYear = searchParams.year ? parseInt(searchParams.year) : new Date().getFullYear();
-  const entities = await getAccessibleEntities(entityKeys, currentYear);
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    unreadCount: number;
+    piutangMetrics: Awaited<ReturnType<typeof getGrupPiutangMetrics>> | null;
+    monthlyDataByYear: Awaited<ReturnType<typeof getMonthlyChartData>>[];
+    entityLaporanData: Awaited<ReturnType<typeof getLaporanKeuanganData>> | null;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    const currentYear = yearParam ? parseInt(yearParam) : new Date().getFullYear();
+    const canGrup = canViewGrupAggregate(role);
+    const chartYear = chartYearParam ? parseInt(chartYearParam) : currentYear;
+    const compareYears = (compareYearsParam ?? "")
+      .split(",")
+      .map((y) => parseInt(y))
+      .filter((y, idx, arr) => !isNaN(y) && y !== chartYear && arr.indexOf(y) === idx)
+      .slice(0, 4);
+    const chartYears = [chartYear, ...compareYears];
+
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys, currentYear).then(async (entities) => {
+      const selectedKey = canGrup
+        ? (entityParam && entityParam !== "grup" && entityKeys.includes(entityParam)
+            ? entityParam
+            : undefined)
+        : resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      const showingGrup = canGrup && !selectedKey;
+      const targetEntityKeys = showingGrup ? entityKeys : selectedEntity ? [selectedEntity.key] : [];
+
+      const [unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData] = await Promise.all([
+        getUnreadNotificationCount(role),
+        targetEntityKeys.length > 0 ? getGrupPiutangMetrics(targetEntityKeys) : Promise.resolve(null),
+        targetEntityKeys.length > 0
+          ? Promise.all(chartYears.map((y) => getMonthlyChartData(targetEntityKeys, y)))
+          : Promise.resolve([]),
+        selectedEntity
+          ? getLaporanKeuanganData([selectedEntity.id], currentYear, "INTERNAL")
+          : Promise.resolve(null),
+      ]);
+
+      setPageData({ entities, unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData });
+    }).catch(() => {
+      setPageData(null);
+    }).finally(() => setPageLoading(false));
+  }, [user, entityParam, yearParam, chartYearParam, compareYearsParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
+  }
+  if (!user) return null;
+  if (!pageData) return <div className="mt-8 p-6 text-sm text-muted">Gagal memuat data.</div>;
+
+  const { role, entityKeys, name } = user;
+  const { entities, unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData } = pageData;
+
+  const currentYear = yearParam ? parseInt(yearParam) : new Date().getFullYear();
   const canGrup = canViewGrupAggregate(role);
-
-  const selectedKey = canGrup
-    // Semua role yang boleh lihat grup: kalau URL tidak ada entity atau entity=grup → tampilkan grup (undefined)
-    ? (searchParams.entity && searchParams.entity !== "grup" && entityKeys.includes(searchParams.entity)
-        ? searchParams.entity
-        : undefined)
-    // Role tanpa akses grup: selalu resolve ke entity pertama
-    : resolveEntityKey(searchParams.entity, entityKeys);
-  const showingGrup = canGrup && !selectedKey;
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const chartYear = searchParams.chartYear ? parseInt(searchParams.chartYear) : currentYear;
-  // Tahun pembanding tambahan (di luar chartYear) — maksimal 4 (jadi 5 tahun
-  // sekaligus), pembatasan lebih ketat (grup cuma 1) ditegakkan di RevenueChart
-  // lewat activeKeys (client-only state, jadi tidak bisa dibatasi di sini).
-  const compareYears = (searchParams.compareYears ?? "")
+  const chartYear = chartYearParam ? parseInt(chartYearParam) : currentYear;
+  const compareYears = (compareYearsParam ?? "")
     .split(",")
     .map((y) => parseInt(y))
     .filter((y, idx, arr) => !isNaN(y) && y !== chartYear && arr.indexOf(y) === idx)
     .slice(0, 4);
   const chartYears = [chartYear, ...compareYears];
 
-  const targetEntityKeys = showingGrup ? entityKeys : selectedEntity ? [selectedEntity.key] : [];
-
-  const [unreadCount, piutangMetrics, monthlyDataByYear, entityLaporanData] = await Promise.all([
-    getUnreadNotificationCount(role),
-    targetEntityKeys.length > 0 ? getGrupPiutangMetrics(targetEntityKeys) : Promise.resolve(null),
-    targetEntityKeys.length > 0
-      ? Promise.all(chartYears.map((y) => getMonthlyChartData(targetEntityKeys, y)))
-      : Promise.resolve([]),
-    selectedEntity
-      ? getLaporanKeuanganData([selectedEntity.id], currentYear, "INTERNAL")
-      : Promise.resolve(null),
-  ]);
+  const selectedKey = canGrup
+    ? (entityParam && entityParam !== "grup" && entityKeys.includes(entityParam)
+        ? entityParam
+        : undefined)
+    : resolveEntityKey(entityParam, entityKeys);
+  const showingGrup = canGrup && !selectedKey;
+  const selectedEntity = entities.find((e) => e.key === selectedKey);
 
   const rightSlot = (
     <>
@@ -89,14 +132,12 @@ export default async function DashboardPage({
     </>
   );
 
-  // Hitung agregat grup
   const totalRevenue = entities.reduce((s, e) => s + e.revenue, 0);
   const totalTalanganGrup = entities.reduce((s, e) => s + (e.talanganKeluar ?? 0), 0);
-  // Pengeluaran operasional konsolidasi grup (mengeliminasi talangan antar entitas agar tidak terjadi pencatatan ganda)
+  void totalTalanganGrup;
   const totalSpend = entities.reduce((s, e) => s + (e.beban ?? (e.spend - (e.talanganKeluar ?? 0))), 0);
   const totalProfit = totalRevenue - totalSpend;
 
-  // Pisahkan entitas utama dan Umum
   const mainEntities = entities.filter((e) => !e.isUmum);
   const umumEntity = entities.find((e) => e.isUmum);
 
@@ -170,14 +211,10 @@ export default async function DashboardPage({
         </div>)}
       </div>
 
-      {/* Grup / Master Dashboard view */}
       {showingGrup ? (
         <>
-          {/* 5 KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-            <div
-              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-            >
+            <div className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center">
                   <TrendingUp size={16} className="text-blue-500 dark:text-blue-400" />
@@ -185,8 +222,6 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pendapatan Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalRevenue)}</div>
-
-              {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
                 <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
                   {formatRupiah(totalRevenue)}
@@ -195,9 +230,7 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div
-              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-            >
+            <div className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-500/15 flex items-center justify-center">
                   <TrendingDown size={16} className="text-slate-400 dark:text-slate-500" />
@@ -205,8 +238,6 @@ export default async function DashboardPage({
                 <span className="text-[11.5px] font-semibold text-muted">Total Pengeluaran Grup</span>
               </div>
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">{formatMiliar(totalSpend)}</div>
-
-              {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
                 <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
                   {formatRupiah(totalSpend)}
@@ -215,9 +246,7 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div
-              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-            >
+            <div className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center">
                   <BarChart3 size={16} className="text-status-green" />
@@ -227,8 +256,6 @@ export default async function DashboardPage({
               <div className={`text-[22px] font-extrabold tabular-nums ${totalProfit >= 0 ? "text-status-green" : "text-status-red"}`}>
                 {totalProfit < 0 ? "-" : ""}{formatMiliar(Math.abs(totalProfit))}
               </div>
-
-              {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
                 <div className={`text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight ${totalProfit >= 0 ? "bg-status-green" : "bg-status-red"}`}>
                   {(totalProfit < 0 ? "-" : "") + formatRupiah(Math.abs(totalProfit))}
@@ -250,9 +277,7 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div
-              className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default"
-            >
+            <div className="group/kpi relative bg-surface-card rounded-[16px] border border-border p-4 hover:border-brand/40 hover:shadow-sm transition-all hover:z-20 cursor-default">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center">
                   <CalendarClock size={16} className="text-purple-500 dark:text-purple-400" />
@@ -262,8 +287,6 @@ export default async function DashboardPage({
               <div className="text-[22px] font-extrabold text-navy-text tabular-nums">
                 {formatMiliar(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
               </div>
-
-              {/* Instant Floating Tooltip */}
               <div className="pointer-events-none absolute bottom-full left-4 mb-1.5 z-50 hidden group-hover/kpi:flex flex-col items-start">
                 <div className="bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap border border-white/10 tracking-tight">
                   {formatRupiah(piutangMetrics?.totalPiutangBelumTertagih ?? 0)}
@@ -273,12 +296,10 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          {/* Alert Termin Perlu Diwaspadai */}
           {piutangMetrics && piutangMetrics.overdueProjects.length > 0 && (
             <TerminWaspadaAlert projects={piutangMetrics.overdueProjects} />
           )}
 
-          {/* Entity cards compact — semua entitas 1 baris */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
             {mainEntities.map((e) => (
               <EntityCardCompact
@@ -315,7 +336,6 @@ export default async function DashboardPage({
         </>
       ) : selectedEntity ? (
         <>
-          {/* Alert Termin Perlu Diwaspadai untuk Entitas Ini */}
           {piutangMetrics && piutangMetrics.overdueProjects.length > 0 && (
             <TerminWaspadaAlert projects={piutangMetrics.overdueProjects} />
           )}
@@ -402,5 +422,13 @@ export default async function DashboardPage({
         <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun. Hubungi Manajer Keuangan.</p>
       )}
     </PageTransition>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

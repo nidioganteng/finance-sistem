@@ -1,5 +1,3 @@
-"use server";
-
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
 export async function approveUser(userId: string, role: string, entityIds: string[]) {

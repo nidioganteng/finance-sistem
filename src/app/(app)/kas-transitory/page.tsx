@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getKasTransitory } from "@/lib/kas-transitory";
@@ -8,29 +10,95 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { KasTransitoryClient } from "@/components/kas-transitory/KasTransitoryClient";
 
-export default async function KasTransitoryPage({ searchParams }: { searchParams: { entity?: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) redirect("/login");
-  const { role, entityKeys } = session.user;
-  if (!["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)) redirect("/dashboard");
-  const entities = await getAccessibleEntities(entityKeys);
-  const selected = entities.find(entity => entity.key === resolveEntityKey(searchParams.entity, entityKeys)) || entities[0];
-  if (!selected) return <p className="p-6 text-sm text-muted">Belum ada akses entitas.</p>;
-  let data;
-  try {
-    data = await getKasTransitory(selected.id);
-  } catch (e) {
-    return <>
-      <PageHeader title={`Kas Transitory – ${selected.name}`} subtitle="Pantau dana yang sudah dicatat keluar dan belum diserahkan kepada penerima." rightSlot={<EntitySwitcher entities={entities.map(entity => ({ key: entity.key, name: entity.name }))} currentEntityKey={selected.key} showGrupOption={false} />} />
-      <div className="mt-8 rounded-xl border border-border bg-surface-card p-6 text-sm text-muted-strong">
-        <p className="font-semibold text-status-red">Gagal memuat data Kas Transitory.</p>
-        <p className="mt-2 text-xs">{e instanceof Error ? e.message : String(e)}</p>
-        <p className="mt-2 text-xs text-muted">Pastikan server PHP aktif dan endpoint <code>/api/kas-transitory</code> tersedia. Coba muat ulang halaman.</p>
-      </div>
-    </>;
+function KasTransitoryContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selected: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    data: Awaited<ReturnType<typeof getKasTransitory>>;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (!["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)) {
+      router.replace("/dashboard");
+      return;
+    }
+    setPageLoading(true);
+    setError(null);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selected = entities.find((e) => e.key === resolveEntityKey(entityParam, entityKeys)) || entities[0];
+      if (!selected) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+      try {
+        const data = await getKasTransitory(selected.id);
+        setPageData({ entities, selected, data });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        setPageData({ entities, selected, data: null as any });
+      }
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
-  return <>
-    <PageHeader title={`Kas Transitory – ${selected.name}`} subtitle="Pantau dana yang sudah dicatat keluar dan belum diserahkan kepada penerima." rightSlot={<EntitySwitcher entities={entities.map(entity => ({ key: entity.key, name: entity.name }))} currentEntityKey={selected.key} showGrupOption={false} />} />
-    <KasTransitoryClient key={selected.id} data={data} canReverse={role !== "STAF_KEUANGAN"} />
-  </>;
+  if (!user) return null;
+  if (!pageData) return <p className="p-6 text-sm text-muted">Belum ada akses entitas.</p>;
+
+  const { role } = user;
+  const { entities, selected } = pageData;
+
+  const header = (
+    <PageHeader
+      title={`Kas Transitory – ${selected.name}`}
+      subtitle="Pantau dana yang sudah dicatat keluar dan belum diserahkan kepada penerima."
+      rightSlot={
+        <EntitySwitcher
+          entities={entities.map((e) => ({ key: e.key, name: e.name }))}
+          currentEntityKey={selected.key}
+          showGrupOption={false}
+        />
+      }
+    />
+  );
+
+  if (error) {
+    return (
+      <>
+        {header}
+        <div className="mt-8 rounded-xl border border-border bg-surface-card p-6 text-sm text-muted-strong">
+          <p className="font-semibold text-status-red">Gagal memuat data Kas Transitory.</p>
+          <p className="mt-2 text-xs">{error}</p>
+          <p className="mt-2 text-xs text-muted">Pastikan server PHP aktif dan endpoint <code>/api/kas-transitory</code> tersedia. Coba muat ulang halaman.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {header}
+      <KasTransitoryClient key={selected.id} data={pageData.data} canReverse={role !== "STAF_KEUANGAN"} />
+    </>
+  );
+}
+
+export default function KasTransitoryPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <KasTransitoryContent />
+    </Suspense>
+  );
 }

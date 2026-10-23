@@ -1,5 +1,3 @@
-"use server";
-
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 import type { GajiTenagaAhliKontrak, SaveGajiTenagaAhliKontrak } from "@/lib/tenaga-ahli-gaji";
 

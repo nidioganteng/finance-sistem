@@ -1,7 +1,10 @@
+"use client";
+
+import { Suspense } from "react";
 import { KasScreen } from "@/components/kas/KasScreen";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export default function KasBesarPage({ searchParams }: { searchParams: { entity?: string; dari?: string; sampai?: string; page?: string } }) {
+function KasBesarContent() {
   return (
     <PageTransition>
       <KasScreen
@@ -9,8 +12,15 @@ export default function KasBesarPage({ searchParams }: { searchParams: { entity?
         title="Kas Besar"
         subtitle="Input dan riwayat transaksi kas besar"
         pagePath="/kas-besar"
-        searchParams={searchParams}
       />
     </PageTransition>
+  );
+}
+
+export default function KasBesarPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <KasBesarContent />
+    </Suspense>
   );
 }

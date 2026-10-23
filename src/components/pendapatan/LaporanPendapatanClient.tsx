@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -60,6 +60,58 @@ interface Props {
   data: LaporanPendapatanData;
   canEdit: boolean;
   availableEntities: Array<{ id: string; key: string; name: string }>;
+}
+
+// Save each document independently without triggering the page navigation loader.
+function FakturDocumentCheckbox({ fakturId, field, label, value, canEdit }: {
+  fakturId: string;
+  field: "ppn" | "pph" | "buktiPotong";
+  label: string;
+  value: boolean;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [checked, setChecked] = useState(value);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    if (!savingRef.current) setChecked(value);
+  }, [value]);
+
+  async function handleChange(next: boolean) {
+    if (!canEdit || savingRef.current) return;
+    const previous = checked;
+    savingRef.current = true;
+    setChecked(next);
+    setSaving(true);
+    try {
+      const result = await toggleCeklisDokumenFakturAction(fakturId, field, next);
+      if (result?.error) throw new Error(result.error);
+      router.refresh();
+    } catch (error) {
+      setChecked(previous);
+      alert(error instanceof Error ? error.message : "Gagal menyimpan ceklis dokumen.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  return (
+    <label className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-muted-stronger" title={`${label}: ${checked ? "Diterima" : "Belum diterima"}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={!canEdit || saving}
+        aria-label={`Dokumen fisik ${label}`}
+        aria-busy={saving}
+        onChange={(event) => void handleChange(event.target.checked)}
+        className="h-4 w-4 rounded border-border-soft accent-brand cursor-pointer disabled:cursor-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      />
+      {label}
+    </label>
+  );
 }
 
 type TabType = "faktur" | "rekap-bulanan" | "rekonsiliasi";
@@ -607,17 +659,6 @@ export function LaporanPendapatanClient({
     }
   }
 
-  function handleToggleCeklis(fakturId: string, field: "ppn" | "pph" | "buktiPotong", currentValue: boolean) {
-    if (!canEdit) return;
-    startTransition(async () => {
-      const res = await toggleCeklisDokumenFakturAction(fakturId, field, !currentValue);
-      if (res?.error) {
-        alert(res.error);
-      } else {
-        router.refresh();
-      }
-    });
-  }
 
   function openReconModal(rec: RekonsiliasiPajakItem) {
     setEditingRecon(rec);
@@ -1088,7 +1129,7 @@ export function LaporanPendapatanClient({
                   <th className="px-3 py-3 text-right border-b border-border-soft">Dana Cair</th>
                   <th className="px-3 py-3 text-center border-b border-border-soft">Balance</th>
                   <th className="px-3 py-3 min-w-[110px] border-b border-border-soft">Tgl &amp; Bank</th>
-                  <th className="px-3 py-3 text-center min-w-[130px] border-b border-border-soft">Dok. Fisik</th>
+                  <th className="px-3 py-3 text-center min-w-[215px] border-b border-border-soft">Dok. Fisik</th>
                   <th className="px-3 py-3 text-center border-b border-border-soft">Jenis</th>
                   {canEdit && <th className="px-3 py-3 text-center w-16 border-b border-border-soft rounded-tr-[16px]">Aksi</th>}
                 </tr>
@@ -1251,46 +1292,10 @@ export function LaporanPendapatanClient({
 
                       {/* Ceklis Fisik */}
                       <td className="px-3 py-3 text-center border-b border-border">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCeklis(f.id, "ppn", f.ceklisPpn)}
-                            disabled={!canEdit || isPending}
-                            title={f.ceklisPpn ? "Fisik PPN: Diterima — klik untuk ubah" : "Fisik PPN: Belum — klik untuk ceklis"}
-                            className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
-                              f.ceklisPpn
-                                ? "bg-brand text-white border-brand"
-                                : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
-                            }`}
-                          >
-                            PPN
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCeklis(f.id, "pph", f.ceklisPph)}
-                            disabled={!canEdit || isPending}
-                            title={f.ceklisPph ? "Fisik PPh: Diterima — klik untuk ubah" : "Fisik PPh: Belum — klik untuk ceklis"}
-                            className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
-                              f.ceklisPph
-                                ? "bg-brand text-white border-brand"
-                                : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
-                            }`}
-                          >
-                            PPh
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCeklis(f.id, "buktiPotong", f.ceklisBuktiPotong)}
-                            disabled={!canEdit || isPending}
-                            title={f.ceklisBuktiPotong ? "Bukti Potong: Diterima — klik untuk ubah" : "Bukti Potong: Belum — klik untuk ceklis"}
-                            className={`w-[44px] py-1 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
-                              f.ceklisBuktiPotong
-                                ? "bg-brand text-white border-brand"
-                                : "bg-surface-subtle text-muted-faint border-border-soft hover:bg-surface-hover"
-                            }`}
-                          >
-                            Bupot
-                          </button>
+                        <div className="flex items-center justify-center gap-3">
+                          <FakturDocumentCheckbox fakturId={f.id} field="ppn" label="PPN" value={f.ceklisPpn} canEdit={canEdit} />
+                          <FakturDocumentCheckbox fakturId={f.id} field="pph" label="PPh" value={f.ceklisPph} canEdit={canEdit} />
+                          <FakturDocumentCheckbox fakturId={f.id} field="buktiPotong" label="Bupot" value={f.ceklisBuktiPotong} canEdit={canEdit} />
                         </div>
                       </td>
 

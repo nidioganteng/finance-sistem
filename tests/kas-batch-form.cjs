@@ -40,6 +40,8 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
     byLabel(`Proyek transaksi ${i}`).props.onChange({ target: { value: i === 1 ? 'P' : 'Q' } }); render();
     const account = nodes().filter(n => n.type === mocks['./CoaCombobox'].CoaCombobox)[i-1]; account.props.onChange('cost'); render();
   }
+  byLabel('Periode akrual transaksi 1').props.onChange({ target: { value: '2026-09' } }); render();
+  byLabel('Periode akrual transaksi 2').props.onChange({ target: { value: '2025-12' } }); render();
   // Error preserves all drafts; the next submission sends each voucher separately.
   response = { error: 'Nomor bukti sudah dipakai' };
   button('Simpan Semua').props.onClick(); await flush();
@@ -51,6 +53,7 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   assert.equal(closed, 1);
   const data = payloads[1];
   assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG/10231', 'P', 'Uraian 1', 100000], ['UG/10232', 'Q', 'Uraian 2', 250000]]);
+  assert.deepEqual(data.map(d => [d.periodeBulanGaji, d.periodeTahunGaji]), [[9,2026],[12,2025]], 'each voucher retains its own accrual period');
   assert.ok(data.every(d => d.rekeningId === 'gs-bpd' && d.entityKey === 'gaharu'));
   console.log('Batch form: independent vouchers, projects, amounts, error preservation and double-click guard passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -6,10 +6,10 @@ function load(expanded = false) {
   const mod = new Module(filename, module); mod.filename = filename; mod.paths = Module._nodeModulePaths(path.dirname(filename));
   let index = 0;
   const mocks = {
-    react: { ...React, useState: initial => React.useState(index++ === 1 && expanded ? 0 : initial) },
+    react: { ...React, useState: initial => React.useState(index++ === 2 && expanded ? 0 : initial) },
     'next/navigation': { useRouter: () => ({}), usePathname: () => '/kas-kecil', useSearchParams: () => new URLSearchParams() },
     '@/lib/use-page-transition': { usePageTransition: () => [false, () => {}] },
-    './KasTransactionForm': { KasTransactionForm: () => null }, './DeleteConfirmModal': { DeleteConfirmModal: () => null },
+    './KasTransactionForm': { KasTransactionForm: () => null }, './KasBatchTransactionForm': { KasBatchTransactionForm: () => null }, './DeleteConfirmModal': { DeleteConfirmModal: () => null },
     '@/lib/actions/kas': {}, '@/components/shared/LoadingOverlay': { LoadingOverlay: () => null }, '@/components/shared/DatePicker': { DatePicker: () => null },
     '@/lib/dashboard-data': { formatRupiah: amount => `Rp ${amount.toLocaleString('id-ID')}` },
   };

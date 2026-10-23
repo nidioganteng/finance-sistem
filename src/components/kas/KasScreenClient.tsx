@@ -102,8 +102,13 @@ export function KasScreenClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [panelOpen, setPanelOpen] = useState(false);
+  const transactionFormRef = useRef<HTMLDivElement>(null);
+
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<LedgerRow | null>(null);
+  useEffect(() => {
+    if (panelOpen || editingRow) transactionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [panelOpen, editingRow]);
   const [deletingRow, setDeletingRow] = useState<LedgerRow | null>(null);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -276,59 +281,6 @@ export function KasScreenClient({
 
   return (
     <>
-      {/* Edit drawer */}
-      {editingRow && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/10"
-            onClick={() => setEditingRow(null)}
-          />
-          <div className="relative w-full max-w-xl h-full bg-surface-card shadow-2xl flex flex-col overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
-              <h2 className="text-[15px] font-bold text-navy-text">Edit Transaksi</h2>
-              <button
-                onClick={() => setEditingRow(null)}
-                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
-            <KasTransactionForm
-              entityKey={entityKey}
-              jenisInputKey={jenisInputKey}
-              pagePath={pagePath}
-              coaOptions={coaOptions}
-              rekeningOptions={rekeningOptions}
-              defaultRekeningId={selectedRekeningId}
-              allEntities={allEntities}
-              projectOptions={projectOptions}
-              defaultArahLaporan={defaultArahLaporan}
-              bukuBankRekeningOptions={bukuBankRekeningOptions}
-              initialValues={{
-                tanggal: editingRow.tanggalRaw,
-                tanggalNota: editingRow.tanggalNota ?? null,
-                noBukti: editingRow.noBukti,
-                keterangan: editingRow.keterangan,
-                arah: editingRow.masuk > 0 ? "masuk" : "keluar",
-                rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
-                crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
-                projectId: editingRow.project?.id,
-                periodeBulanGaji: editingRow.periodeBulanGaji ?? null,
-                periodeTahunGaji: editingRow.periodeTahunGaji ?? null,
-                rows: editingRow.coaRows.map((cr) => ({
-                  coaAccountId: cr.coaAccountId,
-                  nominal: String(cr.nominal),
-                })),
-                existingTxIds: editingRow.allTxIds,
-              }}
-              onClose={() => setEditingRow(null)}
-            />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete confirm modal */}
       {deletingRow && (
         <DeleteConfirmModal
@@ -450,35 +402,53 @@ export function KasScreenClient({
         </div>
 
         <button
-          onClick={() => setPanelOpen(true)}
+          onClick={() => { setEditingRow(null); setPanelOpen(!(panelOpen || editingRow)); }}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
         >
-          <Plus className="w-4 h-4 flex-none" />
-          <span>Transaksi Baru</span>
+          {panelOpen || editingRow ? <X className="w-4 h-4 flex-none" /> : <Plus className="w-4 h-4 flex-none" />}
+          <span>{panelOpen || editingRow ? "Tutup Form" : "Transaksi Baru"}</span>
         </button>
       </div>
 
-      {/* Drawer kanan */}
-      {panelOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/10"
-            onClick={() => setPanelOpen(false)}
-          />
-          {/* Panel */}
-          <div className="relative w-full max-w-xl h-full bg-surface-card shadow-2xl flex flex-col overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
-              <h2 className="text-[15px] font-bold text-navy-text">Transaksi Baru</h2>
-              <button
-                onClick={() => setPanelOpen(false)}
-                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
+      {/* Form melebar di atas riwayat transaksi, sama seperti Entry Jurnal. */}
+      {(panelOpen || editingRow) && (
+        <div ref={transactionFormRef} className="scroll-mt-6">
+          {editingRow ? (
+            <KasTransactionForm
+              key={`edit-${editingRow.allTxIds.join("-")}`}
+              entityKey={entityKey}
+              jenisInputKey={jenisInputKey}
+              pagePath={pagePath}
+              coaOptions={coaOptions}
+              rekeningOptions={rekeningOptions}
+              defaultRekeningId={selectedRekeningId}
+              allEntities={allEntities}
+              projectOptions={projectOptions}
+              defaultArahLaporan={defaultArahLaporan}
+              bukuBankRekeningOptions={bukuBankRekeningOptions}
+              initialValues={{
+                tanggal: editingRow.tanggalRaw,
+                tanggalNota: editingRow.tanggalNota ?? null,
+                noBukti: editingRow.noBukti,
+                keterangan: editingRow.keterangan,
+                arah: editingRow.masuk > 0 ? "masuk" : "keluar",
+                rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
+                crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
+                projectId: editingRow.project?.id,
+                periodeBulanGaji: editingRow.periodeBulanGaji ?? null,
+                periodeTahunGaji: editingRow.periodeTahunGaji ?? null,
+                rows: editingRow.coaRows.map((cr) => ({
+                  coaAccountId: cr.coaAccountId,
+                  nominal: String(cr.nominal),
+                  keterangan: cr.itemDescription ?? "",
+                })),
+                existingTxIds: editingRow.allTxIds,
+              }}
+              onClose={() => setEditingRow(null)}
+            />
+          ) : (
               <KasTransactionForm
+                key="create"
                 entityKey={entityKey}
                 jenisInputKey={jenisInputKey}
                 pagePath={pagePath}
@@ -491,8 +461,7 @@ export function KasScreenClient({
                 bukuBankRekeningOptions={bukuBankRekeningOptions}
                 onClose={() => setPanelOpen(false)}
               />
-            </div>
-          </div>
+          )}
         </div>
       )}
 

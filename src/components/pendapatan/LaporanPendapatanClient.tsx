@@ -2164,6 +2164,7 @@ export function LaporanPendapatanClient({
                         </option>
                       </optgroup>
                     </select>
+                    {selectedRekananId === "__MANUAL__" && <p className="mt-1.5 text-[11px] leading-relaxed text-muted-stronger">Rekanan baru otomatis masuk ke Data Rekanan setelah faktur disimpan dan bisa dipilih kembali.</p>}
                   </div>
 
                   {/* Input Nama Rekanan */}

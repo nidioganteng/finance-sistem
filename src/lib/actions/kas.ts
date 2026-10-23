@@ -1,5 +1,9 @@
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
+function notifyKasChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("kas:changed"));
+}
+
 export type CreateKasTransactionInput = {
   entityKey: string;
   jenisInputKey: string;
@@ -35,6 +39,7 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
       method: "POST",
       body: JSON.stringify(input),
     });
+    notifyKasChanged();
     return { success: true, noBukti: result.noBukti };
   } catch (e) {
     if (e instanceof ApiError) return { error: e.message };
@@ -49,6 +54,7 @@ export async function createKasTransactionBatch(transactions: CreateKasTransacti
       method: "POST",
       body: JSON.stringify({ transactions }),
     });
+    notifyKasChanged();
     return { success: true };
   } catch (error) {
     return { error: error instanceof ApiError ? error.message : "Gagal menyimpan transaksi. Coba lagi." };
@@ -62,6 +68,7 @@ export async function deleteKasTransactionGroup(txIds: string[], pagePath: strin
       method: "DELETE",
       body: JSON.stringify({ txIds, pagePath }),
     });
+    notifyKasChanged();
     return { success: true };
   } catch (e) {
     if (e instanceof ApiError) return { error: e.message };
@@ -76,6 +83,7 @@ export async function replaceKasTransaction(input: CreateKasTransactionInput & {
       method: "PUT",
       body: JSON.stringify(input),
     });
+    notifyKasChanged();
     return { success: true };
   } catch (e) {
     if (e instanceof ApiError) return { error: e.message };
@@ -96,6 +104,7 @@ export async function updateKasTransactionGroup(input: {
       method: "PATCH",
       body: JSON.stringify(input),
     });
+    notifyKasChanged();
     return { success: true };
   } catch (e) {
     if (e instanceof ApiError) return { error: e.message };

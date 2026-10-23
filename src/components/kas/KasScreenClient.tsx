@@ -611,8 +611,12 @@ export function KasScreenClient({
                       <td rowSpan={visibleAccounts.length} className="py-2.5 px-1.5 align-top text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
                       </>}
                       <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
-                        {accountIndex === 0 && cr?.itemDescription && cr.itemDescription !== r.keterangan && <div className="mb-1 text-[11px] font-medium text-muted-faint">{r.keterangan}</div>}
-                        <div className="min-w-[180px] max-w-sm whitespace-normal break-words leading-5">{cr?.itemDescription || r.keterangan}</div>
+                        {r.coaRows.some(account => account.itemDescription && account.itemDescription !== r.keterangan) ? (
+                          <div className="flex items-start gap-3 leading-5">
+                            <span className="w-24 shrink-0 whitespace-normal break-words">{accountIndex === 0 ? r.keterangan : ""}</span>
+                            <span className="min-w-[180px] max-w-sm whitespace-normal break-words font-normal">{cr?.itemDescription && cr.itemDescription !== r.keterangan ? cr.itemDescription : ""}</span>
+                          </div>
+                        ) : <div className="min-w-[180px] max-w-sm whitespace-normal break-words leading-5">{r.keterangan}</div>}
                         {accountIndex === 0 && r.periodeBulanGaji && (
                           <span
                             className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"

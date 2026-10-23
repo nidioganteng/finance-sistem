@@ -94,8 +94,8 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
     setError(null);
     const numbers = new Set<string>();
     for (const [i,d] of drafts.entries()) {
-      if (!d.noBukti.trim() || !d.keterangan.trim() || (!d.coaAccountId || Number(d.nominal) <= 0 || !Number.isFinite(Number(d.nominal)))) {
-        setError(`Transaksi ${i+1}: lengkapi nomor bukti, keterangan, akun, dan nominal.`); return;
+      if (!d.noBukti.trim() || (!d.coaAccountId || Number(d.nominal) <= 0 || !Number.isFinite(Number(d.nominal)))) {
+        setError(`Transaksi ${i+1}: lengkapi nomor bukti, akun, dan nominal.`); return;
       }
       if (!isEdit && numbers.has(d.noBukti.trim())) { setError(`Nomor bukti ${d.noBukti.trim()} dipakai lebih dari satu transaksi.`); return; }
       numbers.add(d.noBukti.trim());
@@ -157,7 +157,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
               {d.projectId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{projectOptions.find((p) => p.id === d.projectId)?.name}</p>}
             </label>
             <div className="min-w-0">
-              <label><span className={label}>Keterangan</span><textarea rows={1} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} min-h-[44px] max-h-[44px] resize-none overflow-y-auto leading-5`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
+              <label><span className={label}>Keterangan</span><textarea rows={1} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} min-h-[44px] max-h-[44px] resize-none overflow-y-auto leading-5`} value={d.keterangan} placeholder="Uraian transaksi (opsional)" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
               {isSalaryAccount(d.coaAccountId) && <label className="mt-2 block text-[11px] font-medium text-muted-stronger">Periode akrual
                 <input type="month" aria-label={`Periode akrual transaksi ${i+1}`} className={`${input} mt-1`} value={d.periode || tanggal.slice(0,7)} onChange={(e) => update(d.id,{periode:e.target.value})} />
               </label>}

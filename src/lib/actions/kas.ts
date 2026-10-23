@@ -42,6 +42,19 @@ export async function createKasTransaction(input: CreateKasTransactionInput) {
   }
 }
 
+export async function createKasTransactionBatch(transactions: CreateKasTransactionInput[]) {
+  const token = await getPhpToken();
+  try {
+    await phpFetch("/api/kas/batch", token, {
+      method: "POST",
+      body: JSON.stringify({ transactions }),
+    });
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof ApiError ? error.message : "Gagal menyimpan transaksi. Coba lagi." };
+  }
+}
+
 export async function deleteKasTransactionGroup(txIds: string[], pagePath: string) {
   const token = await getPhpToken();
   try {

@@ -311,36 +311,12 @@ elseif ($method === 'POST' && $sub === 'no-bukti') {
     $tanggal    = $body['tanggal']   ?? '';
     if (!$entity_key || !$tanggal) return error_response('entityKey dan tanggal wajib diisi.', 400);
 
-    // Prefix — logika dari generateNoBukti() src/lib/actions/kas.ts
-    $prefix_umum = ENTITY_PREFIX_UMUM;
-    $prefix_norm = ENTITY_PREFIX;
-    $prefix = $prefix_umum[$entity_key] ?? $prefix_norm[$entity_key] ?? strtoupper(substr($entity_key, 0, 2));
-
-    $mm   = date('m', strtotime($tanggal));
-    $dd   = date('d', strtotime($tanggal));
-    $day_part = $mm . $dd;
-    $pattern  = $prefix . $day_part;
-
-    // Cari entity id
-    $stmt = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
-    $stmt->execute([$entity_key]);
-    $entity_id = $stmt->fetchColumn();
-    if (!$entity_id) return error_response('Entity tidak ditemukan.', 404);
-
-    $stmt = $pdo->prepare("SELECT noBukti FROM `Transaction` WHERE entityId = ? AND noBukti LIKE ?");
-    $stmt->execute([$entity_id, $pattern . '%']);
-    $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    $max_seq = 0;
-    foreach ($existing as $nb) {
-        $seq_str = substr($nb, strlen($pattern));
-        if (is_numeric($seq_str)) {
-            $seq = (int)$seq_str;
-            if ($seq > $max_seq) $max_seq = $seq;
-        }
+    try {
+        json_response(['noBukti' => kas_next_voucher_number($pdo, $entity_key, $tanggal)]);
+    } catch (InvalidArgumentException $e) {
+        return error_response($e->getMessage(), 400);
     }
 
-    json_response(['noBukti' => $pattern . ($max_seq + 1)]);
 }
 
 // ─── POST /api/kas/transaksi ───────────────────────────────────────────────────
@@ -477,6 +453,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
     try { transitory_guard_coa(array_column((array)$rows,'coaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); }
     $valid_rows = array_values(array_filter($rows, fn($r) => !empty($r['coaAccountId']) && (float)($r['nominal'] ?? 0) > 0));
     if (empty($valid_rows)) return error_response('Isi minimal satu baris akun dengan nominal.', 400);
+    $crossing_keys = kas_piutang_crossing_keys($pdo, $entity_key, $arah, $valid_rows, $crossing_keys);
 
     if ($jenis_input_key === 'bankBuku') {
         if (!$rekening_id) return error_response('Rekening/Bank wajib dipilih.', 400);

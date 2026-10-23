@@ -29,8 +29,18 @@ function bank_ledger_rows(PDO $pdo, string $entity_id, string $jenis_id, ?string
     $sql .= ' ORDER BY t.tanggal ASC, t.noBukti ASC, t.createdAt ASC, t.id ASC';
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $manual_accounts = [];
+    $voucher_key = fn($row) => json_encode([$row['entityId'], $row['jenisInputId'], $row['noBukti'], substr($row['tanggal'], 0, 10)]);
+    foreach ($rows as $row) {
+        $extra = json_decode($row['extraFieldsJson'] ?? '{}', true) ?: [];
+        if ($row['ledger_source'] === 'bankBuku' && !empty($extra['isKasEntry']) && empty($extra['autoPostedFromJurnal'])) {
+            $name = $extra['rekeningNama'] ?? (build_bank_coa_map()[$row['coa_code']]['rekeningNama'] ?? null);
+            if ($name) $manual_accounts[$voucher_key($row)] = $name;
+        }
+    }
     $result = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    foreach ($rows as $row) {
         $extra = json_decode($row['extraFieldsJson'] ?? '{}', true) ?: [];
         // Legacy mirrors are display copies; the original journal is authoritative.
         if (!empty($extra['autoPostedFromJurnal'])) continue;
@@ -39,6 +49,10 @@ function bank_ledger_rows(PDO $pdo, string $entity_id, string $jenis_id, ?string
             $extra['autoPostedFromJurnal'] = true;
             $extra['rekeningNama'] = $accounts[$row['coa_code']]['rekeningNama'];
             $row['sourceJurnal'] = true;
+        }
+        if ($row['ledger_source'] === 'bankBuku' && empty($extra['rekeningNama']) && isset($manual_accounts[$voucher_key($row)])) {
+            // Counterpart rows belong to the bank voucher even without rekening metadata.
+            $extra['rekeningNama'] = $manual_accounts[$voucher_key($row)];
         }
         if ($rekening !== null && ($extra['rekeningNama'] ?? null) !== $rekening) continue;
         $row['extraFieldsJson'] = json_encode($extra);

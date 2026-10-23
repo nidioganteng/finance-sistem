@@ -7,7 +7,7 @@ import { createKasTransactionBatch, generateNoBukti } from "@/lib/actions/kas";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { CoaCombobox } from "./CoaCombobox";
 
-type Draft = { id: number; noBukti: string; manualNumber: boolean; projectId: string; keterangan: string; coaAccountId: string; nominal: string };
+type Draft = { id: number; noBukti: string; manualNumber: boolean; projectId: string; keterangan: string; coaAccountId: string; nominal: string; periode: string };
 type Props = {
   entityKey: string;
   jenisInputKey: string;
@@ -46,7 +46,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
   const [tanggal, setTanggal] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`);
   const [arah, setArah] = useState<"masuk" | "keluar">("keluar");
   const [rekeningId, setRekeningId] = useState(defaultRekeningId ?? rekeningOptions[0]?.id ?? "");
-  const [drafts, setDrafts] = useState<Draft[]>([{ id: 1, noBukti: "", manualNumber: false, projectId: "", keterangan: "", coaAccountId: "", nominal: "" }]);
+  const [drafts, setDrafts] = useState<Draft[]>([{ id: 1, noBukti: "", manualNumber: false, projectId: "", keterangan: "", coaAccountId: "", nominal: "", periode: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [numberLoading, setNumberLoading] = useState(true);
@@ -72,7 +72,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
   }
   function addTransaction() {
     const id = ++sequence.current;
-    setDrafts((current) => allocateVoucherNumbers(baseNumber.current, [...current, { id, noBukti: "", manualNumber: false, projectId: "", keterangan: "", coaAccountId: "", nominal: "" }]));
+    setDrafts((current) => allocateVoucherNumbers(baseNumber.current, [...current, { id, noBukti: "", manualNumber: false, projectId: "", keterangan: "", coaAccountId: "", nominal: "", periode: "" }]));
   }
   async function save() {
     if (savingRef.current) return;
@@ -94,7 +94,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
         noBukti: d.noBukti.trim(), keterangan: d.keterangan.trim(),
         ...(bank ? { rekeningId } : {}),
         ...(d.projectId ? { projectId: d.projectId } : {}),
-        ...(coaOptions.some((c) => c.id === d.coaAccountId && ["511", "612"].includes(c.code)) ? { periodeBulanGaji: Number(tanggal.slice(5,7)), periodeTahunGaji: Number(tanggal.slice(0,4)) } : {}),
+        ...((d.periode || coaOptions.some((c) => c.id === d.coaAccountId && ["511", "612"].includes(c.code))) ? { periodeBulanGaji: Number((d.periode || tanggal.slice(0,7)).slice(5,7)), periodeTahunGaji: Number((d.periode || tanggal.slice(0,7)).slice(0,4)) } : {}),
         rows: [{ coaAccountId: d.coaAccountId, nominal: Number(d.nominal) }],
       })));
       if (result.error) { setError(result.error); return; }
@@ -137,7 +137,12 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
             <label className="min-w-0"><span className={label}>Kode Proyek</span><select aria-label={`Proyek transaksi ${i+1}`} className={input} value={d.projectId} onChange={(e) => update(d.id,{projectId:e.target.value})}><option value="">Tanpa proyek</option>{projectOptions.map((p) => <option key={p.id} value={p.id}>[{p.code}] {p.name}{p.entityKey && p.entityKey !== entityKey ? ` · ${p.entityName ?? p.entityKey}` : ""}</option>)}</select>
               {d.projectId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{projectOptions.find((p) => p.id === d.projectId)?.name}</p>}
             </label>
-            <label className="min-w-0"><span className={label}>Keterangan</span><textarea rows={2} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} resize-y leading-relaxed`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
+            <div className="min-w-0">
+              <label><span className={label}>Keterangan</span><textarea rows={2} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} resize-y leading-relaxed`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
+              <label className="mt-2 block text-[11px] font-medium text-muted-stronger">Periode akrual
+                <input type="month" aria-label={`Periode akrual transaksi ${i+1}`} className={`${input} mt-1`} value={d.periode || tanggal.slice(0,7)} onChange={(e) => update(d.id,{periode:e.target.value})} />
+              </label>
+            </div>
             <div className="min-w-0"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} placeholder="Cari akun…" options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} />
               {d.coaAccountId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{coaOptions.find((c) => c.id === d.coaAccountId)?.name}</p>}
               {arah === "keluar" && (() => {

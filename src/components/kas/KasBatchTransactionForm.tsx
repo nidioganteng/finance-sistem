@@ -41,7 +41,7 @@ export function allocateVoucherNumbers<T extends { noBukti: string; manualNumber
 }
 
 const columns = "lg:grid-cols-[8rem_minmax(0,1.5fr)_minmax(0,1.6fr)_minmax(0,1.3fr)_9rem_2rem]";
-const input = "w-full min-w-0 rounded-lg border border-border-soft bg-surface-input px-3 py-2.5 text-[12px] text-navy-text placeholder:text-muted focus:outline-none focus:border-brand/60 disabled:opacity-60";
+const input = "block h-11 w-full min-w-0 rounded-lg border border-border-soft bg-surface-input px-3 py-2.5 text-[13px] text-navy-text placeholder:text-muted focus:outline-none focus:border-brand/60 disabled:opacity-60";
 const label = "mb-1 block text-[11px] font-semibold text-muted-stronger lg:sr-only";
 
 export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, coaOptions, projectOptions, rekeningOptions, defaultRekeningId, initialValues, onClose }: Props) {
@@ -157,12 +157,12 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
               {d.projectId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{projectOptions.find((p) => p.id === d.projectId)?.name}</p>}
             </label>
             <div className="min-w-0">
-              <label><span className={label}>Keterangan</span><textarea rows={2} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} resize-y leading-relaxed`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
+              <label><span className={label}>Keterangan</span><textarea rows={1} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} min-h-[44px] max-h-[44px] resize-none overflow-y-auto leading-5`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
               {isSalaryAccount(d.coaAccountId) && <label className="mt-2 block text-[11px] font-medium text-muted-stronger">Periode akrual
                 <input type="month" aria-label={`Periode akrual transaksi ${i+1}`} className={`${input} mt-1`} value={d.periode || tanggal.slice(0,7)} onChange={(e) => update(d.id,{periode:e.target.value})} />
               </label>}
             </div>
-            <div className="min-w-0"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} placeholder="Cari akun…" options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} />
+            <div className="min-w-0 [&_input]:h-11 [&_input]:rounded-lg [&_input]:border-border-soft [&_input]:px-3 [&_input]:text-[13px]"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} placeholder="Cari akun…" options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} />
               {d.coaAccountId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{coaOptions.find((c) => c.id === d.coaAccountId)?.name}</p>}
               {arah === "keluar" && (() => {
                 const targets: Record<string, { key: string; name: string }> = { "111": { key: "kencana", name: "Kencana" }, "112": { key: "gaharu", name: "Gaharu" }, "113": { key: "tataring", name: "Tataring" }, "114": { key: "ciptaAsri", name: "Cipta Asri" }, "115": { key: "umum", name: "Umum" } };
@@ -171,7 +171,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
               })()}
             </div>
             <label className="min-w-0"><span className={label}>Nominal (Rp)</span><input inputMode="numeric" aria-label={`Nominal transaksi ${i+1}`} className={`${input} text-right font-mono tabular-nums`} placeholder="0" value={d.nominal ? Number(d.nominal).toLocaleString("id-ID") : ""} onChange={(e) => update(d.id,{nominal:e.target.value.replace(/[^0-9]/g,"")})} /></label>
-            <button type="button" aria-label={`Hapus transaksi ${i+1}`} disabled={drafts.length === 1} className="justify-self-end rounded-lg p-2 text-muted-faint hover:text-status-red disabled:opacity-20" onClick={() => setDrafts((current) => allocateVoucherNumbers(baseNumber.current, current.filter((r) => r.id !== d.id)))}><Trash2 size={15} /></button>
+            <button type="button" aria-label={`Hapus transaksi ${i+1}`} disabled={drafts.length === 1} className="flex h-11 w-8 items-center justify-center justify-self-end rounded-lg text-muted-faint hover:text-status-red disabled:opacity-20" onClick={() => setDrafts((current) => allocateVoucherNumbers(baseNumber.current, current.filter((r) => r.id !== d.id)))}><Trash2 size={15} /></button>
           </div>)}
         </div>
         <button type="button" disabled={drafts.length >= 50} onClick={addTransaction} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border-soft px-4 py-2 text-xs font-bold text-brand disabled:opacity-50"><Plus size={14} />{isEdit ? "Tambah Akun" : "Tambah Transaksi"}</button>

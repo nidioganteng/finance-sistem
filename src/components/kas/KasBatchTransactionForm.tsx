@@ -64,6 +64,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
   const [error, setError] = useState<string | null>(null);
   const [numberLoading, setNumberLoading] = useState(!isEdit);
   const bank = jenisInputKey === "bankBuku";
+  const isSalaryAccount = (id: string) => coaOptions.some((c) => c.id === id && /^(511|612)/.test(c.code));
   const total = drafts.reduce((sum,d) => sum + Number(d.nominal || 0),0);
 
   useEffect(() => {
@@ -108,11 +109,12 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
         noBukti: d.noBukti.trim(), keterangan: d.keterangan.trim(),
         ...(bank ? { rekeningId } : {}),
         ...(d.projectId ? { projectId: d.projectId } : {}),
-        ...((d.periode || coaOptions.some((c) => c.id === d.coaAccountId && ["511", "612"].includes(c.code))) ? { periodeBulanGaji: Number((d.periode || tanggal.slice(0,7)).slice(5,7)), periodeTahunGaji: Number((d.periode || tanggal.slice(0,7)).slice(0,4)) } : {}),
+        ...(isSalaryAccount(d.coaAccountId) ? { periodeBulanGaji: Number((d.periode || tanggal.slice(0,7)).slice(5,7)), periodeTahunGaji: Number((d.periode || tanggal.slice(0,7)).slice(0,4)) } : {}),
         rows: [{ coaAccountId: d.coaAccountId, nominal: Number(d.nominal), ...(d.itemDescription ? { keterangan: d.itemDescription } : {}) }],
       }));
+      const accrual = payloads.find((p) => p.periodeBulanGaji);
       const result = initialValues
-        ? await replaceKasTransaction({ ...payloads[0], rows: payloads.flatMap((p) => p.rows), existingTxIds: initialValues.existingTxIds, crossingEntityKeys: arah === "keluar" ? initialValues.crossingEntityKeys : [], tanggalNota: initialValues.tanggalNota })
+        ? await replaceKasTransaction({ ...payloads[0], ...(accrual ? { periodeBulanGaji: accrual.periodeBulanGaji, periodeTahunGaji: accrual.periodeTahunGaji } : {}), rows: payloads.flatMap((p) => p.rows), existingTxIds: initialValues.existingTxIds, crossingEntityKeys: arah === "keluar" ? initialValues.crossingEntityKeys : [], tanggalNota: initialValues.tanggalNota })
         : await createKasTransactionBatch(payloads);
       if (result.error) { setError(result.error); return; }
       const params = new URLSearchParams(window.location.search);
@@ -156,9 +158,9 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
             </label>
             <div className="min-w-0">
               <label><span className={label}>Keterangan</span><textarea rows={2} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} resize-y leading-relaxed`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
-              <label className="mt-2 block text-[11px] font-medium text-muted-stronger">Periode akrual
+              {isSalaryAccount(d.coaAccountId) && <label className="mt-2 block text-[11px] font-medium text-muted-stronger">Periode akrual
                 <input type="month" aria-label={`Periode akrual transaksi ${i+1}`} className={`${input} mt-1`} value={d.periode || tanggal.slice(0,7)} onChange={(e) => update(d.id,{periode:e.target.value})} />
-              </label>
+              </label>}
             </div>
             <div className="min-w-0"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} placeholder="Cari akun…" options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} />
               {d.coaAccountId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{coaOptions.find((c) => c.id === d.coaAccountId)?.name}</p>}

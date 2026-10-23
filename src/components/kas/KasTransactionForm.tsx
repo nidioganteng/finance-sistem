@@ -237,6 +237,7 @@ export function KasTransactionForm({
   const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
   const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
 
+  const hasSalaryAccount = rows.some((r) => coaOptions.some((c) => c.id === r.coaAccountId && /^(511|612)/.test(c.code)));
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
   const isKasBesar = jenisInputKey === "kasBesar";
@@ -293,7 +294,7 @@ export function KasTransactionForm({
       ...(crossingEntityKeys.length > 0 ? { crossingEntityKeys } : {}),
       ...(projectId ? { projectId } : {}),
       ...(isCustomInput && arahLaporan.length > 0 ? { arahLaporan } : {}),
-      ...(periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
+      ...(hasSalaryAccount && periodeBulanGaji ? { periodeBulanGaji, periodeTahunGaji: periodeTahunGaji || new Date(tanggal).getFullYear() } : {}),
       ...((isKasKecil || isKasBesar) && arah === "masuk" && syncBukuBank && syncRekeningId ? { syncBukuBankRekeningId: syncRekeningId } : {}),
     };
     startTransition(async () => {
@@ -763,8 +764,8 @@ export function KasTransactionForm({
           </div>
         )}
 
-        {/* Periode akrual dapat diatur pada semua transaksi, termasuk saat edit. */}
-        {(
+        {/* Periode akrual hanya untuk akun gaji dan gaji tenaga ahli. */}
+        {hasSalaryAccount && (
           <div className="rounded-[12px] border border-border-soft bg-surface-card p-4 flex flex-col gap-3 shadow-xs">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-[11.5px] font-bold text-navy-text uppercase tracking-wide">

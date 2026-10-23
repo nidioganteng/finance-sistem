@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useState, useCallback, useRef, useEffect } from "react";
-import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { KasTransactionForm } from "./KasTransactionForm";
 import { KasBatchTransactionForm } from "./KasBatchTransactionForm";
@@ -114,7 +113,8 @@ export function KasScreenClient({
     if (panelOpen || editingRow) transactionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [panelOpen, editingRow]);
   const [deletingRow, setDeletingRow] = useState<LedgerRow | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const deleteInFlight = useRef(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(false);
   const [filterDari, setFilterDari] = useState(dari);
@@ -273,14 +273,22 @@ export function KasScreenClient({
     setActionError(null);
   }
 
-  function handleDelete() {
-    if (!deletingRow) return;
-    startTransition(async () => {
+  async function handleDelete() {
+    if (!deletingRow || deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setIsDeleting(true);
+    setActionError(null);
+    try {
       const res = await deleteKasTransactionGroup(deletingRow.allTxIds, pagePath);
+      if (res?.error) { setActionError(res.error); return; }
       setDeletingRow(null);
-      if (res?.error) setActionError(res.error);
-      else router.refresh();
-    });
+      router.refresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Gagal menghapus transaksi. Silakan coba lagi.");
+    } finally {
+      deleteInFlight.current = false;
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -291,8 +299,9 @@ export function KasScreenClient({
           noBukti={deletingRow.noBukti}
           keterangan={deletingRow.keterangan}
           onConfirm={handleDelete}
-          onCancel={() => setDeletingRow(null)}
-          isPending={isPending}
+          onCancel={() => { if (!deleteInFlight.current) setDeletingRow(null); }}
+          isPending={isDeleting}
+          error={actionError}
         />
       )}
 
@@ -491,7 +500,7 @@ export function KasScreenClient({
       )}
 
       <div className="relative bg-surface-card border border-border-soft rounded-[20px] p-5 overflow-x-auto">
-        <LoadingOverlay visible={isPending} />
+        <LoadingOverlay visible={isDeleting} />
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-hover text-left text-[11px] font-bold text-muted-faint">

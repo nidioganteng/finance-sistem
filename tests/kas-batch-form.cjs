@@ -12,7 +12,7 @@ const mocks = {
     useEffect: (fn, deps) => { const i = cursor++; if (!hooks[i] || deps.some((d, n) => d !== hooks[i][n])) { hooks[i] = deps; effects.push(fn); } },
   },
   'next/navigation': { useRouter: () => ({ push() {}, refresh() {} }) },
-  '@/lib/actions/kas': { generateNoBukti: async () => 'UG10231', createKasTransactionBatch: async data => { payloads.push(data); return response; } },
+  '@/lib/actions/kas': { generateNoBukti: async () => 'UG/10231', createKasTransactionBatch: async data => { payloads.push(data); return response; } },
   '@/components/shared/DatePicker': { DatePicker: () => null }, './CoaCombobox': { CoaCombobox: () => null },
 };
 const original = mod.require.bind(mod); mod.require = name => Object.hasOwn(mocks, name) ? mocks[name] : original(name);
@@ -27,10 +27,13 @@ const button = text => find(n => n.type === 'button' && React.Children.toArray(n
 const flush = async () => { await new Promise(resolve => setImmediate(resolve)); render(); };
 global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2026-10-31' } };
 (async () => {
+  const allocate = mod.exports.allocateVoucherNumbers;
+  assert.deepEqual(allocate('UK/09289', [{ noBukti: '', manualNumber: false }, { noBukti: '', manualNumber: false }]).map(r => r.noBukti), ['UK/09289','UK/092810']);
+  assert.deepEqual(allocate('UC/10231', [{ noBukti: 'CA/0001', manualNumber: true }, { noBukti: 'UC/10231', manualNumber: true }, { noBukti: '', manualNumber: false }]).map(r => r.noBukti), ['CA/0001','UC/10231','UC/10232']);
   render(); await flush();
-  assert.equal(byLabel('Nomor bukti transaksi 1').props.value, 'UG10231');
+  assert.equal(byLabel('Nomor bukti transaksi 1').props.value, 'UG/10231');
   button('Tambah Transaksi').props.onClick(); render();
-  assert.equal(byLabel('Nomor bukti transaksi 2').props.value, 'UG10231-2');
+  assert.equal(byLabel('Nomor bukti transaksi 2').props.value, 'UG/10232');
   for (let i = 1; i <= 2; i++) {
     byLabel(`Keterangan transaksi ${i}`).props.onChange({ target: { value: `Uraian ${i}` } }); render();
     byLabel(`Nominal transaksi ${i}`).props.onChange({ target: { value: i === 1 ? '100.000' : '250.000' } }); render();
@@ -47,7 +50,7 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   assert.equal(payloads.length, 2, 'same-tick double click cannot send twice');
   assert.equal(closed, 1);
   const data = payloads[1];
-  assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG10231', 'P', 'Uraian 1', 100000], ['UG10231-2', 'Q', 'Uraian 2', 250000]]);
+  assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG/10231', 'P', 'Uraian 1', 100000], ['UG/10232', 'Q', 'Uraian 2', 250000]]);
   assert.ok(data.every(d => d.rekeningId === 'gs-bpd' && d.entityKey === 'gaharu'));
   console.log('Batch form: independent vouchers, projects, amounts, error preservation and double-click guard passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

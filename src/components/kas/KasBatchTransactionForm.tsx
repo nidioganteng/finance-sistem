@@ -18,8 +18,8 @@ type Props = {
   defaultRekeningId?: string;
   onClose: () => void;
 };
-const columns = "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1.3fr)_minmax(7rem,0.8fr)_2rem]";
-const input = "w-full min-w-0 rounded-lg border border-border-soft bg-surface-input px-3 py-2.5 text-[12px] text-navy-text focus:outline-none focus:border-brand/60 disabled:opacity-60";
+const columns = "lg:grid-cols-[8rem_minmax(0,1.5fr)_minmax(0,1.6fr)_minmax(0,1.3fr)_9rem_2rem]";
+const input = "w-full min-w-0 rounded-lg border border-border-soft bg-surface-input px-3 py-2.5 text-[12px] text-navy-text placeholder:text-muted focus:outline-none focus:border-brand/60 disabled:opacity-60";
 const label = "mb-1 block text-[11px] font-semibold text-muted-stronger lg:sr-only";
 
 export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, coaOptions, projectOptions, rekeningOptions, defaultRekeningId, onClose }: Props) {
@@ -119,9 +119,13 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
           <div className={`hidden lg:grid ${columns} gap-3 rounded-t-xl border-b border-border-soft bg-surface-subtle px-4 py-3 text-[11px] font-bold uppercase text-muted-stronger`}><span>Nomor Bukti</span><span>Kode Proyek</span><span>Keterangan</span><span>Akun</span><span className="text-right">Nominal (Rp)</span><span /></div>
           {drafts.map((d,i) => <div key={d.id} className={`grid ${columns} grid-cols-1 items-start gap-3 border-b border-border-soft p-4 last:border-b-0`}>
             <label className="min-w-0"><span className={label}>Nomor Bukti · Transaksi {i+1}</span><input aria-label={`Nomor bukti transaksi ${i+1}`} className={`${input} font-mono`} value={d.noBukti} placeholder={numberLoading ? "Menyiapkan nomor…" : "Nomor bukti"} onChange={(e) => update(d.id,{noBukti:e.target.value,manualNumber:true})} /></label>
-            <label className="min-w-0"><span className={label}>Kode Proyek</span><select aria-label={`Proyek transaksi ${i+1}`} className={input} value={d.projectId} onChange={(e) => update(d.id,{projectId:e.target.value})}><option value="">Tanpa proyek</option>{projectOptions.map((p) => <option key={p.id} value={p.id}>[{p.code}] {p.name}{p.entityKey && p.entityKey !== entityKey ? ` · ${p.entityName ?? p.entityKey}` : ""}</option>)}</select></label>
-            <label className="min-w-0"><span className={label}>Keterangan</span><input aria-label={`Keterangan transaksi ${i+1}`} className={input} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
-            <div className="min-w-0"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} /></div>
+            <label className="min-w-0"><span className={label}>Kode Proyek</span><select aria-label={`Proyek transaksi ${i+1}`} className={input} value={d.projectId} onChange={(e) => update(d.id,{projectId:e.target.value})}><option value="">Tanpa proyek</option>{projectOptions.map((p) => <option key={p.id} value={p.id}>[{p.code}] {p.name}{p.entityKey && p.entityKey !== entityKey ? ` · ${p.entityName ?? p.entityKey}` : ""}</option>)}</select>
+              {d.projectId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{projectOptions.find((p) => p.id === d.projectId)?.name}</p>}
+            </label>
+            <label className="min-w-0"><span className={label}>Keterangan</span><textarea rows={2} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} resize-y leading-relaxed`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
+            <div className="min-w-0"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} placeholder="Cari akun…" options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} />
+              {d.coaAccountId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{coaOptions.find((c) => c.id === d.coaAccountId)?.name}</p>}
+            </div>
             <label className="min-w-0"><span className={label}>Nominal (Rp)</span><input inputMode="numeric" aria-label={`Nominal transaksi ${i+1}`} className={`${input} text-right font-mono tabular-nums`} placeholder="0" value={d.nominal ? Number(d.nominal).toLocaleString("id-ID") : ""} onChange={(e) => update(d.id,{nominal:e.target.value.replace(/[^0-9]/g,"")})} /></label>
             <button type="button" aria-label={`Hapus transaksi ${i+1}`} disabled={drafts.length === 1} className="justify-self-end rounded-lg p-2 text-muted-faint hover:text-status-red disabled:opacity-20" onClick={() => setDrafts((current) => current.filter((r) => r.id !== d.id))}><Trash2 size={15} /></button>
           </div>)}

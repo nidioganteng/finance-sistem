@@ -11,14 +11,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { YearSelect } from "@/components/shared/YearSelect";
 import { PageTransition } from "@/components/layout/PageTransition";
-import dynamic from "next/dynamic";
 import { getKasTransitory } from "@/lib/kas-transitory";
 import { PayrollHoldSummary } from "@/components/kas-transitory/PayrollHoldSummary";
-
-const PayrollClient = dynamic(
-  () => import("@/components/payroll/PayrollClient").then((m) => ({ default: m.PayrollClient })),
-  { ssr: false, loading: () => <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data payroll…</div> }
-);
+import { PayrollClient } from "@/components/payroll/PayrollClient";
 
 function PayrollContent() {
   const { user, isLoading } = useAuth();

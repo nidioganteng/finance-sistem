@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/bank-ledger.php';
 
 // COA codes per entity — diambil 1:1 dari src/lib/actions/kas.ts & src/lib/bank-accounts.ts
 define('KAS_KECIL_COA', ['kencana' => '1100', 'gaharu' => '1200', 'tataring' => '1300', 'ciptaAsri' => '1400', 'umum' => '1500']);
@@ -143,6 +144,9 @@ function get_running_saldo(PDO $pdo, string $entity_id, string $jenis_input_id, 
     if (!$year) $year = (int)date('Y');
     $saldo_awal = get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year);
 
+    $bank_rows = bank_ledger_rows($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year . '-01-01', $year . '-12-31');
+    if ($bank_rows !== null) return $saldo_awal + bank_ledger_mutation($bank_rows);
+
     // Ambil semua kas entry (isKasEntry = true)
     $stmt = $pdo->prepare(
         "SELECT debit, kredit, extraFieldsJson
@@ -175,6 +179,9 @@ function get_running_saldo(PDO $pdo, string $entity_id, string $jenis_input_id, 
 function get_saldo_sebelum(PDO $pdo, string $entity_id, string $jenis_input_id, string $sebelum, ?string $rekening_nama = null, int $year = 0): float {
     if (!$year) $year = (int)date('Y', strtotime($sebelum));
     $saldo_awal = get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year);
+
+    $bank_rows = bank_ledger_rows($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year . '-01-01', date('Y-m-d', strtotime($sebelum . ' -1 day')));
+    if ($bank_rows !== null) return $saldo_awal + bank_ledger_mutation($bank_rows);
 
     $stmt = $pdo->prepare(
         "SELECT debit, kredit, extraFieldsJson

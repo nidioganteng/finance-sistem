@@ -108,4 +108,17 @@ try { include __DIR__.'/../api/routes/kas.php'; } catch(BatchResponse $r) { $del
 eq($deleted->status,200,'delete bank voucher');
 eq((int)$pdo->query("SELECT COUNT(*) FROM `Transaction` WHERE noBukti='DELETE-BANK'")->fetchColumn(),0,'delete leaves no orphan account rows');
 eq(get_running_saldo($pdo,'A','bank','BPD GS',2026),$before_bank,'delete restores bank balance');
+$empty=draft('OPTIONAL-NOTE','kasKecil',null); $empty['keterangan']='';
+eq(endpoint([$empty])->status,200,'blank description allowed in batch');
+$empty_single=draft('OPTIONAL-SINGLE','kasKecil',null); $empty_single['keterangan']='';
+eq(endpoint($empty_single,true)->status,200,'blank description allowed in full form');
+$ids=$pdo->query("SELECT id FROM `Transaction` WHERE noBukti='OPTIONAL-NOTE'")->fetchAll(PDO::FETCH_COLUMN);
+$body=$empty; $body['existingTxIds']=$ids; $method='PUT'; $segments=['kas','transaksi'];
+try { include __DIR__.'/../api/routes/kas.php'; } catch(BatchResponse $r) { $edited=$r; }
+eq($edited->status,200,'blank description allowed in replacement');
+$ids=$pdo->query("SELECT id FROM `Transaction` WHERE noBukti='OPTIONAL-NOTE'")->fetchAll(PDO::FETCH_COLUMN);
+$body=['txIds'=>$ids,'newNoBukti'=>'OPTIONAL-NOTE','newKeterangan'=>'']; $method='PATCH'; $segments=['kas','transaksi'];
+try { include __DIR__.'/../api/routes/kas.php'; } catch(BatchResponse $r) { $patched=$r; }
+eq($patched->status,200,'blank description allowed in patch');
+eq((int)$pdo->query("SELECT COUNT(*) FROM `Transaction` WHERE noBukti='OPTIONAL-NOTE' AND keterangan=''")->fetchColumn(),3,'description remains blank on all accounting rows');
 echo "Kas batch: $checks checks passed\n";

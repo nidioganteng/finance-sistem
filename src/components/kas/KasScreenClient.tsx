@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { Fragment, useState, useCallback, useRef, useEffect } from "react";
 import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { KasTransactionForm } from "./KasTransactionForm";
+import { KasBatchTransactionForm } from "./KasBatchTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
@@ -29,6 +30,7 @@ type LedgerRow = {
   keterangan: string;
   akunTags: string[];
   rekening?: string;
+  sourceJurnal?: boolean;
   crossingEntityKeys?: string[];
   crossingFromEntityKey?: string;
   masuk: number;
@@ -101,8 +103,16 @@ export function KasScreenClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [batchMode, setBatchMode] = useState(true);
+  const supportsBatch = ["kasKecil", "kasBesar", "bankBuku"].includes(jenisInputKey);
+  const EditTransactionForm = supportsBatch ? KasBatchTransactionForm : KasTransactionForm;
+  const transactionFormRef = useRef<HTMLDivElement>(null);
+
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<LedgerRow | null>(null);
+  useEffect(() => {
+    if (panelOpen || editingRow) transactionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [panelOpen, editingRow]);
   const [deletingRow, setDeletingRow] = useState<LedgerRow | null>(null);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -275,59 +285,6 @@ export function KasScreenClient({
 
   return (
     <>
-      {/* Edit drawer */}
-      {editingRow && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/10"
-            onClick={() => setEditingRow(null)}
-          />
-          <div className="relative w-full max-w-xl h-full bg-surface-card shadow-2xl flex flex-col overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
-              <h2 className="text-[15px] font-bold text-navy-text">Edit Transaksi</h2>
-              <button
-                onClick={() => setEditingRow(null)}
-                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
-            <KasTransactionForm
-              entityKey={entityKey}
-              jenisInputKey={jenisInputKey}
-              pagePath={pagePath}
-              coaOptions={coaOptions}
-              rekeningOptions={rekeningOptions}
-              defaultRekeningId={selectedRekeningId}
-              allEntities={allEntities}
-              projectOptions={projectOptions}
-              defaultArahLaporan={defaultArahLaporan}
-              bukuBankRekeningOptions={bukuBankRekeningOptions}
-              initialValues={{
-                tanggal: editingRow.tanggalRaw,
-                tanggalNota: editingRow.tanggalNota ?? null,
-                noBukti: editingRow.noBukti,
-                keterangan: editingRow.keterangan,
-                arah: editingRow.masuk > 0 ? "masuk" : "keluar",
-                rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
-                crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
-                projectId: editingRow.project?.id,
-                periodeBulanGaji: editingRow.periodeBulanGaji ?? null,
-                periodeTahunGaji: editingRow.periodeTahunGaji ?? null,
-                rows: editingRow.coaRows.map((cr) => ({
-                  coaAccountId: cr.coaAccountId,
-                  nominal: String(cr.nominal),
-                })),
-                existingTxIds: editingRow.allTxIds,
-              }}
-              onClose={() => setEditingRow(null)}
-            />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete confirm modal */}
       {deletingRow && (
         <DeleteConfirmModal
@@ -449,35 +406,68 @@ export function KasScreenClient({
         </div>
 
         <button
-          onClick={() => setPanelOpen(true)}
+          onClick={() => { setEditingRow(null); setPanelOpen(!(panelOpen || editingRow)); }}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[11px] bg-navy text-white text-[13px] font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
         >
-          <Plus className="w-4 h-4 flex-none" />
-          <span>Transaksi Baru</span>
+          {panelOpen || editingRow ? <X className="w-4 h-4 flex-none" /> : <Plus className="w-4 h-4 flex-none" />}
+          <span>{panelOpen || editingRow ? "Tutup Form" : "Transaksi Baru"}</span>
         </button>
       </div>
 
-      {/* Drawer kanan */}
-      {panelOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/10"
-            onClick={() => setPanelOpen(false)}
-          />
-          {/* Panel */}
-          <div className="relative w-full max-w-xl h-full bg-surface-card shadow-2xl flex flex-col overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft flex-none">
-              <h2 className="text-[15px] font-bold text-navy-text">Transaksi Baru</h2>
-              <button
-                onClick={() => setPanelOpen(false)}
-                className="p-2 rounded-lg hover:bg-surface-hover text-muted-stronger"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
+      {/* Form melebar di atas riwayat transaksi, sama seperti Entry Jurnal. */}
+      {(panelOpen || editingRow) && (
+        <div ref={transactionFormRef} className="scroll-mt-6">
+          {!editingRow && supportsBatch && <div className="mb-3 inline-flex gap-1 rounded-xl border border-border-soft bg-surface-card p-1">
+            <button type="button" onClick={() => setBatchMode(true)} className={`rounded-lg px-4 py-2 text-xs font-bold ${batchMode ? "bg-navy text-white" : "text-muted-stronger"}`}>Input Banyak Transaksi</button>
+            <button type="button" onClick={() => setBatchMode(false)} className={`rounded-lg px-4 py-2 text-xs font-bold ${!batchMode ? "bg-navy text-white" : "text-muted-stronger"}`}>Form Lengkap</button>
+          </div>}
+          {editingRow ? (
+            <EditTransactionForm
+              key={`edit-${editingRow.allTxIds.join("-")}`}
+              entityKey={entityKey}
+              jenisInputKey={jenisInputKey}
+              pagePath={pagePath}
+              coaOptions={coaOptions}
+              rekeningOptions={rekeningOptions}
+              defaultRekeningId={selectedRekeningId}
+              allEntities={allEntities}
+              projectOptions={projectOptions}
+              defaultArahLaporan={defaultArahLaporan}
+              bukuBankRekeningOptions={bukuBankRekeningOptions}
+              initialValues={{
+                tanggal: editingRow.tanggalRaw,
+                tanggalNota: editingRow.tanggalNota ?? null,
+                noBukti: editingRow.noBukti,
+                keterangan: editingRow.keterangan,
+                arah: editingRow.masuk > 0 ? "masuk" : "keluar",
+                rekeningId: rekeningOptions.find((r) => r.nama === editingRow.rekening)?.id,
+                crossingEntityKeys: editingRow.crossingEntityKeys ?? [],
+                projectId: editingRow.project?.id,
+                periodeBulanGaji: editingRow.periodeBulanGaji ?? null,
+                periodeTahunGaji: editingRow.periodeTahunGaji ?? null,
+                rows: editingRow.coaRows.map((cr) => ({
+                  coaAccountId: cr.coaAccountId,
+                  nominal: String(cr.nominal),
+                  keterangan: cr.itemDescription ?? "",
+                })),
+                existingTxIds: editingRow.allTxIds,
+              }}
+              onClose={() => setEditingRow(null)}
+            />
+          ) : supportsBatch && batchMode ? (
+            <KasBatchTransactionForm
+              entityKey={entityKey}
+              jenisInputKey={jenisInputKey}
+              pagePath={pagePath}
+              coaOptions={coaOptions}
+              projectOptions={projectOptions}
+              rekeningOptions={rekeningOptions}
+              defaultRekeningId={selectedRekeningId}
+              onClose={() => setPanelOpen(false)}
+            />
+          ) : (
               <KasTransactionForm
+                key="create"
                 entityKey={entityKey}
                 jenisInputKey={jenisInputKey}
                 pagePath={pagePath}
@@ -490,8 +480,7 @@ export function KasScreenClient({
                 bukuBankRekeningOptions={bukuBankRekeningOptions}
                 onClose={() => setPanelOpen(false)}
               />
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -575,9 +564,11 @@ export function KasScreenClient({
                   const diff = new Date(a.tanggalRaw).getTime() - new Date(b.tanggalRaw).getTime();
                   return sortAsc ? diff : -diff;
                 }).map((r, idx) => {
-                  const shown = r.akunTags.slice(0, 2);
-                  const rest = r.akunTags.length - shown.length;
                   const expanded = expandedIdx === idx;
+                  const visibleAccounts: (CoaRow | null)[] = r.coaRows.length
+                    ? (expanded ? r.coaRows : r.coaRows.slice(0, 2)) : [null];
+                  const remainingAccounts = r.coaRows.length - visibleAccounts.length;
+                  const sharedAlignment = visibleAccounts.length === 1 ? "align-middle" : "align-top";
 
                   const isCrossingFrom = !!r.crossingFromEntityKey;
                   const sourceEntityName = isCrossingFrom
@@ -585,8 +576,10 @@ export function KasScreenClient({
                     : null;
 
                   return (
-                    <tr key={r.noBukti + idx} className="border-b border-surface-subtle align-top hover:bg-surface-hover/30 group">
-                      <td className="py-2.5 px-1.5 text-[12.5px] text-muted whitespace-nowrap">
+                    <Fragment key={r.noBukti + idx}>
+                    {visibleAccounts.map((cr, accountIndex) => <tr key={cr?.id || accountIndex} className="border-b border-surface-subtle align-middle hover:bg-surface-hover/30 group">
+                      {accountIndex === 0 && <>
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-[12.5px] text-muted whitespace-nowrap`}>
                         <div className="relative group/dt inline-block">
                           <span>{fmtDateShort(r.tanggalRaw || r.tanggal)}</span>
                           <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
@@ -605,10 +598,16 @@ export function KasScreenClient({
                           </div>
                         )}
                       </td>
-                      <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
-                      <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
-                        {r.keterangan}
-                        {r.periodeBulanGaji && (
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-xs text-muted font-mono whitespace-nowrap`}>{r.noBukti}</td>
+                      </>}
+                      <td className="py-2.5 px-1.5 align-middle text-[13px] text-navy-text">
+                        <div className="min-w-[220px] max-w-sm whitespace-normal break-words leading-5">
+                          {cr?.itemDescription && cr.itemDescription !== r.keterangan ? <>
+                            {accountIndex === 0 && <><span className="font-medium text-muted-stronger">{r.keterangan}</span><span aria-hidden="true" className="mx-2 text-muted-faint">·</span></>}
+                            <span>{cr.itemDescription}</span>
+                          </> : <span className="font-medium">{r.keterangan}</span>}
+                        </div>
+                        {accountIndex === 0 && r.periodeBulanGaji && (
                           <span
                             className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"
                             title={`Beban Gaji Bulan ${MONTH_NAMES[(r.periodeBulanGaji || 1) - 1]} ${r.periodeTahunGaji ?? ""}`}
@@ -617,25 +616,25 @@ export function KasScreenClient({
                             Akrual: {MONTH_NAMES[(r.periodeBulanGaji || 1) - 1].slice(0, 3)} {r.periodeTahunGaji ?? ""}
                           </span>
                         )}
-                        {r.project && (
+                        {accountIndex === 0 && r.project && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
                             {r.project.code}
                           </span>
                         )}
-                        {r.rekening && (
+                        {accountIndex === 0 && r.rekening && (
                           <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                             {r.rekening}
                           </span>
                         )}
                         {/* Crossing destination badge — transaksi masuk dari entitas lain */}
-                        {isCrossingFrom && (
+                        {accountIndex === 0 && isCrossingFrom && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                             <ArrowRightLeft size={9} />
                             dari {sourceEntityName}
                           </span>
                         )}
                         {/* Crossing source badges — transaksi dikirim ke entitas lain */}
-                        {!isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
+                        {accountIndex === 0 && !isCrossingFrom && (r.crossingEntityKeys ?? []).length > 0 && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                             <ArrowRightLeft size={9} />
                             → {(r.crossingEntityKeys ?? [])
@@ -644,56 +643,21 @@ export function KasScreenClient({
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-1.5">
-                        <div className="flex flex-col gap-1">
-                          {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                            <div key={i} className="flex flex-col">
-                              <span className="text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md whitespace-nowrap">
-                                {cr.coaName}
-                              </span>
-                              {cr.itemDescription && (
-                                <span className="text-[10px] text-muted px-1 mt-0.5 italic">{cr.itemDescription}</span>
-                              )}
-                            </div>
-                          ))}
-                          {!expanded && r.coaRows.length > 2 && (
-                            <button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand px-1 text-left whitespace-nowrap">
-                              +{r.coaRows.length - 2} lagi
-                            </button>
-                          )}
-                        </div>
+                      <td className="py-2.5 px-1.5 align-middle">
+                        <span className="inline-flex min-h-7 items-center text-[10.5px] font-bold text-muted-strong bg-surface-hover px-2.5 py-1 rounded-md whitespace-nowrap">{cr?.coaName || "—"}</span>
                       </td>
-                      {/* MASUK — per baris akun */}
-                      <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
-                        {r.coaRows.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                              <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>
-                                {r.masuk > 0 ? formatRupiah(cr.nominal) : "—"}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[13px] font-bold text-status-green tabular-nums whitespace-nowrap">{r.masukFmt}</span>
-                        )}
+                      <td className="py-2.5 px-1.5 text-right align-middle whitespace-nowrap">
+                        <span className={`text-[13px] font-bold tabular-nums ${r.masuk > 0 ? "text-status-green" : "text-muted-faint"}`}>{cr ? (r.masuk > 0 ? formatRupiah(cr.nominal) : "—") : r.masukFmt}</span>
                       </td>
-                      {/* KELUAR — per baris akun */}
-                      <td className="py-2.5 px-1.5 text-right align-top whitespace-nowrap">
-                        {r.coaRows.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {(expanded ? r.coaRows : r.coaRows.slice(0, 2)).map((cr, i) => (
-                              <span key={i} className={`text-[13px] font-bold tabular-nums whitespace-nowrap leading-[28px] ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>
-                                {r.keluar > 0 ? formatRupiah(cr.nominal) : "—"}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[13px] font-bold text-status-red tabular-nums whitespace-nowrap">{r.keluarFmt}</span>
-                        )}
+                      <td className="py-2.5 px-1.5 text-right align-middle whitespace-nowrap">
+                        <span className={`text-[13px] font-bold tabular-nums ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>{cr ? (r.keluar > 0 ? formatRupiah(cr.nominal) : "—") : r.keluarFmt}</span>
                       </td>
-                      <td className="py-2.5 px-1.5 text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">{r.saldoFmt}</td>
-                      <td className="py-2.5 px-1.5 text-right">
-                        {isCrossingFrom ? (
+                      {accountIndex === 0 && <>
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap`}>{r.saldoFmt}</td>
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-right`}>
+                        {r.sourceJurnal ? (
+                          <span className="text-[10px] text-muted" title="Kelola transaksi dari Entry Jurnal">Entry Jurnal</span>
+                        ) : isCrossingFrom ? (
                           <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>
                         ) : (
                           <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -714,7 +678,10 @@ export function KasScreenClient({
                           </div>
                         )}
                       </td>
-                    </tr>
+                      </>}
+                    </tr>)}
+                    {!expanded && remainingAccounts > 0 && <tr className="border-b border-surface-subtle"><td colSpan={8} className="px-1.5 py-2"><button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand">+{remainingAccounts} akun lainnya</button></td></tr>}
+                    </Fragment>
                   );
                 })}
                 {!sortAsc && saldoAwal !== 0 && (

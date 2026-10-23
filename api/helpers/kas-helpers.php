@@ -1,5 +1,6 @@
 <?php
 if (!defined('APP_ENTRY')) die('Direct access not allowed');
+require_once __DIR__.'/bank-ledger.php';
 
 // COA codes per entity — diambil 1:1 dari src/lib/actions/kas.ts & src/lib/bank-accounts.ts
 define('KAS_KECIL_COA', ['kencana' => '1100', 'gaharu' => '1200', 'tataring' => '1300', 'ciptaAsri' => '1400', 'umum' => '1500']);
@@ -55,6 +56,41 @@ define('REKENING_ID_TO_NAMA', [
 // Prefix no. bukti per entity — dari src/lib/kas.ts ENTITY_PREFIX & ENTITY_PREFIX_UMUM
 define('ENTITY_PREFIX', ['gaharu' => 'GH', 'kencana' => 'KC', 'tataring' => 'TT', 'ciptaAsri' => 'CA', 'umum' => 'UM']);
 define('ENTITY_PREFIX_UMUM', ['kencana' => 'UK', 'gaharu' => 'UG', 'tataring' => 'UT', 'ciptaAsri' => 'UC', 'umum' => 'UU']);
+
+/** Nomor nota umum: UK/MMDD1, UG/MMDD1, UT/MMDD1, UC/MMDD1. */
+function kas_next_voucher_number(PDO $pdo, string $entity_key, string $tanggal): string {
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $tanggal);
+    if (!$date || $date->format('Y-m-d') !== $tanggal) throw new InvalidArgumentException('Tanggal transaksi tidak valid.');
+    $prefix = ENTITY_PREFIX_UMUM[$entity_key] ?? null;
+    if (!$prefix) throw new InvalidArgumentException('Kode entitas belum diatur.');
+    $stmt = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
+    $stmt->execute([$entity_key]);
+    $entity_id = $stmt->fetchColumn();
+    if (!$entity_id) throw new InvalidArgumentException('Entitas tidak ditemukan.');
+    $day = $date->format('md');
+    $stmt = $pdo->prepare('SELECT noBukti FROM `Transaction` WHERE entityId = ? AND (noBukti LIKE ? OR noBukti LIKE ?)');
+    $stmt->execute([$entity_id, $prefix . '/' . $day . '%', $prefix . $day . '%']);
+    $max = 0;
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $number) {
+        // Nomor lama tanpa slash tetap diperhitungkan; nomor proyek tetap manual.
+        if (preg_match('~^' . preg_quote($prefix, '~') . '/?' . $day . '(\d+)$~', $number, $match)) $max = max($max, (int)$match[1]);
+    }
+    return $prefix . '/' . $day . ($max + 1);
+}
+
+/** Infer tujuan piutang dari COA, termasuk saat form ringkas tidak mengirim crossing keys. */
+function kas_piutang_crossing_keys(PDO $pdo, string $entity_key, string $arah, array $rows, array $explicit = []): array {
+    if ($arah !== 'keluar') return array_values(array_unique($explicit));
+    $targets = $explicit;
+    $by_code = array_flip(PIUTANG_COA_CODE);
+    foreach ($rows as $row) {
+        $stmt = $pdo->prepare('SELECT code FROM CoaAccount WHERE id = ?');
+        $stmt->execute([$row['coaAccountId']]);
+        $target = $by_code[$stmt->fetchColumn()] ?? null;
+        if ($target && $target !== $entity_key) $targets[] = $target;
+    }
+    return array_values(array_unique($targets));
+}
 
 /**
  * Kembalikan nama rekening dari rekeningId.
@@ -143,6 +179,9 @@ function get_running_saldo(PDO $pdo, string $entity_id, string $jenis_input_id, 
     if (!$year) $year = (int)date('Y');
     $saldo_awal = get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year);
 
+    $bank_rows = bank_ledger_rows($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year . '-01-01', $year . '-12-31');
+    if ($bank_rows !== null) return $saldo_awal + bank_ledger_mutation($bank_rows);
+
     // Ambil semua kas entry (isKasEntry = true)
     $stmt = $pdo->prepare(
         "SELECT debit, kredit, extraFieldsJson
@@ -175,6 +214,9 @@ function get_running_saldo(PDO $pdo, string $entity_id, string $jenis_input_id, 
 function get_saldo_sebelum(PDO $pdo, string $entity_id, string $jenis_input_id, string $sebelum, ?string $rekening_nama = null, int $year = 0): float {
     if (!$year) $year = (int)date('Y', strtotime($sebelum));
     $saldo_awal = get_initial_saldo_awal($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year);
+
+    $bank_rows = bank_ledger_rows($pdo, $entity_id, $jenis_input_id, $rekening_nama, $year . '-01-01', date('Y-m-d', strtotime($sebelum . ' -1 day')));
+    if ($bank_rows !== null) return $saldo_awal + bank_ledger_mutation($bank_rows);
 
     $stmt = $pdo->prepare(
         "SELECT debit, kredit, extraFieldsJson

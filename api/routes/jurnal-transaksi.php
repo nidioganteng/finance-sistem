@@ -31,10 +31,15 @@ if ($method === 'GET' && $sub === '') {
         return json_response(['groups' => [], 'totalPages' => 1, 'page' => $page]);
     }
 
+    // Posting otomatis Kas Transitory hanya ditampilkan di Jurnal Umum.
+    $manual_only_sql = "(CASE WHEN JSON_VALID(extraFieldsJson) THEN JSON_EXTRACT(extraFieldsJson, '$.transitoryAccounting') ELSE NULL END) IS NULL
+        AND (CASE WHEN JSON_VALID(extraFieldsJson) THEN JSON_EXTRACT(extraFieldsJson, '$.transitoryReversalId') ELSE NULL END) IS NULL";
+
     // Tanggal filter & filter non-crossing (khusus Entry Jurnal manual saja, gabungan semua ada di Jurnal Umum)
     $where_parts = [
         'entityId = ?',
         'jenisInputId = ?',
+        $manual_only_sql,
         "(extraFieldsJson IS NULL OR JSON_VALID(extraFieldsJson) = 0 OR JSON_EXTRACT(extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(extraFieldsJson, '$.isCrossingEntry') = false)",
     ];
     $params      = [$entity_id, $jenis_input_id];
@@ -81,6 +86,7 @@ if ($method === 'GET' && $sub === '') {
          LEFT JOIN Project p ON t.projectId = p.id
          WHERE t.entityId = ? AND t.jenisInputId = ?
            AND (t.extraFieldsJson IS NULL OR JSON_VALID(t.extraFieldsJson) = 0 OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') IS NULL OR JSON_EXTRACT(t.extraFieldsJson, '$.isCrossingEntry') = false)
+           AND ($manual_only_sql)
            AND t.noBukti IN ($nb_ph)
          ORDER BY t.tanggal DESC, t.noBukti DESC, t.createdAt ASC"
     );

@@ -3,6 +3,7 @@ if (!defined('APP_ENTRY')) die('Direct access not allowed');
 
 $user       = require_auth();
 require_once __DIR__ . '/../helpers/faktur-realisasi.php';
+require_once __DIR__ . '/../helpers/faktur-rekanan.php';
 $sub_action = $segments[1] ?? null; // null | 'faktur' | 'rekonsiliasi'
 $record_id  = $segments[2] ?? null; // faktur/:id
 
@@ -261,42 +262,50 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
     $id              = uuid4();
     $now             = date('Y-m-d H:i:s');
 
-    $pdo->prepare(
-        'INSERT INTO FakturPendapatan
-         (id, entityId, npwp, noFaktur, masaPajak, tahunPajak, namaRekanan, namaJkp,
-          dpp, dppNilaiLain, tarifPpnPersen, tarifPphPersen, ppn, pph, nilaiProyek,
-          labaSetelahPajak, kodeJenisProyek, pekerjaanPerusahaan, pekerjaanYangDipinjam,
-          tanggalTerima, bank, nominalDiterima, projectId, bankTransactionId, createdById, createdAt, updatedAt)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-    )->execute([
-        $id,
-        $body['entityId'],
-        $body['npwp'],
-        $body['noFaktur'],
-        (int)$body['masaPajak'],
-        (int)$body['tahunPajak'],
-        $body['namaRekanan'],
-        $body['namaJkp'],
-        (float)$body['dpp'],
-        (float)($body['dppNilaiLain'] ?? 0) > 0 ? (float)$body['dppNilaiLain'] : (float)round(((float)$body['dpp'] * 11) / 12),
-        (float)$body['tarifPpnPersen'],
-        (float)$body['tarifPphPersen'],
-        $kalkulasi['ppn'],
-        $kalkulasi['pph'],
-        $kalkulasi['nilai_proyek'],
-        $kalkulasi['laba_setelah_pajak'],
-        (int)($body['kodeJenisProyek'] ?? 1),
-        (float)($body['pekerjaanPerusahaan'] ?? 0),
-        (float)($body['pekerjaanYangDipinjam'] ?? 0),
-        null,
-        null,
-        0,
-        $body['projectId'] ?? null,
-        null,
-        $user['id'],
-        $now,
-        $now,
-    ]);
+    try {
+        $pdo->beginTransaction();
+        faktur_ensure_rekanan($pdo, $body['entityId'], $body['namaRekanan'], $body['npwp']);
+        $pdo->prepare(
+            'INSERT INTO FakturPendapatan
+             (id, entityId, npwp, noFaktur, masaPajak, tahunPajak, namaRekanan, namaJkp,
+              dpp, dppNilaiLain, tarifPpnPersen, tarifPphPersen, ppn, pph, nilaiProyek,
+              labaSetelahPajak, kodeJenisProyek, pekerjaanPerusahaan, pekerjaanYangDipinjam,
+              tanggalTerima, bank, nominalDiterima, projectId, bankTransactionId, createdById, createdAt, updatedAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        )->execute([
+            $id,
+            $body['entityId'],
+            $body['npwp'],
+            $body['noFaktur'],
+            (int)$body['masaPajak'],
+            (int)$body['tahunPajak'],
+            $body['namaRekanan'],
+            $body['namaJkp'],
+            (float)$body['dpp'],
+            (float)($body['dppNilaiLain'] ?? 0) > 0 ? (float)$body['dppNilaiLain'] : (float)round(((float)$body['dpp'] * 11) / 12),
+            (float)$body['tarifPpnPersen'],
+            (float)$body['tarifPphPersen'],
+            $kalkulasi['ppn'],
+            $kalkulasi['pph'],
+            $kalkulasi['nilai_proyek'],
+            $kalkulasi['laba_setelah_pajak'],
+            (int)($body['kodeJenisProyek'] ?? 1),
+            (float)($body['pekerjaanPerusahaan'] ?? 0),
+            (float)($body['pekerjaanYangDipinjam'] ?? 0),
+            null,
+            null,
+            0,
+            $body['projectId'] ?? null,
+            null,
+            $user['id'],
+            $now,
+            $now,
+        ]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return error_response('Faktur dan rekanan belum disimpan. ' . $e->getMessage(), 500);
+    }
 
     log_activity($user['id'], 'faktur_pendapatan.create', 'FINANCIAL_CHANGE', [
         'fakturId' => $id,
@@ -309,7 +318,7 @@ if ($method === 'POST' && $sub_action === 'faktur' && $record_id === null) {
 // ─── PUT /api/pendapatan/faktur/:id ──────────────────────────────────────────
 if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
     $pdo  = get_pdo();
-    $stmt = $pdo->prepare('SELECT id, tarifPpnPersen, tarifPphPersen FROM FakturPendapatan WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, entityId, namaRekanan, npwp, tarifPpnPersen, tarifPphPersen FROM FakturPendapatan WHERE id = ?');
     $stmt->execute([$record_id]);
     $existing = $stmt->fetch();
     if (!$existing) error_response('Faktur tidak ditemukan.', 404);
@@ -356,8 +365,15 @@ if ($method === 'PUT' && $sub_action === 'faktur' && $record_id !== null) {
 
     $set_values[] = $record_id;
 
-    $pdo->prepare('UPDATE FakturPendapatan SET ' . implode(', ', $set_parts) . ' WHERE id = ?')
-        ->execute($set_values);
+    try {
+        $pdo->beginTransaction();
+        faktur_ensure_rekanan($pdo, $existing['entityId'], $body['namaRekanan'] ?? $existing['namaRekanan'], $body['npwp'] ?? $existing['npwp']);
+        $pdo->prepare('UPDATE FakturPendapatan SET ' . implode(', ', $set_parts) . ' WHERE id = ?')->execute($set_values);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return error_response('Perubahan faktur dan rekanan belum disimpan. ' . $e->getMessage(), 500);
+    }
 
     log_activity($user['id'], 'faktur_pendapatan.update', 'FINANCIAL_CHANGE', ['fakturId' => $record_id]);
 

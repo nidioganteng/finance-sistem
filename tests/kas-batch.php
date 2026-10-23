@@ -95,4 +95,17 @@ eq(endpoint([$r])->status,200,'manual and inferred crossing');
 eq((int)$pdo->query("SELECT COUNT(*) FROM `Transaction` WHERE entityId='B' AND noBukti='EXPLICIT-AUTO'")->fetchColumn(),2,'manual crossing never duplicated');
 $before=snapshot(); $r['noBukti']='CROSS-ROLLBACK'; $invalid=draft('INVALID-LATE'); $invalid['rows'][0]['coaAccountId']='missing';
 eq(endpoint([$r,$invalid])->status,400,'failure after crossing'); eq(snapshot(),$before,'target crossing rolled back too');
+// Delete using the IDs returned by the bank ledger, including all counterpart rows.
+$pdo->exec('CREATE TABLE KasTransitory(id TEXT,sourceTransactionId TEXT)');
+$before_bank=get_running_saldo($pdo,'A','bank','BPD GS',2026);
+$r=draft('DELETE-BANK','bankBuku',null);
+eq(endpoint([$r])->status,200,'bank voucher to delete');
+$rows=bank_ledger_rows($pdo,'A','bank','BPD GS');
+$ids=array_column(array_values(array_filter($rows,fn($row)=>$row['noBukti']==='DELETE-BANK')),'id');
+eq(count($ids),3,'ledger returns cash plus all expense rows');
+$body=['txIds'=>$ids]; $method='DELETE'; $segments=['kas','transaksi'];
+try { include __DIR__.'/../api/routes/kas.php'; } catch(BatchResponse $r) { $deleted=$r; }
+eq($deleted->status,200,'delete bank voucher');
+eq((int)$pdo->query("SELECT COUNT(*) FROM `Transaction` WHERE noBukti='DELETE-BANK'")->fetchColumn(),0,'delete leaves no orphan account rows');
+eq(get_running_saldo($pdo,'A','bank','BPD GS',2026),$before_bank,'delete restores bank balance');
 echo "Kas batch: $checks checks passed\n";

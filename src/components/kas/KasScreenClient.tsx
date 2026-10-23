@@ -4,6 +4,7 @@ import { Fragment, useState, useCallback, useRef, useEffect } from "react";
 import { usePageTransition as useTransition } from "@/lib/use-page-transition";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { KasTransactionForm } from "./KasTransactionForm";
+import { KasBatchTransactionForm } from "./KasBatchTransactionForm";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deleteKasTransactionGroup } from "@/lib/actions/kas";
 import type { RekeningOption } from "@/lib/bank-accounts";
@@ -102,6 +103,8 @@ export function KasScreenClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [batchMode, setBatchMode] = useState(true);
+  const supportsBatch = ["kasKecil", "kasBesar", "bankBuku"].includes(jenisInputKey);
   const transactionFormRef = useRef<HTMLDivElement>(null);
 
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
@@ -413,6 +416,10 @@ export function KasScreenClient({
       {/* Form melebar di atas riwayat transaksi, sama seperti Entry Jurnal. */}
       {(panelOpen || editingRow) && (
         <div ref={transactionFormRef} className="scroll-mt-6">
+          {!editingRow && supportsBatch && <div className="mb-3 inline-flex gap-1 rounded-xl border border-border-soft bg-surface-card p-1">
+            <button type="button" onClick={() => setBatchMode(true)} className={`rounded-lg px-4 py-2 text-xs font-bold ${batchMode ? "bg-navy text-white" : "text-muted-stronger"}`}>Input Banyak Transaksi</button>
+            <button type="button" onClick={() => setBatchMode(false)} className={`rounded-lg px-4 py-2 text-xs font-bold ${!batchMode ? "bg-navy text-white" : "text-muted-stronger"}`}>Form Lengkap</button>
+          </div>}
           {editingRow ? (
             <KasTransactionForm
               key={`edit-${editingRow.allTxIds.join("-")}`}
@@ -445,6 +452,17 @@ export function KasScreenClient({
                 existingTxIds: editingRow.allTxIds,
               }}
               onClose={() => setEditingRow(null)}
+            />
+          ) : supportsBatch && batchMode ? (
+            <KasBatchTransactionForm
+              entityKey={entityKey}
+              jenisInputKey={jenisInputKey}
+              pagePath={pagePath}
+              coaOptions={coaOptions}
+              projectOptions={projectOptions}
+              rekeningOptions={rekeningOptions}
+              defaultRekeningId={selectedRekeningId}
+              onClose={() => setPanelOpen(false)}
             />
           ) : (
               <KasTransactionForm

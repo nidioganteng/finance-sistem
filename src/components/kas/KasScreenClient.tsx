@@ -505,6 +505,7 @@ export function KasScreenClient({
                 </button>
               </td>
               <td className="py-2 px-1.5">NO. BUKTI</td>
+              <td className="py-2 px-1.5">SUMBER</td>
               <td className="py-2 px-1.5">KETERANGAN</td>
               <td className="py-2 px-1.5">AKUN</td>
               <td className="py-2 px-1.5 text-right whitespace-nowrap">MASUK</td>
@@ -522,6 +523,7 @@ export function KasScreenClient({
                       {dari ? `Per ${dari}` : `Awal ${currentYear ?? new Date().getFullYear()}`}
                     </td>
                     <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted">—</td>
                     <td className="py-2.5 px-1.5 text-[13px] font-semibold text-muted italic">
                       Saldo Awal {selectedRekeningNama ? `(${selectedRekeningNama})` : ""}
                     </td>
@@ -535,7 +537,7 @@ export function KasScreenClient({
                   </tr>
                 )}
                 <tr>
-                  <td colSpan={8} className="py-6 text-center text-sm text-muted">
+                  <td colSpan={9} className="py-6 text-center text-sm text-muted">
                     {saldoAwal !== 0 ? "Belum ada transaksi mutasi untuk periode ini." : "Belum ada transaksi."}
                   </td>
                 </tr>
@@ -548,6 +550,7 @@ export function KasScreenClient({
                       {dari ? `Per ${dari}` : `Awal ${currentYear ?? new Date().getFullYear()}`}
                     </td>
                     <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted">—</td>
                     <td className="py-2.5 px-1.5 text-[12.5px] font-semibold text-muted italic">
                       Saldo Awal {selectedRekeningNama ? `(${selectedRekeningNama})` : ""}
                     </td>
@@ -599,6 +602,11 @@ export function KasScreenClient({
                         )}
                       </td>
                       <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-xs text-muted font-mono whitespace-nowrap`}>{r.noBukti}</td>
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment}`}>
+                        <span className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-[10.5px] font-bold text-brand whitespace-nowrap dark:bg-blue-500/20">
+                          {r.rekening || (r.sourceJurnal ? "Entry Jurnal" : jenisInputKey === "bankBuku" ? "Buku Bank" : jenisInputKey === "kasBesar" ? "Kas Besar" : jenisInputKey === "kasKecil" ? "Kas Kecil" : "—")}
+                        </span>
+                      </td>
                       </>}
                       <td className="py-2.5 px-1.5 align-middle text-[13px] text-navy-text">
                         <div className="min-w-[220px] max-w-sm whitespace-normal break-words leading-5">
@@ -619,11 +627,6 @@ export function KasScreenClient({
                         {accountIndex === 0 && r.project && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 px-2 py-0.5 rounded-md whitespace-nowrap" title={`${r.project.code} — ${r.project.name}`}>
                             {r.project.code}
-                          </span>
-                        )}
-                        {accountIndex === 0 && r.rekening && (
-                          <span className="ml-2 text-[10.5px] font-bold text-brand bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
-                            {r.rekening}
                           </span>
                         )}
                         {/* Crossing destination badge — transaksi masuk dari entitas lain */}
@@ -680,7 +683,7 @@ export function KasScreenClient({
                       </td>
                       </>}
                     </tr>)}
-                    {!expanded && remainingAccounts > 0 && <tr className="border-b border-surface-subtle"><td colSpan={8} className="px-1.5 py-2"><button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand">+{remainingAccounts} akun lainnya</button></td></tr>}
+                    {!expanded && remainingAccounts > 0 && <tr className="border-b border-surface-subtle"><td colSpan={9} className="px-1.5 py-2"><button onClick={() => setExpandedIdx(idx)} className="text-[10.5px] font-bold text-brand">+{remainingAccounts} akun lainnya</button></td></tr>}
                     </Fragment>
                   );
                 })}
@@ -690,6 +693,7 @@ export function KasScreenClient({
                       {dari ? `Per ${dari}` : `Awal ${currentYear ?? new Date().getFullYear()}`}
                     </td>
                     <td className="py-2.5 px-1.5 text-xs text-muted font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-1.5 text-xs text-muted">—</td>
                     <td className="py-2.5 px-1.5 text-[12.5px] font-semibold text-muted italic">
                       Saldo Awal {selectedRekeningNama ? `(${selectedRekeningNama})` : ""}
                     </td>

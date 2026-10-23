@@ -237,30 +237,6 @@ export function KasTransactionForm({
   const [periodeBulanGaji, setPeriodeBulanGaji] = useState<number | null>(initialValues?.periodeBulanGaji ?? null);
   const [periodeTahunGaji, setPeriodeTahunGaji] = useState<number | null>(initialValues?.periodeTahunGaji ?? null);
 
-  const hasSalaryAccount = rows.some((r) => {
-    const c = coaOptions.find((opt) => opt.id === r.coaAccountId);
-    if (!c) return false;
-    return c.code === "511" || c.code === "612" || c.code.startsWith("511") || c.code.startsWith("612") || /gaji|honor|upah|tenaga ahli|payroll/i.test(c.name);
-  });
-
-  useEffect(() => {
-    if (hasSalaryAccount) {
-      if (periodeBulanGaji === null && !initialValues?.periodeBulanGaji) {
-        const txDate = tanggal ? new Date(tanggal) : new Date();
-        const curM = txDate.getMonth() + 1;
-        const defM = curM === 1 ? 12 : curM - 1;
-        const defY = curM === 1 ? txDate.getFullYear() - 1 : txDate.getFullYear();
-        setPeriodeBulanGaji(defM);
-        setPeriodeTahunGaji(defY);
-      }
-    } else {
-      if (periodeBulanGaji !== null) {
-        setPeriodeBulanGaji(null);
-        setPeriodeTahunGaji(null);
-      }
-    }
-  }, [hasSalaryAccount, tanggal, periodeBulanGaji, initialValues]);
-
   const isBankBuku = jenisInputKey === "bankBuku";
   const isKasKecil = jenisInputKey === "kasKecil";
   const isKasBesar = jenisInputKey === "kasBesar";
@@ -787,12 +763,12 @@ export function KasTransactionForm({
           </div>
         )}
 
-        {/* Pilihan Periode Beban Gaji (Akrual) — Langsung tampil saat input gaji */}
-        {hasSalaryAccount && (
+        {/* Periode akrual dapat diatur pada semua transaksi, termasuk saat edit. */}
+        {(
           <div className="rounded-[12px] border border-border-soft bg-surface-card p-4 flex flex-col gap-3 shadow-xs">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-[11.5px] font-bold text-navy-text uppercase tracking-wide">
-                Periode Beban Gaji (Akrual)
+                Periode Akrual
               </label>
               {periodeBulanGaji && (
                 <span className="text-[11px] font-semibold text-brand">
@@ -804,7 +780,7 @@ export function KasTransactionForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
-                  Bulan Gaji
+                  Bulan Akrual
                 </label>
                 <select
                   value={periodeBulanGaji ?? ""}
@@ -828,7 +804,7 @@ export function KasTransactionForm({
 
               <div>
                 <label className="text-[10.5px] font-bold text-muted-stronger uppercase tracking-wide block mb-1">
-                  Tahun Gaji
+                  Tahun Akrual
                 </label>
                 <input
                   type="number"

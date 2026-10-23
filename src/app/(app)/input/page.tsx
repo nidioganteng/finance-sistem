@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getJenisInput } from "@/lib/kas";
 import { KasScreen } from "@/components/kas/KasScreen";
@@ -20,8 +20,8 @@ const LAPORAN_LABEL: Record<string, string> = {
 function CustomInputContent() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const params = useParams();
-  const key = params.key as string;
+  const searchParams = useSearchParams();
+  const key = searchParams.get("key") ?? "";
 
   const [jenisInput, setJenisInput] = useState<Awaited<ReturnType<typeof getJenisInput>> | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -33,6 +33,7 @@ function CustomInputContent() {
       router.replace("/dashboard");
       return;
     }
+    if (!key) { router.replace("/dashboard"); return; }
     setPageLoading(true);
     getJenisInput(key).then((ji) => {
       if (!ji || !ji.active || SYSTEM_KEYS.includes(key)) {
@@ -42,7 +43,7 @@ function CustomInputContent() {
       setJenisInput(ji);
     }).catch(() => router.replace("/dashboard"))
       .finally(() => setPageLoading(false));
-  }, [user, key]);
+  }, [user, key, router]);
 
   if (isLoading || pageLoading) {
     return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
@@ -50,7 +51,6 @@ function CustomInputContent() {
   if (!user || !jenisInput) return null;
 
   const { entityKeys } = user;
-
   const extra = jenisInput.extraFieldsJson as Record<string, unknown> | null;
   const arahLaporan = Array.isArray(extra?.arahLaporan) ? (extra.arahLaporan as string[]) : [];
   const scopeKeys = Array.isArray(extra?.entityKeys) ? (extra.entityKeys as string[]) : [];
@@ -61,9 +61,7 @@ function CustomInputContent() {
       : "Input dan riwayat transaksi";
 
   const excludeEntityKeys =
-    scopeKeys.length > 0
-      ? entityKeys.filter((k) => !scopeKeys.includes(k))
-      : [];
+    scopeKeys.length > 0 ? entityKeys.filter((k) => !scopeKeys.includes(k)) : [];
 
   return (
     <PageTransition>
@@ -71,7 +69,7 @@ function CustomInputContent() {
         jenisInputKey={key}
         title={jenisInput.nama}
         subtitle={subtitle}
-        pagePath={`/input/${key}`}
+        pagePath={`/input?key=${key}`}
         excludeEntityKeys={excludeEntityKeys}
       />
     </PageTransition>

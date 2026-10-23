@@ -7,7 +7,7 @@ import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJurnalTransaksiHistory } from "@/lib/jurnal-transaksi";
 import { getProjectOptions } from "@/lib/piutang";
-import { phpFetch } from "@/lib/api-client";
+import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntitySwitcher } from "@/components/layout/EntitySwitcher";
 import { JurnalTransaksiClient } from "@/components/jurnal-transaksi/JurnalTransaksiClient";
@@ -62,8 +62,9 @@ function JurnalTransaksiContent() {
         return;
       }
 
+      const token = await getPhpToken();
       const [coaResp, { groups, totalPages }, projectOptions, fakturResp] = await Promise.all([
-        phpFetch<{ data: { id: string; code: string; name: string; kategori: string }[] }>("/api/coa"),
+        phpFetch<{ data: { id: string; code: string; name: string; kategori: string }[] }>("/api/coa", token),
         getJurnalTransaksiHistory(selectedEntity.id, page, dari || undefined, sampai || undefined),
         getProjectOptions(selectedEntity.key),
         phpFetch<{ data: Array<{
@@ -75,7 +76,7 @@ function JurnalTransaksiContent() {
           tahunPajak: number; masaPajak: number;
           tanggalTerima?: string | null; createdAt?: string;
         }> }>(
-          `/api/pendapatan/faktur?entityId=${encodeURIComponent(selectedEntity.id)}`
+          `/api/pendapatan/faktur?entityId=${encodeURIComponent(selectedEntity.id)}`, token
         ).catch(() => ({ data: [] })),
       ]);
 

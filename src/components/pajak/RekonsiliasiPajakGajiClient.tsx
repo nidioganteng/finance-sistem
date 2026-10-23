@@ -151,7 +151,7 @@ export function RekonsiliasiPajakGajiClient({
         keterangan: keterangan.trim() || undefined,
       },
       user?.id ?? "",
-      user?.role ?? ""
+      user?.role ?? "STAF_KEUANGAN"
     );
 
     setIsSubmitting(false);

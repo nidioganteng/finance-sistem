@@ -1,5 +1,6 @@
 import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { canManageTransaksi } from "@/lib/rbac";
+import { Role } from "@/types/app-enums";
 import { logActivity } from "./log";
 
 export interface SaveRekonsiliasiGajiPph21Input {
@@ -19,7 +20,7 @@ export interface SaveRekonsiliasiGajiPph21Input {
 export async function saveRekonsiliasiGajiPph21Action(
   input: SaveRekonsiliasiGajiPph21Input,
   userId: string,
-  role: string
+  role: Role
 ) {
   if (!userId) {
     return { error: "Belum login." };

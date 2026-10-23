@@ -8,6 +8,7 @@ export function DeleteConfirmModal({
   onConfirm,
   onCancel,
   isPending,
+  error,
   title = "Hapus Transaksi?",
 }: {
   noBukti: string;
@@ -15,6 +16,7 @@ export function DeleteConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
   isPending: boolean;
+  error?: string | null;
   title?: string;
 }) {
   return (
@@ -49,6 +51,8 @@ export function DeleteConfirmModal({
             </p>
           </div>
         </div>
+
+        {error && <p role="alert" className="mx-5 mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-status-red dark:border-red-500/30 dark:bg-red-500/10">{error}</p>}
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-soft bg-surface-subtle/50">

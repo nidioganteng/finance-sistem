@@ -35,7 +35,7 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   button('Tambah Transaksi').props.onClick(); render();
   assert.equal(byLabel('Nomor bukti transaksi 2').props.value, 'UG/10232');
   for (let i = 1; i <= 2; i++) {
-    byLabel(`Keterangan transaksi ${i}`).props.onChange({ target: { value: `Uraian ${i}` } }); render();
+    byLabel(`Keterangan transaksi ${i}`).props.onChange({ target: { value: i === 1 ? "" : `Uraian ${i}` } }); render();
     byLabel(`Nominal transaksi ${i}`).props.onChange({ target: { value: i === 1 ? '100.000' : '250.000' } }); render();
     byLabel(`Proyek transaksi ${i}`).props.onChange({ target: { value: i === 1 ? 'P' : 'Q' } }); render();
     const account = nodes().filter(n => n.type === mocks['./CoaCombobox'].CoaCombobox)[i-1]; account.props.onChange(i === 1 ? 'salary' : 'expert'); render();
@@ -52,7 +52,7 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   assert.equal(payloads.length, 2, 'same-tick double click cannot send twice');
   assert.equal(closed, 1);
   const data = payloads[1];
-  assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG/10231', 'P', 'Uraian 1', 100000], ['UG/10232', 'Q', 'Uraian 2', 250000]]);
+  assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG/10231', 'P', '', 100000], ['UG/10232', 'Q', 'Uraian 2', 250000]]);
   assert.deepEqual(data.map(d => [d.periodeBulanGaji, d.periodeTahunGaji]), [[9,2026],[12,2025]], 'each voucher retains its own accrual period');
   assert.ok(data.every(d => d.rekeningId === 'gs-bpd' && d.entityKey === 'gaharu'));
   // Ordinary accounts never show an accrual control.

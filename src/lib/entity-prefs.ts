@@ -1,9 +1,9 @@
-import { cookies } from "next/headers";
+function getLastEntityKeyCookie(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(/(?:^|;\s*)lastEntityKey=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
 
-// Resolves the active entity key, with priority:
-// 1. URL searchParam (explicit user navigation)
-// 2. Cookie (persisted from last switch via EntitySwitcher)
-// 3. First available entity (default)
 export function resolveEntityKey(
   searchParamEntity: string | undefined,
   entityKeys: string[]
@@ -11,23 +11,13 @@ export function resolveEntityKey(
   if (searchParamEntity && entityKeys.includes(searchParamEntity)) {
     return searchParamEntity;
   }
-  const cookieKey = cookies().get("lastEntityKey")?.value;
+  const cookieKey = getLastEntityKeyCookie();
   if (cookieKey && entityKeys.includes(cookieKey)) {
     return cookieKey;
   }
   return entityKeys[0];
 }
 
-// Resolves the active entity key for report & dashboard views that support aggregate "grup" (Semua Entitas).
-// Priority:
-// 1. URL searchParam:
-//    - "grup" -> undefined (if canGrup is true)
-//    - valid entityKey -> that entity key
-// 2. Cookie "lastEntityKey":
-//    - "grup" -> undefined (if canGrup is true)
-//    - valid entityKey -> that entity key
-// 3. Fallback:
-//    - canGrup ? undefined (default Semua Entitas for roles with group access) : entityKeys[0]
 export function resolveReportEntityKey(
   searchParamEntity: string | undefined,
   entityKeys: string[],
@@ -37,11 +27,10 @@ export function resolveReportEntityKey(
     if (searchParamEntity === "grup" && canGrup) return undefined;
     if (entityKeys.includes(searchParamEntity)) return searchParamEntity;
   }
-  const cookieKey = cookies().get("lastEntityKey")?.value;
+  const cookieKey = getLastEntityKeyCookie();
   if (cookieKey) {
     if (cookieKey === "grup" && canGrup) return undefined;
     if (entityKeys.includes(cookieKey)) return cookieKey;
   }
   return canGrup ? undefined : entityKeys[0];
 }
-

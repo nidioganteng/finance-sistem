@@ -407,7 +407,7 @@ export function Sidebar({
             )}
             <div className="flex flex-col gap-0.5">
               {customInputs.map((item) => {
-                const href = `/input/${item.key}`;
+                const href = `/input?key=${item.key}`;
                 const active = pathname === href;
                 return (
                   <Link

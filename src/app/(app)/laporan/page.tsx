@@ -197,7 +197,7 @@ function LaporanContent() {
       } else if (tab === "utang-aset") {
         utangAsetData = await getLaporanUtangAsetData(entityIds[0] ?? "", currentYear);
       } else if (tab === "komparasi") {
-        const mode = modeParam === "bulanan" ? "bulanan" : "tahunan";
+        const mode = (modeParam === "bulanan" ? "bulanan" : "tahunan") as "tahunan" | "bulanan";
         const nowYear = new Date().getFullYear();
         const nowMonth = new Date().getMonth() + 1;
         const periodA = parsePeriod(periodAParam, mode, { year: nowYear, month: nowMonth });

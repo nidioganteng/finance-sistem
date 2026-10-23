@@ -12,7 +12,7 @@ CREATE TABLE `Transaction`(id TEXT,entityId TEXT,jenisInputId TEXT,tanggal TEXT,
 CREATE TABLE ActivityLog(action TEXT);");
 function uuid4() { return bin2hex(random_bytes(16)); }
 function get_pdo() { global $pdo; return $pdo; }
-function require_auth() { return ['id'=>'tester','entityKeys'=>['gaharu']]; }
+function require_auth() { return ['id'=>'tester','entityKeys'=>$GLOBALS['test_entity_keys'] ?? ['gaharu']]; }
 function log_activity($id,$action,$category,$detail) { get_pdo()->prepare('INSERT INTO ActivityLog VALUES (?)')->execute([$action]); }
 class BatchResponse extends Exception { public function __construct(public array $data,public int $status=200) {} }
 function json_response($data) { throw new BatchResponse($data); }
@@ -55,4 +55,44 @@ eq(endpoint(draft('SINGLE'),true)->status,200,'single form uses same posting log
 $before=snapshot(); $pdo->exec("DELETE FROM JenisInputTransaksi WHERE id='bank'");
 $sync=draft('SYNC'); $sync['arah']='masuk'; $sync['syncBukuBankRekeningId']='gs-bpd';
 eq(endpoint([$sync])->status,400,'missing bank setup'); eq(snapshot(),$before,'cash and termin rollback on sync failure');
+// Selecting a piutang COA infers crossing automatically in every cash/bank form.
+$pdo->exec("INSERT INTO JenisInputTransaksi VALUES ('bank','bankBuku','Buku Bank'),('journal','jurnalTransaksi','Entry Jurnal');
+ALTER TABLE CoaAccount ADD COLUMN kategori TEXT DEFAULT 'ASET';
+INSERT INTO Entity VALUES ('C','tataring'),('D','ciptaAsri'),('E','umum');
+INSERT INTO CoaAccount VALUES ('p111','111','Piutang Kencana','ASET'),('p112','112','Piutang Gaharu','ASET'),('p113','113','Piutang Tataring','ASET'),('p114','114','Piutang Cipta Asri','ASET'),('p115','115','Piutang Umum','ASET'),('h312','312','Hutang Gaharu','KEWAJIBAN');");
+foreach(['kasKecil','kasBesar','bankBuku'] as $type) {
+    foreach(['B'=>'111','C'=>'113','D'=>'114','E'=>'115'] as $target=>$code) {
+        $proof='CROSS-'.$type.'-'.$code;
+        $row=draft($proof,$type); $row['rows']=[['coaAccountId'=>'p'.$code,'nominal'=>200]];
+        eq(endpoint([$row])->status,200,'auto crossing '.$proof);
+        $stmt=$pdo->prepare('SELECT debit,kredit,extraFieldsJson FROM `Transaction` WHERE entityId=? AND noBukti=?'); $stmt->execute([$target,$proof]); $legs=$stmt->fetchAll();
+        eq(count($legs),2,'target double entry '.$proof);
+        eq(array_sum(array_column($legs,'debit')),200.0,'target debit '.$proof);
+        eq(array_sum(array_column($legs,'kredit')),200.0,'target credit '.$proof);
+        eq(json_decode($legs[0]['extraFieldsJson'],true)['isCrossingEntry'],true,'marked as crossing '.$proof);
+        $before=snapshot(); eq(endpoint([$row])->status,409,'retry crossing rejected'); eq(snapshot(),$before,'retry never duplicates target');
+    }
+}
+$own=draft('OWN-PIUTANG'); $own['rows']=[['coaAccountId'=>'p112','nominal'=>200]];
+eq(endpoint([$own])->status,200,'own entity piutang accepted');
+eq((int)$pdo->query("SELECT COUNT(*) FROM `Transaction` WHERE noBukti='OWN-PIUTANG' AND entityId<>'A'")->fetchColumn(),0,'no crossing into own entity');
+$mix=draft('CROSS-MULTI'); $mix['rows']=[['coaAccountId'=>'p111','nominal'=>200],['coaAccountId'=>'p113','nominal'=>300]];
+eq(endpoint([$mix])->status,200,'multiple target accounts');
+foreach(['B'=>200.0,'C'=>300.0] as $target=>$expected) {
+    $stmt=$pdo->prepare("SELECT SUM(debit),SUM(kredit) FROM `Transaction` WHERE entityId=? AND noBukti='CROSS-MULTI'"); $stmt->execute([$target]); $totals=$stmt->fetch(PDO::FETCH_NUM);
+    eq((float)$totals[0],$expected,'allocated correct target debit'); eq((float)$totals[1],$expected,'allocated correct target credit');
+}
+$test_entity_keys=['gaharu','kencana','tataring','ciptaAsri','umum'];
+$pdo->exec("INSERT INTO CoaAccount VALUES ('kk-b','1100','Kas Kecil Kencana','ASET'),('kk-c','1300','Kas Kecil Tataring','ASET'),('kk-d','1400','Kas Kecil Cipta Asri','ASET'),('kk-e','1500','Kas Kecil Umum','ASET'),('h311','311','Hutang Kencana','KEWAJIBAN'),('h313','313','Hutang Tataring','KEWAJIBAN'),('h314','314','Hutang Cipta Asri','KEWAJIBAN'),('h315','315','Hutang Umum','KEWAJIBAN');");
+foreach(['kencana','tataring','ciptaAsri','umum'] as $source) {
+    $r=draft('FROM-'.$source); $r['entityKey']=$source; $r['rows']=[['coaAccountId'=>'p112','nominal'=>400]];
+    eq(endpoint([$r])->status,200,'crossing from '.$source);
+    $stmt=$pdo->prepare('SELECT SUM(debit),SUM(kredit) FROM `Transaction` WHERE entityId=? AND noBukti=?'); $stmt->execute(['A',$r['noBukti']]); $totals=$stmt->fetch(PDO::FETCH_NUM);
+    eq((float)$totals[0],400.0,'source mapping target debit'); eq((float)$totals[1],400.0,'source mapping hutang credit');
+}
+$r=draft('EXPLICIT-AUTO'); $r['crossingEntityKeys']=['kencana']; $r['rows']=[['coaAccountId'=>'p111','nominal'=>400]];
+eq(endpoint([$r])->status,200,'manual and inferred crossing');
+eq((int)$pdo->query("SELECT COUNT(*) FROM `Transaction` WHERE entityId='B' AND noBukti='EXPLICIT-AUTO'")->fetchColumn(),2,'manual crossing never duplicated');
+$before=snapshot(); $r['noBukti']='CROSS-ROLLBACK'; $invalid=draft('INVALID-LATE'); $invalid['rows'][0]['coaAccountId']='missing';
+eq(endpoint([$r,$invalid])->status,400,'failure after crossing'); eq(snapshot(),$before,'target crossing rolled back too');
 echo "Kas batch: $checks checks passed\n";

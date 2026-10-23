@@ -29,6 +29,7 @@ type LedgerRow = {
   keterangan: string;
   akunTags: string[];
   rekening?: string;
+  sourceJurnal?: boolean;
   crossingEntityKeys?: string[];
   crossingFromEntityKey?: string;
   masuk: number;
@@ -666,7 +667,9 @@ export function KasScreenClient({
                       {accountIndex === 0 && <>
                       <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap`}>{r.saldoFmt}</td>
                       <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-right`}>
-                        {isCrossingFrom ? (
+                        {r.sourceJurnal ? (
+                          <span className="text-[10px] text-muted" title="Kelola transaksi dari Entry Jurnal">Entry Jurnal</span>
+                        ) : isCrossingFrom ? (
                           <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>
                         ) : (
                           <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">

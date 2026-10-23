@@ -17,7 +17,7 @@ const mocks = {
 };
 const original = mod.require.bind(mod); mod.require = name => Object.hasOwn(mocks, name) ? mocks[name] : original(name);
 mod._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText, filename);
-const props = { entityKey: 'gaharu', jenisInputKey: 'bankBuku', pagePath: '/bank-buku', defaultRekeningId: 'gs-bpd', rekeningOptions: [{ id: 'gs-bpd', nama: 'BPD GS' }], coaOptions: [{ id: 'cost', code: '512', name: 'Transport' }], projectOptions: [{ id: 'P', code: 'GH-01', name: 'Proyek A' }, { id: 'Q', code: 'GH-02', name: 'Proyek B' }], onClose: () => closed++ };
+const props = { entityKey: 'gaharu', jenisInputKey: 'bankBuku', pagePath: '/bank-buku', defaultRekeningId: 'gs-bpd', rekeningOptions: [{ id: 'gs-bpd', nama: 'BPD GS' }], coaOptions: [{ id: 'cost', code: '512', name: 'Transport' }, { id: 'salary', code: '511', name: 'Gaji' }, { id: 'expert', code: '612', name: 'Gaji Tenaga Ahli' }], projectOptions: [{ id: 'P', code: 'GH-01', name: 'Proyek A' }, { id: 'Q', code: 'GH-02', name: 'Proyek B' }], onClose: () => closed++ };
 let tree;
 function render() { cursor = 0; tree = mod.exports.KasBatchTransactionForm(props); effects.splice(0).forEach(fn => fn()); }
 function nodes(node = tree) { if (!node || typeof node !== 'object') return []; return [node, ...React.Children.toArray(node.props?.children).flatMap(nodes)]; }
@@ -38,7 +38,7 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
     byLabel(`Keterangan transaksi ${i}`).props.onChange({ target: { value: `Uraian ${i}` } }); render();
     byLabel(`Nominal transaksi ${i}`).props.onChange({ target: { value: i === 1 ? '100.000' : '250.000' } }); render();
     byLabel(`Proyek transaksi ${i}`).props.onChange({ target: { value: i === 1 ? 'P' : 'Q' } }); render();
-    const account = nodes().filter(n => n.type === mocks['./CoaCombobox'].CoaCombobox)[i-1]; account.props.onChange('cost'); render();
+    const account = nodes().filter(n => n.type === mocks['./CoaCombobox'].CoaCombobox)[i-1]; account.props.onChange(i === 1 ? 'salary' : 'expert'); render();
   }
   byLabel('Periode akrual transaksi 1').props.onChange({ target: { value: '2026-09' } }); render();
   byLabel('Periode akrual transaksi 2').props.onChange({ target: { value: '2025-12' } }); render();
@@ -55,9 +55,12 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   assert.deepEqual(data.map(d => [d.noBukti, d.projectId, d.keterangan, d.rows[0].nominal]), [['UG/10231', 'P', 'Uraian 1', 100000], ['UG/10232', 'Q', 'Uraian 2', 250000]]);
   assert.deepEqual(data.map(d => [d.periodeBulanGaji, d.periodeTahunGaji]), [[9,2026],[12,2025]], 'each voucher retains its own accrual period');
   assert.ok(data.every(d => d.rekeningId === 'gs-bpd' && d.entityKey === 'gaharu'));
+  // Ordinary accounts never show an accrual control.
+  nodes().filter(n => n.type === mocks['./CoaCombobox'].CoaCombobox)[0].props.onChange('cost'); render();
+  assert.ok(!nodes().some(n => n.props?.['aria-label'] === 'Periode akrual transaksi 1'));
   const generationCount = generations;
   hooks = []; effects = [];
-  props.initialValues = { tanggal: '2026-09-15', noBukti: 'UK/09151', keterangan: 'Keterangan lama', arah: 'keluar', rekeningId: 'gs-bpd', projectId: 'P', crossingEntityKeys: ['kencana'], tanggalNota: '2026-09-14', periodeBulanGaji: 8, periodeTahunGaji: 2026, existingTxIds: ['cash','row1','row2'], rows: [{ coaAccountId: 'cost', nominal: '100000', keterangan: 'Item pertama' }, { coaAccountId: 'cost', nominal: '200000', keterangan: 'Item kedua' }] };
+  props.initialValues = { tanggal: '2026-09-15', noBukti: 'UK/09151', keterangan: 'Keterangan lama', arah: 'keluar', rekeningId: 'gs-bpd', projectId: 'P', crossingEntityKeys: ['kencana'], tanggalNota: '2026-09-14', periodeBulanGaji: 8, periodeTahunGaji: 2026, existingTxIds: ['cash','row1','row2'], rows: [{ coaAccountId: 'salary', nominal: '100000', keterangan: 'Item pertama' }, { coaAccountId: 'cost', nominal: '200000', keterangan: 'Item kedua' }] };
   render(); await flush();
   assert.equal(generations, generationCount, 'edit never generates a new voucher number');
   assert.equal(byLabel('Nomor bukti transaksi 1').props.value, 'UK/09151');
@@ -76,5 +79,9 @@ global.window = { location: { search: '?rekening=gs-bpd&dari=2026-10-01&sampai=2
   assert.equal(edits[0].periodeBulanGaji, 7);
   assert.equal(edits[0].tanggalNota, '2026-09-14');
   assert.deepEqual(edits[0].crossingEntityKeys, ['kencana']);
+  nodes().filter(n => n.type === mocks['./CoaCombobox'].CoaCombobox)[0].props.onChange('cost'); render();
+  assert.ok(!nodes().some(n => n.props?.['aria-label']?.startsWith('Periode akrual')));
+  button('Simpan Perubahan').props.onClick(); await flush();
+  assert.equal(edits[1].periodeBulanGaji, undefined, 'stale accrual is removed after changing to an ordinary account');
   console.log('Batch form: independent vouchers, projects, amounts, error preservation and double-click guard passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

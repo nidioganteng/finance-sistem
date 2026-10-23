@@ -18,6 +18,21 @@ type Props = {
   defaultRekeningId?: string;
   onClose: () => void;
 };
+// Allocate only the note sequence, preserving the entity/month/day prefix.
+export function allocateVoucherNumbers<T extends { noBukti: string; manualNumber: boolean }>(base: string, rows: T[]): T[] {
+  const match = /^([A-Z]+\/\d{4})(\d+)$/.exec(base);
+  if (!match) return rows;
+  const reserved = new Set(rows.filter((r) => r.manualNumber).map((r) => r.noBukti.trim()));
+  let next = Number(match[2]);
+  return rows.map((row) => {
+    if (row.manualNumber) return row;
+    while (reserved.has(`${match[1]}${next}`)) next++;
+    const noBukti = `${match[1]}${next++}`;
+    reserved.add(noBukti);
+    return { ...row, noBukti };
+  });
+}
+
 const columns = "lg:grid-cols-[8rem_minmax(0,1.5fr)_minmax(0,1.6fr)_minmax(0,1.3fr)_9rem_2rem]";
 const input = "w-full min-w-0 rounded-lg border border-border-soft bg-surface-input px-3 py-2.5 text-[12px] text-navy-text placeholder:text-muted focus:outline-none focus:border-brand/60 disabled:opacity-60";
 const label = "mb-1 block text-[11px] font-semibold text-muted-stronger lg:sr-only";
@@ -45,7 +60,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
     generateNoBukti(entityKey, tanggal).then((number) => {
       if (!active) return;
       baseNumber.current = number;
-      setDrafts((current) => current.map((d) => d.manualNumber ? d : { ...d, noBukti: d.id === 1 ? number : `${number}-${d.id}` }));
+      setDrafts((current) => allocateVoucherNumbers(number, current));
     }).catch(() => {
       if (active) setError("Nomor bukti otomatis belum tersedia. Isi nomor bukti secara manual.");
     }).finally(() => { if (active) setNumberLoading(false); });
@@ -53,11 +68,11 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
   }, [entityKey, tanggal]);
 
   function update(id: number, patch: Partial<Draft>) {
-    setDrafts((current) => current.map((d) => d.id === id ? { ...d, ...patch } : d));
+    setDrafts((current) => allocateVoucherNumbers(baseNumber.current, current.map((d) => d.id === id ? { ...d, ...patch } : d)));
   }
   function addTransaction() {
     const id = ++sequence.current;
-    setDrafts((current) => [...current, { id, noBukti: baseNumber.current ? `${baseNumber.current}-${id}` : "", manualNumber: false, projectId: "", keterangan: "", coaAccountId: "", nominal: "" }]);
+    setDrafts((current) => allocateVoucherNumbers(baseNumber.current, [...current, { id, noBukti: "", manualNumber: false, projectId: "", keterangan: "", coaAccountId: "", nominal: "" }]));
   }
   async function save() {
     if (savingRef.current) return;
@@ -105,7 +120,7 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
   return (
     <section className="rounded-[20px] border border-border-soft bg-surface-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft p-5">
-        <div><h2 className="text-[15px] font-bold text-navy-text">Transaksi Baru</h2><p className="mt-1 text-xs text-muted">Tambahkan transaksi, lalu simpan sekaligus.</p></div>
+        <div><h2 className="text-[15px] font-bold text-navy-text">Transaksi Baru</h2><p className="mt-1 text-xs text-muted">Nomor umum otomatis. Nomor bukti proyek dapat diisi manual.</p></div>
         <div className="flex gap-1 rounded-xl bg-surface-hover p-1">
           {(["masuk","keluar"] as const).map((a) => <button key={a} type="button" disabled={saving} onClick={() => setArah(a)} className={`rounded-lg px-4 py-2 text-xs font-bold ${arah === a ? a === "masuk" ? "bg-emerald-500 text-white" : "bg-red-500 text-white" : "text-muted-stronger"}`}>{a === "masuk" ? "Masuk" : "Keluar"}</button>)}
         </div>
@@ -125,9 +140,14 @@ export function KasBatchTransactionForm({ entityKey, jenisInputKey, pagePath, co
             <label className="min-w-0"><span className={label}>Keterangan</span><textarea rows={2} aria-label={`Keterangan transaksi ${i+1}`} className={`${input} resize-y leading-relaxed`} value={d.keterangan} placeholder="Uraian transaksi" onChange={(e) => update(d.id,{keterangan:e.target.value})} /></label>
             <div className="min-w-0"><span className={label}>Akun</span><CoaCombobox value={d.coaAccountId} placeholder="Cari akun…" options={coaOptions} onChange={(coaAccountId) => update(d.id,{coaAccountId})} />
               {d.coaAccountId && <p className="mt-2 whitespace-normal break-words text-[12px] leading-relaxed text-navy-text">{coaOptions.find((c) => c.id === d.coaAccountId)?.name}</p>}
+              {arah === "keluar" && (() => {
+                const targets: Record<string, { key: string; name: string }> = { "111": { key: "kencana", name: "Kencana" }, "112": { key: "gaharu", name: "Gaharu" }, "113": { key: "tataring", name: "Tataring" }, "114": { key: "ciptaAsri", name: "Cipta Asri" }, "115": { key: "umum", name: "Umum" } };
+                const target = targets[coaOptions.find((c) => c.id === d.coaAccountId)?.code ?? ""];
+                return target && target.key !== entityKey ? <p className="mt-1 text-[11px] leading-relaxed text-brand">Tercatat juga di Jurnal Umum {target.name}</p> : null;
+              })()}
             </div>
             <label className="min-w-0"><span className={label}>Nominal (Rp)</span><input inputMode="numeric" aria-label={`Nominal transaksi ${i+1}`} className={`${input} text-right font-mono tabular-nums`} placeholder="0" value={d.nominal ? Number(d.nominal).toLocaleString("id-ID") : ""} onChange={(e) => update(d.id,{nominal:e.target.value.replace(/[^0-9]/g,"")})} /></label>
-            <button type="button" aria-label={`Hapus transaksi ${i+1}`} disabled={drafts.length === 1} className="justify-self-end rounded-lg p-2 text-muted-faint hover:text-status-red disabled:opacity-20" onClick={() => setDrafts((current) => current.filter((r) => r.id !== d.id))}><Trash2 size={15} /></button>
+            <button type="button" aria-label={`Hapus transaksi ${i+1}`} disabled={drafts.length === 1} className="justify-self-end rounded-lg p-2 text-muted-faint hover:text-status-red disabled:opacity-20" onClick={() => setDrafts((current) => allocateVoucherNumbers(baseNumber.current, current.filter((r) => r.id !== d.id)))}><Trash2 size={15} /></button>
           </div>)}
         </div>
         <button type="button" disabled={drafts.length >= 50} onClick={addTransaction} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border-soft px-4 py-2 text-xs font-bold text-brand disabled:opacity-50"><Plus size={14} />Tambah Transaksi</button>

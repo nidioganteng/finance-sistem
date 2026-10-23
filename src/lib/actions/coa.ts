@@ -1,5 +1,3 @@
-"use server";
-
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
 export async function createCOA(formData: FormData) {

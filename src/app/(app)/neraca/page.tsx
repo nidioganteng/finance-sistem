@@ -1,5 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import { resolveEntityKey } from "@/lib/entity-prefs";
@@ -10,25 +13,51 @@ import { PageTransition } from "@/components/layout/PageTransition";
 import type { ReportVersion } from "@/lib/laba-rugi";
 import { NeracaView } from "@/components/laporan/NeracaView";
 
-export default async function NeracaPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string; version?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { entityKeys } = session!.user;
+function NeracaContent() {
+  const { user, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
+  const versionParam = searchParams.get("version") ?? undefined;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    currentYear: number;
+    currentVersion: ReportVersion;
+    data: Awaited<ReturnType<typeof getLaporanKeuanganData>>;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  useEffect(() => {
+    if (!user) return;
+    const { entityKeys } = user;
+    const currentYear = parseInt(yearStr ?? "") || new Date().getFullYear();
+    const currentVersion: ReportVersion = (versionParam ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+      const data = await getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion);
+      setPageData({ entities, selectedKey: selectedKey!, selectedEntity, currentYear, currentVersion, data });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr, versionParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  const data = await getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion);
+  const { entities, selectedKey, selectedEntity, currentYear, currentVersion, data } = pageData;
 
   return (
     <PageTransition>
@@ -57,12 +86,16 @@ export default async function NeracaPage({
           <p className="text-[13px] text-muted">Isi data COA (Aset/Kewajiban/Modal) dan transaksi terlebih dahulu.</p>
         </div>
       ) : (
-        <NeracaView
-          data={data}
-          year={currentYear}
-          entityName={selectedEntity.name}
-        />
+        <NeracaView data={data} year={currentYear} entityName={selectedEntity.name} />
       )}
     </PageTransition>
+  );
+}
+
+export default function NeracaPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <NeracaContent />
+    </Suspense>
   );
 }

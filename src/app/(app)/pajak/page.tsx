@@ -1,24 +1,42 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 
-export default async function PajakPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string; tab?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) redirect("/login");
+function PajakContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearParam = searchParams.get("year") ?? undefined;
 
-  const { entityKeys } = session.user;
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const year = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) return;
+    const { entityKeys } = user;
+    const selectedKey = resolveEntityKey(entityParam, entityKeys);
+    const year = parseInt(yearParam ?? "") || new Date().getFullYear();
 
-  const params = new URLSearchParams();
-  if (selectedKey) params.set("entity", selectedKey);
-  if (year) params.set("year", year.toString());
-  params.set("tab", "rekonsiliasi");
+    const params = new URLSearchParams();
+    if (selectedKey) params.set("entity", selectedKey);
+    if (year) params.set("year", year.toString());
+    params.set("tab", "rekonsiliasi");
 
-  redirect(`/payroll?${params.toString()}`);
+    router.replace(`/payroll?${params.toString()}`);
+  }, [user, isLoading, entityParam, yearParam]);
+
+  if (isLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
+  }
+  return null;
+}
+
+export default function PajakPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <PajakContent />
+    </Suspense>
+  );
 }

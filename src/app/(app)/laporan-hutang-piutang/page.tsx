@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveReportEntityKey } from "@/lib/entity-prefs";
 import { canViewGrupAggregate } from "@/lib/rbac";
@@ -14,37 +16,57 @@ import {
 } from "@/lib/laporan-hutang-piutang";
 import { LaporanHutangPiutangClient } from "@/components/laporan-hutang-piutang/LaporanHutangPiutangClient";
 
-export const dynamic = "force-dynamic";
+function LaporanHutangPiutangContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
 
-export default async function LaporanHutangPiutangPage({
-  searchParams,
-}: {
-  searchParams: {
-    entity?: string;
-    year?: string;
-  };
-}) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string | undefined;
+    currentYear: number;
+    canGrup: boolean;
+    entityData: Awaited<ReturnType<typeof getLaporanHutangPiutangEntityData>> | null;
+    grupData: Awaited<ReturnType<typeof getLaporanHutangPiutangGrupData>> | null;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  const { role, entityKeys } = session.user;
-  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") {
-    redirect("/dashboard");
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") {
+      router.replace("/dashboard");
+      return;
+    }
+    const currentYear = parseInt(yearStr ?? "") || new Date().getFullYear();
+    const canGrup = canViewGrupAggregate(role);
+
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveReportEntityKey(entityParam, entityKeys, canGrup);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      const isGrup = !selectedEntity || selectedKey === "grup";
+
+      const [entityData, grupData] = await Promise.all([
+        selectedEntity ? getLaporanHutangPiutangEntityData(selectedEntity.key, currentYear) : null,
+        isGrup && canGrup ? getLaporanHutangPiutangGrupData(currentYear) : null,
+      ]);
+
+      setPageData({ entities, selectedKey, currentYear, canGrup, entityData, grupData });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <div className="mt-8 p-6 text-sm text-muted">Gagal memuat data.</div>;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const canGrup = canViewGrupAggregate(role);
-  const selectedKey = resolveReportEntityKey(searchParams.entity, entityKeys, canGrup);
+  const { entities, selectedKey, currentYear, canGrup, entityData, grupData } = pageData;
   const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-
-  const isGrup = !selectedEntity || selectedKey === "grup";
-
-  const [entityData, grupData] = await Promise.all([
-    selectedEntity ? getLaporanHutangPiutangEntityData(selectedEntity.key, currentYear) : null,
-    isGrup && canGrup ? getLaporanHutangPiutangGrupData(currentYear) : null,
-  ]);
-
   const entityTitle = selectedEntity ? selectedEntity.name : "Semua Entitas (Grup)";
 
   return (
@@ -71,5 +93,13 @@ export default async function LaporanHutangPiutangPage({
         year={currentYear}
       />
     </PageTransition>
+  );
+}
+
+export default function LaporanHutangPiutangPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <LaporanHutangPiutangContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getPayrollData } from "@/lib/payroll";
@@ -13,31 +15,71 @@ import dynamic from "next/dynamic";
 import { getKasTransitory } from "@/lib/kas-transitory";
 import { PayrollHoldSummary } from "@/components/kas-transitory/PayrollHoldSummary";
 
-// Disable SSR for PayrollClient — komponen 7000+ baris ini hanya butuh render di browser,
-// bukan di server. Ini menghilangkan semua kemungkinan crash saat SSR.
 const PayrollClient = dynamic(
   () => import("@/components/payroll/PayrollClient").then((m) => ({ default: m.PayrollClient })),
   { ssr: false, loading: () => <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data payroll…</div> }
 );
 
-export default async function PayrollPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string; month?: string; tab?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) redirect("/login");
+function PayrollContent() {
+  const { user, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearParam = searchParams.get("year") ?? undefined;
+  const monthParam = searchParams.get("month") ?? undefined;
+  const tabParam = searchParams.get("tab") ?? undefined;
 
-  const { role, entityKeys } = session.user;
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    year: number;
+    month: number;
+    initialTab: string;
+    payrollData: Awaited<ReturnType<typeof getPayrollData>> | null;
+    rekonsiliasiData: RekonsiliasiPajakGajiData | null;
+    transitoryData: Awaited<ReturnType<typeof getKasTransitory>> | null;
+    payrollError: string | null;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey) || entities[0];
-  const year = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-  const month = parseInt(searchParams.month ?? "") || new Date().getMonth() + 1;
-  const initialTab = searchParams.tab || "pegawai";
+  useEffect(() => {
+    if (!user) return;
+    const { entityKeys, role } = user;
+    const year = parseInt(yearParam ?? "") || new Date().getFullYear();
+    const month = parseInt(monthParam ?? "") || new Date().getMonth() + 1;
+    const initialTab = tabParam || "pegawai";
 
-  if (!selectedEntity) {
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey) || entities[0];
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+
+      let payrollError: string | null = null;
+      const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
+        getPayrollData(selectedEntity.id, year, month).catch((e: unknown) => {
+          payrollError = e instanceof Error ? e.message : String(e);
+          return null;
+        }),
+        getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch(() => null),
+        ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)
+          ? getKasTransitory(selectedEntity.id).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      setPageData({ entities, selectedEntity, year, month, initialTab, payrollData, rekonsiliasiData: rekonsiliasiData as RekonsiliasiPajakGajiData | null, transitoryData, payrollError });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearParam, monthParam, tabParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
+  }
+  if (!user) return null;
+  if (!pageData) {
     return (
       <div className="p-8 text-center text-sm text-muted-faint">
         Anda belum memiliki akses ke entitas manapun.
@@ -45,17 +87,8 @@ export default async function PayrollPage({
     );
   }
 
-  let payrollError: string | null = null;
-  const [payrollData, rekonsiliasiData, transitoryData] = await Promise.all([
-    getPayrollData(selectedEntity.id, year, month).catch((e: unknown) => {
-      payrollError = e instanceof Error ? e.message : String(e);
-      return null;
-    }),
-    getRekonsiliasiPajakGajiData(selectedEntity.id, year).catch(() => null),
-    ["SUPER_ADMIN", "MANAJER_KEUANGAN", "STAF_KEUANGAN"].includes(role)
-      ? getKasTransitory(selectedEntity.id).catch(() => null)
-      : Promise.resolve(null),
-  ]);
+  const { role } = user;
+  const { entities, selectedEntity, year, month, initialTab, payrollData, rekonsiliasiData, transitoryData, payrollError } = pageData;
 
   if (!payrollData) {
     return (
@@ -97,5 +130,13 @@ export default async function PayrollPage({
         selectedMonth={month}
       />
     </PageTransition>
+  );
+}
+
+export default function PayrollPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <PayrollContent />
+    </Suspense>
   );
 }

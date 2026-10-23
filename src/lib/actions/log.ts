@@ -1,5 +1,3 @@
-"use server";
-
 import { phpFetch, getPhpToken, ApiError } from "@/lib/api-client";
 
 export type LogCategory = "USER_ACTIVITY" | "FINANCIAL_CHANGE";

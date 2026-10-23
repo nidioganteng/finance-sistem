@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getBukuBesarRekap, getBukuBesarDrilldown } from "@/lib/buku-besar";
@@ -30,30 +32,65 @@ const KATEGORI_BADGE: Record<string, string> = {
   MODAL:      "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
 };
 
-export default async function BukuBesarPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string; akun?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
+function BukuBesarContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
+  const akunParam = searchParams.get("akun") ?? undefined;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    currentYear: number;
+    rekapData: Awaited<ReturnType<typeof getBukuBesarRekap>> | null;
+    drilldownData: Awaited<ReturnType<typeof getBukuBesarDrilldown>> | null;
+    isDrilldown: boolean;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (role === "SUPER_ADMIN") {
+      router.replace("/dashboard");
+      return;
+    }
+    const currentYear = parseInt(yearStr ?? "") || new Date().getFullYear();
+    const isDrilldown = !!akunParam;
+
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+
+      const [rekapData, drilldownData] = await Promise.all([
+        !isDrilldown ? getBukuBesarRekap(selectedEntity.id, currentYear) : Promise.resolve(null),
+        isDrilldown ? getBukuBesarDrilldown(selectedEntity.id, akunParam!, currentYear) : Promise.resolve(null),
+      ]);
+
+      setPageData({ entities, selectedKey: selectedKey!, selectedEntity, currentYear, rekapData, drilldownData, isDrilldown });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr, akunParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  // URL builder untuk navigasi antar view
+  const { entities, selectedKey, selectedEntity, currentYear, rekapData, drilldownData, isDrilldown } = pageData;
   const baseQ = `entity=${selectedKey}&year=${currentYear}`;
   const rekapHref = (coaId: string) => `/buku-besar?${baseQ}&akun=${coaId}`;
   const backHref = `/buku-besar?${baseQ}`;
-
-  const isDrilldown = !!searchParams.akun;
 
   return (
     <PageTransition>
@@ -62,11 +99,7 @@ export default async function BukuBesarPage({
         subtitle={`Ledger per akun COA — ${currentYear}`}
         rightSlot={
           <>
-            <PrintButton
-              title="Buku Besar"
-              entityName={selectedEntity.name}
-              year={currentYear}
-            />
+            <PrintButton title="Buku Besar" entityName={selectedEntity.name} year={currentYear} />
             <YearSelect currentYear={currentYear} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
@@ -77,27 +110,30 @@ export default async function BukuBesarPage({
         }
       />
 
-      {isDrilldown
-        ? <DrilldownView entityId={selectedEntity.id} coaId={searchParams.akun!} year={currentYear} backHref={backHref} />
-        : <RekapView entityId={selectedEntity.id} year={currentYear} rekapHref={rekapHref} />
-      }
+      {isDrilldown && drilldownData !== null ? (
+        <DrilldownView data={drilldownData} backHref={backHref} year={currentYear} kategori_badge={KATEGORI_BADGE} fmtShort={fmtDateShort} fmtFull={fmtDateFull} />
+      ) : isDrilldown ? (
+        <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
+          <p className="text-sm text-muted">Akun tidak ditemukan.</p>
+          <a href={backHref} className="text-brand text-[13px] font-bold mt-2 inline-block">← Kembali</a>
+        </div>
+      ) : rekapData ? (
+        <RekapView data={rekapData} rekapHref={rekapHref} kategori_badge={KATEGORI_BADGE} />
+      ) : null}
     </PageTransition>
   );
 }
 
-// ── Tampilan Rekap ────────────────────────────────────────────────
-async function RekapView({
-  entityId,
-  year,
+function RekapView({
+  data,
   rekapHref,
+  kategori_badge,
 }: {
-  entityId: string;
-  year: number;
+  data: Awaited<ReturnType<typeof getBukuBesarRekap>>;
   rekapHref: (coaId: string) => string;
+  kategori_badge: Record<string, string>;
 }) {
-  const { rows, totalSemuaDebetFmt, totalSemuaKreditFmt, isBalanced, totalSemuaDebet, totalSemuaKredit } =
-    await getBukuBesarRekap(entityId, year);
-
+  const { rows, totalSemuaDebetFmt, totalSemuaKreditFmt, isBalanced, totalSemuaDebet, totalSemuaKredit } = data;
   const selisih = Math.abs(totalSemuaDebet - totalSemuaKredit);
 
   return (
@@ -137,14 +173,9 @@ async function RekapView({
               </tr>
             ) : (
               rows.map((r) => (
-                <tr
-                  key={r.coaId}
-                  className="border-b border-surface-subtle hover:bg-surface-hover/40 cursor-pointer group"
-                >
+                <tr key={r.coaId} className="border-b border-surface-subtle hover:bg-surface-hover/40 cursor-pointer group">
                   <td className="py-3 px-5">
-                    <a href={rekapHref(r.coaId)} className="font-mono font-bold text-navy-text text-[13px]">
-                      {r.code}
-                    </a>
+                    <a href={rekapHref(r.coaId)} className="font-mono font-bold text-navy-text text-[13px]">{r.code}</a>
                   </td>
                   <td className="py-3 px-3">
                     <a href={rekapHref(r.coaId)} className="flex items-center gap-1 text-[13px] font-semibold text-navy-text">
@@ -153,7 +184,7 @@ async function RekapView({
                     </a>
                   </td>
                   <td className="py-3 px-3">
-                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[r.kategori] ?? "bg-surface-hover text-muted"}`}>
+                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${kategori_badge[r.kategori] ?? "bg-surface-hover text-muted"}`}>
                       {r.kategori}
                     </span>
                   </td>
@@ -174,9 +205,7 @@ async function RekapView({
               <tr className={`border-t-2 ${isBalanced ? "border-border" : "border-red-300"}`}>
                 <td colSpan={4} className="py-3.5 px-5 text-[13px] font-extrabold text-navy-text">
                   Total Semua Akun
-                  {!isBalanced && (
-                    <span className="ml-2 text-[11px] font-bold text-red-500">⚠ tidak seimbang</span>
-                  )}
+                  {!isBalanced && <span className="ml-2 text-[11px] font-bold text-red-500">⚠ tidak seimbang</span>}
                 </td>
                 <td className={`py-3.5 px-3 text-right tabular-nums text-[13.5px] font-extrabold whitespace-nowrap ${isBalanced ? "text-navy-text" : "text-red-600 dark:text-red-400"}`}>
                   {totalSemuaDebetFmt}
@@ -195,44 +224,32 @@ async function RekapView({
   );
 }
 
-// ── Tampilan Drill-down ───────────────────────────────────────────
-async function DrilldownView({
-  entityId,
-  coaId,
-  year,
+function DrilldownView({
+  data,
   backHref,
+  year,
+  kategori_badge,
+  fmtShort,
+  fmtFull,
 }: {
-  entityId: string;
-  coaId: string;
-  year: number;
+  data: NonNullable<Awaited<ReturnType<typeof getBukuBesarDrilldown>>>;
   backHref: string;
+  year: number;
+  kategori_badge: Record<string, string>;
+  fmtShort: (s: string) => string;
+  fmtFull: (s: string) => string;
 }) {
-  const data = await getBukuBesarDrilldown(entityId, coaId, year);
-
-  if (!data) {
-    return (
-      <div className="bg-surface-card rounded-[20px] border border-border-soft py-16 text-center">
-        <p className="text-sm text-muted">Akun tidak ditemukan.</p>
-        <a href={backHref} className="text-brand text-[13px] font-bold mt-2 inline-block">← Kembali</a>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      {/* Header drill-down */}
       <div className="flex items-center gap-3 flex-wrap">
-        <a
-          href={backHref}
-          className="flex items-center gap-1.5 text-[13px] font-bold text-muted-stronger hover:text-navy-text transition-colors"
-        >
+        <a href={backHref} className="flex items-center gap-1.5 text-[13px] font-bold text-muted-stronger hover:text-navy-text transition-colors">
           <ChevronLeft size={15} />
           Semua Akun
         </a>
         <span className="text-muted-faint">/</span>
         <span className="font-mono font-bold text-navy-text text-[13px]">{data.coa.code}</span>
         <span className="font-semibold text-muted-stronger text-[13px]">{data.coa.name}</span>
-        <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${KATEGORI_BADGE[data.coa.kategori] ?? "bg-surface-hover text-muted"}`}>
+        <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${kategori_badge[data.coa.kategori] ?? "bg-surface-hover text-muted"}`}>
           {data.coa.kategori}
         </span>
       </div>
@@ -251,7 +268,6 @@ async function DrilldownView({
             </tr>
           </thead>
           <tbody>
-            {/* Baris saldo awal */}
             <tr className="border-b border-surface-subtle bg-surface-subtle/50">
               <td colSpan={5} className="py-2.5 px-5 text-[12px] font-semibold text-muted-faint italic">
                 Saldo Awal {year}
@@ -272,9 +288,9 @@ async function DrilldownView({
                 <tr key={i} className="border-b border-surface-subtle hover:bg-surface-hover/30">
                   <td className="py-2.5 px-5 text-[12.5px] text-muted whitespace-nowrap">
                     <div className="relative group/dt inline-block">
-                      <span>{fmtDateShort(e.tanggal)}</span>
+                      <span>{fmtShort(e.tanggal)}</span>
                       <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
-                        {fmtDateFull(e.tanggal)}
+                        {fmtFull(e.tanggal)}
                       </div>
                     </div>
                   </td>
@@ -303,5 +319,13 @@ async function DrilldownView({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BukuBesarPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <BukuBesarContent />
+    </Suspense>
   );
 }

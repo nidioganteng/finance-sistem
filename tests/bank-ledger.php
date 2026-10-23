@@ -30,6 +30,8 @@ add_tx('transfer-out','gaharu','journal','21',0,300,[],'TRANSFER');
 add_tx('transfer-in','gaharu','journal','22',300,0,[],'TRANSFER');
 add_tx('second-line','gaharu','journal','22',200,0,[],'TRANSFER');
 add_tx('manual','gaharu','bank','22',50,0,['isKasEntry'=>true,'rekeningNama'=>'BPD GS'],'DIRECT');
+$pdo->exec("INSERT INTO CoaAccount VALUES ('cost','512','Transport')");
+add_tx('manual-counterpart','gaharu','bank','cost',0,50,[],'DIRECT');
 add_tx('old','gaharu','journal','22',999,0,[],'OLD','2025-10-10');
 add_tx('future','gaharu','journal','22',999,0,[],'FUTURE','2027-10-10');
 $pdo->exec("INSERT INTO SaldoAwal VALUES ('gaharu','22',2026,100)");
@@ -52,6 +54,9 @@ function ledger($account) {
 }
 $count=(int)$pdo->query('SELECT COUNT(*) FROM `Transaction`')->fetchColumn();
 $bpd=ledger('BPD GS'); $bri=ledger('BRI GS');
+$direct=array_values(array_filter($bpd['entries'],fn($r)=>$r['noBukti']==='DIRECT'))[0];
+eq(count($direct['allTxIds']),2,'manual bank voucher retains counterpart id for edit/delete');
+eq($direct['coaRows'][0]['coaName'],'Transport','manual bank counterpart account remains visible');
 eq($bpd['totalMasuk'],1550.0,'BPD all receipts');
 eq($bpd['totalKeluar'],0.0,'BPD no transfer withdrawal');
 eq($bpd['saldoAkhir'],1650.0,'BPD closing balance');

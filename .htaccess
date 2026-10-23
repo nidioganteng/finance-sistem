@@ -1,0 +1,14 @@
+Options -Indexes
+RewriteEngine On
+RewriteBase /
+
+# Biarkan request ke /api/* masuk ke PHP backend
+RewriteRule ^api/ - [L]
+
+# Biarkan file dan folder statis yang benar-benar ada (JS, CSS, gambar, dll)
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Semua route lain → index.html (Next.js static export dengan trailingSlash)
+RewriteRule ^ index.html [L]

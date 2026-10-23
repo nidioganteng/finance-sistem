@@ -31,7 +31,13 @@ export function AppShell({
     }
     const fetchCount = async () => {
       try {
-        const res = await fetch("/api/notif-count");
+        const { PHP_API_URL } = await import("@/lib/api-client");
+        const { getStoredToken } = await import("@/lib/auth-store");
+        const token = getStoredToken();
+        if (!token) return;
+        const res = await fetch(`${PHP_API_URL}/api/notifikasi/count`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (res.ok) {
           const data = await res.json();
           setUnreadCount(data.count ?? 0);

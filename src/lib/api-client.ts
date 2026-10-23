@@ -1,10 +1,11 @@
 /**
  * PHP API client — semua fetch ke backend PHP melalui helper ini.
- * Token JWT PHP disimpan di NextAuth session (session.user.phpToken).
+ * Token JWT PHP disimpan di localStorage (auth-store.ts).
  */
 
+import { getStoredToken } from "./auth-store";
+
 export const PHP_API_URL =
-  process.env.PHP_API_URL ??
   process.env.NEXT_PUBLIC_PHP_API_URL ??
   "http://localhost:8000";
 
@@ -36,12 +37,13 @@ export async function phpFetch<T = unknown>(
   return res.json() as Promise<T>;
 }
 
-/** Helper untuk server actions & server components yang sudah punya session */
 export async function getPhpToken(): Promise<string> {
-  const { getServerSession } = await import("next-auth");
-  const { authOptions } = await import("./auth");
-  const { redirect } = await import("next/navigation");
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.phpToken) redirect("/login");
-  return session!.user.phpToken as string;
+  const token = getStoredToken();
+  if (!token) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    throw new Error("Sesi habis. Silakan login kembali.");
+  }
+  return token;
 }

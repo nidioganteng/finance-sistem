@@ -57,6 +57,41 @@ define('REKENING_ID_TO_NAMA', [
 define('ENTITY_PREFIX', ['gaharu' => 'GH', 'kencana' => 'KC', 'tataring' => 'TT', 'ciptaAsri' => 'CA', 'umum' => 'UM']);
 define('ENTITY_PREFIX_UMUM', ['kencana' => 'UK', 'gaharu' => 'UG', 'tataring' => 'UT', 'ciptaAsri' => 'UC', 'umum' => 'UU']);
 
+/** Nomor nota umum: UK/MMDD1, UG/MMDD1, UT/MMDD1, UC/MMDD1. */
+function kas_next_voucher_number(PDO $pdo, string $entity_key, string $tanggal): string {
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $tanggal);
+    if (!$date || $date->format('Y-m-d') !== $tanggal) throw new InvalidArgumentException('Tanggal transaksi tidak valid.');
+    $prefix = ENTITY_PREFIX_UMUM[$entity_key] ?? null;
+    if (!$prefix) throw new InvalidArgumentException('Kode entitas belum diatur.');
+    $stmt = $pdo->prepare('SELECT id FROM Entity WHERE `key` = ?');
+    $stmt->execute([$entity_key]);
+    $entity_id = $stmt->fetchColumn();
+    if (!$entity_id) throw new InvalidArgumentException('Entitas tidak ditemukan.');
+    $day = $date->format('md');
+    $stmt = $pdo->prepare('SELECT noBukti FROM `Transaction` WHERE entityId = ? AND (noBukti LIKE ? OR noBukti LIKE ?)');
+    $stmt->execute([$entity_id, $prefix . '/' . $day . '%', $prefix . $day . '%']);
+    $max = 0;
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $number) {
+        // Nomor lama tanpa slash tetap diperhitungkan; nomor proyek tetap manual.
+        if (preg_match('~^' . preg_quote($prefix, '~') . '/?' . $day . '(\d+)$~', $number, $match)) $max = max($max, (int)$match[1]);
+    }
+    return $prefix . '/' . $day . ($max + 1);
+}
+
+/** Infer tujuan piutang dari COA, termasuk saat form ringkas tidak mengirim crossing keys. */
+function kas_piutang_crossing_keys(PDO $pdo, string $entity_key, string $arah, array $rows, array $explicit = []): array {
+    if ($arah !== 'keluar') return array_values(array_unique($explicit));
+    $targets = $explicit;
+    $by_code = array_flip(PIUTANG_COA_CODE);
+    foreach ($rows as $row) {
+        $stmt = $pdo->prepare('SELECT code FROM CoaAccount WHERE id = ?');
+        $stmt->execute([$row['coaAccountId']]);
+        $target = $by_code[$stmt->fetchColumn()] ?? null;
+        if ($target && $target !== $entity_key) $targets[] = $target;
+    }
+    return array_values(array_unique($targets));
+}
+
 /**
  * Kembalikan nama rekening dari rekeningId.
  */

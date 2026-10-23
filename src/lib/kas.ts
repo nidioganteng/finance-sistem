@@ -115,6 +115,7 @@ export type KasLedgerEntry = {
   keterangan: string;
   akunTags: string[];
   rekening?: string;
+  sourceJurnal?: boolean;
   crossingEntityKeys?: string[];
   crossingFromEntityKey?: string;
   periodeBulanGaji?: number | null;

@@ -61,16 +61,23 @@ if ($method === 'GET' && $sub === 'ledger') {
 
     $sql .= " ORDER BY t.tanggal ASC, t.noBukti ASC, t.createdAt ASC";
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($jenis_input_key === 'bankBuku') {
+        $rows = bank_ledger_rows($pdo, $entity_id, $jenis_input_id, $rekening_nama, $dari, $sampai);
+    } else {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     // Kelompokkan per noBukti|tanggal — logika dari getKasLedger() src/lib/kas.ts
     $groups = [];
     foreach ($rows as $r) {
         $tanggal_raw = substr($r['tanggal'], 0, 10);
-        $key = $r['noBukti'] . '|' . $tanggal_raw;
         $extra = $r['extraFieldsJson'] ? json_decode($r['extraFieldsJson'], true) : [];
+        $key = $r['noBukti'] . '|' . $tanggal_raw;
+        if ($jenis_input_key === 'bankBuku') {
+            $key .= '|' . ($extra['rekeningNama'] ?? '') . '|' . (!empty($r['sourceJurnal']) ? 'jurnal|' . $r['entityId'] . '|' . ((float)$r['debit'] > 0 ? 'in' : 'out') : 'bank');
+        }
 
         if (!isset($groups[$key])) {
             $groups[$key] = [
@@ -86,6 +93,7 @@ if ($method === 'GET' && $sub === 'ledger') {
                 'crossingFromEntityKey' => null,
                 'crossingGroupId'     => null,
                 'hasKasEntry'         => false,
+                'sourceJurnal'        => !empty($r['sourceJurnal']),
                 'allTxIds'            => [],
                 'coaRows'             => [],
                 'project'             => null,
@@ -115,8 +123,8 @@ if ($method === 'GET' && $sub === 'ledger') {
 
         if ($is_kas_entry) {
             $g['hasKasEntry'] = true;
-            $g['masuk']       = (float)$r['debit'];
-            $g['keluar']      = (float)$r['kredit'];
+            $g['masuk']       += (float)$r['debit'];
+            $g['keluar']      += (float)$r['kredit'];
             if (!empty($extra['rekeningNama']))        $g['rekening']            = $extra['rekeningNama'];
             if (!empty($extra['crossingEntityKeys']))  $g['crossingEntityKeys']  = $extra['crossingEntityKeys'];
             elseif (!empty($extra['crossingEntityKey'])) $g['crossingEntityKeys'] = [$extra['crossingEntityKey']]; // backward compat
@@ -229,6 +237,7 @@ if ($method === 'GET' && $sub === 'ledger') {
                 'keterangan'          => $g['keterangan'],
                 'akunTags'            => $g['akunTags'],
                 'rekening'            => $g['rekening'],
+                'sourceJurnal'        => $g['sourceJurnal'],
                 'crossingEntityKeys'  => $g['crossingEntityKeys'],
                 'crossingFromEntityKey' => $g['crossingFromEntityKey'],
                 'masuk'               => $g['masuk'],
@@ -586,6 +595,7 @@ elseif ($method === 'DELETE' && $sub === 'transaksi') {
 
     $tx_ids = array_filter((array)($body['txIds'] ?? []));
     if (empty($tx_ids)) return error_response('Tidak ada transaksi untuk dihapus.', 400);
+    if (bank_ledger_has_journal_source($pdo, $tx_ids)) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_values($tx_ids));
 
     // Cari crossingGroupIds dan projectIds dari source transactions sebelum dihapus
@@ -640,6 +650,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
 
     $existing_tx_ids = array_filter((array)($body['existingTxIds'] ?? []));
     if (empty($existing_tx_ids)) return error_response('Tidak ada transaksi lama untuk diganti.', 400);
+    if (bank_ledger_has_journal_source($pdo, $existing_tx_ids)) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_values($existing_tx_ids));
 
     $entity_key      = $body['entityKey']      ?? '';
@@ -832,6 +843,7 @@ elseif ($method === 'PATCH' && $sub === 'transaksi') {
     try { transitory_guard_coa(array_column($coa_updates,'newCoaAccountId')); } catch(RuntimeException $e) { return error_response($e->getMessage(),409); } // [{txId, newCoaAccountId}]
 
     if (empty($tx_ids)) return error_response('txIds wajib diisi.', 400);
+    if (bank_ledger_has_journal_source($pdo, array_merge($tx_ids, array_column($coa_updates, 'txId')))) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_merge(array_values($tx_ids),array_column($coa_updates,'txId')));
     if (!$new_no_bukti || !$new_keterangan) return error_response('No. bukti dan keterangan wajib diisi.', 400);
 

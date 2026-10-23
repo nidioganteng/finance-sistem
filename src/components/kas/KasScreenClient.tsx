@@ -105,6 +105,7 @@ export function KasScreenClient({
   const [panelOpen, setPanelOpen] = useState(false);
   const [batchMode, setBatchMode] = useState(true);
   const supportsBatch = ["kasKecil", "kasBesar", "bankBuku"].includes(jenisInputKey);
+  const EditTransactionForm = supportsBatch ? KasBatchTransactionForm : KasTransactionForm;
   const transactionFormRef = useRef<HTMLDivElement>(null);
 
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
@@ -421,7 +422,7 @@ export function KasScreenClient({
             <button type="button" onClick={() => setBatchMode(false)} className={`rounded-lg px-4 py-2 text-xs font-bold ${!batchMode ? "bg-navy text-white" : "text-muted-stronger"}`}>Form Lengkap</button>
           </div>}
           {editingRow ? (
-            <KasTransactionForm
+            <EditTransactionForm
               key={`edit-${editingRow.allTxIds.join("-")}`}
               entityKey={entityKey}
               jenisInputKey={jenisInputKey}

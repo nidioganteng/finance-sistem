@@ -281,7 +281,7 @@ export function KasTransactionForm({
     if (isBankBuku && !rekeningId) { setError("Pilih rekening/bank terlebih dahulu."); return; }
     const validRows = rows.filter((r) => r.coaAccountId && Number(r.nominal.replace(/[^0-9]/g, "")) > 0);
     if (validRows.length === 0) { setError("Isi minimal satu baris akun dengan akun dan nominal."); return; }
-    if (!noBukti.trim() || !keterangan.trim()) { setError("No. bukti dan keterangan wajib diisi."); return; }
+    if (!noBukti.trim()) { setError("No. bukti wajib diisi."); return; }
     const payload = {
       entityKey, jenisInputKey, tanggal, noBukti, keterangan, arah,
       rows: validRows.map((r) => ({
@@ -414,7 +414,7 @@ export function KasTransactionForm({
 
         {/* Keterangan */}
         <div>
-          <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">Keterangan</label>
+          <label className="text-[11px] font-bold text-muted-stronger uppercase tracking-wide block mb-1.5">Keterangan (opsional)</label>
           <input
             value={keterangan}
             onChange={(e) => setKeterangan(e.target.value)}

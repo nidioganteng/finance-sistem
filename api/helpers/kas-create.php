@@ -25,8 +25,8 @@ function kas_create_transaction(PDO $pdo, array $user, array $body): array {
     $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
 
     // Validasi dasar
-    if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$keterangan || !$arah) {
-        throw new KasInputException('entityKey, jenisInputKey, tanggal, noBukti, keterangan, dan arah wajib diisi.', 400);
+    if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$arah) {
+        throw new KasInputException('entityKey, jenisInputKey, tanggal, noBukti, dan arah wajib diisi.', 400);
     }
 
     if (!in_array($arah, ['masuk', 'keluar'], true)) throw new KasInputException('Arah transaksi tidak valid.', 400);

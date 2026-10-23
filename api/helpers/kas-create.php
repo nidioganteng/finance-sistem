@@ -50,6 +50,7 @@ function kas_create_transaction(PDO $pdo, array $user, array $body): array {
     try { transitory_guard_coa(array_column((array)$rows,'coaAccountId')); } catch(RuntimeException $e) { throw new KasInputException($e->getMessage(),409); }
     $valid_rows = array_values(array_filter($rows, fn($r) => !empty($r['coaAccountId']) && (float)($r['nominal'] ?? 0) > 0));
     if (empty($valid_rows)) throw new KasInputException('Isi minimal satu baris akun dengan nominal.', 400);
+    $crossing_keys = kas_piutang_crossing_keys($pdo, $entity_key, $arah, $valid_rows, $crossing_keys);
 
     if ($jenis_input_key === 'bankBuku') {
         if (!$rekening_id) throw new KasInputException('Rekening/Bank wajib dipilih untuk transaksi Buku Bank.', 400);

@@ -579,6 +579,7 @@ export function KasScreenClient({
                   const visibleAccounts: (CoaRow | null)[] = r.coaRows.length
                     ? (expanded ? r.coaRows : r.coaRows.slice(0, 2)) : [null];
                   const remainingAccounts = r.coaRows.length - visibleAccounts.length;
+                  const sharedAlignment = visibleAccounts.length === 1 ? "align-middle" : "align-top";
 
                   const isCrossingFrom = !!r.crossingFromEntityKey;
                   const sourceEntityName = isCrossingFrom
@@ -589,7 +590,7 @@ export function KasScreenClient({
                     <Fragment key={r.noBukti + idx}>
                     {visibleAccounts.map((cr, accountIndex) => <tr key={cr?.id || accountIndex} className="border-b border-surface-subtle align-middle hover:bg-surface-hover/30 group">
                       {accountIndex === 0 && <>
-                      <td rowSpan={visibleAccounts.length} className="py-2.5 px-1.5 align-top text-[12.5px] text-muted whitespace-nowrap">
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-[12.5px] text-muted whitespace-nowrap`}>
                         <div className="relative group/dt inline-block">
                           <span>{fmtDateShort(r.tanggalRaw || r.tanggal)}</span>
                           <div className="absolute bottom-full left-0 mb-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] whitespace-nowrap opacity-0 group-hover/dt:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
@@ -608,15 +609,15 @@ export function KasScreenClient({
                           </div>
                         )}
                       </td>
-                      <td rowSpan={visibleAccounts.length} className="py-2.5 px-1.5 align-top text-xs text-muted font-mono whitespace-nowrap">{r.noBukti}</td>
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-xs text-muted font-mono whitespace-nowrap`}>{r.noBukti}</td>
                       </>}
-                      <td className="py-2.5 px-1.5 text-[13px] font-semibold text-navy-text">
-                        {r.coaRows.some(account => account.itemDescription && account.itemDescription !== r.keterangan) ? (
-                          <div className="flex items-start gap-3 leading-5">
-                            <span className="w-24 shrink-0 whitespace-normal break-words">{accountIndex === 0 ? r.keterangan : ""}</span>
-                            <span className="min-w-[180px] max-w-sm whitespace-normal break-words font-normal">{cr?.itemDescription && cr.itemDescription !== r.keterangan ? cr.itemDescription : ""}</span>
-                          </div>
-                        ) : <div className="min-w-[180px] max-w-sm whitespace-normal break-words leading-5">{r.keterangan}</div>}
+                      <td className="py-2.5 px-1.5 align-middle text-[13px] text-navy-text">
+                        <div className="min-w-[220px] max-w-sm whitespace-normal break-words leading-5">
+                          {cr?.itemDescription && cr.itemDescription !== r.keterangan ? <>
+                            {accountIndex === 0 && <><span className="font-medium text-muted-stronger">{r.keterangan}</span><span aria-hidden="true" className="mx-2 text-muted-faint">·</span></>}
+                            <span>{cr.itemDescription}</span>
+                          </> : <span className="font-medium">{r.keterangan}</span>}
+                        </div>
                         {accountIndex === 0 && r.periodeBulanGaji && (
                           <span
                             className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-md whitespace-nowrap"
@@ -663,8 +664,8 @@ export function KasScreenClient({
                         <span className={`text-[13px] font-bold tabular-nums ${r.keluar > 0 ? "text-status-red" : "text-muted-faint"}`}>{cr ? (r.keluar > 0 ? formatRupiah(cr.nominal) : "—") : r.keluarFmt}</span>
                       </td>
                       {accountIndex === 0 && <>
-                      <td rowSpan={visibleAccounts.length} className="py-2.5 px-1.5 align-top text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap">{r.saldoFmt}</td>
-                      <td rowSpan={visibleAccounts.length} className="py-2.5 px-1.5 align-top text-right">
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-[13px] font-bold text-navy-text text-right tabular-nums whitespace-nowrap`}>{r.saldoFmt}</td>
+                      <td rowSpan={visibleAccounts.length} className={`py-2.5 px-1.5 ${sharedAlignment} text-right`}>
                         {isCrossingFrom ? (
                           <span className="text-[10px] text-muted-faint px-1" title="Kelola dari entitas sumber">—</span>
                         ) : (

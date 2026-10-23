@@ -1,5 +1,8 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities, formatRupiah } from "@/lib/dashboard-data";
 import { getLaporanKeuanganData } from "@/lib/laporan-keuangan";
 import { resolveEntityKey } from "@/lib/entity-prefs";
@@ -15,36 +18,67 @@ import type { ReportVersion } from "@/lib/laba-rugi";
 import { getLaporanPajakData } from "@/lib/pajak";
 import { LabaRugiUmumView } from "@/components/laporan/LabaRugiUmumView";
 import { getArusKasPresisiData } from "@/lib/arus-kas-presisi";
-import { ArusKasPresisiClient } from "@/components/laporan/ArusKasPresisiClient";
 import { ArusKasTabWrapper } from "@/components/laporan/ArusKasTabWrapper";
 import { NeracaView } from "@/components/laporan/NeracaView";
 
-export default async function LaporanKeuanganPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string; tab?: string; version?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { entityKeys } = session!.user;
+function LaporanKeuanganContent() {
+  const { user, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
+  const tabParam = searchParams.get("tab") ?? undefined;
+  const versionParam = searchParams.get("version") ?? undefined;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const tab = searchParams.tab ?? "neraca";
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    currentYear: number;
+    currentVersion: ReportVersion;
+    tab: string;
+    data: Awaited<ReturnType<typeof getLaporanKeuanganData>>;
+    taxData: Awaited<ReturnType<typeof getLaporanPajakData>>;
+    arusKasPresisiData: Awaited<ReturnType<typeof getArusKasPresisiData>> | null;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  useEffect(() => {
+    if (!user) return;
+    const { entityKeys } = user;
+    const currentYear = parseInt(yearStr ?? "") || new Date().getFullYear();
+    const currentVersion: ReportVersion = (versionParam ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+    const tab = tabParam ?? "neraca";
+
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+
+      const [data, taxData, arusKasPresisiData] = await Promise.all([
+        getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
+        getLaporanPajakData(selectedEntity.id, currentYear, currentVersion, selectedEntity.name),
+        tab === "arus-kas"
+          ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
+          : Promise.resolve(null),
+      ]);
+
+      setPageData({ entities, selectedKey: selectedKey!, selectedEntity, currentYear, currentVersion, tab, data, taxData, arusKasPresisiData });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr, tabParam, versionParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  const [data, taxData, arusKasPresisiData] = await Promise.all([
-    getLaporanKeuanganData(selectedEntity.id, currentYear, currentVersion),
-    getLaporanPajakData(selectedEntity.id, currentYear, currentVersion, selectedEntity.name),
-    tab === "arus-kas"
-      ? getArusKasPresisiData(selectedEntity.id, currentYear, currentVersion)
-      : Promise.resolve(null),
-  ]);
+  const { entities, selectedKey, selectedEntity, currentYear, currentVersion, tab, data, taxData, arusKasPresisiData } = pageData;
   const hasData = data.pendapatan.length > 0 || data.beban.length > 0 || data.aset.length > 0;
 
   const TAB_NAMES: Record<string, string> = {
@@ -108,6 +142,14 @@ export default async function LaporanKeuanganPage({
         />
       )}
     </PageTransition>
+  );
+}
+
+export default function LaporanKeuanganPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <LaporanKeuanganContent />
+    </Suspense>
   );
 }
 
@@ -193,223 +235,6 @@ function SubtotalRow({ label, amount, amountClass = "text-navy-text", bgClass = 
   );
 }
 
-// ── Tab: Neraca ──────────────────────────────────────────────────────
-function NeracaTab({
-  data,
-  year,
-  entityName,
-}: {
-  data: Awaited<ReturnType<typeof getLaporanKeuanganData>>;
-  year: number;
-  entityName: string;
-}) {
-  const balancedBadge = (
-    <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
-      data.neracaBalanced
-        ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
-        : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
-    }`}>
-      {data.neracaBalanced ? "✓ Seimbang" : "✗ Tidak Seimbang"}
-    </span>
-  );
-
-  return (
-    <div className="flex flex-col gap-4">
-      <ReportHeader
-        entityName={entityName}
-        title="Neraca"
-        period={`Per 31 Desember ${year}`}
-        note="Dalam Rupiah"
-        badge={balancedBadge}
-      />
-
-      {!data.neracaBalanced && (
-        <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
-          <AlertTriangle size={15} className="text-red-500 mt-0.5 shrink-0" />
-          <p className="text-[13px] text-red-700 dark:text-red-400">
-            <span className="font-bold">Neraca tidak seimbang!</span>{" "}
-            Total Aktiva ({data.totalAsetFmt}) ≠ Total Pasiva ({data.totalPassivaFmt}).
-            Periksa entri akun COA untuk menemukan sumber ketidakseimbangan.
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* ── Aktiva ── */}
-        <div className="flex flex-col gap-4">
-          {/* I. Aktiva Lancar */}
-          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="blue" label="I. Aktiva Lancar" />
-            <div className="divide-y divide-surface-subtle">
-              {data.aktivaLancar.length === 0 ? (
-                <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva lancar.</p>
-              ) : (
-                data.aktivaLancar.map((item) => (
-                  <ItemRow
-                    key={item.code}
-                    code={item.code}
-                    name={item.name + (item.isContra ? " (Kontra)" : "")}
-                    amount={item.saldoFmt}
-                    amountClass={item.isContra ? "text-status-amber" : "text-navy-text"}
-                  />
-                ))
-              )}
-            </div>
-            <SubtotalRow
-              label="Total Aktiva Lancar"
-              amount={data.totalAktivaLancarFmt}
-              bgClass="bg-blue-50/50 dark:bg-blue-500/10"
-              borderClass="border-blue-100 dark:border-blue-500/20"
-            />
-          </div>
-
-          {/* II. Aktiva Tetap */}
-          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="blue" label="II. Aktiva Tetap" />
-            <div className="divide-y divide-surface-subtle">
-              {data.rekapPerKategoriAset && data.rekapPerKategoriAset.length === 4 ? (
-                <>
-                  {data.rekapPerKategoriAset.map((rekap, idx) => {
-                    const hasVal = rekap.totalHargaPerolehan > 0;
-                    return (
-                      <ItemRow
-                        key={rekap.kategori}
-                        code={String(idx + 1)}
-                        name={rekap.label}
-                        amount={hasVal ? formatRupiah(rekap.totalHargaPerolehan) : "-"}
-                        amountClass={hasVal ? "text-navy-text" : "text-muted-faint"}
-                      />
-                    );
-                  })}
-                  {(() => {
-                    const totalAkm = Math.max(
-                      data.rekapPerKategoriAset.reduce((s, r) => s + r.totalAkumulasiPenyusutan, 0),
-                      data.aktivaTetap.find((a) => a.isContra || a.code === "1001" || /penyusutan/i.test(a.name))?.saldo ?? 0
-                    );
-                    return (
-                      <ItemRow
-                        code="1001"
-                        name="Akumulasi Penyusutan (Pengurang)"
-                        amount={totalAkm > 0 ? `(${formatRupiah(totalAkm)})` : "-"}
-                        amountClass="text-status-amber"
-                      />
-                    );
-                  })()}
-                </>
-              ) : data.aktivaTetap.length === 0 ? (
-                <p className="py-5 px-5 text-[13px] text-muted-faint italic">Tidak ada akun aktiva tetap.</p>
-              ) : (
-                data.aktivaTetap.map((item) => (
-                  <ItemRow
-                    key={item.code}
-                    code={item.code}
-                    name={item.name + (item.isContra ? " (Pengurang)" : "")}
-                    amount={item.saldoFmt}
-                    amountClass={item.isContra ? "text-status-amber" : "text-navy-text"}
-                  />
-                ))
-              )}
-            </div>
-            <SubtotalRow
-              label="Total Aktiva Tetap (Net)"
-              amount={data.totalAktivaTetapFmt}
-              bgClass="bg-cyan-50/50 dark:bg-cyan-500/10"
-              borderClass="border-cyan-100 dark:border-cyan-500/20"
-            />
-          </div>
-
-          {/* Total Aktiva */}
-          <TotalRow
-            label="Total Aktiva (Lancar + Tetap)"
-            amount={data.totalAsetFmt}
-            amountClass={data.neracaBalanced ? "text-blue-700 dark:text-blue-400" : "text-status-red"}
-            bgClass="bg-blue-50 dark:bg-blue-500/15"
-            borderClass="border-blue-200 dark:border-blue-500/30"
-          />
-        </div>
-
-        {/* ── Pasiva ── */}
-        <div className="flex flex-col gap-4">
-          {/* Kewajiban */}
-          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="orange" label="I. Kewajiban" />
-            <div className="divide-y divide-surface-subtle">
-              {data.kewajiban.length === 0 ? (
-                <p className="py-4 px-5 text-[13px] text-muted-faint italic">Tidak ada kewajiban.</p>
-              ) : (
-                data.kewajiban.map((item) => (
-                  <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
-                ))
-              )}
-            </div>
-            <SubtotalRow
-              label="Total Kewajiban"
-              amount={data.totalKewajibanFmt}
-              bgClass="bg-orange-50/50 dark:bg-orange-500/10"
-              borderClass="border-orange-100 dark:border-orange-500/20"
-            />
-          </div>
-
-          {/* Modal & Ekuitas */}
-          <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-            <SectionHeader color="violet" label="II. Modal & Ekuitas" />
-            <div className="divide-y divide-surface-subtle">
-              {data.modal.map((item) => (
-                <ItemRow key={item.code} code={item.code} name={item.name} amount={item.saldoFmt} />
-              ))}
-              {/* Laba Ditahan (Akun 310) */}
-              <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-violet-50/30 dark:bg-violet-500/5">
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <code className="text-[10.5px] text-muted-faintest font-mono shrink-0">310</code>
-                  <span className="text-[13px] text-muted-stronger">Laba Ditahan</span>
-                </div>
-                <span className="tabular-nums text-[13px] font-semibold shrink-0 text-navy-text">
-                  {data.labaDitahanFmt}
-                </span>
-              </div>
-              {/* Laba Tahun Berjalan */}
-              <div className="flex items-baseline justify-between py-2.5 px-5 gap-4 bg-green-50/40 dark:bg-green-500/10">
-                <span className="text-[13px] font-semibold text-muted-stronger">Laba Tahun Berjalan {year}</span>
-                <span className={`tabular-nums text-[13px] font-bold shrink-0 ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
-                  {data.labaBersihPositive ? "" : "–"}{data.labaBersihFmt}
-                </span>
-              </div>
-            </div>
-            <SubtotalRow
-              label="Total Modal & Laba"
-              amount={data.totalModalDanLabaFmt}
-              bgClass="bg-violet-50/50 dark:bg-violet-500/10"
-              borderClass="border-violet-100 dark:border-violet-500/20"
-            />
-          </div>
-
-          {/* Total Pasiva summary */}
-          <div className={`rounded-[16px] border-2 px-5 py-4 flex items-center justify-between gap-4 ${
-            data.neracaBalanced
-              ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10"
-              : "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10"
-          }`}>
-            <div>
-              <p className="font-extrabold text-[13px] text-navy-text">Total Pasiva (Kewajiban + Modal + Laba)</p>
-              <p className={`text-[11.5px] font-semibold mt-0.5 ${
-                data.neracaBalanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
-              }`}>
-                {data.neracaBalanced ? "✓ Neraca seimbang" : "✗ Neraca tidak seimbang"}
-              </p>
-            </div>
-            <span className={`tabular-nums font-extrabold text-[15px] shrink-0 ${
-              data.neracaBalanced ? "text-navy-text" : "text-status-red"
-            }`}>
-              {data.totalPassivaFmt}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Tab: Laba Rugi ───────────────────────────────────────────────────
 function LabaRugiTab({
   data,
   year,
@@ -439,7 +264,6 @@ function LabaRugiTab({
         badge={statusBadge}
       />
 
-      {/* Pendapatan */}
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <SectionHeader color="green" label="Pendapatan Usaha" />
         <div className="divide-y divide-surface-subtle">
@@ -451,16 +275,9 @@ function LabaRugiTab({
             ))
           )}
         </div>
-        <TotalRow
-          label="Total Pendapatan Usaha"
-          amount={data.totalPendapatanFmt}
-          amountClass="text-status-green"
-          bgClass="bg-green-50 dark:bg-green-500/15"
-          borderClass="border-green-200 dark:border-green-500/30"
-        />
+        <TotalRow label="Total Pendapatan Usaha" amount={data.totalPendapatanFmt} amountClass="text-status-green" bgClass="bg-green-50 dark:bg-green-500/15" borderClass="border-green-200 dark:border-green-500/30" />
       </div>
 
-      {/* Beban */}
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
         <SectionHeader color="red" label="Beban Usaha" />
         <div className="divide-y divide-surface-subtle">
@@ -472,44 +289,23 @@ function LabaRugiTab({
             ))
           )}
         </div>
-        <TotalRow
-          label="Total Beban Usaha"
-          amount={data.totalBebanFmt}
-          amountClass="text-status-red"
-          bgClass="bg-red-50 dark:bg-red-500/15"
-          borderClass="border-red-200 dark:border-red-500/30"
-        />
+        <TotalRow label="Total Beban Usaha" amount={data.totalBebanFmt} amountClass="text-status-red" bgClass="bg-red-50 dark:bg-red-500/15" borderClass="border-red-200 dark:border-red-500/30" />
       </div>
 
-      {/* Laba / Rugi Bersih — hero card */}
-      <div className={`rounded-[20px] border-2 overflow-hidden ${
-        data.labaBersihPositive
-          ? "border-green-300 dark:border-green-500/40"
-          : "border-red-300 dark:border-red-500/40"
-      }`}>
-        <div className={`px-6 py-5 flex items-start justify-between gap-4 ${
-          data.labaBersihPositive
-            ? "bg-green-50 dark:bg-green-500/10"
-            : "bg-red-50 dark:bg-red-500/10"
-        }`}>
+      <div className={`rounded-[20px] border-2 overflow-hidden ${data.labaBersihPositive ? "border-green-300 dark:border-green-500/40" : "border-red-300 dark:border-red-500/40"}`}>
+        <div className={`px-6 py-5 flex items-start justify-between gap-4 ${data.labaBersihPositive ? "bg-green-50 dark:bg-green-500/10" : "bg-red-50 dark:bg-red-500/10"}`}>
           <div>
-            <p className={`text-[10.5px] font-extrabold uppercase tracking-widest mb-1.5 ${
-              data.labaBersihPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-            }`}>
+            <p className={`text-[10.5px] font-extrabold uppercase tracking-widest mb-1.5 ${data.labaBersihPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
               {data.labaBersihPositive ? "Laba Bersih" : "Rugi Bersih"}
             </p>
-            <p className={`text-[30px] font-extrabold tabular-nums leading-none ${
-              data.labaBersihPositive ? "text-status-green" : "text-status-red"
-            }`}>
+            <p className={`text-[30px] font-extrabold tabular-nums leading-none ${data.labaBersihPositive ? "text-status-green" : "text-status-red"}`}>
               {data.labaBersihPositive ? "" : "–"}{data.labaBersihFmt}
             </p>
             <p className="text-[12px] text-muted mt-2.5">
               Pendapatan {data.totalPendapatanFmt} — Beban {data.totalBebanFmt}
             </p>
           </div>
-          <div className={`w-11 h-11 rounded-[13px] flex items-center justify-center shrink-0 ${
-            data.labaBersihPositive ? "bg-green-500" : "bg-red-500"
-          }`}>
+          <div className={`w-11 h-11 rounded-[13px] flex items-center justify-center shrink-0 ${data.labaBersihPositive ? "bg-green-500" : "bg-red-500"}`}>
             {data.labaBersihPositive
               ? <TrendingUp size={20} className="text-white" />
               : <TrendingDown size={20} className="text-white" />
@@ -521,7 +317,6 @@ function LabaRugiTab({
   );
 }
 
-// ── Tab: Arus Kas ────────────────────────────────────────────────────
 function ArusKasTab({
   data,
   year,
@@ -571,11 +366,7 @@ function ArusKasTab({
         period={`Periode 1 Januari s/d 31 Desember ${year}`}
         note="Dalam Rupiah · Metode Tidak Langsung"
         badge={
-          <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${
-            data.arusKasBalanced
-              ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400"
-              : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"
-          }`}>
+          <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${data.arusKasBalanced ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400"}`}>
             {data.arusKasBalanced ? "✓ Konsisten" : "✗ Tidak Konsisten"}
           </span>
         }
@@ -592,15 +383,9 @@ function ArusKasTab({
       )}
 
       <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
-        {/* Aktivitas Operasi */}
         <SectionHeader color="blue" label="Aktivitas Operasi" />
         <AkRow label="Laba/(Rugi) Bersih" val={data.labaBersih} fmt={data.labaBersihFmt} />
-        <AkRow
-          label="Penyesuaian non-kas (penyusutan aset tetap)"
-          val={data.penyesuaianNonKas ?? 0}
-          fmt={data.penyesuaianNonKasFmt ?? "Rp 0"}
-          italic={!data.penyesuaianNonKas}
-        />
+        <AkRow label="Penyesuaian non-kas (penyusutan aset tetap)" val={data.penyesuaianNonKas ?? 0} fmt={data.penyesuaianNonKasFmt ?? "Rp 0"} italic={!data.penyesuaianNonKas} />
         {data.perubahanAsetNonKas !== 0 && (
           <AkRow label="Penurunan/(Kenaikan) Aset Non-Kas" val={data.perubahanAsetNonKas} fmt={formatRupiah(Math.abs(data.perubahanAsetNonKas))} />
         )}
@@ -609,14 +394,12 @@ function ArusKasTab({
         )}
         <AkSubtotal label="Kas dari Aktivitas Operasi" val={data.kasOperasi} fmt={data.kasOperasiFmt} color="blue" />
 
-        {/* Aktivitas Investasi */}
         <div className="border-t border-surface-hover">
           <SectionHeader color="violet" label="Aktivitas Investasi" />
           <AkRow label="Perolehan/Pelepasan Aset Tetap" val={0} fmt="" italic />
           <AkSubtotal label="Kas dari Aktivitas Investasi" val={data.kasInvestasi} fmt={data.kasInvestasiFmt} color="violet" />
         </div>
 
-        {/* Aktivitas Pendanaan */}
         <div className="border-t border-surface-hover">
           <SectionHeader color="amber" label="Aktivitas Pendanaan" />
           {data.kasPendanaan !== 0 ? (
@@ -627,7 +410,6 @@ function ArusKasTab({
           <AkSubtotal label="Kas dari Aktivitas Pendanaan" val={data.kasPendanaan} fmt={data.kasPendanaanFmt} color="amber" />
         </div>
 
-        {/* Summary */}
         <div className="border-t-2 border-border">
           <div className="flex items-center justify-between px-5 py-3 border-b border-surface-subtle">
             <span className="font-semibold text-[13px] text-muted-stronger">Kenaikan/(Penurunan) Bersih Kas & Setara Kas</span>
@@ -639,20 +421,14 @@ function ArusKasTab({
               {data.kasAwal === 0 ? <span className="text-muted-faint">—</span> : data.kasAwalFmt}
             </span>
           </div>
-          <div className={`flex items-center justify-between px-5 py-4 gap-4 ${
-            data.arusKasBalanced
-              ? "bg-green-50 dark:bg-green-500/10"
-              : "bg-red-50 dark:bg-red-500/10"
-          }`}>
+          <div className={`flex items-center justify-between px-5 py-4 gap-4 ${data.arusKasBalanced ? "bg-green-50 dark:bg-green-500/10" : "bg-red-50 dark:bg-red-500/10"}`}>
             <div>
               <p className="font-extrabold text-[13px] text-navy-text">Kas & Setara Kas Akhir Periode</p>
               {data.arusKasBalanced && (
                 <p className="text-[11px] text-green-600 dark:text-green-400 font-semibold mt-0.5">✓ Konsisten dengan Neraca</p>
               )}
             </div>
-            <span className={`tabular-nums font-extrabold text-[16px] shrink-0 ${
-              data.arusKasBalanced ? "text-navy-text" : "text-status-red"
-            }`}>
+            <span className={`tabular-nums font-extrabold text-[16px] shrink-0 ${data.arusKasBalanced ? "text-navy-text" : "text-status-red"}`}>
               {data.kasAkhirFmt}
             </span>
           </div>

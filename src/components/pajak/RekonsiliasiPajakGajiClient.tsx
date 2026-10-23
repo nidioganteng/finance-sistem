@@ -23,6 +23,7 @@ import {
 } from "@/lib/rekonsiliasi-pajak-gaji";
 import { saveRekonsiliasiGajiPph21Action } from "@/lib/actions/rekonsiliasi-pajak-gaji";
 import { formatRupiah } from "@/lib/dashboard-data";
+import { useAuth } from "@/context/AuthContext";
 
 type ViewMode = "pegawai" | "tenaga-ahli" | "paralel";
 
@@ -35,6 +36,7 @@ export function RekonsiliasiPajakGajiClient({
   entityKey: string;
   canEdit?: boolean;
 }) {
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("pegawai");
 
   const [editingItem, setEditingItem] = useState<RekonsiliasiGajiPph21Item | null>(null);
@@ -134,19 +136,23 @@ export function RekonsiliasiPajakGajiClient({
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    const res = await saveRekonsiliasiGajiPph21Action({
-      entityId: data.entityId,
-      year: data.year,
-      month: editingItem.month,
-      gajiTerlapor: Number(gajiTerlapor) || 0,
-      pph21Terlapor: Number(pph21Terlapor) || 0,
-      gajiPegawaiTerlapor: Number(gajiPegawaiTerlapor) || 0,
-      gajiTaTerlapor: Number(gajiTaTerlapor) || 0,
-      pph21PegawaiTerlapor: Number(pph21PegawaiTerlapor) || 0,
-      pph21TaTerlapor: Number(pph21TaTerlapor) || 0,
-      ntpn: ntpn.trim() || undefined,
-      keterangan: keterangan.trim() || undefined,
-    });
+    const res = await saveRekonsiliasiGajiPph21Action(
+      {
+        entityId: data.entityId,
+        year: data.year,
+        month: editingItem.month,
+        gajiTerlapor: Number(gajiTerlapor) || 0,
+        pph21Terlapor: Number(pph21Terlapor) || 0,
+        gajiPegawaiTerlapor: Number(gajiPegawaiTerlapor) || 0,
+        gajiTaTerlapor: Number(gajiTaTerlapor) || 0,
+        pph21PegawaiTerlapor: Number(pph21PegawaiTerlapor) || 0,
+        pph21TaTerlapor: Number(pph21TaTerlapor) || 0,
+        ntpn: ntpn.trim() || undefined,
+        keterangan: keterangan.trim() || undefined,
+      },
+      user?.id ?? "",
+      user?.role ?? "STAF_KEUANGAN"
+    );
 
     setIsSubmitting(false);
 

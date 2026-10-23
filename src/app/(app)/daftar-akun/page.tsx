@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getDaftarAkunData } from "@/lib/daftar-akun";
@@ -12,25 +14,52 @@ import { PrintButton } from "@/components/shared/PrintButton";
 import { DaftarAkunClient } from "@/components/daftar-akun/DaftarAkunClient";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export default async function DaftarAkunPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; year?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
+function DaftarAkunContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const year = parseInt(searchParams.year ?? "") || new Date().getFullYear();
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    year: number;
+    rows: Awaited<ReturnType<typeof getDaftarAkunData>>["rows"];
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (role === "SUPER_ADMIN") {
+      router.replace("/dashboard");
+      return;
+    }
+    const year = parseInt(yearStr ?? "") || new Date().getFullYear();
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+      const { rows } = await getDaftarAkunData(selectedEntity.id, year);
+      setPageData({ entities, selectedEntity, year, rows });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  const { rows } = await getDaftarAkunData(selectedEntity.id, year);
+  const { role } = user;
+  const { entities, selectedEntity, year, rows } = pageData;
 
   return (
     <PageTransition>
@@ -39,11 +68,7 @@ export default async function DaftarAkunPage({
         subtitle="Seluruh akun COA beserta saldo awal, mutasi, dan saldo akhir"
         rightSlot={
           <>
-            <PrintButton
-              title="Daftar Akun"
-              entityName={selectedEntity.name}
-              year={year}
-            />
+            <PrintButton title="Daftar Akun" entityName={selectedEntity.name} year={year} />
             <YearSelect currentYear={year} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
@@ -62,5 +87,13 @@ export default async function DaftarAkunPage({
         canEdit={canManageTransaksi(role)}
       />
     </PageTransition>
+  );
+}
+
+export default function DaftarAkunPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <DaftarAkunContent />
+    </Suspense>
   );
 }

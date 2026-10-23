@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities, formatRupiah, getMonthlyChartData, getMonthlyByYear } from "@/lib/dashboard-data";
 import { getLabaRugiData } from "@/lib/laba-rugi";
 import { getNeracaData } from "@/lib/neraca";
@@ -56,8 +58,6 @@ function periodLabel(p: Period, mode: "tahunan" | "bulanan") {
   return mode === "bulanan" ? `${BULAN_LABEL[(p.month ?? 1) - 1]} ${p.year}` : `Tahun ${p.year}`;
 }
 
-// delta positif dianggap "baik" untuk Pendapatan & Laba, tapi "buruk" untuk Beban —
-// goodWhenUp membalik warna supaya kenaikan Beban tetap ditandai merah.
 function computeDelta(a: number, b: number, goodWhenUp: boolean) {
   const diff = a - b;
   const pct = b !== 0 ? (diff / Math.abs(b)) * 100 : a !== 0 ? 100 : 0;
@@ -67,138 +67,26 @@ function computeDelta(a: number, b: number, goodWhenUp: boolean) {
   return { diff, pct, isUp, isFlat, isGood };
 }
 
-export default async function LaporanPage({
-  searchParams,
-}: {
-  searchParams: {
-    entity?: string;
-    year?: string;
-    tab?: string;
-    mode?: string;
-    periodA?: string;
-    periodB?: string;
-    chartYears?: string;
-    version?: string;
-  };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
-  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
-
-  const entities = await getAccessibleEntities(entityKeys);
-  const currentVersion: ReportVersion = (searchParams.version ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
-  const canGrup = canViewGrupAggregate(role);
-  const effectiveCanGrup = currentVersion === "UMUM" ? false : canGrup;
-  const selectedKey = resolveReportEntityKey(searchParams.entity, entityKeys, effectiveCanGrup);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const currentYear = parseInt(searchParams.year ?? "") || new Date().getFullYear();
-  const tab = searchParams.tab ?? "ringkasan";
-
-  // For group view, aggregate all entity data
-  const entityIds = selectedEntity
-    ? [selectedEntity.id]
-    : entities.map((e) => e.id);
-  const entityKeysArr = selectedEntity
-    ? [selectedEntity.key]
-    : entities.map((e) => e.key);
-
-  // Fetch data based on active tab
-  let laporanKeuanganData: Awaited<ReturnType<typeof getLaporanKeuanganData>> | null = null;
-  let jurnalData: Awaited<ReturnType<typeof getLaporanJurnalData>> | null = null;
-  let bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null = null;
-  let arusKasCombined: any = null;
-  let arusKasPresisiData: Awaited<ReturnType<typeof getArusKasPresisiData>> | null = null;
-  let piutangData: Awaited<ReturnType<typeof getPiutangData>> | null = null;
-  let utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null = null;
-  let taxData: Awaited<ReturnType<typeof getLaporanPajakData>> | null = null;
-  let validasiPajak3Arah: ValidasiPajak3ArahData | null = null;
-
-  if (tab === "ringkasan") {
-    const [laporan, jData, bData] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
-      getLaporanJurnalData(entityIds, currentYear, 80),
-      getLaporanBankData(entityIds, currentYear, 80),
-    ]);
-    laporanKeuanganData = laporan;
-    jurnalData = jData;
-    bankData = bData;
-  } else if (tab === "laba-rugi" || tab === "neraca") {
-    const [laporan, tax, validasi3Arah] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
-      tab === "laba-rugi"
-        ? getLaporanPajakData(entityIds, currentYear, currentVersion, selectedEntity?.name ?? "Grup")
-        : Promise.resolve(null),
-      tab === "laba-rugi"
-        ? getValidasiPajak3Arah(entityIds, currentYear, currentVersion)
-        : Promise.resolve(null),
-    ]);
-    laporanKeuanganData = laporan;
-    taxData = tax;
-    validasiPajak3Arah = validasi3Arah;
-  } else if (tab === "arus-kas") {
-    const [laporan, allArusKas, presisi] = await Promise.all([
-      getLaporanKeuanganData(entityIds, currentYear, currentVersion),
-      Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
-      getArusKasPresisiData(entityIds, currentYear, currentVersion),
-    ]);
-    laporanKeuanganData = laporan;
-    arusKasPresisiData = presisi;
-
-    const MONTHS_LABEL = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-    ];
-
-    const monthlyCombined = MONTHS_LABEL.map((bulan, i) => {
-      const masuk = allArusKas.reduce((s, d) => s + (d.monthly[i]?.masuk || 0), 0);
-      const keluar = allArusKas.reduce((s, d) => s + (d.monthly[i]?.keluar || 0), 0);
-      const net = masuk - keluar;
-      return {
-        bulan,
-        masuk,
-        keluar,
-        net,
-        masukFmt: masuk > 0 ? formatRupiah(masuk) : "-",
-        keluarFmt: keluar > 0 ? formatRupiah(keluar) : "-",
-        netFmt: formatRupiah(Math.abs(net)),
-        netPositive: net >= 0,
-        hasData: masuk > 0 || keluar > 0,
-      };
-    });
-
-    const totalMasuk = allArusKas.reduce((s, d) => s + d.monthly.reduce((x, m) => x + m.masuk, 0), 0);
-    const totalKeluar = allArusKas.reduce((s, d) => s + d.monthly.reduce((x, m) => x + m.keluar, 0), 0);
-    const netTotal = totalMasuk - totalKeluar;
-
-    arusKasCombined = {
-      monthly: monthlyCombined,
-      totalMasuk,
-      totalKeluar,
-      netTotal,
-      totalMasukFmt: formatRupiah(totalMasuk),
-      totalKeluarFmt: formatRupiah(totalKeluar),
-      netTotalFmt: formatRupiah(Math.abs(netTotal)),
-      netTotalPositive: netTotal >= 0,
-      kasAwalFmt: laporan.kasAwalFmt,
-      kasOperasiFmt: laporan.kasOperasiFmt,
-      kasInvestasiFmt: laporan.kasInvestasiFmt,
-      kasPendanaanFmt: laporan.kasPendanaanFmt,
-      kenaikanBersihFmt: laporan.kenaikanBersihFmt,
-      kasAkhirFmt: laporan.kasAkhirFmt,
-      kasOperasi: laporan.kasOperasi,
-      kasInvestasi: laporan.kasInvestasi,
-      kasPendanaan: laporan.kasPendanaan,
-      kenaikanBersihKas: laporan.kenaikanBersihKas,
-    };
-  } else if (tab === "piutang") {
-    piutangData = await getPiutangData(entityKeysArr[0] ?? "");
-  } else if (tab === "utang-aset") {
-    utangAsetData = await getLaporanUtangAsetData(entityIds[0] ?? "", currentYear);
-  }
-
-  // Komparasi antar-periode (bulan vs bulan, atau tahun vs tahun) — jangkauan
-  // dibatasi 5 tahun ke belakang lewat KomparasiControls.
-  let komparasiData: {
+type PageData = {
+  entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+  selectedKey: string | undefined;
+  currentVersion: ReportVersion;
+  canGrup: boolean;
+  effectiveCanGrup: boolean;
+  currentYear: number;
+  tab: string;
+  entityIds: string[];
+  entityKeysArr: string[];
+  laporanKeuanganData: Awaited<ReturnType<typeof getLaporanKeuanganData>> | null;
+  jurnalData: Awaited<ReturnType<typeof getLaporanJurnalData>> | null;
+  bankData: Awaited<ReturnType<typeof getLaporanBankData>> | null;
+  arusKasCombined: any;
+  arusKasPresisiData: Awaited<ReturnType<typeof getArusKasPresisiData>> | null;
+  piutangData: Awaited<ReturnType<typeof getPiutangData>> | null;
+  utangAsetData: Awaited<ReturnType<typeof getLaporanUtangAsetData>> | null;
+  taxData: Awaited<ReturnType<typeof getLaporanPajakData>> | null;
+  validasiPajak3Arah: ValidasiPajak3ArahData | null;
+  komparasiData: {
     mode: "tahunan" | "bulanan";
     periodA: Period;
     periodB: Period;
@@ -209,132 +97,207 @@ export default async function LaporanPage({
     laba: ReturnType<typeof computeDelta> & { a: number; b: number };
     txCountA: number;
     txCountB: number;
-  } | null = null;
+  } | null;
+  komparasiChart: any;
+};
 
-  type MonthRow = Record<string, string | number>;
-  let komparasiChart:
-    | { type: "grup"; chartA: MonthRow[]; chartB: MonthRow[]; entities: { key: string; name: string; colorHex: string }[]; lineData: MonthRow[]; lineYears: number[] }
-    | { type: "single"; data: MonthRow[]; years: number[] }
-    | null = null;
+function LaporanContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const yearStr = searchParams.get("year") ?? undefined;
+  const tabParam = searchParams.get("tab") ?? undefined;
+  const modeParam = searchParams.get("mode") ?? undefined;
+  const periodAParam = searchParams.get("periodA") ?? undefined;
+  const periodBParam = searchParams.get("periodB") ?? undefined;
+  const chartYearsParam = searchParams.get("chartYears") ?? undefined;
+  const versionParam = searchParams.get("version") ?? undefined;
 
-  if (tab === "komparasi") {
-    const mode = searchParams.mode === "bulanan" ? "bulanan" : "tahunan";
-    const nowYear = new Date().getFullYear();
-    const nowMonth = new Date().getMonth() + 1;
-    const periodA = parsePeriod(searchParams.periodA, mode, { year: nowYear, month: nowMonth });
-    const periodB = parsePeriod(searchParams.periodB, mode, { year: nowYear - 2, month: nowMonth });
+  const [pageData, setPageData] = useState<PageData | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-    const fmtDate = (p: Period, end: boolean) => {
-      if (p.month) {
-        const lastDay = new Date(p.year, p.month, 0).getDate();
-        return end ? `${p.year}-${String(p.month).padStart(2, "0")}-${lastDay} 23:59:59` : `${p.year}-${String(p.month).padStart(2, "0")}-01 00:00:00`;
-      }
-      return end ? `${p.year}-12-31 23:59:59` : `${p.year}-01-01 00:00:00`;
-    };
-
-    const phpToken = await getPhpToken();
-    const txCountParams = (p: Period) => {
-      const params = new URLSearchParams({ type: "tx-count", dateFrom: fmtDate(p, false), dateTo: fmtDate(p, true) });
-      entityIds.forEach((id) => params.append("entityIds[]", id));
-      return params.toString();
-    };
-
-    const [labaRugiA, labaRugiB, txRespA, txRespB] = await Promise.all([
-      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month, currentVersion))),
-      Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month, currentVersion))),
-      phpFetch<{ count: number }>(`/api/laporan-keuangan?${txCountParams(periodA)}`, phpToken),
-      phpFetch<{ count: number }>(`/api/laporan-keuangan?${txCountParams(periodB)}`, phpToken),
-    ]);
-    const txCountA = txRespA.count ?? 0;
-    const txCountB = txRespB.count ?? 0;
-
-    const sumPendapatan = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalPendapatan, 0);
-    const sumBeban = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalBeban, 0);
-
-    const pendapatanA = sumPendapatan(labaRugiA);
-    const pendapatanB = sumPendapatan(labaRugiB);
-    const bebanA = sumBeban(labaRugiA);
-    const bebanB = sumBeban(labaRugiB);
-
-    komparasiData = {
-      mode,
-      periodA,
-      periodB,
-      labelA: periodLabel(periodA, mode),
-      labelB: periodLabel(periodB, mode),
-      pendapatan: { a: pendapatanA, b: pendapatanB, ...computeDelta(pendapatanA, pendapatanB, true) },
-      beban: { a: bebanA, b: bebanB, ...computeDelta(bebanA, bebanB, false) },
-      laba: {
-        a: pendapatanA - bebanA,
-        b: pendapatanB - bebanB,
-        ...computeDelta(pendapatanA - bebanA, pendapatanB - bebanB, true),
-      },
-      txCountA,
-      txCountB,
-    };
-
-    // Chart tren pendapatan bulanan antar-tahun (berlaku untuk mode Tahunan maupun Bulanan).
-    // Grup ("Semua Entitas") menampilkan tren per tahun komparasi;
-    // 1 entitas spesifik menampilkan pilihan multi-tahun (2-5 tahun) dengan warna per tahun.
-    if (!selectedEntity) {
-      const entityKeysAll = entities.map((e) => e.key);
-      let allYears: number[];
-      if (periodA.year === periodB.year) {
-        allYears = [periodA.year - 1, periodA.year];
-      } else {
-        const minYear = Math.min(periodA.year, periodB.year);
-        const maxYear = Math.max(periodA.year, periodB.year);
-        allYears = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
-      }
-
-      const allCharts = await Promise.all(allYears.map((y) => getMonthlyChartData(entityKeysAll, y, currentVersion)));
-      const chartByYear: Record<number, MonthRow[]> = {};
-      allYears.forEach((y, i) => { chartByYear[y] = allCharts[i]; });
-
-      const chartA = chartByYear[periodA.year];
-      const chartB = chartByYear[periodB.year];
-      const baseChart = chartA || chartByYear[allYears[0]] || [];
-
-      // Line chart: per bulan, total semua entitas, satu garis per tahun
-      const lineData: MonthRow[] = baseChart.map((rowA, mi) => {
-        const entry: MonthRow = { month: rowA.month };
-        for (const y of allYears) {
-          const row = chartByYear[y]?.[mi];
-          if (row) {
-            entry[String(y)] = entityKeysAll.reduce((s, k) => s + (Number(row[k]) || 0), 0);
-          }
-        }
-        return entry;
-      });
-
-      komparasiChart = {
-        type: "grup",
-        chartA: chartA || baseChart,
-        chartB: chartB || baseChart,
-        entities: entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex })),
-        lineData,
-        lineYears: allYears,
-      };
-    } else {
-      const parsedYears = (searchParams.chartYears ?? "")
-        .split(",")
-        .map((y) => parseInt(y))
-        .filter((y) => !isNaN(y));
-      let chartYears: number[];
-      if (parsedYears.length >= 2) {
-        chartYears = Array.from(new Set(parsedYears)).sort((a, b) => a - b).slice(0, 5);
-      } else {
-        const yearsSet = new Set([periodB.year, periodA.year]);
-        if (yearsSet.size < 2) {
-          yearsSet.add(periodA.year - 1);
-        }
-        chartYears = Array.from(yearsSet).sort((a, b) => a - b);
-      }
-      const data = await getMonthlyByYear([selectedEntity.id], chartYears, currentVersion);
-      komparasiChart = { type: "single", data, years: chartYears };
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") {
+      router.replace("/dashboard");
+      return;
     }
-  }
+    const currentVersion: ReportVersion = (versionParam ?? "internal").toUpperCase() === "UMUM" ? "UMUM" : "INTERNAL";
+    const canGrup = canViewGrupAggregate(role);
+    const effectiveCanGrup = currentVersion === "UMUM" ? false : canGrup;
+    const currentYear = parseInt(yearStr ?? "") || new Date().getFullYear();
+    const tab = tabParam ?? "ringkasan";
 
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveReportEntityKey(entityParam, entityKeys, effectiveCanGrup);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+
+      const entityIds = selectedEntity ? [selectedEntity.id] : entities.map((e) => e.id);
+      const entityKeysArr = selectedEntity ? [selectedEntity.key] : entities.map((e) => e.key);
+
+      let laporanKeuanganData = null;
+      let jurnalData = null;
+      let bankData = null;
+      let arusKasCombined = null;
+      let arusKasPresisiData = null;
+      let piutangData = null;
+      let utangAsetData = null;
+      let taxData = null;
+      let validasiPajak3Arah = null;
+      let komparasiData = null;
+      let komparasiChart = null;
+
+      if (tab === "ringkasan") {
+        const [laporan, jData, bData] = await Promise.all([
+          getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+          getLaporanJurnalData(entityIds, currentYear, 80),
+          getLaporanBankData(entityIds, currentYear, 80),
+        ]);
+        laporanKeuanganData = laporan;
+        jurnalData = jData;
+        bankData = bData;
+      } else if (tab === "laba-rugi" || tab === "neraca") {
+        const [laporan, tax, validasi3Arah] = await Promise.all([
+          getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+          tab === "laba-rugi"
+            ? getLaporanPajakData(entityIds, currentYear, currentVersion, selectedEntity?.name ?? "Grup")
+            : Promise.resolve(null),
+          tab === "laba-rugi"
+            ? getValidasiPajak3Arah(entityIds, currentYear, currentVersion)
+            : Promise.resolve(null),
+        ]);
+        laporanKeuanganData = laporan;
+        taxData = tax;
+        validasiPajak3Arah = validasi3Arah;
+      } else if (tab === "arus-kas") {
+        const [laporan, allArusKas, presisi] = await Promise.all([
+          getLaporanKeuanganData(entityIds, currentYear, currentVersion),
+          Promise.all(entityIds.map((id) => getArusKasData(id, currentYear, currentVersion))),
+          getArusKasPresisiData(entityIds, currentYear, currentVersion),
+        ]);
+        laporanKeuanganData = laporan;
+        arusKasPresisiData = presisi;
+
+        const MONTHS_LABEL = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        const monthlyCombined = MONTHS_LABEL.map((bulan, i) => {
+          const masuk = allArusKas.reduce((s, d) => s + (d.monthly[i]?.masuk || 0), 0);
+          const keluar = allArusKas.reduce((s, d) => s + (d.monthly[i]?.keluar || 0), 0);
+          const net = masuk - keluar;
+          return { bulan, masuk, keluar, net, masukFmt: masuk > 0 ? formatRupiah(masuk) : "-", keluarFmt: keluar > 0 ? formatRupiah(keluar) : "-", netFmt: formatRupiah(Math.abs(net)), netPositive: net >= 0, hasData: masuk > 0 || keluar > 0 };
+        });
+        const totalMasuk = allArusKas.reduce((s, d) => s + d.monthly.reduce((x, m) => x + m.masuk, 0), 0);
+        const totalKeluar = allArusKas.reduce((s, d) => s + d.monthly.reduce((x, m) => x + m.keluar, 0), 0);
+        const netTotal = totalMasuk - totalKeluar;
+        arusKasCombined = { monthly: monthlyCombined, totalMasuk, totalKeluar, netTotal, totalMasukFmt: formatRupiah(totalMasuk), totalKeluarFmt: formatRupiah(totalKeluar), netTotalFmt: formatRupiah(Math.abs(netTotal)), netTotalPositive: netTotal >= 0, kasAwalFmt: laporan.kasAwalFmt, kasOperasiFmt: laporan.kasOperasiFmt, kasInvestasiFmt: laporan.kasInvestasiFmt, kasPendanaanFmt: laporan.kasPendanaanFmt, kenaikanBersihFmt: laporan.kenaikanBersihFmt, kasAkhirFmt: laporan.kasAkhirFmt, kasOperasi: laporan.kasOperasi, kasInvestasi: laporan.kasInvestasi, kasPendanaan: laporan.kasPendanaan, kenaikanBersihKas: laporan.kenaikanBersihKas };
+      } else if (tab === "piutang") {
+        piutangData = await getPiutangData(entityKeysArr[0] ?? "");
+      } else if (tab === "utang-aset") {
+        utangAsetData = await getLaporanUtangAsetData(entityIds[0] ?? "", currentYear);
+      } else if (tab === "komparasi") {
+        const mode = (modeParam === "bulanan" ? "bulanan" : "tahunan") as "tahunan" | "bulanan";
+        const nowYear = new Date().getFullYear();
+        const nowMonth = new Date().getMonth() + 1;
+        const periodA = parsePeriod(periodAParam, mode, { year: nowYear, month: nowMonth });
+        const periodB = parsePeriod(periodBParam, mode, { year: nowYear - 2, month: nowMonth });
+
+        const fmtDate = (p: Period, end: boolean) => {
+          if (p.month) {
+            const lastDay = new Date(p.year, p.month, 0).getDate();
+            return end ? `${p.year}-${String(p.month).padStart(2, "0")}-${lastDay} 23:59:59` : `${p.year}-${String(p.month).padStart(2, "0")}-01 00:00:00`;
+          }
+          return end ? `${p.year}-12-31 23:59:59` : `${p.year}-01-01 00:00:00`;
+        };
+
+        const phpToken = await getPhpToken();
+        const txCountParams = (p: Period) => {
+          const params = new URLSearchParams({ type: "tx-count", dateFrom: fmtDate(p, false), dateTo: fmtDate(p, true) });
+          entityIds.forEach((id) => params.append("entityIds[]", id));
+          return params.toString();
+        };
+
+        const [labaRugiA, labaRugiB, txRespA, txRespB] = await Promise.all([
+          Promise.all(entityIds.map((id) => getLabaRugiData(id, periodA.year, periodA.month, currentVersion))),
+          Promise.all(entityIds.map((id) => getLabaRugiData(id, periodB.year, periodB.month, currentVersion))),
+          phpFetch<{ count: number }>(`/api/laporan-keuangan?${txCountParams(periodA)}`, phpToken),
+          phpFetch<{ count: number }>(`/api/laporan-keuangan?${txCountParams(periodB)}`, phpToken),
+        ]);
+        const txCountA = txRespA.count ?? 0;
+        const txCountB = txRespB.count ?? 0;
+        const sumPendapatan = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalPendapatan, 0);
+        const sumBeban = (list: typeof labaRugiA) => list.reduce((s, d) => s + d.totalBeban, 0);
+        const pendapatanA = sumPendapatan(labaRugiA);
+        const pendapatanB = sumPendapatan(labaRugiB);
+        const bebanA = sumBeban(labaRugiA);
+        const bebanB = sumBeban(labaRugiB);
+
+        komparasiData = {
+          mode, periodA, periodB,
+          labelA: periodLabel(periodA, mode),
+          labelB: periodLabel(periodB, mode),
+          pendapatan: { a: pendapatanA, b: pendapatanB, ...computeDelta(pendapatanA, pendapatanB, true) },
+          beban: { a: bebanA, b: bebanB, ...computeDelta(bebanA, bebanB, false) },
+          laba: { a: pendapatanA - bebanA, b: pendapatanB - bebanB, ...computeDelta(pendapatanA - bebanA, pendapatanB - bebanB, true) },
+          txCountA, txCountB,
+        };
+
+        type MonthRow = Record<string, string | number>;
+        if (!selectedEntity) {
+          const entityKeysAll = entities.map((e) => e.key);
+          let allYears: number[];
+          if (periodA.year === periodB.year) {
+            allYears = [periodA.year - 1, periodA.year];
+          } else {
+            const minYear = Math.min(periodA.year, periodB.year);
+            const maxYear = Math.max(periodA.year, periodB.year);
+            allYears = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+          }
+          const allCharts = await Promise.all(allYears.map((y) => getMonthlyChartData(entityKeysAll, y, currentVersion)));
+          const chartByYear: Record<number, MonthRow[]> = {};
+          allYears.forEach((y, i) => { chartByYear[y] = allCharts[i]; });
+          const chartA = chartByYear[periodA.year];
+          const chartB = chartByYear[periodB.year];
+          const baseChart = chartA || chartByYear[allYears[0]] || [];
+          const lineData: MonthRow[] = baseChart.map((rowA, mi) => {
+            const entry: MonthRow = { month: rowA.month };
+            for (const y of allYears) {
+              const row = chartByYear[y]?.[mi];
+              if (row) entry[String(y)] = entityKeysAll.reduce((s, k) => s + (Number(row[k]) || 0), 0);
+            }
+            return entry;
+          });
+          komparasiChart = { type: "grup", chartA: chartA || baseChart, chartB: chartB || baseChart, entities: entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex })), lineData, lineYears: allYears };
+        } else {
+          const parsedYears = (chartYearsParam ?? "").split(",").map((y) => parseInt(y)).filter((y) => !isNaN(y));
+          let chartYears: number[];
+          if (parsedYears.length >= 2) {
+            chartYears = Array.from(new Set(parsedYears)).sort((a, b) => a - b).slice(0, 5);
+          } else {
+            const yearsSet = new Set([periodB.year, periodA.year]);
+            if (yearsSet.size < 2) yearsSet.add(periodA.year - 1);
+            chartYears = Array.from(yearsSet).sort((a, b) => a - b);
+          }
+          const data = await getMonthlyByYear([selectedEntity.id], chartYears, currentVersion);
+          komparasiChart = { type: "single", data, years: chartYears };
+        }
+      }
+
+      setPageData({ entities, selectedKey, currentVersion, canGrup, effectiveCanGrup, currentYear, tab, entityIds, entityKeysArr, laporanKeuanganData, jurnalData, bankData, arusKasCombined, arusKasPresisiData, piutangData, utangAsetData, taxData, validasiPajak3Arah, komparasiData, komparasiChart });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, yearStr, tabParam, modeParam, periodAParam, periodBParam, chartYearsParam, versionParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
+  }
+  if (!user) return null;
+  if (!pageData) return <div className="mt-8 p-6 text-sm text-muted">Gagal memuat data.</div>;
+
+  const { entities, selectedKey, currentVersion, canGrup, effectiveCanGrup, currentYear, tab, laporanKeuanganData, jurnalData, bankData, arusKasCombined, arusKasPresisiData, piutangData, utangAsetData, taxData, validasiPajak3Arah, komparasiData, komparasiChart } = pageData;
+  const { role } = user;
+  const selectedEntity = entities.find((e) => e.key === selectedKey);
   const entityLabel = selectedEntity ? selectedEntity.name : "Semua Entitas";
 
   return (
@@ -363,16 +326,8 @@ export default async function LaporanPage({
       {tab === "komparasi" && komparasiData && (
         <div className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <KomparasiControls
-              mode={komparasiData.mode}
-              periodA={komparasiData.periodA}
-              periodB={komparasiData.periodB}
-            />
-            <KomparasiEntityPills
-              entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))}
-              currentEntityKey={selectedKey}
-              canGrup={effectiveCanGrup}
-            />
+            <KomparasiControls mode={komparasiData.mode} periodA={komparasiData.periodA} periodB={komparasiData.periodB} />
+            <KomparasiEntityPills entities={entities.map((e) => ({ key: e.key, name: e.name, colorHex: e.colorHex }))} currentEntityKey={selectedKey} canGrup={effectiveCanGrup} />
           </div>
 
           <div className="bg-surface-card rounded-[20px] border border-border-soft overflow-hidden">
@@ -393,11 +348,7 @@ export default async function LaporanPage({
                   { label: "Laba/Rugi Bersih", d: komparasiData.laba },
                 ].map((row) => {
                   const Icon = row.d.isFlat ? Minus : row.d.isUp ? TrendingUp : TrendingDown;
-                  const color = row.d.isFlat
-                    ? "text-muted"
-                    : row.d.isGood
-                    ? "text-status-green"
-                    : "text-status-red";
+                  const color = row.d.isFlat ? "text-muted" : row.d.isGood ? "text-status-green" : "text-status-red";
                   return (
                     <tr key={row.label} className="border-b border-surface-subtle">
                       <td className="py-3 px-6 font-semibold text-navy-text">{row.label}</td>
@@ -407,9 +358,7 @@ export default async function LaporanPage({
                         <div className="flex items-center justify-end gap-1.5">
                           <Icon size={14} />
                           {(row.d.diff >= 0 ? "+" : "-") + formatRupiah(Math.abs(row.d.diff))}
-                          <span className="text-[11px] font-semibold text-muted-faint">
-                            ({row.d.pct >= 0 ? "+" : ""}{row.d.pct.toFixed(1)}%)
-                          </span>
+                          <span className="text-[11px] font-semibold text-muted-faint">({row.d.pct >= 0 ? "+" : ""}{row.d.pct.toFixed(1)}%)</span>
                         </div>
                       </td>
                     </tr>
@@ -420,8 +369,7 @@ export default async function LaporanPage({
                   <td className="py-3 px-3 text-right tabular-nums text-navy-text">{komparasiData.txCountA}</td>
                   <td className="py-3 px-3 text-right tabular-nums text-navy-text">{komparasiData.txCountB}</td>
                   <td className="py-3 px-6 text-right tabular-nums font-bold text-muted-stronger">
-                    {komparasiData.txCountA - komparasiData.txCountB >= 0 ? "+" : ""}
-                    {komparasiData.txCountA - komparasiData.txCountB}
+                    {komparasiData.txCountA - komparasiData.txCountB >= 0 ? "+" : ""}{komparasiData.txCountA - komparasiData.txCountB}
                   </td>
                 </tr>
               </tbody>
@@ -430,21 +378,13 @@ export default async function LaporanPage({
           </div>
 
           {komparasiChart?.type === "grup" && (
-            <KomparasiLineChart
-              title={`Tren Pendapatan Bulanan — ${komparasiChart.lineYears.join(", ")}`}
-              data={komparasiChart.lineData}
-              lineKeys={komparasiChart.lineYears.map(String)}
-            />
+            <KomparasiLineChart title={`Tren Pendapatan Bulanan — ${komparasiChart.lineYears.join(", ")}`} data={komparasiChart.lineData} lineKeys={komparasiChart.lineYears.map(String)} />
           )}
 
           {komparasiChart?.type === "single" && (
             <div className="flex flex-col gap-3">
               <MultiYearChips selectedYears={komparasiChart.years} />
-              <KomparasiLineChart
-                title="Tren Pendapatan Bulanan Antar-Tahun"
-                data={komparasiChart.data}
-                lineKeys={komparasiChart.years.map(String)}
-              />
+              <KomparasiLineChart title="Tren Pendapatan Bulanan Antar-Tahun" data={komparasiChart.data} lineKeys={komparasiChart.years.map(String)} />
             </div>
           )}
         </div>
@@ -461,10 +401,7 @@ export default async function LaporanPage({
             labaBersihFmt: laporanKeuanganData.labaBersihFmt,
             labaBersihPositive: laporanKeuanganData.labaBersihPositive,
             txCount: jurnalData.totalCount,
-            marginPct:
-              laporanKeuanganData.totalPendapatan > 0
-                ? (laporanKeuanganData.labaBersih / laporanKeuanganData.totalPendapatan) * 100
-                : 0,
+            marginPct: laporanKeuanganData.totalPendapatan > 0 ? (laporanKeuanganData.labaBersih / laporanKeuanganData.totalPendapatan) * 100 : 0,
           }}
           jurnal={jurnalData}
           bank={bankData}
@@ -476,66 +413,46 @@ export default async function LaporanPage({
 
       {tab === "laba-rugi" && laporanKeuanganData && (
         <div className="flex flex-col gap-6">
-          {validasiPajak3Arah && (
-            <ValidasiPajak3ArahCard
-              data={validasiPajak3Arah}
-              entityName={entityLabel}
-            />
-          )}
+          {validasiPajak3Arah && <ValidasiPajak3ArahCard data={validasiPajak3Arah} entityName={entityLabel} />}
           {taxData ? (
             <LabaRugiUmumView data={taxData} entityKey={selectedKey ?? ""} version={currentVersion} />
           ) : (
-            <LabaRugiView
-              data={laporanKeuanganData}
-              year={currentYear}
-              entityName={entityLabel}
-            />
+            <LabaRugiView data={laporanKeuanganData} year={currentYear} entityName={entityLabel} />
           )}
         </div>
       )}
 
       {tab === "neraca" && laporanKeuanganData && (
-        <NeracaView
-          data={laporanKeuanganData}
-          year={currentYear}
-          entityName={entityLabel}
-        />
+        <NeracaView data={laporanKeuanganData} year={currentYear} entityName={entityLabel} />
       )}
 
       {tab === "arus-kas" && arusKasCombined && (
         arusKasPresisiData ? (
           <ArusKasTabWrapper
-            standardView={
-              <ArusKasView
-                data={arusKasCombined}
-                year={currentYear}
-                entityName={entityLabel}
-              />
-            }
+            standardView={<ArusKasView data={arusKasCombined} year={currentYear} entityName={entityLabel} />}
             presisiData={arusKasPresisiData}
-            entityId={selectedEntity?.id ?? entityIds[0]}
+            entityId={selectedEntity?.id ?? pageData.entityIds[0]}
           />
         ) : (
-          <ArusKasView
-            data={arusKasCombined}
-            year={currentYear}
-            entityName={entityLabel}
-          />
+          <ArusKasView data={arusKasCombined} year={currentYear} entityName={entityLabel} />
         )
       )}
 
       {tab === "piutang" && piutangData && (
-        <PiutangView
-          projectList={piutangData.projectList}
-          summary={piutangData.summary}
-          userRole={role}
-          isGrup={!selectedEntity}
-        />
+        <PiutangView projectList={piutangData.projectList} summary={piutangData.summary} userRole={role} isGrup={!selectedEntity} />
       )}
 
       {tab === "utang-aset" && utangAsetData && (
         <UtangAsetView data={utangAsetData} />
       )}
     </PageTransition>
+  );
+}
+
+export default function LaporanPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <LaporanContent />
+    </Suspense>
   );
 }

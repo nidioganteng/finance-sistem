@@ -1,5 +1,3 @@
-"use server";
-
 import { phpFetch, getPhpToken, PHP_API_URL, ApiError } from "@/lib/api-client";
 
 export async function uploadDokumen(formData: FormData) {

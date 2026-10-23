@@ -1,17 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  output: "export",
   reactStrictMode: true,
   compress: true,
+  // Static export: gambar tidak bisa pakai next/image optimization
   images: {
-    formats: ["image/avif", "image/webp"],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-    ],
+    unoptimized: true,
   },
+  // Trailing slash agar Apache bisa serve /dashboard/ → /dashboard/index.html
+  trailingSlash: true,
 };
 
 export default nextConfig;

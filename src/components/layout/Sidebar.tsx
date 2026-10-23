@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useAuth } from "@/context/AuthContext";
 import { Role } from "@/types/app-enums";
 import {
   LayoutGrid,
@@ -81,6 +81,7 @@ export function Sidebar({
   onToggleCollapse?: () => void;
   unreadCount?: number;
 }) {
+  const { logout } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentVersionParam = searchParams.get("version")?.toLowerCase();
@@ -406,7 +407,7 @@ export function Sidebar({
             )}
             <div className="flex flex-col gap-0.5">
               {customInputs.map((item) => {
-                const href = `/input/${item.key}`;
+                const href = `/input?key=${item.key}`;
                 const active = pathname === href;
                 return (
                   <Link
@@ -431,7 +432,7 @@ export function Sidebar({
       </nav>
 
       <button
-        onClick={() => signOut({ callbackUrl: "/login" })}
+        onClick={() => logout()}
         title={collapsed ? "Keluar Sistem" : undefined}
         className={`mt-2 border border-white/20 rounded-pill flex items-center text-[13.5px] font-semibold text-white/60 hover:bg-white/10 hover:text-red-400 hover:border-red-400/40 transition-all duration-150 ${collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3.5 py-2.5"}`}
       >

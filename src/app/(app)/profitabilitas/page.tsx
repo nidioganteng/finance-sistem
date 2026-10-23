@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { getProfitabilitasData } from "@/lib/profitabilitas";
 import { resolveEntityKey } from "@/lib/entity-prefs";
@@ -20,24 +22,50 @@ const STATUS_LABEL: Record<string, string> = {
   NEEDS_AUDIT: "Perlu Audit",
 };
 
-export default async function ProfitabilitasPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
+function ProfitabilitasContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string;
+    selectedEntity: Awaited<ReturnType<typeof getAccessibleEntities>>[0];
+    data: Awaited<ReturnType<typeof getProfitabilitasData>>;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (role === "SUPER_ADMIN") {
+      router.replace("/dashboard");
+      return;
+    }
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+      const data = await getProfitabilitasData(selectedEntity.id);
+      setPageData({ entities, selectedKey: selectedKey!, selectedEntity, data });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  const data = await getProfitabilitasData(selectedEntity.id);
+  const { role } = user;
+  const { entities, selectedKey, selectedEntity, data } = pageData;
 
   return (
     <PageTransition>
@@ -123,5 +151,13 @@ export default async function ProfitabilitasPage({
         </div>
       </div>
     </PageTransition>
+  );
+}
+
+export default function ProfitabilitasPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <ProfitabilitasContent />
+    </Suspense>
   );
 }

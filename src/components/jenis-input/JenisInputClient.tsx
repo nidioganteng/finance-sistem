@@ -266,9 +266,9 @@ export function JenisInputClient({
                     <span className="font-mono text-[12px] text-muted">{item.key}</span>
                     {!isSystem && item.active && (
                       <Link
-                        href={`/input/${item.key}`}
+                        href={`/input?key=${item.key}`}
                         className="p-1 rounded-md hover:bg-surface-hover text-brand"
-                        title={`Buka halaman /input/${item.key}`}
+                        title={`Buka halaman /input?key=${item.key}`}
                       >
                         <ExternalLink size={12} />
                       </Link>

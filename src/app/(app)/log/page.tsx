@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getActivityLogs } from "@/lib/log";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LogTabs } from "@/components/log/LogTabs";
@@ -8,21 +10,36 @@ import { roleLabel } from "@/lib/rbac";
 import { formatLogDetail } from "@/lib/format-log-detail";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+function LogContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab = tabParam === "financial" ? "financial" : tabParam === "user" ? "user" : "all";
 
-export default async function LogPage({
-  searchParams,
-}: {
-  searchParams: { tab?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role } = session!.user;
-  if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") redirect("/dashboard");
+  const [logs, setLogs] = useState<Awaited<ReturnType<typeof getActivityLogs>> | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  const tab = searchParams.tab === "financial" ? "financial" : searchParams.tab === "user" ? "user" : "all";
-  const category = tab === "financial" ? "FINANCIAL_CHANGE" : tab === "user" ? "USER_ACTIVITY" : undefined;
-  const logs = await getActivityLogs(category);
+  useEffect(() => {
+    if (!user) return;
+    const { role } = user;
+    if (role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") {
+      router.replace("/dashboard");
+      return;
+    }
+    const category = tab === "financial" ? "FINANCIAL_CHANGE" : tab === "user" ? "USER_ACTIVITY" : undefined;
+    setPageLoading(true);
+    getActivityLogs(category)
+      .then(setLogs)
+      .catch(() => setLogs(null))
+      .finally(() => setPageLoading(false));
+  }, [user, tab]);
+
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
+  }
+  if (!user) return null;
+  if (!logs) return <div className="mt-8 p-6 text-sm text-muted">Gagal memuat log.</div>;
 
   return (
     <PageTransition>
@@ -87,5 +104,13 @@ export default async function LogPage({
         </div>
       </div>
     </PageTransition>
+  );
+}
+
+export default function LogPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <LogContent />
+    </Suspense>
   );
 }

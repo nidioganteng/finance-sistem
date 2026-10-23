@@ -1,10 +1,6 @@
-"use server";
-
-import { getServerSession } from "next-auth";
-import { revalidatePath } from "next/cache";
-import { authOptions } from "@/lib/auth";
 import { phpFetch, getPhpToken } from "@/lib/api-client";
 import { canManageTransaksi } from "@/lib/rbac";
+import { Role } from "@/types/app-enums";
 import { logActivity } from "./log";
 
 export interface SaveRekonsiliasiGajiPph21Input {
@@ -21,13 +17,15 @@ export interface SaveRekonsiliasiGajiPph21Input {
   keterangan?: string;
 }
 
-export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGajiPph21Input) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+export async function saveRekonsiliasiGajiPph21Action(
+  input: SaveRekonsiliasiGajiPph21Input,
+  userId: string,
+  role: Role
+) {
+  if (!userId) {
     return { error: "Belum login." };
   }
 
-  const role = session.user.role;
   if (!canManageTransaksi(role) && role !== "SUPER_ADMIN" && role !== "MANAJER_KEUANGAN" && role !== "STAF_KEUANGAN") {
     return { error: "Kamu tidak punya hak akses untuk mengubah rekonsiliasi pajak gaji." };
   }
@@ -68,7 +66,7 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
     );
 
     await logActivity(
-      session.user.id,
+      userId,
       `Update Rekonsiliasi Pajak Gaji & PPh 21 Bulan ${input.month}/${input.year} Entitas ${input.entityId}`,
       "FINANCIAL_CHANGE",
       {
@@ -83,8 +81,6 @@ export async function saveRekonsiliasiGajiPph21Action(input: SaveRekonsiliasiGaj
       }
     );
 
-    revalidatePath("/pajak");
-    revalidatePath("/payroll");
     return { success: true, id: saved.id };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Gagal menyimpan rekonsiliasi.";

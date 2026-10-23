@@ -2,10 +2,10 @@
 
 import { Suspense, useState } from "react";
 import Image from "next/image";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
-import { registerUser } from "@/lib/actions/auth";
+import { useAuth } from "@/context/AuthContext";
+import { PHP_API_URL } from "@/lib/api-client";
 
 const BG_IMAGE = "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop";
 
@@ -27,6 +27,7 @@ export default function LoginPage() {
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
   const justRegistered = searchParams.get("registered") === "1";
 
   const [isLogin, setIsLogin] = useState(true);
@@ -57,24 +58,23 @@ function AuthForm() {
     setLoading(true);
     try {
       if (isLogin) {
-        const result = await signIn("credentials", { email, password, redirect: false });
-        if (result?.error) {
-          setError("Email atau password salah, atau akun belum aktif.");
+        const result = await login(email, password);
+        if (result.error) {
+          setError(result.error);
         } else {
-          router.push("/dashboard");
-          router.refresh();
+          router.replace("/dashboard");
         }
       } else {
         if (!name.trim()) throw new Error("Nama lengkap harus diisi.");
         if (password !== confirmPassword) throw new Error("Password dan konfirmasi tidak cocok.");
-        const fd = new FormData();
-        fd.set("name", name);
-        fd.set("email", email);
-        fd.set("password", password);
-        fd.set("confirm", confirmPassword);
-        const result = await registerUser(fd);
-        if (result?.error) {
-          setError(result.error);
+        const res = await fetch(`${PHP_API_URL}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password, confirm: confirmPassword }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.message ?? "Pendaftaran gagal. Coba lagi.");
         } else {
           setSuccessMsg("Pendaftaran berhasil! Akun Anda menunggu persetujuan Manajer Keuangan.");
           switchMode(true);

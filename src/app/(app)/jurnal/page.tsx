@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { getAccessibleEntities } from "@/lib/dashboard-data";
 import { resolveEntityKey } from "@/lib/entity-prefs";
 import { getJenisInputChips, getJurnalRows, getCoaList } from "@/lib/jurnal";
@@ -16,37 +18,82 @@ import { JurnalTable } from "@/components/jurnal/JurnalTable";
 import { AlertTriangle } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-export default async function JurnalPage({
-  searchParams,
-}: {
-  searchParams: { entity?: string; filter?: string; bulan?: string; akunCode?: string; projectId?: string; page?: string };
-}) {
-  const session = await getServerSession(authOptions);
-  const { role, entityKeys } = session!.user;
+function JurnalContent() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const entityParam = searchParams.get("entity") ?? undefined;
+  const filter = searchParams.get("filter") ?? "semua";
+  const bulan = searchParams.get("bulan") ?? "";
+  const akunCode = searchParams.get("akunCode") ?? "";
+  const projectId = searchParams.get("projectId") ?? "";
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
 
-  if (role === "SUPER_ADMIN") redirect("/dashboard");
+  const [pageData, setPageData] = useState<{
+    entities: Awaited<ReturnType<typeof getAccessibleEntities>>;
+    selectedKey: string | undefined;
+    chips: Awaited<ReturnType<typeof getJenisInputChips>>;
+    coaList: Awaited<ReturnType<typeof getCoaList>>;
+    projectOptions: Awaited<ReturnType<typeof getProjectOptions>>;
+    rows: Awaited<ReturnType<typeof getJurnalRows>>["rows"];
+    totalDebit: number;
+    totalKredit: number;
+    isBalanced: boolean;
+    totalDebitFmt: string;
+    totalKreditFmt: string;
+    totalPages: number;
+  } | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  const entities = await getAccessibleEntities(entityKeys);
-  const selectedKey = resolveEntityKey(searchParams.entity, entityKeys);
-  const selectedEntity = entities.find((e) => e.key === selectedKey);
-  const filter = searchParams.filter ?? "semua";
-  const bulan = searchParams.bulan ?? "";
-  const akunCode = searchParams.akunCode ?? "";
-  const projectId = searchParams.projectId ?? "";
-  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  useEffect(() => {
+    if (!user) return;
+    const { role, entityKeys } = user;
+    if (role === "SUPER_ADMIN") {
+      router.replace("/dashboard");
+      return;
+    }
+    setPageLoading(true);
+    getAccessibleEntities(entityKeys).then(async (entities) => {
+      const selectedKey = resolveEntityKey(entityParam, entityKeys);
+      const selectedEntity = entities.find((e) => e.key === selectedKey);
+      if (!selectedEntity) {
+        setPageData(null);
+        setPageLoading(false);
+        return;
+      }
+      const [chips, coaList, projectOptions, jurnalResult] = await Promise.all([
+        getJenisInputChips(selectedEntity.id),
+        getCoaList(),
+        getProjectOptions(selectedEntity.key),
+        getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined, page, projectId || undefined),
+      ]);
+      setPageData({
+        entities,
+        selectedKey,
+        chips,
+        coaList,
+        projectOptions,
+        rows: jurnalResult.rows,
+        totalDebit: jurnalResult.totalDebit,
+        totalKredit: jurnalResult.totalKredit,
+        isBalanced: jurnalResult.isBalanced,
+        totalDebitFmt: jurnalResult.totalDebitFmt,
+        totalKreditFmt: jurnalResult.totalKreditFmt,
+        totalPages: jurnalResult.totalPages,
+      });
+    }).catch(() => setPageData(null))
+      .finally(() => setPageLoading(false));
+  }, [user, entityParam, filter, bulan, akunCode, projectId, page]);
 
-  if (!selectedEntity) {
-    return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
+  if (isLoading || pageLoading) {
+    return <div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>;
   }
+  if (!user) return null;
+  if (!pageData) return <p className="text-sm text-muted">Kamu belum punya akses ke entity manapun.</p>;
 
-  const [chips, coaList, projectOptions, { rows, totalDebit, totalKredit, isBalanced, totalDebitFmt, totalKreditFmt, totalPages }] =
-    await Promise.all([
-      getJenisInputChips(selectedEntity.id),
-      getCoaList(),
-      getProjectOptions(selectedEntity.key),
-      getJurnalRows(selectedEntity.id, filter, bulan || undefined, akunCode || undefined, page, projectId || undefined),
-    ]);
-
+  const { role } = user;
+  const { entities, selectedKey, chips, coaList, projectOptions, rows, totalDebit, totalKredit, isBalanced, totalDebitFmt, totalKreditFmt, totalPages } = pageData;
+  const selectedEntity = entities.find((e) => e.key === selectedKey)!;
   const selisih = Math.abs(totalDebit - totalKredit);
 
   return (
@@ -56,10 +103,7 @@ export default async function JurnalPage({
         subtitle="Seluruh transaksi kas dan bank, tercatat otomatis dari setiap input"
         rightSlot={
           <>
-            <PrintButton
-              title="Jurnal Umum"
-              entityName={selectedEntity.name}
-            />
+            <PrintButton title="Jurnal Umum" entityName={selectedEntity.name} />
             <EntitySwitcher
               entities={entities.map((e) => ({ key: e.key, name: e.name }))}
               showGrupOption={false}
@@ -69,7 +113,6 @@ export default async function JurnalPage({
         }
       />
 
-      {/* Warning balance — muncul kalau Total Debit ≠ Total Kredit */}
       {!isBalanced && rows.length > 0 && (
         <div className="flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[14px] px-4 py-3.5">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-none" />
@@ -81,7 +124,6 @@ export default async function JurnalPage({
         </div>
       )}
 
-      {/* Filter row */}
       <div className="print:hidden flex items-center justify-between flex-wrap gap-3">
         <JurnalFilterChips chips={chips} current={filter} entityKey={selectedEntity.key} />
         <JurnalExtraFilters
@@ -120,5 +162,13 @@ export default async function JurnalPage({
         }}
       />
     </PageTransition>
+  );
+}
+
+export default function JurnalPage() {
+  return (
+    <Suspense fallback={<div className="mt-8 p-6 text-sm text-muted animate-pulse">Memuat data…</div>}>
+      <JurnalContent />
+    </Suspense>
   );
 }

@@ -428,7 +428,7 @@ export function KasTransactionForm({
                   setIsNoBuktiManual(true);
                   setNoBukti(e.target.value);
                 }}
-                placeholder="mis. UK09281 atau KC/0002"
+                placeholder="mis. UK/09281 atau KC/0002"
                 className={`${inputClass} font-mono pr-24`}
               />
             </div>

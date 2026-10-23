@@ -443,7 +443,7 @@ elseif ($method === 'PUT' && $sub === 'transaksi') {
     $periode_tahun_gaji = !empty($body['periodeTahunGaji']) ? (int)$body['periodeTahunGaji'] : (!empty($periode_bulan_gaji) ? (int)date('Y', strtotime($tanggal)) : null);
     $tanggal_nota       = !empty($body['tanggalNota']) ? trim((string)$body['tanggalNota']) : null;
 
-    if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$keterangan || !$arah) {
+    if (!$entity_key || !$jenis_input_key || !$tanggal || !$no_bukti || !$arah) {
         return error_response('Data wajib tidak lengkap.', 400);
     }
     if (!in_array($entity_key, $user['entityKeys'] ?? [])) {
@@ -621,7 +621,7 @@ elseif ($method === 'PATCH' && $sub === 'transaksi') {
     if (empty($tx_ids)) return error_response('txIds wajib diisi.', 400);
     if (bank_ledger_has_journal_source($pdo, array_merge($tx_ids, array_column($coa_updates, 'txId')))) return error_response('Kelola transaksi ini dari Entry Jurnal agar seluruh baris jurnal tetap sinkron.', 409);
     transitory_assert_unlinked($pdo,array_merge(array_values($tx_ids),array_column($coa_updates,'txId')));
-    if (!$new_no_bukti || !$new_keterangan) return error_response('No. bukti dan keterangan wajib diisi.', 400);
+    if (!$new_no_bukti) return error_response('No. bukti wajib diisi.', 400);
 
     $pdo->beginTransaction();
     try {
